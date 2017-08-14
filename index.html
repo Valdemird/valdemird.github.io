@@ -1,109 +1,76 @@
 <!DOCTYPE html>
 <html>
-<title>Dazzling hair and makeup</title>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Montserrat">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-<style>
-  body,
-  h1 {
-    font-family: "Montserrat", sans-serif
-  }
 
-  img {
-    margin-bottom: -7px
-  }
-
-  .w3-row-padding img {
-    margin-bottom: 12px
-  }
-</style>
+<head>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css?family=Inconsolata|Indie+Flower" rel="stylesheet">
+</head>
 
 <body>
-
-  <!-- Sidebar -->
-  <nav class="w3-sidebar w3-black w3-animate-top w3-xxlarge" style="display:none;padding-top:150px" id="mySidebar">
-    <a href="javascript:void(0)" onclick="w3_close()" class="w3-button w3-black w3-xxlarge w3-padding w3-display-topright" style="padding:6px 24px">
-    <i class="fa fa-remove"></i>
-  </a>
-    <div class="w3-bar-block w3-center">
-      <a href="#" class="w3-bar-item w3-button w3-text-grey w3-hover-black">About</a>
-      <a href="#" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Photos</a>
-      <a href="#" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Shop</a>
-      <a href="#" class="w3-bar-item w3-button w3-text-grey w3-hover-black">Contact</a>
-    </div>
-  </nav>
-
-  <!-- !PAGE CONTENT! -->
-  <div class="w3-content" style="max-width:1500px">
-
-    <!-- Header -->
-    <div class="w3-opacity">
-      <span class="w3-button w3-xxlarge w3-white w3-right" onclick="w3_open()"><i class="fa fa-bars"></i></span>
-      <div class="w3-clear"></div>
-      <header class="w3-center w3-margin-bottom">
-        <h1><b>Sindy reyes</b></h1>
-        <p><b>Makeup artist</b></p>
-        <p class="w3-padding-16"><button class="w3-button w3-black" onclick="myFunction()">Toggle Grid Padding</button></p>
-      </header>
-    </div>
-
-    <!-- Photo Grid -->
-    <div class="w3-row" id="myGrid" style="margin-bottom:128px">
-      <div class="w3-third">
-        <img src="img\1.jpeg" style="width:100%">
-        <img src="img\2.jpeg" style="width:100%">
-        <img src="img\3.jpeg" style="width:100%">
-      </div>
-      <div class="w3-third">
-        <img src="img\4.jpeg" style="width:100%">
-        <img src="img\5.jpeg" style="width:100%">
-        <img src="img\6.jpeg" style="width:100%">
-      </div>
-
-      <div class="w3-third">
-        <img src="img\7.jpeg" style="width:100%">
-        <img src="img\9.jpeg" style="width:100%">
-        <img src="img\8.jpeg" style="width:100%">
-      </div>
-    </div>
-
-    <!-- End Page Content -->
+  <div class="top">
+    <h1 class="title">Sebastian Castaño Jara</h1>
+    <h2 class="title">Movile developer</h2>
   </div>
 
-  <!-- Footer -->
-  <footer class="w3-container w3-padding-64 w3-light-grey w3-center w3-opacity w3-xlarge" style="margin-top:128px">
-    <i class="fa fa-facebook-official w3-hover-opacity"></i>
-    <i class="fa fa-instagram w3-hover-opacity"></i>
-    <i class="fa fa-pinterest-p w3-hover-opacity"></i>
-    <i class="fa fa-twitter w3-hover-opacity"></i>
-    <i class="fa fa-linkedin w3-hover-opacity"></i>
+  <div class="parallax-me"></div>
 
-  </footer>
+  <div class="marco">
+    <p class="parrafo">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus ornare risus lacus, in accumsan nibh scelerisque vitae. Vestibulum libero lectus, varius non magna sit amet, egestas bibendum velit. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Sed sit amet rutrum enim. Nulla facilisi. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia Curae; Integer non nunc ac ex lacinia tincidunt. Etiam suscipit non purus eget lobortis. Praesent non cursus turpis. Aliquam nisi ipsum, efficitur nec metus ac, feugiat congue erat. Ut et gravida diam, eu consequat quam. Praesent facilisis risus in venenatis aliquet. Morbi ultricies justo eget quam mollis faucibus.  </p>
+  </div>
 
-  <script>
-    // Toggle grid padding
-    function myFunction() {
-      var x = document.getElementById("myGrid");
-      if (x.className === "w3-row") {
-        x.className = "w3-row-padding";
-      } else {
-        x.className = x.className.replace("w3-row-padding", "w3-row");
-      }
-    }
+  <div class="fo">
 
-    // Open and close sidebar
-    function w3_open() {
-      document.getElementById("mySidebar").style.width = "100%";
-      document.getElementById("mySidebar").style.display = "block";
-    }
+  </div>
 
-    function w3_close() {
-      document.getElementById("mySidebar").style.display = "none";
-    }
-  </script>
+
+
+
+    <h1 class="title">Portafolio</h1>
+
+
+  <div class="flex-container">
+    <div class="container">
+      <img src="foto.jpg" alt="Avatar" class="image">
+      <div class="overlay">
+        <div class="text">Desarrollo movil</div>
+      </div>
+    </div>
+    <div class="container">
+      <img src="foto.jpg" alt="Avatar" class="image">
+      <div class="overlay">
+        <div class="text">Desarrollo movil</div>
+      </div>
+    </div>
+    <div class="container">
+      <img src="foto.jpg" alt="Avatar" class="image">
+      <div class="overlay">
+        <div class="text">Desarrollo movil</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex-container">
+    <div class="container">
+      <img src="foto.jpg" alt="Avatar" class="image">
+      <div class="overlay">
+        <div class="text">Desarrollo movil</div>
+      </div>
+    </div>
+    <div class="container">
+      <img src="foto.jpg" alt="Avatar" class="image">
+      <div class="overlay">
+        <div class="text">Desarrollo movil</div>
+      </div>
+    </div>
+    <div class="container">
+      <img src="foto.jpg" alt="Avatar" class="image">
+      <div class="overlay">
+        <div class="text">Desarrollo movil</div>
+      </div>
+    </div>
+  </div>
+
+
 
 </body>
 
