@@ -13,7 +13,8 @@ body {
 	word-wrap: break-word;
 	overflow-wrap: break-word;
 	line-height: 1.5;
-	color: #444;
+	color: #333;
+	text-rendering: optimizeLegibility;
 }
 h1,
 h2,
