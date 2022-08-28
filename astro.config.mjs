@@ -6,6 +6,5 @@ import sitemap from '@astrojs/sitemap';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://valdemird.github.io',
-	base: '/personal-blog',
 	integrations: [mdx(), sitemap()],
 });
