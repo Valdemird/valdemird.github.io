@@ -1,0 +1,110 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE, getLocale } from '../consts';
+
+const locale = getLocale(Astro.url);
+const isEs = locale === 'es';
+
+const title = isEs ? 'Página no encontrada' : 'Page not found';
+const heading = '404';
+const message = isEs ? 'Esta página no existe.' : 'This page doesn\u2019t exist.';
+const subMessage = isEs
+	? 'Puede que haya sido movida o el enlace esté incorrecto.'
+	: 'It may have been moved, or the link might be incorrect.';
+const buttonText = isEs ? 'Ir al inicio' : 'Go home';
+const homePath = isEs ? '/es/' : '/';
+---
+
+<!doctype html>
+<html lang={locale}>
+	<head>
+		<BaseHead title={`${title} — ${SITE_TITLE}`} description={title} />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<div class="not-found">
+				<span class="error-code animate-fade-in">404</span>
+				<h1 class="animate-fade-in delay-1">{message}</h1>
+				<p class="animate-fade-in delay-2">{subMessage}</p>
+				<a href={homePath} class="home-btn animate-fade-in delay-3">
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<line x1="19" y1="12" x2="5" y2="12"></line>
+						<polyline points="12 19 5 12 12 5"></polyline>
+					</svg>
+					{buttonText}
+				</a>
+			</div>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<style>
+	main {
+		max-width: var(--full-width);
+		margin: 0 auto;
+		padding: 0;
+	}
+
+	.not-found {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		text-align: center;
+		min-height: 60vh;
+		padding: 4rem var(--space-lg);
+	}
+
+	.error-code {
+		font-family: var(--font-serif);
+		font-size: clamp(6rem, 20vw, 12rem);
+		font-weight: 700;
+		line-height: 1;
+		letter-spacing: -0.04em;
+		color: var(--color-border);
+		margin-bottom: 0.5rem;
+		user-select: none;
+	}
+
+	h1 {
+		font-size: clamp(1.4rem, 3vw, 1.8rem);
+		font-weight: 600;
+		margin-bottom: 0.5rem;
+	}
+
+	p {
+		font-size: 1rem;
+		color: var(--color-text-muted);
+		margin-bottom: 2.5rem;
+		max-width: 360px;
+	}
+
+	.home-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.65rem 1.4rem;
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: var(--color-text);
+		text-decoration: none;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: oklch(from var(--color-surface) l c h / 0.6);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		transition: all var(--duration-normal) var(--ease-spring);
+	}
+
+	.home-btn:hover {
+		color: var(--color-text);
+		border-color: var(--color-border-strong);
+		background: var(--color-surface);
+		box-shadow: var(--shadow-md);
+		transform: translateY(-2px);
+	}
+</style>

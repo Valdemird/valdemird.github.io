@@ -1,0 +1,12 @@
+{
+  "name": "valdemird",
+  "short_name": "valdemird",
+  "description": "Software engineer, builder, and writer.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#6366f1",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" }
+  ]
+}

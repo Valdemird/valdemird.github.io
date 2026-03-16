@@ -16,6 +16,9 @@ const allPosts = await getCollection('blog');
 const currentPath = Astro.url.pathname;
 const slug = currentPath.replace(/^\/blog\//, '').replace(/\/$/, '');
 
+// OG image: use heroImage if provided, otherwise use generated OG image
+const ogImage = heroImage || `/og/${slug}.png`;
+
 // Build JSON-LD BlogPosting structured data
 const blogPostingJsonLd: Record<string, unknown> = {
 	'@context': 'https://schema.org',
@@ -68,7 +71,7 @@ if (lang === 'en') {
 
 <html lang={lang}>
 	<head>
-		<BaseHead title={title} description={description} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} publishedTime={pubDate} modifiedTime={updatedDate} tags={tags} />
+		<BaseHead title={title} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} publishedTime={pubDate} modifiedTime={updatedDate} tags={tags} />
 	</head>
 
 	<body>

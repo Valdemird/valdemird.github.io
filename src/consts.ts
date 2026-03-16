@@ -41,7 +41,7 @@ export const UI_STRINGS = {
 		},
 		about: {
 			title: 'About Me',
-			description: 'Learn more about me and what I do.',
+			description: 'Senior software engineer building developer tools and AI-powered workflows. 8+ years shipping full-stack products with React, Next.js, and Node.js.',
 		},
 		footer: {
 			copyright: 'All rights reserved.',
@@ -70,7 +70,7 @@ export const UI_STRINGS = {
 		},
 		about: {
 			title: 'Sobre Mí',
-			description: 'Conoce más sobre mí y lo que hago.',
+			description: 'Ingeniero de software senior construyendo herramientas para desarrolladores y flujos de trabajo con IA. 8+ años enviando productos full-stack con React, Next.js y Node.js.',
 		},
 		footer: {
 			copyright: 'Todos los derechos reservados.',

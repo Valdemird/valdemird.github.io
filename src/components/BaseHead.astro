@@ -1,5 +1,8 @@
 ---
 import '../styles/global.css';
+import '@fontsource-variable/fraunces';
+import '@fontsource-variable/geist';
+import '@fontsource-variable/geist-mono';
 import { ClientRouter } from 'astro:transitions';
 
 interface Alternate {
@@ -23,7 +26,8 @@ interface Props {
 const AUTHOR_NAME = 'Valdemir D.';
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const { title, description, image, lang, type = 'website', alternates = [], jsonLd, publishedTime, modifiedTime, tags } = Astro.props;
+const { title, description, image: imageProp, lang, type = 'website', alternates = [], jsonLd, publishedTime, modifiedTime, tags } = Astro.props;
+const image = imageProp || '/og/default.png';
 
 const defaultJsonLd = {
 	'@context': 'https://schema.org',
@@ -50,18 +54,21 @@ const structuredData = jsonLd || defaultJsonLd;
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/favicon.svg" />
+<link rel="manifest" href="/site.webmanifest" />
 <meta name="generator" content={Astro.generator} />
+
+<!-- Security -->
+<meta http-equiv="X-Content-Type-Options" content="nosniff" />
+<meta http-equiv="X-Frame-Options" content="DENY" />
+<meta name="referrer" content="strict-origin-when-cross-origin" />
+
+<!-- Analytics: Plausible (privacy-friendly, no cookies, <1KB) -->
+<!-- Uncomment when Plausible account is set up at https://plausible.io -->
+<!-- <script defer data-domain="valdemird.com" src="https://plausible.io/js/script.js"></script> -->
 
 <!-- View Transitions -->
 <ClientRouter />
-
-<!-- Fonts: Fraunces (serif display) + Geist (sans body) -->
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link
-	href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Geist:wght@300..900&family=Geist+Mono:wght@400;500&display=swap"
-	rel="stylesheet"
-/>
 
 <!-- Dark mode: prevent flash -->
 <script is:inline>
@@ -96,7 +103,7 @@ const structuredData = jsonLd || defaultJsonLd;
 <meta property="og:url" content={Astro.url} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
-{image && <meta property="og:image" content={new URL(image, Astro.url)} />}
+<meta property="og:image" content={new URL(image, Astro.url)} />
 <meta property="og:locale" content={lang === 'es' ? 'es_ES' : 'en_US'} />
 {lang === 'es' && <meta property="og:locale:alternate" content="en_US" />}
 {lang !== 'es' && <meta property="og:locale:alternate" content="es_ES" />}
@@ -113,11 +120,11 @@ const structuredData = jsonLd || defaultJsonLd;
 <meta name="author" content={AUTHOR_NAME} />
 
 <!-- Twitter -->
-<meta property="twitter:card" content={image ? "summary_large_image" : "summary"} />
+<meta property="twitter:card" content="summary_large_image" />
 <meta property="twitter:url" content={Astro.url} />
 <meta property="twitter:title" content={title} />
 <meta property="twitter:description" content={description} />
-{image && <meta property="twitter:image" content={new URL(image, Astro.url)} />}
+<meta property="twitter:image" content={new URL(image, Astro.url)} />
 
 <!-- Structured Data (JSON-LD) -->
 <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
