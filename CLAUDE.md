@@ -6,6 +6,19 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 Personal website/blog at valdemird.com, built with Astro 6 and deployed to GitHub Pages via GitHub Actions.
 
+## Blog Content Rules
+
+**IMPORTANT**: Always use the `/blog-writer` skill for ANY action involving blog content — creating, editing, auditing, translating, or improving posts. This ensures consistent voice, proper use of MDX components, and bilingual quality.
+
+### New Blog Post Checklist
+
+When adding a new blog post, ensure ALL of the following:
+- Create both EN (`src/content/blog/<slug>.mdx`) and ES (`src/content/blog/es/<slug>.mdx`) versions
+- Include `lang: en` or `lang: es` in frontmatter — this drives `<html lang>` and hreflang pairing
+- Hreflang alternates are auto-generated in `BlogPost.astro` by matching EN/ES pairs via slug, so filenames must match between languages
+- Verify `og:type="article"` is applied (handled automatically via `BlogPost.astro` → `BaseHead type="article"`)
+- Run `npm run build` to confirm both posts compile and hreflang links are correct
+
 ## Commands
 
 - **Dev server**: `npm run dev` (localhost:4321)

@@ -5,71 +5,208 @@ import Footer from '../components/Footer.astro';
 import { SITE_TITLE, SOCIAL_LINKS, t } from '../consts';
 
 const strings = t(Astro.url);
+
+const techDomains = [
+	{ domain: 'Frontend', tools: ['React', 'Next.js', 'Astro', 'TypeScript', 'CSS/Design Systems'], accent: 'var(--color-accent)' },
+	{ domain: 'Backend', tools: ['Node.js', 'PostgreSQL', 'Prisma', 'REST APIs'], accent: 'var(--color-success)' },
+	{ domain: 'DevOps & Cloud', tools: ['AWS (Certified)', 'CI/CD', 'Docker', 'GitHub Actions'], accent: 'var(--color-warning)' },
+	{ domain: 'AI & Tooling', tools: ['LLM Integration', 'Vercel AI SDK', 'Spec-Driven Development', 'Custom CLI Workflows'], accent: 'oklch(0.6 0.15 300)' },
+];
+
+const timeline = [
+	{ year: '2022–Now', title: 'Senior FullStack Engineer', place: 'Gorilla Logic', desc: 'Building digital products for global brands. Full-stack engineering with React, Next.js, and cloud infrastructure. 4+ years and counting.', active: true },
+	{ year: '2020–2022', title: 'Software Engineer → Senior', place: 'Encora Inc.', desc: 'Grew from Software Engineer to Senior in under 2 years. Full-stack development across multiple client projects.', active: false },
+	{ year: '2019–2020', title: 'Software Developer', place: 'Angular (We Are Angular)', desc: 'Built real-time transactional services, group video call systems, drag-and-drop dashboards, and PDF report generators. React, Node.js, Firebase, AWS.', active: false },
+	{ year: '2017–2018', title: 'Freelance Engineer', place: 'Independent', desc: 'Android apps, Arduino IoT integration, Firebase backends. Built Spirits Machine mobile app and Empanada Coqueta delivery platform.', active: false },
+	{ year: '2016–2017', title: 'Junior Developer', place: 'VOV Solutions', desc: 'First professional role. Laid the foundation for a career in software engineering.', active: false },
+];
+
+const education = [
+	{ name: 'B.Eng. Systems Engineering, Universidad del Valle', year: '2026' },
+	{ name: 'Technology Degree in Information Systems, Universidad del Valle', year: '2018' },
+	{ name: 'Technology Degree in Game Development, SENA', year: '2016' },
+];
+
+const certs = [
+	{ name: 'AWS Certified Cloud Practitioner', year: '2023' },
+	{ name: 'EF SET English C2 Proficient', year: '2020' },
+	{ name: 'Learning How to Learn, Coursera', year: '2020' },
+];
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={`${strings.about.title} — ${SITE_TITLE}`} description={strings.about.description} />
+		<BaseHead title={`${strings.about.title} | ${SITE_TITLE}`} description={strings.about.description} alternates={[
+			{ hreflang: 'en', href: 'https://valdemird.com/about/' },
+			{ hreflang: 'es', href: 'https://valdemird.com/es/about/' },
+		]} />
 	</head>
 	<body>
 		<Header />
 		<main>
-			<!-- Hero area with grid background -->
 			<div class="about-hero">
-				<div class="about-hero-bg" aria-hidden="true"><div class="hero-grid"></div></div>
+				<div class="about-hero-bg" aria-hidden="true">
+					<div class="hero-grid"></div>
+					<div class="hero-orb orb-1"></div>
+					<div class="hero-orb orb-2"></div>
+				</div>
 				<div class="about-hero-content animate-fade-in">
 					<span class="about-label">About</span>
-					<h1>{strings.about.title}</h1>
+					<h1>Sebastian Castano Jara</h1>
+					<p class="about-subtitle">Senior Software Engineer at <a href="https://gorillalogic.com" target="_blank" rel="noopener noreferrer">Gorilla Logic</a> &middot; Cali, Colombia</p>
 				</div>
 			</div>
 
 			<article class="about-body">
 				<section class="section animate-fade-in delay-1">
 					<p>
-						I'm a software engineer who loves building tools that make developers more productive.
-						I'm passionate about the intersection of AI and developer experience — how we can
-						use language models not just as code generators, but as thoughtful collaborators in
-						the software development process.
+						I'm a full-stack engineer with 8+ years building digital products for global brands.
+						I work at <strong>Gorilla Logic</strong> as a Senior FullStack Engineer, where I help launch new products
+						and evolve complex systems for high-growth companies across the Americas.
 					</p>
 					<p>
-						Currently, I'm building <a href="https://todo.valdemird.com">todo.valdemird.com</a>,
-						an AI-powered task manager with Pomodoro timer, drag-and-drop, and smart scheduling.
-						Built with Next.js 15, React 19, Prisma, and Tailwind CSS 4.
+						Outside of work, I build tools that make developers more productive. My current project is
+						<a href="https://todo.valdemird.com">todo.valdemird.com</a>, an AI-powered task manager
+						with Pomodoro timer, drag-and-drop, and smart scheduling, built with Next.js 15, React 19,
+						Prisma, and Tailwind CSS 4.
+					</p>
+					<p>
+						I'm passionate about the intersection of AI and developer experience: how we can use
+						language models not just as code generators, but as thoughtful collaborators in the
+						software development process. I created a spec-driven development workflow that I use
+						daily and <a href="/blog/custom-commands-ai-coding/">write about on this blog</a>.
 					</p>
 				</section>
 
+				<!-- Tech domains as card grid -->
 				<section class="section">
 					<div class="section-header">
 						<span class="section-label">01</span>
+						<h2>What I work with</h2>
+						<div class="section-line"></div>
+					</div>
+					<div class="domains-grid">
+						{techDomains.map((d) => (
+							<div class="domain-card" style={`--domain-accent: ${d.accent};`}>
+								<h3>{d.domain}</h3>
+								<div class="domain-tools">
+									{d.tools.map((tool) => (
+										<span class="domain-tool">{tool}</span>
+									))}
+								</div>
+							</div>
+						))}
+					</div>
+				</section>
+
+				<!-- Timeline -->
+				<section class="section">
+					<div class="section-header">
+						<span class="section-label">02</span>
+						<h2>Journey</h2>
+						<div class="section-line"></div>
+					</div>
+					<div class="timeline">
+						{timeline.map((item) => (
+							<div class:list={['timeline-item', { active: item.active }]}>
+								<div class="timeline-marker">
+									<div class="timeline-dot"></div>
+									<div class="timeline-line"></div>
+								</div>
+								<div class="timeline-content">
+									<div class="timeline-top">
+										<span class="timeline-year">{item.year}</span>
+										<span class="timeline-place">{item.place}</span>
+									</div>
+									<h3 class="timeline-title">{item.title}</h3>
+									<p class="timeline-desc">{item.desc}</p>
+								</div>
+							</div>
+						))}
+					</div>
+				</section>
+
+				<!-- Education -->
+				<section class="section">
+					<div class="section-header">
+						<span class="section-label">03</span>
+						<h2>Education</h2>
+						<div class="section-line"></div>
+					</div>
+					<div class="certs">
+						{education.map((edu) => (
+							<div class="cert-item">
+								<span class="cert-year">{edu.year}</span>
+								<span class="cert-name">{edu.name}</span>
+							</div>
+						))}
+					</div>
+				</section>
+
+				<!-- Certifications -->
+				<section class="section">
+					<div class="section-header">
+						<span class="section-label">04</span>
+						<h2>Certifications</h2>
+						<div class="section-line"></div>
+					</div>
+					<div class="certs">
+						{certs.map((cert) => (
+							<div class="cert-item">
+								<span class="cert-year">{cert.year}</span>
+								<span class="cert-name">{cert.name}</span>
+							</div>
+						))}
+					</div>
+				</section>
+
+				<!-- Beliefs -->
+				<section class="section">
+					<div class="section-header">
+						<span class="section-label">05</span>
 						<h2>What I believe in</h2>
 						<div class="section-line"></div>
 					</div>
 					<div class="beliefs">
 						<div class="belief">
-							<div class="belief-number" aria-hidden="true">01</div>
-							<h3>Spec-driven development</h3>
-							<p>Write the spec before the code. Let the LLM be your co-architect, not just your typist.</p>
+							<div class="belief-icon" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+							</div>
+							<div class="belief-text">
+								<h3>Spec-driven development</h3>
+								<p>Write the spec before the code. Let the LLM be your co-architect, not just your typist.</p>
+							</div>
 						</div>
 						<div class="belief">
-							<div class="belief-number" aria-hidden="true">02</div>
-							<h3>Build in public</h3>
-							<p>Share what you learn. The best way to solidify knowledge is to teach it.</p>
+							<div class="belief-icon" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+							</div>
+							<div class="belief-text">
+								<h3>Build in public</h3>
+								<p>Share what you learn. The best way to solidify knowledge is to teach it.</p>
+							</div>
 						</div>
 						<div class="belief">
-							<div class="belief-number" aria-hidden="true">03</div>
-							<h3>Beauty & function</h3>
-							<p>Tools should be beautiful AND functional. Design is not decoration — it's communication.</p>
+							<div class="belief-icon" aria-hidden="true">
+								<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813h6.088l-4.912 3.587 1.912 5.813L12 14.626l-4.912 3.587 1.912-5.813L4 8.813h6.088z"/></svg>
+							</div>
+							<div class="belief-text">
+								<h3>Beauty & function</h3>
+								<p>Tools should be beautiful AND functional. Design is not decoration, it's communication.</p>
+							</div>
 						</div>
 					</div>
 				</section>
 
+				<!-- Languages -->
 				<section class="section">
 					<div class="section-header">
-						<span class="section-label">02</span>
+						<span class="section-label">06</span>
 						<h2>Get in touch</h2>
 						<div class="section-line"></div>
 					</div>
+					<p class="lang-note">I speak <strong>Spanish</strong> (native) and <strong>English</strong> (C2 proficient).</p>
 					<div class="contact-links">
 						{SOCIAL_LINKS.github && (
 							<a href={SOCIAL_LINKS.github} target="_blank" rel="noopener noreferrer" class="contact-link">
@@ -106,133 +243,111 @@ const strings = t(Astro.url);
 <style>
 	main { max-width: var(--full-width); margin: 0 auto; padding: 0; }
 
-	/* Hero */
-	.about-hero {
-		position: relative;
-		padding: 5rem var(--space-lg) 3rem;
-		overflow: hidden;
-	}
+	.about-hero { position: relative; padding: 5rem var(--space-lg) 3rem; overflow: hidden; }
 	.about-hero-bg { position: absolute; inset: 0; z-index: 0; }
-	.hero-grid {
-		position: absolute; inset: 0;
-		background-image: linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
-		background-size: 48px 48px; opacity: 0.25;
-		mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%);
-		-webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%);
-	}
+	.hero-grid { position: absolute; inset: 0; background-image: linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px); background-size: 48px 48px; opacity: 0.25; mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%); -webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%); }
+	.hero-orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.1; animation: orbFloat 20s ease-in-out infinite; }
+	.orb-1 { width: 300px; height: 300px; top: -20%; right: 10%; background: var(--color-accent); }
+	.orb-2 { width: 200px; height: 200px; bottom: -10%; left: 20%; background: var(--color-success); animation-delay: -7s; }
+	@keyframes orbFloat { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(20px, -15px) scale(1.05); } }
+
 	.about-hero-content { position: relative; z-index: 1; max-width: var(--content-width); margin: 0 auto; }
-	.about-label {
-		font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500;
-		color: var(--color-accent); letter-spacing: 0.08em; text-transform: uppercase;
-		display: block; margin-bottom: 0.75rem;
-	}
-	.about-hero-content h1 { font-size: clamp(2rem, 5vw, 2.8rem); }
+	.about-label { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500; color: var(--color-accent); letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 0.75rem; }
+	.about-hero-content h1 { font-size: clamp(2rem, 5vw, 2.8rem); margin-bottom: 0.3em; }
+	.about-subtitle { font-size: 1rem; color: var(--color-text-secondary); margin: 0; }
+	.about-subtitle a { color: var(--color-accent); }
 
-	/* Body */
-	.about-body {
-		max-width: var(--content-width);
-		margin: 0 auto;
-		padding: 0 var(--space-lg) 4rem;
-	}
+	.about-body { max-width: var(--content-width); margin: 0 auto; padding: 0 var(--space-lg) 4rem; }
+	.about-body > .section:first-child p { font-size: 1.1rem; line-height: 1.85; }
 
-	.about-body p { font-size: 1.1rem; line-height: 1.85; }
-
-	/* Scroll-triggered sections */
-	.section {
-		margin-bottom: 3.5rem;
-		opacity: 0;
-		transform: translateY(24px);
-		transition: opacity 0.7s var(--ease-smooth), transform 0.7s var(--ease-smooth);
-	}
-
-	.section.visible,
-	.section.animate-fade-in {
-		opacity: 1;
-		transform: translateY(0);
-	}
-
-	.section-header {
-		display: flex;
-		align-items: center;
-		gap: var(--space-md);
-		margin-bottom: 2rem;
-	}
-
-	.section-label {
-		font-family: var(--font-mono);
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: var(--color-accent);
-		opacity: 0.6;
-		letter-spacing: 0.05em;
-	}
-
+	.section { margin-bottom: 3.5rem; opacity: 0; transform: translateY(24px); transition: opacity 0.7s var(--ease-smooth), transform 0.7s var(--ease-smooth); }
+	.section.visible, .section.animate-fade-in { opacity: 1; transform: translateY(0); }
+	.section-header { display: flex; align-items: center; gap: var(--space-md); margin-bottom: 2rem; }
+	.section-label { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500; color: var(--color-accent); opacity: 0.6; letter-spacing: 0.05em; }
 	.section-header h2 { margin: 0; white-space: nowrap; }
 	.section-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--color-border), transparent); }
 
-	/* Beliefs */
-	.beliefs { display: grid; gap: 1rem; }
+	/* ---- Tech domain cards ---- */
+	.domains-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
 
-	.belief {
-		position: relative;
-		padding: 1.5rem 1.5rem 1.5rem 4.5rem;
+	.domain-card {
+		padding: 1.25rem;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
 		background: var(--color-surface);
-		transition: border-color var(--duration-normal) var(--ease-smooth),
-			transform var(--duration-normal) var(--ease-spring),
-			box-shadow var(--duration-normal) var(--ease-smooth);
+		border-top: 3px solid var(--domain-accent);
+		transition: transform var(--duration-normal) var(--ease-spring), box-shadow var(--duration-normal) var(--ease-smooth);
 	}
 
-	.belief:hover {
-		border-color: var(--color-accent);
-		transform: translateX(4px);
-		box-shadow: var(--shadow-md);
-	}
+	.domain-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
 
-	.belief-number {
-		position: absolute;
-		left: 1.25rem;
-		top: 1.5rem;
-		font-family: var(--font-mono);
-		font-size: 0.72rem;
+	.domain-card h3 {
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
 		font-weight: 600;
-		color: var(--color-accent);
-		opacity: 0.5;
-	}
-
-	.belief h3 { font-size: 1.05rem; margin-bottom: 0.25em; }
-	.belief p { font-size: 0.92rem; margin: 0; color: var(--color-text-secondary); line-height: 1.6; }
-
-	/* Contact links */
-	.contact-links { display: flex; gap: 0.75rem; margin-top: 1rem; }
-
-	.contact-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.6rem 1.2rem;
-		font-size: 0.88rem;
-		font-weight: 500;
-		color: var(--color-text-secondary);
-		text-decoration: none;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		transition: all var(--duration-normal) var(--ease-spring);
-	}
-
-	.contact-link:hover {
 		color: var(--color-text);
-		border-color: var(--color-accent);
-		background: var(--color-accent-subtle);
-		transform: translateY(-2px);
-		box-shadow: var(--shadow-md);
+		margin: 0 0 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
 	}
+
+	.domain-tools { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+	.domain-tool {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		padding: 0.2em 0.55em;
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		transition: border-color var(--duration-fast) var(--ease-smooth), color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.domain-card:hover .domain-tool { border-color: var(--color-border-strong); color: var(--color-text); }
+
+	/* ---- Timeline ---- */
+	.timeline { display: flex; flex-direction: column; }
+	.timeline-item { display: flex; gap: 1.25rem; padding-bottom: 2rem; }
+	.timeline-marker { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 20px; }
+	.timeline-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--color-border-strong); border: 2px solid var(--color-bg); box-shadow: 0 0 0 2px var(--color-border); flex-shrink: 0; }
+	.timeline-item.active .timeline-dot { background: var(--color-accent); box-shadow: 0 0 0 2px var(--color-accent), 0 0 0 6px oklch(from var(--color-accent) l c h / 0.12); }
+	.timeline-line { width: 2px; flex: 1; background: var(--color-border); margin-top: 0.4rem; }
+	.timeline-item:last-child .timeline-line { display: none; }
+
+	.timeline-content { flex: 1; }
+	.timeline-top { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; }
+	.timeline-year { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; color: var(--color-accent); }
+	.timeline-place { font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-text-muted); }
+	.timeline-title { font-family: var(--font-sans); font-size: 1rem; font-weight: 600; color: var(--color-text); margin: 0 0 0.2em; }
+	.timeline-desc { font-size: 0.88rem; color: var(--color-text-secondary); margin: 0; line-height: 1.55; }
+	.timeline-item.active .timeline-title { color: var(--color-text); }
+
+	/* ---- Certs ---- */
+	.certs { display: flex; flex-direction: column; gap: 0.6rem; }
+	.cert-item { display: flex; align-items: center; gap: 1rem; padding: 0.65rem 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); transition: border-color var(--duration-fast) var(--ease-smooth); }
+	.cert-item:hover { border-color: var(--color-border-strong); }
+	.cert-year { font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600; color: var(--color-accent); min-width: 36px; }
+	.cert-name { font-size: 0.88rem; color: var(--color-text-secondary); }
+
+	/* ---- Beliefs ---- */
+	.beliefs { display: flex; flex-direction: column; gap: 1rem; }
+	.belief { display: flex; gap: 1rem; padding: 1.25rem 1.5rem; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); transition: border-color var(--duration-normal) var(--ease-smooth), transform var(--duration-normal) var(--ease-spring), box-shadow var(--duration-normal) var(--ease-smooth); }
+	.belief:hover { border-color: var(--color-accent); transform: translateX(4px); box-shadow: var(--shadow-md); }
+	.belief-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--color-accent-subtle); border-radius: var(--radius-md); color: var(--color-accent); flex-shrink: 0; }
+	.belief-text h3 { font-size: 1rem; margin-bottom: 0.2em; }
+	.belief-text p { font-size: 0.88rem; margin: 0; color: var(--color-text-secondary); line-height: 1.5; }
+
+	/* ---- Contact ---- */
+	.lang-note { font-size: 0.95rem; color: var(--color-text-secondary); margin-bottom: 1rem; }
+	.contact-links { display: flex; gap: 0.75rem; }
+	.contact-link { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1.2rem; font-size: 0.88rem; font-weight: 500; color: var(--color-text-secondary); text-decoration: none; border: 1px solid var(--color-border); border-radius: var(--radius-md); transition: all var(--duration-normal) var(--ease-spring); }
+	.contact-link:hover { color: var(--color-text); border-color: var(--color-accent); background: var(--color-accent-subtle); transform: translateY(-2px); box-shadow: var(--shadow-md); }
 
 	@media (max-width: 640px) {
 		.about-hero { padding: 3rem var(--space-lg) 2rem; }
-		.belief { padding-left: 1.5rem; }
-		.belief-number { display: none; }
+		.domains-grid { grid-template-columns: 1fr; }
 		.contact-links { flex-direction: column; }
+		.hero-orb { display: none; }
 	}
 </style>

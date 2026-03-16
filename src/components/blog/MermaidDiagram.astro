@@ -1,0 +1,160 @@
+---
+interface Props {
+	title?: string;
+	chart: string;
+}
+
+const { title, chart } = Astro.props;
+const mermaidId = `mermaid-${Math.random().toString(36).slice(2, 7)}`;
+---
+
+<div class="mermaid-container">
+	{title && <span class="mermaid-title">{title}</span>}
+	<div class="mermaid-diagram" id={mermaidId} data-chart={chart}>
+		<div class="mermaid-loading" aria-hidden="true">
+			<div class="mermaid-spinner"></div>
+			<span>Rendering diagram...</span>
+		</div>
+	</div>
+</div>
+
+<script>
+	let mermaidLoaded = false;
+	let mermaidPromise: Promise<void> | null = null;
+
+	function loadMermaid(): Promise<void> {
+		if (mermaidLoaded) return Promise.resolve();
+		if (mermaidPromise) return mermaidPromise;
+
+		mermaidPromise = new Promise((resolve) => {
+			const script = document.createElement('script');
+			script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+			script.onload = () => {
+				const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+					(!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+				(window as any).mermaid.initialize({
+					startOnLoad: false,
+					theme: isDark ? 'dark' : 'default',
+					fontFamily: 'system-ui, sans-serif',
+					fontSize: 14,
+				});
+				mermaidLoaded = true;
+				resolve();
+			};
+			document.head.appendChild(script);
+		});
+
+		return mermaidPromise;
+	}
+
+	async function renderDiagrams() {
+		const containers = document.querySelectorAll<HTMLElement>('.mermaid-diagram[data-chart]');
+		if (containers.length === 0) return;
+
+		await loadMermaid();
+
+		for (const container of containers) {
+			if (container.querySelector('.mermaid-rendered')) continue;
+
+			// Replace literal \n with actual newlines
+			const code = (container.dataset.chart || '').replace(/\\n/g, '\n');
+			const loading = container.querySelector('.mermaid-loading') as HTMLElement;
+
+			try {
+				const { svg } = await (window as any).mermaid.render(
+					`mermaid-svg-${Math.random().toString(36).slice(2, 7)}`,
+					code
+				);
+				const rendered = document.createElement('div');
+				rendered.className = 'mermaid-rendered';
+				rendered.innerHTML = svg;
+				container.appendChild(rendered);
+				if (loading) loading.style.display = 'none';
+			} catch (err) {
+				console.error('Mermaid error:', err);
+				if (loading) loading.innerHTML = '<span style="color:var(--color-destructive)">Diagram rendering failed</span>';
+			}
+		}
+	}
+
+	function initMermaid() {
+		const observer = new IntersectionObserver((entries) => {
+			entries.forEach((entry) => {
+				if (entry.isIntersecting) {
+					renderDiagrams();
+					observer.unobserve(entry.target);
+				}
+			});
+		}, { rootMargin: '200px' });
+
+		document.querySelectorAll('.mermaid-container').forEach((el) => observer.observe(el));
+	}
+
+	initMermaid();
+	document.addEventListener('astro:after-swap', () => {
+		mermaidLoaded = false;
+		mermaidPromise = null;
+		initMermaid();
+	});
+</script>
+
+<style>
+	.mermaid-container {
+		margin: 2em 0;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: var(--color-surface);
+	}
+
+	.mermaid-title {
+		display: block;
+		padding: 0.55rem 1rem;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--color-text-muted);
+		border-bottom: 1px solid var(--color-border);
+		background: var(--color-bg-secondary);
+	}
+
+	.mermaid-diagram {
+		padding: 1.5rem;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		min-height: 120px;
+	}
+
+	.mermaid-loading {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		color: var(--color-text-muted);
+		font-size: 0.82rem;
+		font-family: var(--font-mono);
+	}
+
+	.mermaid-spinner {
+		width: 16px;
+		height: 16px;
+		border: 2px solid var(--color-border);
+		border-top-color: var(--color-accent);
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	@keyframes spin { to { transform: rotate(360deg); } }
+
+	.mermaid-diagram :global(.mermaid-rendered) {
+		width: 100%;
+		display: flex;
+		justify-content: center;
+	}
+
+	.mermaid-diagram :global(.mermaid-rendered svg) {
+		max-width: 100%;
+		height: auto;
+	}
+</style>

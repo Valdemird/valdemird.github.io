@@ -1,0 +1,80 @@
+---
+interface Props {
+	title: string;
+	open?: boolean;
+}
+
+const { title, open = false } = Astro.props;
+---
+
+<details class="collapsible" open={open ? true : undefined}>
+	<summary>
+		<svg class="chevron" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<polyline points="9 18 15 12 9 6"></polyline>
+		</svg>
+		<span>{title}</span>
+	</summary>
+	<div class="collapsible-content">
+		<slot />
+	</div>
+</details>
+
+<style>
+	.collapsible {
+		margin: 1.5em 0;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: var(--color-surface);
+	}
+
+	summary {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.85rem 1.15rem;
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		font-weight: 600;
+		color: var(--color-text);
+		cursor: pointer;
+		list-style: none;
+		user-select: none;
+		transition: background var(--duration-fast) var(--ease-smooth);
+	}
+
+	summary::-webkit-details-marker { display: none; }
+	summary::marker { display: none; }
+
+	summary:hover {
+		background: var(--color-bg-secondary);
+	}
+
+	.chevron {
+		color: var(--color-text-muted);
+		transition: transform var(--duration-normal) var(--ease-spring);
+		flex-shrink: 0;
+	}
+
+	.collapsible[open] .chevron {
+		transform: rotate(90deg);
+	}
+
+	.collapsible-content {
+		padding: 0 1.15rem 1rem;
+		font-size: 0.95rem;
+		line-height: 1.65;
+		color: var(--color-text-secondary);
+		border-top: 1px solid var(--color-border);
+		animation: collapseOpen 0.3s var(--ease-smooth);
+	}
+
+	.collapsible-content :global(p:first-child) { margin-top: 1rem; }
+	.collapsible-content :global(p:last-child) { margin-bottom: 0; }
+	.collapsible-content :global(pre) { margin: 0.75em 0; }
+
+	@keyframes collapseOpen {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+</style>

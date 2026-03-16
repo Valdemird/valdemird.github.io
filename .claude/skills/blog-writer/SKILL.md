@@ -68,6 +68,118 @@ import CodeBlock from '../../components/blog/CodeBlock.astro';
 
 The `filename` prop adds a file header with the path — it tells the reader *where* this code lives, not just what it does. Always use filenames for real code. Omit it only for abstract examples or pseudocode.
 
+### Tabs + TabPanel — For side-by-side alternatives
+
+Show the same concept in different languages, before/after comparisons, or multiple approaches:
+
+```mdx
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+
+<Tabs labels={["TypeScript", "JavaScript", "Python"]}>
+<TabPanel>
+TypeScript content here (can include code blocks, text, anything)
+</TabPanel>
+<TabPanel>
+JavaScript equivalent
+</TabPanel>
+<TabPanel>
+Python equivalent
+</TabPanel>
+</Tabs>
+```
+
+The active tab has an animated underline indicator. Content fades in smoothly. Use for code comparisons, framework alternatives, or any content where the reader wants to pick their version.
+
+### Collapsible — For optional depth
+
+Expandable sections for details that not everyone needs:
+
+```mdx
+import Collapsible from '../../components/blog/Collapsible.astro';
+
+<Collapsible title="How does this work under the hood?">
+Detailed explanation here. The reader can skip this without losing the main thread.
+</Collapsible>
+```
+
+Use `open` prop to start expanded: `<Collapsible title="..." open>`. Great for FAQs, implementation details, long code examples, and tangential but interesting context.
+
+### FileTree — For project structure visualization
+
+Interactive file tree with expand/collapse and file highlighting:
+
+```mdx
+import FileTree from '../../components/blog/FileTree.astro';
+
+<FileTree highlight="auth.ts">
+<div class="folder">
+<div class="folder-label">src</div>
+<div class="folder-children">
+<div class="file">index.ts</div>
+<div class="folder">
+<div class="folder-label">middleware</div>
+<div class="folder-children">
+<div class="file">auth.ts</div>
+</div>
+</div>
+</div>
+</div>
+</FileTree>
+```
+
+The `highlight` prop highlights a specific file name. Folders are clickable to collapse/expand. Much better than ASCII trees in code blocks.
+
+### CopyableCommand — For terminal commands
+
+Inline terminal command with one-click copy:
+
+```mdx
+import CopyableCommand from '../../components/blog/CopyableCommand.astro';
+
+<CopyableCommand command="npx astro add mdx" />
+```
+
+More compact than a full CodeBlock — use for install commands, one-liners, and CLI examples.
+
+### MermaidDiagram — For flowcharts and diagrams
+
+Renders Mermaid.js diagrams. Loads the library only when the diagram scrolls into view:
+
+```mdx
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+
+<MermaidDiagram title="Authentication Flow">
+graph LR
+  A[User] --> B[Login]
+  B --> C{Valid?}
+  C -->|Yes| D[JWT Token]
+  C -->|No| E[Error]
+</MermaidDiagram>
+```
+
+Supports all Mermaid diagram types: flowcharts, sequence diagrams, ER diagrams, Gantt charts, etc. Shows a loading spinner while rendering. Use for architecture, workflows, and data relationships.
+
+### InteractiveChart — For data visualization
+
+Animated bar charts (vertical or horizontal) with hover tooltips:
+
+```mdx
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+
+<InteractiveChart
+  title="Bundle Size Comparison"
+  type="bar"
+  data={[
+    { label: "React", value: 42, color: "oklch(0.6 0.15 220)" },
+    { label: "Svelte", value: 8, color: "oklch(0.65 0.2 27)" },
+    { label: "Astro", value: 0, color: "oklch(0.6 0.18 145)" },
+  ]}
+/>
+```
+
+Types: `bar` (vertical) and `horizontal`. Bars animate in with stagger when scrolled into view. Use for comparisons, benchmarks, survey results, and any numerical data.
+
 ### Standard Markdown — Still Powerful
 
 Use the full MDX/Markdown toolkit alongside components:
@@ -108,14 +220,20 @@ The components aren't decoration — they're information architecture. Think abo
 
 | Information Type | Best Format |
 |---|---|
-| A process or workflow | ASCII diagram in CodeBlock |
+| A process or workflow | MermaidDiagram |
 | A configuration or real code | CodeBlock with filename |
+| Same code in multiple languages | Tabs + TabPanel with code blocks inside |
 | A practical tip | Callout type="tip" |
 | A common mistake | Callout type="warning" |
 | A core insight | Callout type="important" |
-| Comparing options | Markdown table |
+| Comparing options | Markdown table or Tabs |
 | A memorable principle | Blockquote |
 | Step-by-step instructions | Ordered list |
+| Project file structure | FileTree with highlight |
+| Terminal install command | CopyableCommand |
+| Numerical comparison/benchmark | InteractiveChart |
+| Optional deep-dive details | Collapsible |
+| Before/after comparison | Tabs with 2 panels |
 
 **Density target**: Aim for an interactive element every 200-300 words. This creates a rhythm — text explains, component demonstrates, text transitions, component reinforces.
 
@@ -132,7 +250,7 @@ When writing the Spanish version:
 Before considering a post done, verify:
 - [ ] Title is specific and promises something concrete (not "Thoughts on X")
 - [ ] Description is a hook, not a summary
-- [ ] At least 3 different interactive components used
+- [ ] At least 4 different interactive components used (mix of static and interactive)
 - [ ] No more than 3 consecutive paragraphs without a visual break
 - [ ] Code examples are real and runnable (not pseudocode, unless explicitly teaching a concept)
 - [ ] Every CodeBlock with real code has a `filename`

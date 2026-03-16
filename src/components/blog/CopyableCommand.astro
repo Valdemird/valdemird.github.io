@@ -1,0 +1,99 @@
+---
+interface Props {
+	command: string;
+}
+
+const { command } = Astro.props;
+const cmdId = `cmd-${Math.random().toString(36).slice(2, 7)}`;
+---
+
+<div class="copyable-command" id={cmdId}>
+	<span class="cmd-prompt">$</span>
+	<code class="cmd-text">{command}</code>
+	<button class="cmd-copy" data-cmd={command} type="button" aria-label="Copy command">
+		<svg class="icon-copy" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+			<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+		</svg>
+		<svg class="icon-check" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<polyline points="20 6 9 17 4 12"></polyline>
+		</svg>
+	</button>
+</div>
+
+<script>
+	function initCopyableCommands() {
+		document.querySelectorAll('.copyable-command .cmd-copy').forEach((btn) => {
+			btn.addEventListener('click', async (e) => {
+				e.stopPropagation();
+				const cmd = (btn as HTMLElement).dataset.cmd || '';
+				try {
+					await navigator.clipboard.writeText(cmd);
+					btn.classList.add('copied');
+					setTimeout(() => btn.classList.remove('copied'), 2000);
+				} catch { /* fallback */ }
+			});
+		});
+	}
+
+	initCopyableCommands();
+	document.addEventListener('astro:after-swap', initCopyableCommands);
+</script>
+
+<style>
+	.copyable-command {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.4rem 0.6rem 0.4rem 0.8rem;
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		margin: 0.5em 0;
+		max-width: 100%;
+		overflow-x: auto;
+	}
+
+	.cmd-prompt {
+		color: var(--color-accent);
+		font-family: var(--font-mono);
+		font-weight: 600;
+		font-size: 0.82rem;
+		flex-shrink: 0;
+	}
+
+	.cmd-text {
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
+		color: var(--color-text);
+		background: transparent;
+		padding: 0;
+		white-space: nowrap;
+	}
+
+	.cmd-copy {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 26px;
+		height: 26px;
+		padding: 0;
+		border: none;
+		background: transparent;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		border-radius: var(--radius-sm);
+		flex-shrink: 0;
+		transition: color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth);
+	}
+
+	.cmd-copy:hover {
+		color: var(--color-text);
+		background: var(--color-accent-subtle);
+	}
+
+	.icon-check { display: none; }
+	.cmd-copy.copied .icon-copy { display: none; }
+	.cmd-copy.copied .icon-check { display: block; color: var(--color-success); }
+</style>

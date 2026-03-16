@@ -3,48 +3,99 @@ import BaseHead from '../../components/BaseHead.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import { SITE_TITLE, SOCIAL_LINKS, t } from '../../consts';
-
 const strings = t(Astro.url);
+const techDomains = [
+	{ domain: 'Frontend', tools: ['React', 'Next.js', 'Astro', 'TypeScript', 'CSS/Design Systems'], accent: 'var(--color-accent)' },
+	{ domain: 'Backend', tools: ['Node.js', 'PostgreSQL', 'Prisma', 'REST APIs'], accent: 'var(--color-success)' },
+	{ domain: 'DevOps & Cloud', tools: ['AWS (Certificado)', 'CI/CD', 'Docker', 'GitHub Actions'], accent: 'var(--color-warning)' },
+	{ domain: 'IA & Tooling', tools: ['LLM Integration', 'Vercel AI SDK', 'Desarrollo Spec-Driven', 'Flujos CLI Custom'], accent: 'oklch(0.6 0.15 300)' },
+];
+const timeline = [
+	{ year: '2022–Ahora', title: 'Senior FullStack Engineer', place: 'Gorilla Logic', desc: 'Construyendo productos digitales para marcas globales. Ingeniería full-stack con React, Next.js e infraestructura cloud. 4+ años y contando.', active: true },
+	{ year: '2020–2022', title: 'Software Engineer → Senior', place: 'Encora Inc.', desc: 'Crecí de Software Engineer a Senior en menos de 2 años. Desarrollo full-stack en múltiples proyectos de clientes.', active: false },
+	{ year: '2019–2020', title: 'Software Developer', place: 'Angular (We Are Angular)', desc: 'Servicios transaccionales en tiempo real, sistema de videollamadas grupales, dashboards con drag-and-drop, generadores de reportes PDF. React, Node.js, Firebase, AWS.', active: false },
+	{ year: '2017–2018', title: 'Freelance Engineer', place: 'Independiente', desc: 'Apps Android, integración IoT con Arduino, backends Firebase. App móvil de Spirits Machine y plataforma de delivery Empanada Coqueta.', active: false },
+	{ year: '2016–2017', title: 'Junior Developer', place: 'VOV Solutions', desc: 'Primer rol profesional. Sentó las bases de una carrera en ingeniería de software.', active: false },
+];
+const education = [
+	{ name: 'Ingeniero de Sistemas, Universidad del Valle', year: '2026' },
+	{ name: 'Tecnologo en Sistemas de Informacion, Universidad del Valle', year: '2018' },
+	{ name: 'Tecnologo en Desarrollo de Videojuegos, SENA', year: '2016' },
+];
+const certs = [
+	{ name: 'AWS Certified Cloud Practitioner', year: '2023' },
+	{ name: 'EF SET English C2 Proficient', year: '2020' },
+	{ name: 'Learning How to Learn, Coursera', year: '2020' },
+];
 ---
-
 <!doctype html>
 <html lang="es">
-	<head>
-		<BaseHead title={`${strings.about.title} — ${SITE_TITLE}`} description={strings.about.description} />
-	</head>
+	<head><BaseHead title={`${strings.about.title} | ${SITE_TITLE}`} description={strings.about.description} lang="es" alternates={[
+			{ hreflang: 'en', href: 'https://valdemird.com/about/' },
+			{ hreflang: 'es', href: 'https://valdemird.com/es/about/' },
+		]} /></head>
 	<body>
 		<Header />
 		<main>
 			<div class="about-hero">
-				<div class="about-hero-bg" aria-hidden="true"><div class="hero-grid"></div></div>
+				<div class="about-hero-bg" aria-hidden="true"><div class="hero-grid"></div><div class="hero-orb orb-1"></div><div class="hero-orb orb-2"></div></div>
 				<div class="about-hero-content animate-fade-in">
 					<span class="about-label">Acerca</span>
-					<h1>{strings.about.title}</h1>
+					<h1>Sebastian Castano Jara</h1>
+					<p class="about-subtitle">Senior Software Engineer en <a href="https://gorillalogic.com" target="_blank" rel="noopener noreferrer">Gorilla Logic</a> &middot; Cali, Colombia</p>
 				</div>
 			</div>
 			<article class="about-body">
 				<section class="section animate-fade-in delay-1">
-					<p>Soy ingeniero de software y me encanta construir herramientas que hacen a los desarrolladores más productivos. Me apasiona la intersección entre la IA y la experiencia de desarrollo — cómo podemos usar modelos de lenguaje no solo como generadores de código, sino como colaboradores reflexivos en el proceso de desarrollo de software.</p>
-					<p>Actualmente estoy construyendo <a href="https://todo.valdemird.com">todo.valdemird.com</a>, un gestor de tareas con IA, temporizador Pomodoro, drag-and-drop y planificación inteligente. Construido con Next.js 15, React 19, Prisma y Tailwind CSS 4.</p>
+					<p>Soy ingeniero full-stack con 8+ años construyendo productos digitales para marcas globales. Trabajo en <strong>Gorilla Logic</strong> como Senior FullStack Engineer, donde ayudo a lanzar nuevos productos y evolucionar sistemas complejos para empresas de alto crecimiento en las Américas.</p>
+					<p>Fuera del trabajo, construyo herramientas que hacen a los desarrolladores más productivos. Mi proyecto actual es <a href="https://todo.valdemird.com">todo.valdemird.com</a>, un gestor de tareas con IA, temporizador Pomodoro, drag-and-drop y planificación inteligente, construido con Next.js 15, React 19, Prisma y Tailwind CSS 4.</p>
+					<p>Me apasiona la intersección entre la IA y la experiencia de desarrollo: cómo podemos usar modelos de lenguaje no solo como generadores de código, sino como colaboradores reflexivos. Creé un flujo de desarrollo spec-driven que uso a diario y sobre el cual <a href="/es/blog/">escribo en este blog</a>.</p>
 				</section>
 				<section class="section">
-					<div class="section-header">
-						<span class="section-label">01</span>
-						<h2>En lo que creo</h2>
-						<div class="section-line"></div>
+					<div class="section-header"><span class="section-label">01</span><h2>Con qué trabajo</h2><div class="section-line"></div></div>
+					<div class="domains-grid">
+						{techDomains.map((d) => (
+							<div class="domain-card" style={`--domain-accent: ${d.accent};`}>
+								<h3>{d.domain}</h3>
+								<div class="domain-tools">{d.tools.map((tool) => <span class="domain-tool">{tool}</span>)}</div>
+							</div>
+						))}
 					</div>
+				</section>
+				<section class="section">
+					<div class="section-header"><span class="section-label">02</span><h2>Trayectoria</h2><div class="section-line"></div></div>
+					<div class="timeline">
+						{timeline.map((item) => (
+							<div class:list={['timeline-item', { active: item.active }]}>
+								<div class="timeline-marker"><div class="timeline-dot"></div><div class="timeline-line"></div></div>
+								<div class="timeline-content">
+									<div class="timeline-top"><span class="timeline-year">{item.year}</span><span class="timeline-place">{item.place}</span></div>
+									<h3 class="timeline-title">{item.title}</h3>
+									<p class="timeline-desc">{item.desc}</p>
+								</div>
+							</div>
+						))}
+					</div>
+				</section>
+				<section class="section">
+					<div class="section-header"><span class="section-label">03</span><h2>Educacion</h2><div class="section-line"></div></div>
+					<div class="certs">{education.map((e) => <div class="cert-item"><span class="cert-year">{e.year}</span><span class="cert-name">{e.name}</span></div>)}</div>
+				</section>
+				<section class="section">
+					<div class="section-header"><span class="section-label">04</span><h2>Certificaciones</h2><div class="section-line"></div></div>
+					<div class="certs">{certs.map((c) => <div class="cert-item"><span class="cert-year">{c.year}</span><span class="cert-name">{c.name}</span></div>)}</div>
+				</section>
+				<section class="section">
+					<div class="section-header"><span class="section-label">05</span><h2>En lo que creo</h2><div class="section-line"></div></div>
 					<div class="beliefs">
-						<div class="belief"><div class="belief-number" aria-hidden="true">01</div><h3>Desarrollo basado en especificaciones</h3><p>Escribe el spec antes del código. Deja que el LLM sea tu co-arquitecto, no solo tu mecanógrafo.</p></div>
-						<div class="belief"><div class="belief-number" aria-hidden="true">02</div><h3>Construir en público</h3><p>Comparte lo que aprendes. La mejor forma de solidificar el conocimiento es enseñarlo.</p></div>
-						<div class="belief"><div class="belief-number" aria-hidden="true">03</div><h3>Belleza y función</h3><p>Las herramientas deben ser hermosas Y funcionales. El diseño no es decoración — es comunicación.</p></div>
+						<div class="belief"><div class="belief-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg></div><div class="belief-text"><h3>Desarrollo spec-driven</h3><p>Escribe el spec antes del código. Deja que el LLM sea tu co-arquitecto, no solo tu mecanógrafo.</p></div></div>
+						<div class="belief"><div class="belief-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><div class="belief-text"><h3>Construir en público</h3><p>Comparte lo que aprendes. La mejor forma de solidificar el conocimiento es enseñarlo.</p></div></div>
+						<div class="belief"><div class="belief-icon"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813h6.088l-4.912 3.587 1.912 5.813L12 14.626l-4.912 3.587 1.912-5.813L4 8.813h6.088z"/></svg></div><div class="belief-text"><h3>Belleza y función</h3><p>Las herramientas deben ser hermosas Y funcionales. El diseño no es decoración — es comunicación.</p></div></div>
 					</div>
 				</section>
 				<section class="section">
-					<div class="section-header">
-						<span class="section-label">02</span>
-						<h2>Contacto</h2>
-						<div class="section-line"></div>
-					</div>
+					<div class="section-header"><span class="section-label">06</span><h2>Contacto</h2><div class="section-line"></div></div>
+					<p class="lang-note">Hablo <strong>Español</strong> (nativo) e <strong>Inglés</strong> (C2 proficiente).</p>
 					<div class="contact-links">
 						{SOCIAL_LINKS.github && (<a href={SOCIAL_LINKS.github} target="_blank" rel="noopener noreferrer" class="contact-link"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg><span>GitHub</span></a>)}
 						{SOCIAL_LINKS.linkedin && (<a href={SOCIAL_LINKS.linkedin} target="_blank" rel="noopener noreferrer" class="contact-link"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg><span>LinkedIn</span></a>)}
@@ -52,44 +103,36 @@ const strings = t(Astro.url);
 				</section>
 			</article>
 		</main>
-
 		<script>
-			function initAbout() {
-				const observer = new IntersectionObserver(
-					(entries) => { entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }); },
-					{ threshold: 0.08, rootMargin: '0px 0px -60px 0px' }
-				);
-				document.querySelectorAll('.section:not(.animate-fade-in)').forEach(s => observer.observe(s));
-			}
-			initAbout();
-			document.addEventListener('astro:after-swap', initAbout);
+			function initAbout(){const o=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');o.unobserve(e.target)}})},{threshold:.08,rootMargin:'0px 0px -60px 0px'});document.querySelectorAll('.section:not(.animate-fade-in)').forEach(s=>o.observe(s))}initAbout();document.addEventListener('astro:after-swap',initAbout);
 		</script>
-
 		<Footer />
 	</body>
 </html>
-
 <style>
 	main{max-width:var(--full-width);margin:0 auto;padding:0}
 	.about-hero{position:relative;padding:5rem var(--space-lg) 3rem;overflow:hidden}.about-hero-bg{position:absolute;inset:0;z-index:0}
 	.hero-grid{position:absolute;inset:0;background-image:linear-gradient(var(--color-border) 1px,transparent 1px),linear-gradient(90deg,var(--color-border) 1px,transparent 1px);background-size:48px 48px;opacity:.25;mask-image:radial-gradient(ellipse 70% 80% at 50% 60%,black 10%,transparent 70%);-webkit-mask-image:radial-gradient(ellipse 70% 80% at 50% 60%,black 10%,transparent 70%)}
-	.about-hero-content{position:relative;z-index:1;max-width:var(--content-width);margin:0 auto}
-	.about-label{font-family:var(--font-mono);font-size:.75rem;font-weight:500;color:var(--color-accent);letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:.75rem}
-	.about-hero-content h1{font-size:clamp(2rem,5vw,2.8rem)}
-	.about-body{max-width:var(--content-width);margin:0 auto;padding:0 var(--space-lg) 4rem}
-	.about-body p{font-size:1.1rem;line-height:1.85}
-	.section{margin-bottom:3.5rem;opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease-smooth),transform .7s var(--ease-smooth)}
-	.section.visible,.section.animate-fade-in{opacity:1;transform:translateY(0)}
-	.section-header{display:flex;align-items:center;gap:var(--space-md);margin-bottom:2rem}
-	.section-label{font-family:var(--font-mono);font-size:.75rem;font-weight:500;color:var(--color-accent);opacity:.6;letter-spacing:.05em}
-	.section-header h2{margin:0;white-space:nowrap}.section-line{flex:1;height:1px;background:linear-gradient(90deg,var(--color-border),transparent)}
-	.beliefs{display:grid;gap:1rem}
-	.belief{position:relative;padding:1.5rem 1.5rem 1.5rem 4.5rem;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);transition:border-color var(--duration-normal) var(--ease-smooth),transform var(--duration-normal) var(--ease-spring),box-shadow var(--duration-normal) var(--ease-smooth)}
-	.belief:hover{border-color:var(--color-accent);transform:translateX(4px);box-shadow:var(--shadow-md)}
-	.belief-number{position:absolute;left:1.25rem;top:1.5rem;font-family:var(--font-mono);font-size:.72rem;font-weight:600;color:var(--color-accent);opacity:.5}
-	.belief h3{font-size:1.05rem;margin-bottom:.25em}.belief p{font-size:.92rem;margin:0;color:var(--color-text-secondary);line-height:1.6}
-	.contact-links{display:flex;gap:.75rem;margin-top:1rem}
-	.contact-link{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.2rem;font-size:.88rem;font-weight:500;color:var(--color-text-secondary);text-decoration:none;border:1px solid var(--color-border);border-radius:var(--radius-md);transition:all var(--duration-normal) var(--ease-spring)}
-	.contact-link:hover{color:var(--color-text);border-color:var(--color-accent);background:var(--color-accent-subtle);transform:translateY(-2px);box-shadow:var(--shadow-md)}
-	@media(max-width:640px){.about-hero{padding:3rem var(--space-lg) 2rem}.belief{padding-left:1.5rem}.belief-number{display:none}.contact-links{flex-direction:column}}
+	.hero-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.1;animation:orbFloat 20s ease-in-out infinite}.orb-1{width:300px;height:300px;top:-20%;right:10%;background:var(--color-accent)}.orb-2{width:200px;height:200px;bottom:-10%;left:20%;background:var(--color-success);animation-delay:-7s}
+	@keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(20px,-15px) scale(1.05)}}
+	.about-hero-content{position:relative;z-index:1;max-width:var(--content-width);margin:0 auto}.about-label{font-family:var(--font-mono);font-size:.75rem;font-weight:500;color:var(--color-accent);letter-spacing:.08em;text-transform:uppercase;display:block;margin-bottom:.75rem}
+	.about-hero-content h1{font-size:clamp(2rem,5vw,2.8rem);margin-bottom:.3em}.about-subtitle{font-size:1rem;color:var(--color-text-secondary);margin:0}.about-subtitle a{color:var(--color-accent)}
+	.about-body{max-width:var(--content-width);margin:0 auto;padding:0 var(--space-lg) 4rem}.about-body>.section:first-child p{font-size:1.1rem;line-height:1.85}
+	.section{margin-bottom:3.5rem;opacity:0;transform:translateY(24px);transition:opacity .7s var(--ease-smooth),transform .7s var(--ease-smooth)}.section.visible,.section.animate-fade-in{opacity:1;transform:translateY(0)}
+	.section-header{display:flex;align-items:center;gap:var(--space-md);margin-bottom:2rem}.section-label{font-family:var(--font-mono);font-size:.75rem;font-weight:500;color:var(--color-accent);opacity:.6;letter-spacing:.05em}.section-header h2{margin:0;white-space:nowrap}.section-line{flex:1;height:1px;background:linear-gradient(90deg,var(--color-border),transparent)}
+	.domains-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem}.domain-card{padding:1.25rem;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);border-top:3px solid var(--domain-accent);transition:transform var(--duration-normal) var(--ease-spring),box-shadow var(--duration-normal) var(--ease-smooth)}.domain-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
+	.domain-card h3{font-family:var(--font-sans);font-size:.82rem;font-weight:600;color:var(--color-text);margin:0 0 .75rem;text-transform:uppercase;letter-spacing:.04em}
+	.domain-tools{display:flex;flex-wrap:wrap;gap:.35rem}.domain-tool{font-family:var(--font-mono);font-size:.7rem;padding:.2em .55em;background:var(--color-bg-secondary);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-secondary);transition:border-color var(--duration-fast) var(--ease-smooth),color var(--duration-fast) var(--ease-smooth)}.domain-card:hover .domain-tool{border-color:var(--color-border-strong);color:var(--color-text)}
+	.timeline{display:flex;flex-direction:column}.timeline-item{display:flex;gap:1.25rem;padding-bottom:2rem}.timeline-marker{display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:20px}
+	.timeline-dot{width:10px;height:10px;border-radius:50%;background:var(--color-border-strong);border:2px solid var(--color-bg);box-shadow:0 0 0 2px var(--color-border);flex-shrink:0}.timeline-item.active .timeline-dot{background:var(--color-accent);box-shadow:0 0 0 2px var(--color-accent),0 0 0 6px oklch(from var(--color-accent) l c h/.12)}
+	.timeline-line{width:2px;flex:1;background:var(--color-border);margin-top:.4rem}.timeline-item:last-child .timeline-line{display:none}
+	.timeline-content{flex:1}.timeline-top{display:flex;align-items:center;gap:.6rem;margin-bottom:.25rem}.timeline-year{font-family:var(--font-mono);font-size:.72rem;font-weight:600;color:var(--color-accent)}.timeline-place{font-family:var(--font-mono);font-size:.72rem;color:var(--color-text-muted)}
+	.timeline-title{font-family:var(--font-sans);font-size:1rem;font-weight:600;color:var(--color-text);margin:0 0 .2em}.timeline-desc{font-size:.88rem;color:var(--color-text-secondary);margin:0;line-height:1.55}
+	.certs{display:flex;flex-direction:column;gap:.6rem}.cert-item{display:flex;align-items:center;gap:1rem;padding:.65rem 1rem;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface);transition:border-color var(--duration-fast) var(--ease-smooth)}.cert-item:hover{border-color:var(--color-border-strong)}.cert-year{font-family:var(--font-mono);font-size:.72rem;font-weight:600;color:var(--color-accent);min-width:36px}.cert-name{font-size:.88rem;color:var(--color-text-secondary)}
+	.beliefs{display:flex;flex-direction:column;gap:1rem}.belief{display:flex;gap:1rem;padding:1.25rem 1.5rem;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface);transition:border-color var(--duration-normal) var(--ease-smooth),transform var(--duration-normal) var(--ease-spring),box-shadow var(--duration-normal) var(--ease-smooth)}.belief:hover{border-color:var(--color-accent);transform:translateX(4px);box-shadow:var(--shadow-md)}
+	.belief-icon{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:var(--color-accent-subtle);border-radius:var(--radius-md);color:var(--color-accent);flex-shrink:0}
+	.belief-text h3{font-size:1rem;margin-bottom:.2em}.belief-text p{font-size:.88rem;margin:0;color:var(--color-text-secondary);line-height:1.5}
+	.lang-note{font-size:.95rem;color:var(--color-text-secondary);margin-bottom:1rem}
+	.contact-links{display:flex;gap:.75rem}.contact-link{display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.2rem;font-size:.88rem;font-weight:500;color:var(--color-text-secondary);text-decoration:none;border:1px solid var(--color-border);border-radius:var(--radius-md);transition:all var(--duration-normal) var(--ease-spring)}.contact-link:hover{color:var(--color-text);border-color:var(--color-accent);background:var(--color-accent-subtle);transform:translateY(-2px);box-shadow:var(--shadow-md)}
+	@media(max-width:640px){.about-hero{padding:3rem var(--space-lg) 2rem}.domains-grid{grid-template-columns:1fr}.contact-links{flex-direction:column}.hero-orb{display:none}}
 </style>

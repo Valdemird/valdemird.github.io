@@ -1,0 +1,10 @@
+# valdemird.com robots.txt
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://valdemird.com/sitemap-index.xml
+
+# LLM-friendly content (llms.txt proposal)
+# Summary: https://valdemird.com/llms.txt
+# Full content: https://valdemird.com/llms-full.txt

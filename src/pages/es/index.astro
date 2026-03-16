@@ -9,6 +9,7 @@ import { getCollection } from 'astro:content';
 
 const strings = t(Astro.url);
 const recentPosts = (await getCollection('blog'))
+	.filter((p) => p.data.lang === 'es')
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
 	.slice(0, 3);
 const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma', 'Tailwind CSS', 'PostgreSQL', 'Vercel AI SDK', 'Claude Code'];
@@ -17,7 +18,10 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 <!doctype html>
 <html lang="es">
 	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} lang="es" alternates={[
+			{ hreflang: 'en', href: 'https://valdemird.com/' },
+			{ hreflang: 'es', href: 'https://valdemird.com/es/' },
+		]} />
 	</head>
 	<body>
 		<Header />

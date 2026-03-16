@@ -8,7 +8,9 @@ import { SITE_TITLE, t } from '../../../consts';
 import { getCollection } from 'astro:content';
 
 const strings = t(Astro.url);
-const posts = (await getCollection('blog')).sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const posts = (await getCollection('blog'))
+	.filter((p) => p.data.lang === 'es')
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 const featuredPost = posts.find((p) => p.data.featured) || posts[0];
 const otherPosts = posts.filter((p) => p !== featuredPost);
 ---
@@ -16,7 +18,10 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 <!doctype html>
 <html lang="es">
 	<head>
-		<BaseHead title={`${strings.blog.title} — ${SITE_TITLE}`} description={strings.blog.description} />
+		<BaseHead title={`${strings.blog.title} | ${SITE_TITLE}`} description={strings.blog.description} lang="es" alternates={[
+			{ hreflang: 'en', href: 'https://valdemird.com/blog/' },
+			{ hreflang: 'es', href: 'https://valdemird.com/es/blog/' },
+		]} />
 	</head>
 	<body>
 		<Header />

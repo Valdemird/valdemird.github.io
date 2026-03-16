@@ -1,5 +1,6 @@
 ---
 import type { CollectionEntry } from 'astro:content';
+import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
@@ -8,12 +9,66 @@ import ReadingProgress from '../components/blog/ReadingProgress.astro';
 
 type Props = CollectionEntry<'blog'>['data'];
 
-const { title, description, pubDate, updatedDate, heroImage, tags } = Astro.props;
+const { title, description, pubDate, updatedDate, heroImage, tags, lang = 'en' } = Astro.props;
+
+// Build hreflang alternates for this post
+const allPosts = await getCollection('blog');
+const currentPath = Astro.url.pathname;
+const slug = currentPath.replace(/^\/blog\//, '').replace(/\/$/, '');
+
+// Build JSON-LD BlogPosting structured data
+const blogPostingJsonLd: Record<string, unknown> = {
+	'@context': 'https://schema.org',
+	'@type': 'BlogPosting',
+	headline: title,
+	description,
+	datePublished: pubDate.toISOString(),
+	...(updatedDate && { dateModified: updatedDate.toISOString() }),
+	author: {
+		'@type': 'Person',
+		name: 'Valdemir D.',
+		url: 'https://valdemird.com',
+	},
+	publisher: {
+		'@type': 'Person',
+		name: 'Valdemir D.',
+		url: 'https://valdemird.com',
+	},
+	mainEntityOfPage: {
+		'@type': 'WebPage',
+		'@id': `https://valdemird.com${currentPath}`,
+	},
+	inLanguage: lang,
+	...(heroImage && { image: `https://valdemird.com${heroImage}` }),
+	...(tags && tags.length > 0 && { keywords: tags.join(', ') }),
+};
+
+const alternates: { hreflang: string; href: string }[] = [];
+if (lang === 'en') {
+	// Look for ES counterpart: es/<slug>
+	const esPair = allPosts.find(p => p.id === `es/${slug}` && p.data.lang === 'es');
+	if (esPair) {
+		alternates.push(
+			{ hreflang: 'en', href: `https://valdemird.com/blog/${slug}/` },
+			{ hreflang: 'es', href: `https://valdemird.com/blog/es/${slug}/` },
+		);
+	}
+} else if (lang === 'es') {
+	// Look for EN counterpart: <slug without es/>
+	const enSlug = slug.replace(/^es\//, '');
+	const enPair = allPosts.find(p => p.id === enSlug && p.data.lang === 'en');
+	if (enPair) {
+		alternates.push(
+			{ hreflang: 'en', href: `https://valdemird.com/blog/${enSlug}/` },
+			{ hreflang: 'es', href: `https://valdemird.com/blog/es/${enSlug}/` },
+		);
+	}
+}
 ---
 
-<html lang="en">
+<html lang={lang}>
 	<head>
-		<BaseHead title={title} description={description} />
+		<BaseHead title={title} description={description} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} publishedTime={pubDate} modifiedTime={updatedDate} tags={tags} />
 	</head>
 
 	<body>

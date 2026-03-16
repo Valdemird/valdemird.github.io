@@ -1,0 +1,202 @@
+---
+title: "Slash Commands Custom para Programar con IA: Construye Tu Propio Flujo Spec-Driven"
+description: "Cómo 6 archivos markdown convirtieron mi asistente de IA en un co-arquitecto estructurado. Así es por qué deberías construir tu propio sistema de comandos en vez de depender de prompts crudos."
+pubDate: 2026-03-10
+tags: ["herramientas-ia", "workflow", "productividad", "automatizacion"]
+featured: true
+lang: es
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import FileTree from '../../../components/blog/FileTree.astro';
+import CopyableCommand from '../../../components/blog/CopyableCommand.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+
+Todas las herramientas de IA para programar te dejan escribir prompts en lenguaje natural. Muy pocas te dejan construir *flujos de trabajo estructurados* sobre ellas. Ese es el gap que la mayoría de desarrolladores no ven, y la razón por la que su código generado por IA necesita reescrituras constantes.
+
+El concepto no es nuevo. El [desarrollo spec-driven](https://en.wikipedia.org/wiki/Spec-driven_development): definir *qué* quieres antes de escribir *cómo* ha sido una disciplina de ingeniería de software por décadas. Lo nuevo es aplicarlo a la programación asistida por IA. Como [explora Birgitta Bockeler en martinfowler.com](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html), las herramientas de SDD están trayendo la disciplina de la ingeniería temprana — diseñar antes de codear — a la era agéntica.
+
+La idea es simple: en lugar de escribir las mismas instrucciones cada vez ("explora mi codebase primero", "sigue los patrones existentes", "no escribas tests todavía"), las codificas en slash commands reutilizables. Archivos markdown. Sin SDK, sin API, sin sistema de plugins. Solo archivos que tu herramienta de IA lee como instrucciones.
+
+Construí 6 comandos que forman un **pipeline de desarrollo spec-driven**. Así es cómo. Así es por qué deberías construir los tuyos.
+
+## Por Qué los Prompts Crudos Fallan a Escala
+
+Cuando escribes *"agrega autenticación JWT a mi API"*, le estás pidiendo al modelo que tome docenas de decisiones implícitas:
+
+- ¿Qué librería de JWT?
+- ¿Dónde se almacenan los tokens?
+- ¿Cómo se integra con tu middleware existente?
+- ¿Cuál es tu patrón de manejo de errores?
+
+El modelo va a adivinar. A veces acierta. A menudo no. Y pasas más tiempo debuggeando las adivinanzas de la IA que lo que hubieras gastado escribiendo el código tú mismo.
+
+<Callout type="important" title="La idea central">
+El cuello de botella no es generar código, es la **especificación**. Si defines claramente *qué* quieres, el *cómo* se vuelve casi trivial para el modelo.
+</Callout>
+
+## El Pipeline
+
+Seis comandos, cada uno un archivo markdown, formando un pipeline lineal donde cada paso produce un artefacto y cada transición requiere tu aprobación:
+
+<MermaidDiagram title="Pipeline Spec-Driven" chart="graph LR\n    A[Crear] --> B[Auditar]\n    B --> C[Revisar]\n    C --> D[Planear]\n    D --> E[Implementar]\n    E --> F[Listo]" />
+
+## Comando 1: Crear. De Idea a Spec Estructurado
+
+Le das un nombre y una descripción vaga. El comando genera un spec estructurado con contexto, comportamiento esperado, edge cases, restricciones, criterios de aceptación, y, crucialmente, **preguntas abiertas** que detectó que *tú* necesitas responder.
+
+<CodeBlock filename=".commands/spec-create.md">
+```markdown
+# Crear Spec
+
+Crea un spec estructurado para: **$ARGUMENTS**
+
+## Tu tarea
+
+1. Genera un documento de especificación estructurado
+2. Incluye: contexto, comportamiento esperado, edge cases,
+   restricciones, criterios de aceptación
+3. Lista preguntas abiertas que necesitan decisiones humanas
+
+**No explores el código. Solo crea el spec.**
+```
+</CodeBlock>
+
+En lugar de adivinar tu preferencia de librería JWT, te pregunta.
+
+<Callout type="tip" title="Adelanta las decisiones">
+Toma 5 minutos responder preguntas en un spec. Toma 2 horas desenredar suposiciones equivocadas en código. Fuerza la especificación antes del código.
+</Callout>
+
+## Comando 2: Auditar. El Spec Se Encuentra con Tu Codebase
+
+Aquí el modelo **explora tu proyecto real**: estructura de archivos, convenciones de nombrado, patrones de manejo de errores, dependencias existentes, y enriquece el spec con una sección de análisis técnico.
+
+<Collapsible title="Lo que explora el audit">
+
+- Estructura del proyecto (carpetas, módulos, capas)
+- Patrones de arquitectura (MVC, service layer, feature-based)
+- Convenciones de nombrado de archivos y funciones
+- Enfoque actual de manejo de errores
+- Organización de tests y cobertura
+- Dependencias en package.json / requirements.txt
+- Archivos similares a lo que se quiere construir (para seguir el mismo patrón)
+
+</Collapsible>
+
+Este paso previene la falla #1 del código generado por IA: **ignorar patrones existentes**. Después del audit, el modelo conoce las convenciones de tu proyecto. El código que escriba después va a *encajar*.
+
+## Comando 3: Revisar. El Semáforo de Readiness
+
+Antes de invertir tiempo en implementación, este comando evalúa el spec:
+
+<Tabs labels={["Listo", "Con Supuestos", "Bloqueante"]}>
+<TabPanel>
+
+🟢 **Listo**: Bien definido. Todas las decisiones tomadas. Avanzar al plan.
+
+</TabPanel>
+<TabPanel>
+
+🟡 **Puede avanzar**: Existe ambigüedad, pero se pueden hacer suposiciones razonables. Cada supuesto se lista explícitamente para que lo apruebes.
+
+</TabPanel>
+<TabPanel>
+
+🔴 **Bloqueante**: Decisiones críticas pendientes. Ejemplos: "¿Sessions o JWT?", "¿Qué base de datos?", "¿Necesita real-time?" Resuelve antes de continuar.
+
+</TabPanel>
+</Tabs>
+
+Si algo está en rojo, lo arreglas ahora, no después de 3 fases de implementación.
+
+## Comando 4: Planear. Implementación por Fases
+
+El plan genera una implementación paso a paso. Cada fase es pequeña (1-3 archivos), verificable (criterio claro de "está listo") e independiente (revisable antes de continuar).
+
+<CodeBlock filename="Ejemplo de plan">
+```markdown
+### Fase 1: Schema y migración
+**Objetivo:** La tabla Users existe con campos de auth
+**Archivos:** crear migración, modificar schema
+**Verificar:** la migración corre sin errores
+
+### Fase 2: Middleware de auth y utilidades
+**Objetivo:** Rutas protegidas retornan 401 sin auth
+**Archivos:** crear middleware, crear utils, modificar entry
+**Verificar:** curl ruta libre → 200, protegida → 401
+```
+</CodeBlock>
+
+<Callout type="warning">
+Regla dura: **máximo 3-4 fases** para features medianas. Si necesita más, la feature es muy grande y debe dividirse. Esto previene el scope creep.
+</Callout>
+
+## Comando 5: Implementar. Una Fase a la Vez
+
+El comando de implementación solo ejecuta **una fase a la vez**. Después de cada fase, resume qué hizo, qué decisiones tomó, y pide tu revisión antes de continuar.
+
+Si la Fase 1 revela un problema, ajustas el plan antes de que empiece la Fase 2. El costo del cambio se mantiene bajo durante todo el proyecto.
+
+## Bonus: Comandos de Review
+
+| Comando | Qué revisa | Output |
+|---|---|---|
+| Performance | Loops O(n²), queries N+1, memory leaks, caché, bundles | Hallazgos por severidad con fixes |
+| Arquitectura | SOLID, acoplamiento, separación de concerns, seguridad | Diagrama de capas + roadmap |
+
+## Configúralo
+
+<CopyableCommand command="mkdir -p .commands" />
+
+Pon tus archivos de comandos:
+
+<FileTree highlight="spec-create.md">
+<div class="folder">
+<div class="folder-label">.commands</div>
+<div class="folder-children">
+<div class="file">spec-create.md</div>
+<div class="file">spec-audit.md</div>
+<div class="file">spec-review.md</div>
+<div class="file">spec-plan.md</div>
+<div class="file">spec-implement.md</div>
+<div class="file">performance.md</div>
+<div class="file">architecture.md</div>
+</div>
+</div>
+</FileTree>
+
+## Tiempo Ahorrado en Retrabajo
+
+<InteractiveChart
+  title="Tiempo en Retrabajo"
+  type="bar"
+  data={[
+    { label: "Prompts crudos", value: 45, color: "oklch(0.65 0.2 27)" },
+    { label: "Con spec", value: 12, color: "oklch(0.6 0.18 145)" },
+  ]}
+/>
+
+*(Porcentaje del tiempo de sesión arreglando código que no encajó)*
+
+## La Regla de Oro
+
+> Nunca saltes pasos bajo presión. El tiempo que "ahorras" saltando el audit o el review lo pagas triple en correcciones después.
+
+No se trata de ir más lento. Se trata de **invertir 10 minutos en especificación para ahorrar 2 horas en debugging**. Tu herramienta de IA se vuelve dramáticamente más útil cuando la tratas como un colaborador que necesita contexto, no como una caja mágica que adivina lo que quieres.
+
+Los flujos estructurados le ganan a los prompts crudos. Siempre.
+
+---
+
+**Lectura adicional:**
+- [Spec-Driven Development: Designing Before You Code](https://medium.com/@dave-patten/spec-driven-development-designing-before-you-code-again-21023ac91180), Dave Patten, Medium
+- [Exploring SDD Tools](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html), Martin Fowler
+- [Spec-Driven Development: When Architecture Becomes Executable](https://www.infoq.com/articles/spec-driven-development/), InfoQ
+- [Beyond Vibe-Coding: A Practical Guide to Spec-Driven Development](https://www.scalablepath.com/machine-learning/spec-driven-development-guide), Scalable Path
+- [GitHub Spec Kit](https://github.com/github/spec-kit), Tooling open-source de GitHub para SDD

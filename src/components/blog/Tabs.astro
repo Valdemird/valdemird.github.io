@@ -1,0 +1,137 @@
+---
+interface Props {
+	labels: string[];
+}
+
+const { labels } = Astro.props;
+const tabId = `tabs-${Math.random().toString(36).slice(2, 7)}`;
+---
+
+<div class="tabs-container" id={tabId} data-active="0">
+	<div class="tabs-header" role="tablist">
+		{labels.map((label, i) => (
+			<button
+				role="tab"
+				class:list={['tab-btn', { active: i === 0 }]}
+				data-tab-index={i}
+				aria-selected={i === 0 ? 'true' : 'false'}
+				type="button"
+			>
+				{label}
+			</button>
+		))}
+		<div class="tab-indicator" aria-hidden="true"></div>
+	</div>
+	<div class="tabs-panels">
+		<slot />
+	</div>
+</div>
+
+<script>
+	function initTabs() {
+		document.querySelectorAll('.tabs-container').forEach((container) => {
+			const buttons = container.querySelectorAll<HTMLButtonElement>('.tab-btn');
+			const panels = container.querySelectorAll<HTMLElement>('.tab-panel');
+			const indicator = container.querySelector<HTMLElement>('.tab-indicator');
+
+			function activate(index: number) {
+				buttons.forEach((btn, i) => {
+					btn.classList.toggle('active', i === index);
+					btn.setAttribute('aria-selected', i === index ? 'true' : 'false');
+				});
+				panels.forEach((panel, i) => {
+					panel.classList.toggle('active', i === index);
+				});
+				// Move indicator
+				if (indicator && buttons[index]) {
+					const btn = buttons[index];
+					indicator.style.width = `${btn.offsetWidth}px`;
+					indicator.style.transform = `translateX(${btn.offsetLeft}px)`;
+				}
+			}
+
+			buttons.forEach((btn) => {
+				btn.addEventListener('click', () => {
+					const index = parseInt(btn.dataset.tabIndex || '0');
+					activate(index);
+				});
+			});
+
+			// Initialize indicator position
+			if (buttons.length > 0) activate(0);
+		});
+	}
+
+	initTabs();
+	document.addEventListener('astro:after-swap', initTabs);
+</script>
+
+<style>
+	.tabs-container {
+		margin: 2em 0;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: var(--color-surface);
+	}
+
+	.tabs-header {
+		position: relative;
+		display: flex;
+		border-bottom: 1px solid var(--color-border);
+		background: var(--color-bg-secondary);
+		overflow-x: auto;
+	}
+
+	.tab-btn {
+		position: relative;
+		z-index: 1;
+		padding: 0.65rem 1.25rem;
+		border: none;
+		background: transparent;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		font-weight: 500;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		white-space: nowrap;
+		transition: color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.tab-btn:hover { color: var(--color-text); }
+	.tab-btn.active { color: var(--color-text); }
+
+	.tab-indicator {
+		position: absolute;
+		bottom: 0;
+		left: 0;
+		height: 2px;
+		background: var(--color-accent);
+		border-radius: 1px;
+		transition: transform var(--duration-normal) var(--ease-spring),
+			width var(--duration-normal) var(--ease-spring);
+	}
+
+	.tabs-panels {
+		position: relative;
+	}
+
+	.tabs-panels :global(.tab-panel) {
+		display: none;
+		padding: 1.25rem;
+	}
+
+	.tabs-panels :global(.tab-panel.active) {
+		display: block;
+		animation: tabFadeIn 0.25s var(--ease-smooth);
+	}
+
+	@keyframes tabFadeIn {
+		from { opacity: 0; transform: translateY(4px); }
+		to { opacity: 1; transform: translateY(0); }
+	}
+
+	/* Reset prose styles inside tabs */
+	.tabs-panels :global(.tab-panel p:last-child) { margin-bottom: 0; }
+	.tabs-panels :global(.tab-panel pre) { margin: 0; }
+</style>
