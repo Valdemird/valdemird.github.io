@@ -81,7 +81,8 @@ export const UI_STRINGS = {
 export type Locale = keyof typeof UI_STRINGS;
 
 export function getLocale(url: URL): Locale {
-	return url.pathname.startsWith('/es') ? 'es' : 'en';
+	// Check both /es/ prefix (regular pages) and /blog/es/ (blog posts with es/ in content id)
+	return url.pathname.startsWith('/es') || /^\/blog\/es\//.test(url.pathname) ? 'es' : 'en';
 }
 
 export function t(url: URL) {

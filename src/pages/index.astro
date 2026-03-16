@@ -139,6 +139,7 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 								description={post.data.description}
 								pubDate={post.data.pubDate}
 								tags={post.data.tags}
+								locale="en"
 							/>
 						))}
 					</div>
@@ -191,18 +192,40 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 	const outputEl = document.getElementById('terminal-output');
 	const cursorEl = document.querySelector('.terminal-cursor') as HTMLElement;
 	let cmdIndex = 0;
+	let _terminalStopped = false;
 
 	async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+	function waitForVisible(): Promise<void> {
+		if (!document.hidden) return Promise.resolve();
+		return new Promise(resolve => {
+			const handler = () => {
+				if (!document.hidden) {
+					document.removeEventListener('visibilitychange', handler);
+					resolve();
+				}
+			};
+			document.addEventListener('visibilitychange', handler);
+		});
+	}
+
 	async function typeCommand(text: string) {
 		if (!cmdEl) return;
 		cmdEl.textContent = '';
-		for (let i = 0; i < text.length; i++) { cmdEl.textContent += text[i]; await sleep(45 + Math.random() * 35); }
+		for (let i = 0; i < text.length; i++) {
+			if (_terminalStopped) return;
+			await waitForVisible();
+			cmdEl.textContent += text[i];
+			await sleep(45 + Math.random() * 35);
+		}
 	}
 	async function showOutput(text: string) {
 		if (!outputEl) return;
 		await sleep(300);
 		if (cursorEl) cursorEl.style.display = 'none';
 		for (const line of text.split('\n')) {
+			if (_terminalStopped) return;
+			await waitForVisible();
 			const div = document.createElement('div');
 			div.className = 'output-line';
 			div.textContent = line;
@@ -211,7 +234,8 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 		}
 	}
 	async function runTerminalLoop() {
-		while (true) {
+		while (!_terminalStopped) {
+			await waitForVisible();
 			const { cmd, output } = commands[cmdIndex % commands.length];
 			if (cmdEl) cmdEl.textContent = '';
 			if (outputEl) outputEl.innerHTML = '';
@@ -228,6 +252,12 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 		{ threshold: 0.08, rootMargin: '0px 0px -60px 0px' }
 	);
 	document.querySelectorAll('.section').forEach(s => observer.observe(s));
+
+	// --- Cleanup on View Transition ---
+	document.addEventListener('astro:before-swap', () => {
+		_terminalStopped = true;
+		observer.disconnect();
+	}, { once: true });
 </script>
 
 <style>

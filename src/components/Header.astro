@@ -4,9 +4,27 @@ import { SITE_TITLE, getLocale, t } from '../consts';
 const locale = getLocale(Astro.url);
 const strings = t(Astro.url);
 const altLocale = locale === 'en' ? 'es' : 'en';
-const altPath = locale === 'en'
-	? `/es${Astro.url.pathname}`
-	: Astro.url.pathname.replace(/^\/es\/?/, '/');
+
+// Blog posts use /blog/es/<slug>/ pattern (es/ is part of content id, not a URL prefix)
+function getAltPath(pathname: string, currentLocale: string): string {
+	const isBlogPost = /^\/blog\/(?!index)/.test(pathname) && !pathname.endsWith('/blog/');
+	if (isBlogPost) {
+		if (currentLocale === 'en') {
+			// /blog/my-post/ → /blog/es/my-post/
+			return pathname.replace(/^\/blog\//, '/blog/es/');
+		} else {
+			// /blog/es/my-post/ → /blog/my-post/
+			return pathname.replace(/^\/blog\/es\//, '/blog/');
+		}
+	}
+	// Other pages use /es/ prefix
+	if (currentLocale === 'en') {
+		return `/es${pathname}`;
+	}
+	return pathname.replace(/^\/es\/?/, '/');
+}
+
+const altPath = getAltPath(Astro.url.pathname, locale);
 ---
 
 <header id="site-header">
@@ -68,7 +86,18 @@ const altPath = locale === 'en'
 </header>
 
 <script>
+	let _headerScrollHandler: (() => void) | null = null;
+
+	function cleanupHeader() {
+		if (_headerScrollHandler) {
+			window.removeEventListener('scroll', _headerScrollHandler);
+			_headerScrollHandler = null;
+		}
+	}
+
 	function initHeader() {
+		cleanupHeader();
+
 		const toggle = document.getElementById('theme-toggle');
 		toggle?.addEventListener('click', () => {
 			const current = document.documentElement.getAttribute('data-theme');
@@ -87,22 +116,28 @@ const altPath = locale === 'en'
 
 		const header = document.getElementById('site-header');
 		let ticking = false;
-		const onScroll = () => {
+		let isScrolled = window.scrollY > 10;
+		header?.classList.toggle('scrolled', isScrolled);
+
+		_headerScrollHandler = () => {
 			if (!ticking) {
 				requestAnimationFrame(() => {
-					header?.classList.toggle('scrolled', window.scrollY > 10);
+					const shouldBeScrolled = window.scrollY > 10;
+					if (shouldBeScrolled !== isScrolled) {
+						isScrolled = shouldBeScrolled;
+						header?.classList.toggle('scrolled', isScrolled);
+					}
 					ticking = false;
 				});
 				ticking = true;
 			}
 		};
-		window.addEventListener('scroll', onScroll);
-		// Set initial state
-		header?.classList.toggle('scrolled', window.scrollY > 10);
+		window.addEventListener('scroll', _headerScrollHandler, { passive: true });
 	}
 
 	initHeader();
 	document.addEventListener('astro:after-swap', initHeader);
+	document.addEventListener('astro:before-swap', cleanupHeader);
 </script>
 
 <style>

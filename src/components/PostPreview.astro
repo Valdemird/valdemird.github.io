@@ -8,9 +8,10 @@ interface Props {
 	pubDate: Date;
 	tags?: string[];
 	basePath?: string;
+	locale?: string;
 }
 
-const { id, title, description, pubDate, tags, basePath = '/blog' } = Astro.props;
+const { id, title, description, pubDate, tags, basePath = '/blog', locale = 'en' } = Astro.props;
 const readingTime = Math.max(1, Math.ceil(description.length / 50));
 ---
 
@@ -18,7 +19,7 @@ const readingTime = Math.max(1, Math.ceil(description.length / 50));
 	<div class="post-accent" aria-hidden="true"></div>
 	<div class="post-preview-content">
 		<div class="post-preview-meta">
-			<FormattedDate date={pubDate} />
+			<FormattedDate date={pubDate} locale={locale} />
 			<span class="separator">&middot;</span>
 			<span>{readingTime} min</span>
 		</div>

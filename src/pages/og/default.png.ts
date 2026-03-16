@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import satori from 'satori';
 import sharp from 'sharp';
-import { readFileSync } from 'node:fs';
+import { getOgSatoriFonts } from '../../lib/og-fonts';
 
 export const GET: APIRoute = async () => {
 	const markup = {
@@ -139,18 +139,10 @@ export const GET: APIRoute = async () => {
 		},
 	};
 
-	const serifFont = readFileSync('/usr/share/fonts/truetype/freefont/FreeSerif.ttf');
-	const serifBoldFont = readFileSync('/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf');
-	const sansFont = readFileSync('/usr/share/fonts/truetype/freefont/FreeSans.ttf');
-
 	const svg = await satori(markup as any, {
 		width: 1200,
 		height: 630,
-		fonts: [
-			{ name: 'Serif', data: serifFont, weight: 400 as const, style: 'normal' as const },
-			{ name: 'Serif', data: serifBoldFont, weight: 700 as const, style: 'normal' as const },
-			{ name: 'Sans', data: sansFont, weight: 400 as const, style: 'normal' as const },
-		],
+		fonts: getOgSatoriFonts(),
 	});
 
 	const png = await sharp(Buffer.from(svg)).png().toBuffer();

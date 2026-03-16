@@ -2,7 +2,7 @@ import type { APIRoute, GetStaticPaths } from 'astro';
 import { getCollection } from 'astro:content';
 import satori from 'satori';
 import sharp from 'sharp';
-import { readFileSync } from 'node:fs';
+import { getOgSatoriFonts } from '../../lib/og-fonts';
 
 export const getStaticPaths: GetStaticPaths = async () => {
 	const posts = await getCollection('blog');
@@ -204,18 +204,10 @@ export const GET: APIRoute = async ({ props }) => {
 		},
 	};
 
-	const serifFont = readFileSync('/usr/share/fonts/truetype/freefont/FreeSerif.ttf');
-	const serifBoldFont = readFileSync('/usr/share/fonts/truetype/freefont/FreeSerifBold.ttf');
-	const sansFont = readFileSync('/usr/share/fonts/truetype/freefont/FreeSans.ttf');
-
 	const svg = await satori(markup as any, {
 		width: 1200,
 		height: 630,
-		fonts: [
-			{ name: 'Serif', data: serifFont, weight: 400, style: 'normal' as const },
-			{ name: 'Serif', data: serifBoldFont, weight: 700, style: 'normal' as const },
-			{ name: 'Sans', data: sansFont, weight: 400, style: 'normal' as const },
-		],
+		fonts: getOgSatoriFonts(),
 	});
 
 	const png = await sharp(Buffer.from(svg)).png().toBuffer();

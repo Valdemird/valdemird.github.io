@@ -87,10 +87,10 @@ if (lang === 'en') {
 				<div class="prose">
 					<header class="article-header">
 						<div class="meta">
-							<FormattedDate date={pubDate} />
+							<FormattedDate date={pubDate} locale={lang} />
 							{updatedDate && (
 								<span class="updated">
-									&middot; updated <FormattedDate date={updatedDate} />
+									&middot; updated <FormattedDate date={updatedDate} locale={lang} />
 								</span>
 							)}
 						</div>

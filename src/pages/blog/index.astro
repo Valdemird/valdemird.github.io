@@ -47,7 +47,7 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 						<div class="featured-inner">
 							<div class="featured-meta">
 								<span class="featured-badge">Featured</span>
-								<FormattedDate date={featuredPost.data.pubDate} />
+								<FormattedDate date={featuredPost.data.pubDate} locale="en" />
 							</div>
 							<h2>{featuredPost.data.title}</h2>
 							<p>{featuredPost.data.description}</p>
@@ -80,6 +80,7 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 									description={post.data.description}
 									pubDate={post.data.pubDate}
 									tags={post.data.tags}
+									locale="en"
 								/>
 							))}
 						</div>
