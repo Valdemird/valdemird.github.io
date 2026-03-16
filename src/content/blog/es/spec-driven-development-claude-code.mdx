@@ -1,0 +1,210 @@
+---
+title: "Desarrollo Basado en Specs con Claude Code: 6 Comandos Que Cambiaron Mi Forma de Construir Software"
+description: "Por qué pedirle código a un LLM sin especificación produce resultados mediocres, y cómo un flujo estructurado de specs convierte a Claude Code en un co-arquitecto."
+pubDate: 2026-03-15
+tags: ["claude-code", "ia", "herramientas-dev", "workflow"]
+featured: true
+lang: es
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Hay un momento que todo desarrollador usando herramientas de IA ha vivido: le pides una feature, recibes 200 líneas de código, las pegas en tu proyecto, y pasas la siguiente hora debuggeando por qué no encajan. El código *funciona* — simplemente no *pertenece*.
+
+El problema no es el modelo. Es el proceso.
+
+Después de meses construyendo con Claude Code, desarrollé un flujo de trabajo que cambió fundamentalmente mis resultados. En lugar de tratar al LLM como un generador de código, lo trato como un **co-arquitecto** — y la diferencia es abismal.
+
+## El Problema del Desarrollo "a Puro Prompt"
+
+Cuando abres Claude Code y escribes *"agrega autenticación JWT a mi API"*, le estás pidiendo al modelo que tome docenas de decisiones implícitas:
+
+- ¿Qué librería de JWT?
+- ¿Dónde se almacenan los tokens?
+- ¿Cómo se integra con tu middleware existente?
+- ¿Cuál es tu patrón de manejo de errores?
+- ¿Cómo están estructuradas tus rutas?
+
+El modelo va a adivinar. A veces acierta. Pero cuando no, perdiste tiempo en código que hay que reescribir, no refactorizar.
+
+<Callout type="important" title="La idea central">
+El cuello de botella no es generar código — es la **especificación**. Si puedes definir claramente *qué* quieres, el *cómo* se vuelve casi trivial para el modelo.
+</Callout>
+
+## El Flujo Spec-Driven
+
+Construí 6 slash commands para Claude Code que imponen un pipeline estructurado. Cada paso produce un artefacto, y cada transición requiere aprobación humana:
+
+```
+/spec-create  →  /spec-audit  →  /spec-review  →  /spec-plan  →  /spec-implement
+     ↓               ↓               ↓                ↓               ↓
+  Spec crudo    Spec enriquecido  Check de readiness  Plan por fases  Código (fase por fase)
+```
+
+Veamos cada uno con ejemplos reales.
+
+## Paso 1: `/spec-create` — De idea a spec estructurado
+
+Le das un nombre y una descripción vaga. Eso es todo.
+
+<CodeBlock filename=".claude/commands/spec-create.md">
+```markdown
+# Crear Spec Inicial
+
+Quiero crear un spec para la feature: **$ARGUMENTS**
+
+## Tu tarea
+
+1. Crea el directorio `.claude/specs/` si no existe
+2. Toma el input que te di y genera un spec estructurado
+3. Guárdalo en `.claude/specs/<nombre-feature>.md`
+```
+</CodeBlock>
+
+El comando toma tu idea vaga y produce un documento estructurado con:
+
+- **Contexto**: Por qué se necesita esta feature
+- **Comportamiento esperado**: Casos normales y edge cases
+- **Lo que NO debe hacer**: Restricciones explícitas
+- **Criterios de aceptación**: Checkboxes verificables
+- **Preguntas abiertas**: Cosas que *Claude detectó* que tú necesitas decidir
+
+Esa última parte es la magia. En lugar de adivinar tu preferencia de librería JWT, te pregunta.
+
+<Callout type="tip" title="Por qué funciona">
+Al forzar la especificación antes del código, adelantas las decisiones que causan más retrabajo. Toma 5 minutos responder preguntas en un spec. Toma 2 horas desenredar suposiciones equivocadas en código.
+</Callout>
+
+## Paso 2: `/spec-audit` — El spec se encuentra con la realidad
+
+Aquí se pone interesante. El comando de audit le dice a Claude que **explore tu codebase real** y enriquezca el spec con contexto técnico.
+
+<CodeBlock filename=".claude/commands/spec-audit.md">
+```markdown
+# Auditar Spec contra el Código
+
+### Paso 2 — Explora el proyecto a fondo
+
+Sin escribir código, explora:
+- Estructura general del proyecto
+- Patrones de arquitectura usados
+- Convenciones de nombrado
+- Cómo se manejan los errores actualmente
+- Archivos similares a lo que se quiere construir
+```
+</CodeBlock>
+
+Después de ejecutar esto, tu spec obtiene una nueva sección — **Análisis Técnico** — con una tabla de archivos a modificar, archivos a crear, patrones existentes a seguir, dependencias relevantes y riesgos detectados.
+
+Este paso previene la falla #1 del código generado por IA: **ignorar patrones existentes**. Claude ahora sabe que tu proyecto usa un enfoque específico de manejo de errores, una estructura de carpetas particular y ciertas convenciones de nombrado. El código que escriba después va a *encajar*.
+
+## Paso 3: `/spec-review` — El semáforo de readiness
+
+Antes de invertir tiempo en un plan, este comando te da una evaluación clara:
+
+- 🟢 **Listo**: Bien definido, suficiente para implementar
+- 🟡 **Puede avanzar con supuestos**: Ambiguo pero Claude puede hacer suposiciones razonables
+- 🔴 **Bloqueante**: Decisiones críticas que deben tomarse antes de escribir código
+
+Este es el checkpoint que previene esfuerzo desperdiciado. Si algo está en rojo, lo arreglas ahora — no después de 3 fases de implementación.
+
+## Paso 4: `/spec-plan` — Plan de implementación por fases
+
+El comando de plan lee el spec auditado y genera un plan paso a paso. Cada fase es:
+
+- **Pequeña**: 1-3 archivos tocados
+- **Verificable**: Criterio claro de "cómo sé que está bien"
+- **Independiente**: Se puede revisar antes de continuar
+
+<CodeBlock filename="Ejemplo de plan generado">
+```markdown
+### Fase 1 — Schema de base de datos y migración
+**Objetivo:** La tabla Users existe con campos de auth
+**Archivos que se tocan:**
+- crear: prisma/migrations/add-auth-fields.sql
+- modificar: prisma/schema.prisma
+**Cómo verifico:** `npx prisma migrate dev` corre sin errores
+
+### Fase 2 — Middleware de auth y utilidades JWT
+**Objetivo:** Rutas protegidas retornan 401 sin autenticación
+**Archivos que se tocan:**
+- crear: src/middleware/auth.ts
+- crear: src/utils/jwt.ts
+- modificar: src/app.ts
+**Cómo verifico:** curl ruta desprotegida → 200, ruta protegida → 401
+```
+</CodeBlock>
+
+<Callout type="warning">
+El plan tiene una regla dura: **máximo 3-4 fases** para features medianas. Si necesita más, la feature es muy grande y debe dividirse. Esto previene el scope creep.
+</Callout>
+
+## Paso 5: `/spec-implement` — Ejecución fase por fase
+
+Finalmente, el comando de implementación. Pero fíjate — solo implementa **una fase a la vez**.
+
+<CodeBlock filename=".claude/commands/spec-implement.md">
+```markdown
+# Implementar Fase $2
+
+## Reglas de implementación
+
+- Sigue exactamente los patrones detectados en el análisis técnico
+- Si encuentras algo inesperado que cambia el plan,
+  **detente y avísame** antes de improvisar
+- Usa el estilo de código que ya existe en el proyecto
+```
+</CodeBlock>
+
+Después de cada fase, Claude:
+
+1. Corre los tests relevantes
+2. Resume qué hizo y qué decisiones tomó
+3. **Te pide revisión antes de continuar**
+
+Esta es la diferencia clave con "genera todo el código de una vez". Si la Fase 1 revela un problema, puedes ajustar el plan antes de que empiece la Fase 2. El costo del cambio se mantiene bajo.
+
+## Bonus: Comandos de review
+
+Más allá de los specs, también uso dos comandos de revisión que complementan el flujo:
+
+### `/performance`
+
+Un review de performance estructurado que revisa algoritmos, queries N+1, memory leaks, oportunidades de caché, tamaños de bundle y más. Los hallazgos se ranquean por severidad con fixes concretos.
+
+### `/architecture`
+
+Un review de arquitectura que cubre principios SOLID, acoplamiento, separación de concerns, patrones de diseño, seguridad y testabilidad. Incluye un diagrama ASCII de las capas detectadas y un roadmap de refactoring priorizado.
+
+## Instala estos comandos en tu proyecto
+
+El setup es simple. Pon los archivos markdown en tu proyecto:
+
+<CodeBlock filename="Estructura del proyecto">
+```
+tu-proyecto/
+├── .claude/
+│   ├── commands/
+│   │   ├── spec-create.md
+│   │   ├── spec-audit.md
+│   │   ├── spec-review.md
+│   │   ├── spec-plan.md
+│   │   ├── spec-implement.md
+│   │   ├── performance.md
+│   │   └── architecture.md
+│   └── specs/
+│       └── (los specs generados van aquí)
+└── CLAUDE.md
+```
+</CodeBlock>
+
+Cada comando es un archivo markdown standalone con frontmatter que define su descripción, herramientas permitidas y formato de argumentos. Claude Code los detecta automáticamente como slash commands `/project:nombre-comando`.
+
+## La regla de oro
+
+> Nunca saltes pasos bajo presión. El tiempo que "ahorras" saltando el audit o el review lo pagas triple en correcciones después.
+
+Este flujo no se trata de ir más lento — se trata de **invertir 10 minutos en especificación para ahorrar 2 horas en debugging**. El LLM se vuelve dramáticamente más útil cuando lo tratas como un colaborador que necesita contexto, no como una caja mágica que adivina lo que quieres.
+
+Spec-driven le gana a prompt-driven. Siempre.

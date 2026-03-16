@@ -1,0 +1,329 @@
+---
+interface Props {
+	title: string;
+	description: string;
+	url: string;
+	tech: readonly string[];
+}
+
+const { title, description, url, tech } = Astro.props;
+---
+
+<a href={url} target="_blank" rel="noopener noreferrer" class="project-card">
+	<div class="card-glow" aria-hidden="true"></div>
+	<div class="card-inner">
+		<!-- Live browser preview -->
+		<div class="card-preview">
+			<div class="preview-bar">
+				<div class="preview-dots"><span></span><span></span><span></span></div>
+				<span class="preview-url">{url.replace('https://', '')}</span>
+				<span class="preview-live-badge">LIVE</span>
+			</div>
+			<div class="preview-viewport">
+				<!-- Scaled iframe of the real site -->
+				<iframe
+					src={url}
+					title={`Preview of ${title}`}
+					loading="lazy"
+					sandbox="allow-scripts allow-same-origin"
+					tabindex="-1"
+				></iframe>
+				<!-- Overlay to prevent iframe interaction (card is the link) -->
+				<div class="preview-overlay"></div>
+				<!-- Fallback wireframe shown while iframe loads -->
+				<div class="preview-fallback" aria-hidden="true">
+					<div class="preview-line w-60"></div>
+					<div class="preview-line w-80"></div>
+					<div class="preview-line w-40"></div>
+					<div class="preview-grid">
+						<div class="preview-block"></div>
+						<div class="preview-block"></div>
+						<div class="preview-block"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="card-body">
+			<div class="card-header">
+				<h3>{title}</h3>
+				<svg class="arrow" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<line x1="7" y1="17" x2="17" y2="7"></line>
+					<polyline points="7 7 17 7 17 17"></polyline>
+				</svg>
+			</div>
+			<p>{description}</p>
+			<div class="tech-tags">
+				{tech.map((t) => <span class="tech-tag">{t}</span>)}
+			</div>
+		</div>
+	</div>
+</a>
+
+<script>
+	function initPreviews() {
+		document.querySelectorAll('.preview-viewport').forEach((viewport) => {
+			const iframe = viewport.querySelector('iframe') as HTMLIFrameElement;
+			if (!iframe) return;
+
+			// Scale iframe to fit container width exactly
+			const setScale = () => {
+				const containerWidth = viewport.clientWidth;
+				const scale = containerWidth / 1440;
+				iframe.style.transform = `scale(${scale})`;
+			};
+
+			setScale();
+			window.addEventListener('resize', setScale);
+
+			iframe.addEventListener('load', () => {
+				const fallback = viewport.querySelector('.preview-fallback') as HTMLElement;
+				if (fallback) {
+					fallback.style.opacity = '0';
+					setTimeout(() => { fallback.style.display = 'none'; }, 300);
+				}
+				iframe.style.opacity = '1';
+			});
+		});
+	}
+
+	initPreviews();
+	document.addEventListener('astro:after-swap', initPreviews);
+</script>
+
+<style>
+	.project-card {
+		position: relative;
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		border-radius: var(--radius-lg);
+		overflow: hidden;
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+
+	.project-card:hover {
+		transform: translateY(-4px);
+	}
+
+	/* Gradient glow border */
+	.card-glow {
+		position: absolute;
+		inset: 0;
+		border-radius: var(--radius-lg);
+		padding: 1px;
+		background: linear-gradient(135deg, var(--color-border), var(--color-border));
+		transition: background var(--duration-slow) var(--ease-smooth);
+		z-index: 0;
+	}
+
+	.project-card:hover .card-glow {
+		background: linear-gradient(135deg, var(--color-accent), var(--color-success), var(--color-accent));
+		background-size: 200% 200%;
+		animation: glowShift 3s ease infinite;
+	}
+
+	@keyframes glowShift {
+		0%, 100% { background-position: 0% 50%; }
+		50% { background-position: 100% 50%; }
+	}
+
+	.card-inner {
+		position: relative;
+		z-index: 1;
+		background: var(--color-surface);
+		border-radius: calc(var(--radius-lg) - 1px);
+		overflow: hidden;
+		transition: box-shadow var(--duration-normal) var(--ease-smooth);
+	}
+
+	.project-card:hover .card-inner {
+		box-shadow: var(--shadow-lg);
+	}
+
+	/* ========================================
+	   LIVE BROWSER PREVIEW
+	   ======================================== */
+	.card-preview {
+		background: var(--color-bg-secondary);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.preview-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.5rem 0.75rem;
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.preview-dots { display: flex; gap: 4px; }
+	.preview-dots span { width: 7px; height: 7px; border-radius: 50%; }
+	.preview-dots span:first-child { background: oklch(0.65 0.2 27); }
+	.preview-dots span:nth-child(2) { background: oklch(0.78 0.15 85); }
+	.preview-dots span:last-child { background: oklch(0.6 0.18 145); }
+
+	.preview-url {
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		color: var(--color-text-muted);
+		background: oklch(from var(--color-bg) l c h / 0.5);
+		padding: 0.15em 0.5em;
+		border-radius: var(--radius-sm);
+		flex: 1;
+	}
+
+	.preview-live-badge {
+		font-family: var(--font-mono);
+		font-size: 0.55rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		color: var(--color-success);
+		background: oklch(from var(--color-success) l c h / 0.1);
+		border: 1px solid oklch(from var(--color-success) l c h / 0.2);
+		padding: 0.15em 0.4em;
+		border-radius: var(--radius-sm);
+	}
+
+	/* Viewport container — uses aspect-ratio for proper fit */
+	.preview-viewport {
+		position: relative;
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		overflow: hidden;
+	}
+
+	.preview-viewport iframe {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 1440px;
+		height: 810px;
+		border: none;
+		transform-origin: top left;
+		opacity: 0;
+		transition: opacity 0.4s var(--ease-smooth);
+		pointer-events: none;
+	}
+
+	/* Invisible overlay to block iframe interaction */
+	.preview-overlay {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		cursor: pointer;
+	}
+
+	/* Fallback wireframe while iframe loads */
+	.preview-fallback {
+		position: absolute;
+		inset: 0;
+		z-index: 1;
+		padding: 1rem;
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		transition: opacity 0.3s var(--ease-smooth);
+	}
+
+	.preview-line {
+		height: 6px;
+		border-radius: 3px;
+		background: var(--color-border);
+	}
+
+	.project-card:hover .preview-fallback .preview-line {
+		animation: shimmerLine 1.5s ease-in-out infinite;
+	}
+
+	.w-60 { width: 60%; }
+	.w-80 { width: 80%; }
+	.w-40 { width: 40%; }
+
+	@keyframes shimmerLine {
+		0%, 100% { opacity: 0.5; }
+		50% { opacity: 1; }
+	}
+
+	.preview-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.35rem;
+		margin-top: 0.3rem;
+	}
+
+	.preview-block {
+		height: 28px;
+		border-radius: var(--radius-sm);
+		background: var(--color-border);
+		opacity: 0.6;
+	}
+
+	/* ========================================
+	   CARD BODY
+	   ======================================== */
+	.card-body {
+		padding: 1.5rem;
+	}
+
+	.card-header {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		margin-bottom: 0.5rem;
+		gap: 0.5rem;
+	}
+
+	.arrow {
+		color: var(--color-text-muted);
+		flex-shrink: 0;
+		margin-top: 0.15rem;
+		transition: transform var(--duration-normal) var(--ease-spring),
+			color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.project-card:hover .arrow {
+		transform: translate(3px, -3px);
+		color: var(--color-accent);
+	}
+
+	h3 {
+		font-family: var(--font-serif);
+		font-size: 1.25rem;
+		margin: 0;
+		color: var(--color-text);
+		line-height: 1.3;
+	}
+
+	p {
+		font-size: 0.9rem;
+		color: var(--color-text-secondary);
+		line-height: 1.6;
+		margin: 0 0 1rem;
+	}
+
+	.tech-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+
+	.tech-tag {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 500;
+		padding: 0.2em 0.55em;
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		color: var(--color-text-muted);
+		letter-spacing: 0.01em;
+		transition: border-color var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.project-card:hover .tech-tag {
+		border-color: var(--color-border-strong);
+		color: var(--color-text-secondary);
+	}
+</style>

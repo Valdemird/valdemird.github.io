@@ -1,62 +1,238 @@
 ---
-import Layout from '../layouts/BlogPost.astro';
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import { SITE_TITLE, SOCIAL_LINKS, t } from '../consts';
+
+const strings = t(Astro.url);
 ---
 
-<Layout
-	title="About Me"
-	description="Lorem ipsum dolor sit amet"
-	pubDate={new Date('August 08 2021')}
-	heroImage="/blog-placeholder-about.jpg"
->
-	<p>
-		Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut
-		labore et dolore magna aliqua. Vitae ultricies leo integer malesuada nunc vel risus commodo
-		viverra. Adipiscing enim eu turpis egestas pretium. Euismod elementum nisi quis eleifend quam
-		adipiscing. In hac habitasse platea dictumst vestibulum. Sagittis purus sit amet volutpat. Netus
-		et malesuada fames ac turpis egestas. Eget magna fermentum iaculis eu non diam phasellus
-		vestibulum lorem. Varius sit amet mattis vulputate enim. Habitasse platea dictumst quisque
-		sagittis. Integer quis auctor elit sed vulputate mi. Dictumst quisque sagittis purus sit amet.
-	</p>
+<!doctype html>
+<html lang="en">
+	<head>
+		<BaseHead title={`${strings.about.title} — ${SITE_TITLE}`} description={strings.about.description} />
+	</head>
+	<body>
+		<Header />
+		<main>
+			<!-- Hero area with grid background -->
+			<div class="about-hero">
+				<div class="about-hero-bg" aria-hidden="true"><div class="hero-grid"></div></div>
+				<div class="about-hero-content animate-fade-in">
+					<span class="about-label">About</span>
+					<h1>{strings.about.title}</h1>
+				</div>
+			</div>
 
-	<p>
-		Morbi tristique senectus et netus. Id semper risus in hendrerit gravida rutrum quisque non
-		tellus. Habitasse platea dictumst quisque sagittis purus sit amet. Tellus molestie nunc non
-		blandit massa. Cursus vitae congue mauris rhoncus. Accumsan tortor posuere ac ut. Fringilla urna
-		porttitor rhoncus dolor. Elit ullamcorper dignissim cras tincidunt lobortis. In cursus turpis
-		massa tincidunt dui ut ornare lectus. Integer feugiat scelerisque varius morbi enim nunc.
-		Bibendum neque egestas congue quisque egestas diam. Cras ornare arcu dui vivamus arcu felis
-		bibendum. Dignissim suspendisse in est ante in nibh mauris. Sed tempus urna et pharetra pharetra
-		massa massa ultricies mi.
-	</p>
+			<article class="about-body">
+				<section class="section animate-fade-in delay-1">
+					<p>
+						I'm a software engineer who loves building tools that make developers more productive.
+						I'm passionate about the intersection of AI and developer experience — how we can
+						use language models not just as code generators, but as thoughtful collaborators in
+						the software development process.
+					</p>
+					<p>
+						Currently, I'm building <a href="https://todo.valdemird.com">todo.valdemird.com</a>,
+						an AI-powered task manager with Pomodoro timer, drag-and-drop, and smart scheduling.
+						Built with Next.js 15, React 19, Prisma, and Tailwind CSS 4.
+					</p>
+				</section>
 
-	<p>
-		Mollis nunc sed id semper risus in. Convallis a cras semper auctor neque. Diam sit amet nisl
-		suscipit. Lacus viverra vitae congue eu consequat ac felis donec. Egestas integer eget aliquet
-		nibh praesent tristique magna sit amet. Eget magna fermentum iaculis eu non diam. In vitae
-		turpis massa sed elementum. Tristique et egestas quis ipsum suspendisse ultrices. Eget lorem
-		dolor sed viverra ipsum. Vel turpis nunc eget lorem dolor sed viverra. Posuere ac ut consequat
-		semper viverra nam. Laoreet suspendisse interdum consectetur libero id faucibus. Diam phasellus
-		vestibulum lorem sed risus ultricies tristique. Rhoncus dolor purus non enim praesent elementum
-		facilisis. Ultrices tincidunt arcu non sodales neque. Tempus egestas sed sed risus pretium quam
-		vulputate. Viverra suspendisse potenti nullam ac tortor vitae purus faucibus ornare. Fringilla
-		urna porttitor rhoncus dolor purus non. Amet dictum sit amet justo donec enim.
-	</p>
+				<section class="section">
+					<div class="section-header">
+						<span class="section-label">01</span>
+						<h2>What I believe in</h2>
+						<div class="section-line"></div>
+					</div>
+					<div class="beliefs">
+						<div class="belief">
+							<div class="belief-number" aria-hidden="true">01</div>
+							<h3>Spec-driven development</h3>
+							<p>Write the spec before the code. Let the LLM be your co-architect, not just your typist.</p>
+						</div>
+						<div class="belief">
+							<div class="belief-number" aria-hidden="true">02</div>
+							<h3>Build in public</h3>
+							<p>Share what you learn. The best way to solidify knowledge is to teach it.</p>
+						</div>
+						<div class="belief">
+							<div class="belief-number" aria-hidden="true">03</div>
+							<h3>Beauty & function</h3>
+							<p>Tools should be beautiful AND functional. Design is not decoration — it's communication.</p>
+						</div>
+					</div>
+				</section>
 
-	<p>
-		Mattis ullamcorper velit sed ullamcorper morbi tincidunt. Tortor posuere ac ut consequat semper
-		viverra. Tellus mauris a diam maecenas sed enim ut sem viverra. Venenatis urna cursus eget nunc
-		scelerisque viverra mauris in. Arcu ac tortor dignissim convallis aenean et tortor at. Curabitur
-		gravida arcu ac tortor dignissim convallis aenean et tortor. Egestas tellus rutrum tellus
-		pellentesque eu. Fusce ut placerat orci nulla pellentesque dignissim enim sit amet. Ut enim
-		blandit volutpat maecenas volutpat blandit aliquam etiam. Id donec ultrices tincidunt arcu. Id
-		cursus metus aliquam eleifend mi.
-	</p>
+				<section class="section">
+					<div class="section-header">
+						<span class="section-label">02</span>
+						<h2>Get in touch</h2>
+						<div class="section-line"></div>
+					</div>
+					<div class="contact-links">
+						{SOCIAL_LINKS.github && (
+							<a href={SOCIAL_LINKS.github} target="_blank" rel="noopener noreferrer" class="contact-link">
+								<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+								<span>GitHub</span>
+							</a>
+						)}
+						{SOCIAL_LINKS.linkedin && (
+							<a href={SOCIAL_LINKS.linkedin} target="_blank" rel="noopener noreferrer" class="contact-link">
+								<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+								<span>LinkedIn</span>
+							</a>
+						)}
+					</div>
+				</section>
+			</article>
+		</main>
 
-	<p>
-		Tempus quam pellentesque nec nam aliquam sem. Risus at ultrices mi tempus imperdiet. Id porta
-		nibh venenatis cras sed felis eget velit. Ipsum a arcu cursus vitae. Facilisis magna etiam
-		tempor orci eu lobortis elementum. Tincidunt dui ut ornare lectus sit. Quisque non tellus orci
-		ac. Blandit libero volutpat sed cras. Nec tincidunt praesent semper feugiat nibh sed pulvinar
-		proin gravida. Egestas integer eget aliquet nibh praesent tristique magna.
-	</p>
-</Layout>
+		<script>
+			function initAbout() {
+				const observer = new IntersectionObserver(
+					(entries) => { entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }); },
+					{ threshold: 0.08, rootMargin: '0px 0px -60px 0px' }
+				);
+				document.querySelectorAll('.section:not(.animate-fade-in)').forEach(s => observer.observe(s));
+			}
+			initAbout();
+			document.addEventListener('astro:after-swap', initAbout);
+		</script>
+		<Footer />
+	</body>
+</html>
+
+<style>
+	main { max-width: var(--full-width); margin: 0 auto; padding: 0; }
+
+	/* Hero */
+	.about-hero {
+		position: relative;
+		padding: 5rem var(--space-lg) 3rem;
+		overflow: hidden;
+	}
+	.about-hero-bg { position: absolute; inset: 0; z-index: 0; }
+	.hero-grid {
+		position: absolute; inset: 0;
+		background-image: linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
+		background-size: 48px 48px; opacity: 0.25;
+		mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%);
+		-webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%);
+	}
+	.about-hero-content { position: relative; z-index: 1; max-width: var(--content-width); margin: 0 auto; }
+	.about-label {
+		font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500;
+		color: var(--color-accent); letter-spacing: 0.08em; text-transform: uppercase;
+		display: block; margin-bottom: 0.75rem;
+	}
+	.about-hero-content h1 { font-size: clamp(2rem, 5vw, 2.8rem); }
+
+	/* Body */
+	.about-body {
+		max-width: var(--content-width);
+		margin: 0 auto;
+		padding: 0 var(--space-lg) 4rem;
+	}
+
+	.about-body p { font-size: 1.1rem; line-height: 1.85; }
+
+	/* Scroll-triggered sections */
+	.section {
+		margin-bottom: 3.5rem;
+		opacity: 0;
+		transform: translateY(24px);
+		transition: opacity 0.7s var(--ease-smooth), transform 0.7s var(--ease-smooth);
+	}
+
+	.section.visible,
+	.section.animate-fade-in {
+		opacity: 1;
+		transform: translateY(0);
+	}
+
+	.section-header {
+		display: flex;
+		align-items: center;
+		gap: var(--space-md);
+		margin-bottom: 2rem;
+	}
+
+	.section-label {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--color-accent);
+		opacity: 0.6;
+		letter-spacing: 0.05em;
+	}
+
+	.section-header h2 { margin: 0; white-space: nowrap; }
+	.section-line { flex: 1; height: 1px; background: linear-gradient(90deg, var(--color-border), transparent); }
+
+	/* Beliefs */
+	.beliefs { display: grid; gap: 1rem; }
+
+	.belief {
+		position: relative;
+		padding: 1.5rem 1.5rem 1.5rem 4.5rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
+		transition: border-color var(--duration-normal) var(--ease-smooth),
+			transform var(--duration-normal) var(--ease-spring),
+			box-shadow var(--duration-normal) var(--ease-smooth);
+	}
+
+	.belief:hover {
+		border-color: var(--color-accent);
+		transform: translateX(4px);
+		box-shadow: var(--shadow-md);
+	}
+
+	.belief-number {
+		position: absolute;
+		left: 1.25rem;
+		top: 1.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--color-accent);
+		opacity: 0.5;
+	}
+
+	.belief h3 { font-size: 1.05rem; margin-bottom: 0.25em; }
+	.belief p { font-size: 0.92rem; margin: 0; color: var(--color-text-secondary); line-height: 1.6; }
+
+	/* Contact links */
+	.contact-links { display: flex; gap: 0.75rem; margin-top: 1rem; }
+
+	.contact-link {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.6rem 1.2rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		transition: all var(--duration-normal) var(--ease-spring);
+	}
+
+	.contact-link:hover {
+		color: var(--color-text);
+		border-color: var(--color-accent);
+		background: var(--color-accent-subtle);
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md);
+	}
+
+	@media (max-width: 640px) {
+		.about-hero { padding: 3rem var(--space-lg) 2rem; }
+		.belief { padding-left: 1.5rem; }
+		.belief-number { display: none; }
+		.contact-links { flex-direction: column; }
+	}
+</style>

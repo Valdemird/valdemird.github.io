@@ -1,0 +1,137 @@
+---
+interface Props {
+	filename?: string;
+}
+
+const { filename } = Astro.props;
+const blockId = `code-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<div class="code-block" id={blockId}>
+	{filename && (
+		<div class="code-header">
+			<span class="code-filename">
+				<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+					<polyline points="14 2 14 8 20 8"></polyline>
+				</svg>
+				{filename}
+			</span>
+			<button class="copy-btn" data-block-id={blockId} type="button" aria-label="Copy code">
+				<svg class="icon-copy" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+					<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+				</svg>
+				<svg class="icon-check" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<polyline points="20 6 9 17 4 12"></polyline>
+				</svg>
+			</button>
+		</div>
+	)}
+	{!filename && (
+		<button class="copy-btn copy-btn-float" data-block-id={blockId} type="button" aria-label="Copy code">
+			<svg class="icon-copy" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+				<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+			</svg>
+			<svg class="icon-check" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<polyline points="20 6 9 17 4 12"></polyline>
+			</svg>
+		</button>
+	)}
+	<div class="code-content">
+		<slot />
+	</div>
+</div>
+
+<script>
+	document.querySelectorAll('.copy-btn').forEach((btn) => {
+		btn.addEventListener('click', async () => {
+			const blockId = (btn as HTMLElement).dataset.blockId;
+			const block = document.getElementById(blockId!);
+			const code = block?.querySelector('pre code')?.textContent || block?.querySelector('pre')?.textContent || '';
+
+			try {
+				await navigator.clipboard.writeText(code.trim());
+				btn.classList.add('copied');
+				setTimeout(() => btn.classList.remove('copied'), 2000);
+			} catch {
+				// Fallback
+			}
+		});
+	});
+</script>
+
+<style>
+	.code-block {
+		position: relative;
+		margin: 1.75em 0;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+		background: var(--color-bg-secondary);
+	}
+
+	.code-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.5em 1em;
+		background: var(--color-surface);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.code-filename {
+		display: flex;
+		align-items: center;
+		gap: 0.4em;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: var(--color-text-muted);
+	}
+
+	.copy-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		border: none;
+		background: transparent;
+		color: var(--color-text-muted);
+		cursor: pointer;
+		border-radius: var(--radius-sm);
+		transition: color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth);
+	}
+
+	.copy-btn:hover {
+		color: var(--color-text);
+		background: var(--color-accent-subtle);
+	}
+
+	.copy-btn-float {
+		position: absolute;
+		top: 0.5em;
+		right: 0.5em;
+		opacity: 0;
+		transition: opacity var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth);
+	}
+
+	.code-block:hover .copy-btn-float {
+		opacity: 1;
+	}
+
+	.icon-check { display: none; }
+	.copy-btn.copied .icon-copy { display: none; }
+	.copy-btn.copied .icon-check { display: block; color: var(--color-success); }
+
+	.code-content :global(pre) {
+		margin: 0;
+		border: none;
+		border-radius: 0;
+	}
+</style>

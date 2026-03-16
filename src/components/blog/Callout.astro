@@ -1,0 +1,123 @@
+---
+interface Props {
+	type?: 'tip' | 'warning' | 'note' | 'important';
+	title?: string;
+}
+
+const { type = 'note', title } = Astro.props;
+
+const icons: Record<string, string> = {
+	tip: '💡',
+	warning: '⚠️',
+	note: '📝',
+	important: '🔑',
+};
+
+const defaultTitles: Record<string, string> = {
+	tip: 'Tip',
+	warning: 'Warning',
+	note: 'Note',
+	important: 'Important',
+};
+---
+
+<aside class:list={['callout', `callout-${type}`]} role="note">
+	<div class="callout-header">
+		<span class="callout-icon">{icons[type]}</span>
+		<span class="callout-title">{title || defaultTitles[type]}</span>
+	</div>
+	<div class="callout-content">
+		<slot />
+	</div>
+</aside>
+
+<style>
+	.callout {
+		margin: 2em 0;
+		padding: 1.25em 1.5em;
+		border-radius: var(--radius-md);
+		border-left: 4px solid;
+	}
+
+	.callout-note {
+		background: var(--color-accent-subtle);
+		border-left-color: var(--color-accent);
+	}
+
+	.callout-tip {
+		background: oklch(0.95 0.03 145);
+		border-left-color: var(--color-success);
+	}
+
+	.callout-warning {
+		background: oklch(0.96 0.03 75);
+		border-left-color: var(--color-warning);
+	}
+
+	.callout-important {
+		background: oklch(0.95 0.03 300);
+		border-left-color: oklch(0.6 0.15 300);
+	}
+
+	/* Dark mode overrides */
+	:global([data-theme='dark']) .callout-tip {
+		background: oklch(0.22 0.02 145);
+	}
+
+	:global([data-theme='dark']) .callout-warning {
+		background: oklch(0.22 0.02 75);
+	}
+
+	:global([data-theme='dark']) .callout-important {
+		background: oklch(0.22 0.02 300);
+	}
+
+	:global([data-theme='dark']) .callout-note {
+		background: var(--color-accent-subtle);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .callout-tip {
+			background: oklch(0.22 0.02 145);
+		}
+		:global(:root:not([data-theme='light'])) .callout-warning {
+			background: oklch(0.22 0.02 75);
+		}
+		:global(:root:not([data-theme='light'])) .callout-important {
+			background: oklch(0.22 0.02 300);
+		}
+	}
+
+	.callout-header {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		margin-bottom: 0.5em;
+	}
+
+	.callout-icon {
+		font-size: 1.1em;
+		line-height: 1;
+	}
+
+	.callout-title {
+		font-family: var(--font-sans);
+		font-weight: 600;
+		font-size: 0.9rem;
+		color: var(--color-text);
+	}
+
+	.callout-content {
+		font-size: 0.95rem;
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+	}
+
+	.callout-content :global(p) {
+		margin: 0;
+	}
+
+	.callout-content :global(p + p) {
+		margin-top: 0.5em;
+	}
+</style>

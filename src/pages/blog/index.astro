@@ -2,110 +2,282 @@
 import BaseHead from '../../components/BaseHead.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../../consts';
-import { getCollection } from 'astro:content';
+import PostPreview from '../../components/PostPreview.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
+import { SITE_TITLE, t } from '../../consts';
+import { getCollection } from 'astro:content';
+
+const strings = t(Astro.url);
 
 const posts = (await getCollection('blog')).sort(
 	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
 );
+
+const featuredPost = posts.find((p) => p.data.featured) || posts[0];
+const otherPosts = posts.filter((p) => p !== featuredPost);
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-		<style>
-			main {
-				width: 960px;
-			}
-			ul {
-				display: flex;
-				flex-wrap: wrap;
-				gap: 2rem;
-				list-style-type: none;
-				margin: 0;
-				padding: 0;
-			}
-			ul li {
-				width: calc(50% - 1rem);
-			}
-			ul li * {
-				text-decoration: none;
-				transition: 0.2s ease;
-			}
-			ul li:first-child {
-				width: 100%;
-				margin-bottom: 1rem;
-				text-align: center;
-			}
-			ul li:first-child img {
-				width: 100%;
-			}
-			ul li:first-child .title {
-				font-size: 2.369rem;
-			}
-			ul li img {
-				margin-bottom: 0.5rem;
-				border-radius: 12px;
-			}
-			ul li a {
-				display: block;
-			}
-			.title {
-				margin: 0;
-				color: rgb(var(--black));
-				line-height: 1;
-			}
-			.date {
-				margin: 0;
-				color: rgb(var(--gray));
-			}
-			ul li a:hover h4,
-			ul li a:hover .date {
-				color: rgb(var(--accent));
-			}
-			ul a:hover img {
-				box-shadow: var(--box-shadow);
-			}
-			@media (max-width: 720px) {
-				ul {
-					gap: 0.5em;
-				}
-				ul li {
-					width: 100%;
-					text-align: center;
-				}
-				ul li:first-child {
-					margin-bottom: 0;
-				}
-				ul li:first-child .title {
-					font-size: 1.563em;
-				}
-			}
-		</style>
+		<BaseHead title={`${strings.blog.title} — ${SITE_TITLE}`} description={strings.blog.description} />
 	</head>
 	<body>
 		<Header />
 		<main>
-			<section>
-				<ul>
-					{
-						posts.map((post) => (
-							<li>
-								<a href={`/blog/${post.slug}/`}>
-									<img width={720} height={360} src={post.data.heroImage} alt="" />
-									<h4 class="title">{post.data.title}</h4>
-									<p class="date">
-										<FormattedDate date={post.data.pubDate} />
-									</p>
-								</a>
-							</li>
-						))
-					}
-				</ul>
-			</section>
+			<!-- Blog hero -->
+			<div class="blog-hero">
+				<div class="blog-hero-bg" aria-hidden="true">
+					<div class="hero-grid"></div>
+				</div>
+				<div class="blog-hero-content animate-fade-in">
+					<span class="blog-label">Blog</span>
+					<h1>{strings.blog.description}</h1>
+				</div>
+			</div>
+
+			<div class="blog-content">
+				<!-- Featured post -->
+				{featuredPost && (
+					<a href={`/blog/${featuredPost.id}/`} class="featured-post animate-fade-in delay-1">
+						<div class="featured-accent" aria-hidden="true"></div>
+						<div class="featured-inner">
+							<div class="featured-meta">
+								<span class="featured-badge">Featured</span>
+								<FormattedDate date={featuredPost.data.pubDate} />
+							</div>
+							<h2>{featuredPost.data.title}</h2>
+							<p>{featuredPost.data.description}</p>
+							{featuredPost.data.tags && (
+								<div class="featured-tags">
+									{featuredPost.data.tags.map((tag: string) => (
+										<span class="tag">{tag}</span>
+									))}
+								</div>
+							)}
+							<span class="read-arrow">
+								{strings.blog.readMore}
+								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<line x1="5" y1="12" x2="19" y2="12"></line>
+									<polyline points="12 5 19 12 12 19"></polyline>
+								</svg>
+							</span>
+						</div>
+					</a>
+				)}
+
+				<!-- Other posts -->
+				{otherPosts.length > 0 && (
+					<section class="posts-section animate-fade-in delay-2">
+						<div class="posts-list">
+							{otherPosts.map((post) => (
+								<PostPreview
+									id={post.id}
+									title={post.data.title}
+									description={post.data.description}
+									pubDate={post.data.pubDate}
+									tags={post.data.tags}
+								/>
+							))}
+						</div>
+					</section>
+				)}
+			</div>
 		</main>
 		<Footer />
 	</body>
 </html>
+
+<style>
+	main {
+		max-width: var(--full-width);
+		margin: 0 auto;
+		padding: 0;
+	}
+
+	/* --- Blog hero --- */
+	.blog-hero {
+		position: relative;
+		padding: 5rem var(--space-lg) 3.5rem;
+		overflow: hidden;
+	}
+
+	.blog-hero-bg {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+	}
+
+	.hero-grid {
+		position: absolute;
+		inset: 0;
+		background-image:
+			linear-gradient(var(--color-border) 1px, transparent 1px),
+			linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
+		background-size: 48px 48px;
+		opacity: 0.25;
+		mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%);
+		-webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%);
+	}
+
+	.blog-hero-content {
+		position: relative;
+		z-index: 1;
+		max-width: var(--wide-width);
+		margin: 0 auto;
+	}
+
+	.blog-label {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--color-accent);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		display: block;
+		margin-bottom: 0.75rem;
+	}
+
+	.blog-hero-content h1 {
+		font-size: clamp(1.6rem, 3.5vw, 2.2rem);
+		max-width: 600px;
+		line-height: 1.3;
+		letter-spacing: -0.02em;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+	}
+
+	/* --- Blog content --- */
+	.blog-content {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: 0 var(--space-lg) 4rem;
+	}
+
+	/* --- Featured post --- */
+	.featured-post {
+		position: relative;
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+		background: var(--color-surface);
+		margin-bottom: 3rem;
+		transition: box-shadow var(--duration-normal) var(--ease-smooth),
+			transform var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+
+	.featured-post:hover {
+		box-shadow: var(--shadow-lg);
+		transform: translateY(-3px);
+		border-color: var(--color-accent);
+	}
+
+	.featured-accent {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 4px;
+		height: 100%;
+		background: linear-gradient(180deg, var(--color-accent), var(--color-success));
+		border-radius: 4px 0 0 4px;
+		opacity: 0;
+		transition: opacity var(--duration-normal) var(--ease-smooth);
+	}
+
+	.featured-post:hover .featured-accent {
+		opacity: 1;
+	}
+
+	.featured-inner {
+		padding: 2rem 2.5rem;
+	}
+
+	.featured-meta {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 1rem;
+		font-size: 0.82rem;
+		color: var(--color-text-muted);
+	}
+
+	.featured-badge {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-accent);
+		background: var(--color-accent-subtle);
+		padding: 0.25em 0.65em;
+		border-radius: var(--radius-sm);
+	}
+
+	.featured-inner h2 {
+		font-size: clamp(1.5rem, 3vw, 2rem);
+		margin: 0 0 0.6em;
+		line-height: 1.25;
+		letter-spacing: -0.015em;
+	}
+
+	.featured-inner p {
+		font-size: 1.05rem;
+		color: var(--color-text-secondary);
+		line-height: 1.7;
+		margin: 0 0 1.25em;
+		max-width: 600px;
+	}
+
+	.featured-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+		margin-bottom: 1.25rem;
+	}
+
+	.tag {
+		font-size: 0.72rem;
+		font-weight: 500;
+		padding: 0.2em 0.6em;
+		background: var(--color-accent-subtle);
+		border-radius: var(--radius-sm);
+		color: var(--color-accent);
+	}
+
+	.read-arrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--color-accent);
+	}
+
+	.read-arrow svg {
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+
+	.featured-post:hover .read-arrow svg {
+		transform: translateX(4px);
+	}
+
+	/* --- Posts list --- */
+	.posts-list {
+		display: flex;
+		flex-direction: column;
+	}
+
+	@media (max-width: 640px) {
+		.blog-hero {
+			padding: 3rem var(--space-lg) 2rem;
+		}
+
+		.featured-inner {
+			padding: 1.5rem;
+		}
+	}
+</style>

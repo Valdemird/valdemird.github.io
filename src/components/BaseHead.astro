@@ -1,7 +1,6 @@
 ---
-// Import the global.css file here so that it is included on
-// all pages through the use of the <BaseHead /> component.
 import '../styles/global.css';
+import { ClientRouter } from 'astro:transitions';
 
 interface Props {
 	title: string;
@@ -10,8 +9,7 @@ interface Props {
 }
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-
-const { title, description, image = '/blog-placeholder-1.jpg' } = Astro.props;
+const { title, description, image } = Astro.props;
 ---
 
 <!-- Global Metadata -->
@@ -20,9 +18,28 @@ const { title, description, image = '/blog-placeholder-1.jpg' } = Astro.props;
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <meta name="generator" content={Astro.generator} />
 
-<!-- Font preloads -->
-<link rel="preload" href="/fonts/atkinson-regular.woff" as="font" type="font/woff" crossorigin />
-<link rel="preload" href="/fonts/atkinson-bold.woff" as="font" type="font/woff" crossorigin />
+<!-- View Transitions -->
+<ClientRouter />
+
+<!-- Fonts: Fraunces (serif display) + Geist (sans body) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+	href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Geist:wght@300..900&family=Geist+Mono:wght@400;500&display=swap"
+	rel="stylesheet"
+/>
+
+<!-- Dark mode: prevent flash -->
+<script is:inline>
+	(function () {
+		const saved = localStorage.getItem('theme');
+		if (saved) {
+			document.documentElement.setAttribute('data-theme', saved);
+		} else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+			document.documentElement.setAttribute('data-theme', 'dark');
+		}
+	})();
+</script>
 
 <!-- Canonical URL -->
 <link rel="canonical" href={canonicalURL} />
@@ -37,11 +54,11 @@ const { title, description, image = '/blog-placeholder-1.jpg' } = Astro.props;
 <meta property="og:url" content={Astro.url} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
-<meta property="og:image" content={new URL(image, Astro.url)} />
+{image && <meta property="og:image" content={new URL(image, Astro.url)} />}
 
 <!-- Twitter -->
-<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:card" content={image ? "summary_large_image" : "summary"} />
 <meta property="twitter:url" content={Astro.url} />
 <meta property="twitter:title" content={title} />
 <meta property="twitter:description" content={description} />
-<meta property="twitter:image" content={new URL(image, Astro.url)} />
+{image && <meta property="twitter:image" content={new URL(image, Astro.url)} />}
