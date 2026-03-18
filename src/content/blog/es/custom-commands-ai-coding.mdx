@@ -1,6 +1,6 @@
 ---
 title: "Slash Commands Custom para Programar con IA: Construye Tu Propio Flujo Spec-Driven"
-description: "Cómo 6 archivos markdown convirtieron mi asistente de IA en un co-arquitecto estructurado. Así es por qué deberías construir tu propio sistema de comandos en vez de depender de prompts crudos."
+description: "Cómo 6 archivos markdown convirtieron mi asistente de IA en un co-arquitecto estructurado — y por qué deberías construir tu propio sistema de comandos en vez de depender de prompts crudos."
 pubDate: 2026-03-10
 tags: ["herramientas-ia", "workflow", "productividad", "automatizacion"]
 featured: true
@@ -19,11 +19,11 @@ import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
 
 Todas las herramientas de IA para programar te dejan escribir prompts en lenguaje natural. Muy pocas te dejan construir *flujos de trabajo estructurados* sobre ellas. Ese es el gap que la mayoría de desarrolladores no ven, y la razón por la que su código generado por IA necesita reescrituras constantes.
 
-El concepto no es nuevo. El [desarrollo spec-driven](https://en.wikipedia.org/wiki/Spec-driven_development): definir *qué* quieres antes de escribir *cómo* ha sido una disciplina de ingeniería de software por décadas. Lo nuevo es aplicarlo a la programación asistida por IA. Como [explora Birgitta Bockeler en martinfowler.com](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html), las herramientas de SDD están trayendo la disciplina de la ingeniería temprana — diseñar antes de codear — a la era agéntica.
+El concepto no es nuevo. El [desarrollo spec-driven](https://en.wikipedia.org/wiki/Spec-driven_development) — definir *qué* quieres antes de escribir *cómo* — ha sido una disciplina de ingeniería de software por décadas. Lo nuevo es aplicarlo a la programación asistida por IA. Como [explora Birgitta Bockeler en martinfowler.com](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html), las herramientas de SDD están trayendo la disciplina de la ingeniería temprana — diseñar antes de codear — a la era agéntica.
 
 La idea es simple: en lugar de escribir las mismas instrucciones cada vez ("explora mi codebase primero", "sigue los patrones existentes", "no escribas tests todavía"), las codificas en slash commands reutilizables. Archivos markdown. Sin SDK, sin API, sin sistema de plugins. Solo archivos que tu herramienta de IA lee como instrucciones.
 
-Construí 6 comandos que forman un **pipeline de desarrollo spec-driven**. Así es cómo. Así es por qué deberías construir los tuyos.
+Construí 6 comandos que forman un **pipeline de desarrollo spec-driven**. Te cuento cómo, y por qué deberías armar los tuyos.
 
 ## Por Qué los Prompts Crudos Fallan a Escala
 
@@ -34,7 +34,7 @@ Cuando escribes *"agrega autenticación JWT a mi API"*, le estás pidiendo al mo
 - ¿Cómo se integra con tu middleware existente?
 - ¿Cuál es tu patrón de manejo de errores?
 
-El modelo va a adivinar. A veces acierta. A menudo no. Y pasas más tiempo debuggeando las adivinanzas de la IA que lo que hubieras gastado escribiendo el código tú mismo.
+El modelo va a adivinar. A veces acierta. A menudo no. Y terminas gastando más tiempo corrigiendo las suposiciones de la IA que lo que hubieras tardado escribiendo el código tú mismo.
 
 <Callout type="important" title="La idea central">
 El cuello de botella no es generar código, es la **especificación**. Si defines claramente *qué* quieres, el *cómo* se vuelve casi trivial para el modelo.
@@ -48,7 +48,7 @@ Seis comandos, cada uno un archivo markdown, formando un pipeline lineal donde c
 
 ## Comando 1: Crear. De Idea a Spec Estructurado
 
-Le das un nombre y una descripción vaga. El comando genera un spec estructurado con contexto, comportamiento esperado, edge cases, restricciones, criterios de aceptación, y, crucialmente, **preguntas abiertas** que detectó que *tú* necesitas responder.
+Le das un nombre y una descripción general. El comando genera un spec estructurado con contexto, comportamiento esperado, edge cases, restricciones, criterios de aceptación, y, crucialmente, **preguntas abiertas** que detectó que *tú* necesitas responder.
 
 <CodeBlock filename=".commands/spec-create.md">
 ```markdown
@@ -91,7 +91,7 @@ Aquí el modelo **explora tu proyecto real**: estructura de archivos, convencion
 
 Este paso previene la falla #1 del código generado por IA: **ignorar patrones existentes**. Después del audit, el modelo conoce las convenciones de tu proyecto. El código que escriba después va a *encajar*.
 
-## Comando 3: Revisar. El Semáforo de Readiness
+## Comando 3: Revisar. El Semáforo de Preparación
 
 Antes de invertir tiempo en implementación, este comando evalúa el spec:
 
@@ -141,7 +141,7 @@ Regla dura: **máximo 3-4 fases** para features medianas. Si necesita más, la f
 
 El comando de implementación solo ejecuta **una fase a la vez**. Después de cada fase, resume qué hizo, qué decisiones tomó, y pide tu revisión antes de continuar.
 
-Si la Fase 1 revela un problema, ajustas el plan antes de que empiece la Fase 2. El costo del cambio se mantiene bajo durante todo el proyecto.
+Esta es la diferencia clave con "generar todo de un golpe". Si la Fase 1 revela un problema, ajustas el plan antes de que arranque la Fase 2. El costo del cambio se mantiene bajo durante todo el proyecto.
 
 ## Bonus: Comandos de Review
 

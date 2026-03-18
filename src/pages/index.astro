@@ -154,111 +154,131 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 </html>
 
 <script>
-	// --- Mouse-tracking parallax ---
-	const hero = document.getElementById('hero');
-	const terminal = document.getElementById('floating-terminal');
-	const shape1 = document.getElementById('shape-1');
-	const shape2 = document.getElementById('shape-2');
-	const shape3 = document.getElementById('shape-3');
-	let mouseX = 0, mouseY = 0, currentX = 0, currentY = 0;
+	function initLandingPage() {
+		// --- Mouse-tracking parallax ---
+		const hero = document.getElementById('hero');
+		const terminal = document.getElementById('floating-terminal');
+		const shape1 = document.getElementById('shape-1');
+		const shape2 = document.getElementById('shape-2');
+		const shape3 = document.getElementById('shape-3');
 
-	function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+		if (!hero) return; // Not on the landing page
 
-	hero?.addEventListener('mousemove', (e) => {
-		const rect = hero.getBoundingClientRect();
-		mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
-		mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
-	});
-	hero?.addEventListener('mouseleave', () => { mouseX = 0; mouseY = 0; });
+		let mouseX = 0, mouseY = 0, currentX = 0, currentY = 0;
+		let stopped = false;
+		let animFrameId = 0;
 
-	function animateParallax() {
-		currentX = lerp(currentX, mouseX, 0.06);
-		currentY = lerp(currentY, mouseY, 0.06);
-		if (terminal) terminal.style.transform = `translate(${currentX * 14}px, ${currentY * 10}px) rotateY(${currentX * 3}deg) rotateX(${-currentY * 3}deg)`;
-		if (shape1) shape1.style.transform = `translate(${currentX * -22}px, ${currentY * -18}px)`;
-		if (shape2) shape2.style.transform = `translate(${currentX * 28}px, ${currentY * 20}px)`;
-		if (shape3) shape3.style.transform = `translate(${currentX * -18}px, ${currentY * 25}px)`;
-		requestAnimationFrame(animateParallax);
-	}
-	animateParallax();
+		function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
 
-	// --- Terminal typing ---
-	const commands = [
-		{ cmd: '/spec-create auth-jwt', output: '  Creating spec... done\n  Saved to .claude/specs/auth-jwt.md' },
-		{ cmd: '/spec-audit auth-jwt', output: '  Analyzing codebase... 47 files\n  Enriched spec with technical context' },
-		{ cmd: '/spec-plan auth-jwt', output: '  Generated 3-phase plan\n  Ready for implementation' },
-	];
-	const cmdEl = document.getElementById('typed-cmd');
-	const outputEl = document.getElementById('terminal-output');
-	const cursorEl = document.querySelector('.terminal-cursor') as HTMLElement;
-	let cmdIndex = 0;
-	let _terminalStopped = false;
-
-	async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-
-	function waitForVisible(): Promise<void> {
-		if (!document.hidden) return Promise.resolve();
-		return new Promise(resolve => {
-			const handler = () => {
-				if (!document.hidden) {
-					document.removeEventListener('visibilitychange', handler);
-					resolve();
-				}
-			};
-			document.addEventListener('visibilitychange', handler);
+		hero.addEventListener('mousemove', (e) => {
+			const rect = hero.getBoundingClientRect();
+			mouseX = ((e.clientX - rect.left) / rect.width - 0.5) * 2;
+			mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 2;
 		});
+		hero.addEventListener('mouseleave', () => { mouseX = 0; mouseY = 0; });
+
+		function animateParallax() {
+			if (stopped) return;
+			currentX = lerp(currentX, mouseX, 0.06);
+			currentY = lerp(currentY, mouseY, 0.06);
+			if (terminal) terminal.style.transform = `translate(${currentX * 14}px, ${currentY * 10}px) rotateY(${currentX * 3}deg) rotateX(${-currentY * 3}deg)`;
+			if (shape1) shape1.style.transform = `translate(${currentX * -22}px, ${currentY * -18}px)`;
+			if (shape2) shape2.style.transform = `translate(${currentX * 28}px, ${currentY * 20}px)`;
+			if (shape3) shape3.style.transform = `translate(${currentX * -18}px, ${currentY * 25}px)`;
+			animFrameId = requestAnimationFrame(animateParallax);
+		}
+		animateParallax();
+
+		// --- Terminal typing ---
+		const commands = [
+			{ cmd: '/spec-create auth-jwt', output: '  Creating spec... done\n  Saved to .claude/specs/auth-jwt.md' },
+			{ cmd: '/spec-audit auth-jwt', output: '  Analyzing codebase... 47 files\n  Enriched spec with technical context' },
+			{ cmd: '/spec-plan auth-jwt', output: '  Generated 3-phase plan\n  Ready for implementation' },
+		];
+		const cmdEl = document.getElementById('typed-cmd');
+		const outputEl = document.getElementById('terminal-output');
+		const cursorEl = document.querySelector('.terminal-cursor') as HTMLElement;
+		let cmdIndex = 0;
+
+		async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+		function waitForVisible(): Promise<void> {
+			if (!document.hidden) return Promise.resolve();
+			return new Promise(resolve => {
+				const handler = () => {
+					if (!document.hidden) {
+						document.removeEventListener('visibilitychange', handler);
+						resolve();
+					}
+				};
+				document.addEventListener('visibilitychange', handler);
+			});
+		}
+
+		async function typeCommand(text: string) {
+			if (!cmdEl) return;
+			cmdEl.textContent = '';
+			for (let i = 0; i < text.length; i++) {
+				if (stopped) return;
+				await waitForVisible();
+				cmdEl.textContent += text[i];
+				await sleep(45 + Math.random() * 35);
+			}
+		}
+		async function showOutput(text: string) {
+			if (!outputEl) return;
+			await sleep(300);
+			if (cursorEl) cursorEl.style.display = 'none';
+			for (const line of text.split('\n')) {
+				if (stopped) return;
+				await waitForVisible();
+				const div = document.createElement('div');
+				div.className = 'output-line';
+				div.textContent = line;
+				outputEl.appendChild(div);
+				await sleep(150);
+			}
+		}
+		async function runTerminalLoop() {
+			while (!stopped) {
+				await waitForVisible();
+				const { cmd, output } = commands[cmdIndex % commands.length];
+				if (cmdEl) cmdEl.textContent = '';
+				if (outputEl) outputEl.innerHTML = '';
+				if (cursorEl) cursorEl.style.display = '';
+				await sleep(800); await typeCommand(cmd); await showOutput(output); await sleep(2500);
+				cmdIndex++;
+			}
+		}
+		runTerminalLoop();
+
+		// --- Intersection Observer ---
+		const observer = new IntersectionObserver(
+			(entries) => { entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }); },
+			{ threshold: 0.08, rootMargin: '0px 0px -60px 0px' }
+		);
+		document.querySelectorAll('.section').forEach(s => observer.observe(s));
+
+		// --- Cleanup on View Transition ---
+		document.addEventListener('astro:before-swap', () => {
+			stopped = true;
+			cancelAnimationFrame(animFrameId);
+			observer.disconnect();
+		}, { once: true });
 	}
 
-	async function typeCommand(text: string) {
-		if (!cmdEl) return;
-		cmdEl.textContent = '';
-		for (let i = 0; i < text.length; i++) {
-			if (_terminalStopped) return;
-			await waitForVisible();
-			cmdEl.textContent += text[i];
-			await sleep(45 + Math.random() * 35);
-		}
-	}
-	async function showOutput(text: string) {
-		if (!outputEl) return;
-		await sleep(300);
-		if (cursorEl) cursorEl.style.display = 'none';
-		for (const line of text.split('\n')) {
-			if (_terminalStopped) return;
-			await waitForVisible();
-			const div = document.createElement('div');
-			div.className = 'output-line';
-			div.textContent = line;
-			outputEl.appendChild(div);
-			await sleep(150);
-		}
-	}
-	async function runTerminalLoop() {
-		while (!_terminalStopped) {
-			await waitForVisible();
-			const { cmd, output } = commands[cmdIndex % commands.length];
-			if (cmdEl) cmdEl.textContent = '';
-			if (outputEl) outputEl.innerHTML = '';
-			if (cursorEl) cursorEl.style.display = '';
-			await sleep(800); await typeCommand(cmd); await showOutput(output); await sleep(2500);
-			cmdIndex++;
-		}
-	}
-	runTerminalLoop();
-
-	// --- Intersection Observer ---
-	const observer = new IntersectionObserver(
-		(entries) => { entries.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } }); },
-		{ threshold: 0.08, rootMargin: '0px 0px -60px 0px' }
-	);
-	document.querySelectorAll('.section').forEach(s => observer.observe(s));
-
-	// --- Cleanup on View Transition ---
-	document.addEventListener('astro:before-swap', () => {
-		_terminalStopped = true;
-		observer.disconnect();
-	}, { once: true });
+	initLandingPage();
+	document.addEventListener('astro:after-swap', initLandingPage);
 </script>
+
+<style is:global>
+	html:has(.hero) {
+		scrollbar-width: none;
+	}
+	html:has(.hero)::-webkit-scrollbar {
+		display: none;
+	}
+</style>
 
 <style>
 	main {

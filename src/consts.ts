@@ -1,5 +1,5 @@
 export const SITE_TITLE = 'valdemird';
-export const SITE_DESCRIPTION = 'Software engineer, builder, and writer. Building tools that make developers more productive.';
+export const SITE_DESCRIPTION = 'Software engineer and builder. I make developer tools and write about what I learn.';
 
 export const SOCIAL_LINKS = {
 	github: 'https://github.com/valdemird',
@@ -10,7 +10,7 @@ export const SOCIAL_LINKS = {
 export const PROJECTS = [
 	{
 		title: 'Todo App',
-		description: 'A beautiful, AI-powered task manager with Pomodoro timer, drag-and-drop, and smart scheduling.',
+		description: 'Task manager with AI scheduling, Pomodoro timer, and drag-and-drop. Built because every other todo app annoyed me.',
 		url: 'https://todo.valdemird.com',
 		tech: ['Next.js 15', 'React 19', 'Prisma', 'Tailwind CSS 4', 'Vercel AI SDK'],
 	},
@@ -28,20 +28,20 @@ export const UI_STRINGS = {
 			greeting: "Hi, I'm",
 			name: 'valdemird',
 			subtitle: 'Software Engineer & Builder',
-			bio: 'I build tools that make developers more productive. Currently exploring the intersection of AI and developer experience.',
+			bio: 'I build developer tools and side projects. Right now I\'m figuring out how to make AI actually useful in day-to-day coding.',
 			projectsTitle: 'Projects',
 			recentPostsTitle: 'Recent Posts',
 			viewAllPosts: 'View all posts',
 		},
 		blog: {
 			title: 'Blog',
-			description: 'Thoughts on software engineering, AI tools, and building products.',
+			description: 'Writing about software, AI tools, and things I\'ve learned building products.',
 			readMore: 'Read more',
 			minRead: 'min read',
 		},
 		about: {
 			title: 'About Me',
-			description: 'Senior software engineer building developer tools and AI-powered workflows. 8+ years shipping full-stack products with React, Next.js, and Node.js.',
+			description: 'Full-stack engineer with 8+ years shipping products with React, Next.js, and Node.js. Currently building developer tools and experimenting with AI workflows.',
 		},
 		footer: {
 			copyright: 'All rights reserved.',
@@ -56,21 +56,21 @@ export const UI_STRINGS = {
 		home: {
 			greeting: 'Hola, soy',
 			name: 'valdemird',
-			subtitle: 'Ingeniero de Software & Builder',
-			bio: 'Construyo herramientas que hacen a los desarrolladores más productivos. Actualmente explorando la intersección entre IA y experiencia de desarrollo.',
+			subtitle: 'Ingeniero de Software & Maker',
+			bio: 'Construyo herramientas para desarrolladores y side projects. Ahora mismo estoy buscando cómo hacer que la IA sea realmente útil en el día a día de programar.',
 			projectsTitle: 'Proyectos',
 			recentPostsTitle: 'Posts Recientes',
 			viewAllPosts: 'Ver todos los posts',
 		},
 		blog: {
 			title: 'Blog',
-			description: 'Reflexiones sobre ingeniería de software, herramientas de IA y construcción de productos.',
+			description: 'Sobre software, herramientas de IA y cosas que he aprendido construyendo productos.',
 			readMore: 'Leer más',
 			minRead: 'min de lectura',
 		},
 		about: {
 			title: 'Sobre Mí',
-			description: 'Ingeniero de software senior construyendo herramientas para desarrolladores y flujos de trabajo con IA. 8+ años enviando productos full-stack con React, Next.js y Node.js.',
+			description: 'Ingeniero full-stack con 8+ años creando productos con React, Next.js y Node.js. Construyendo herramientas para desarrolladores y experimentando con flujos de trabajo con IA.',
 		},
 		footer: {
 			copyright: 'Todos los derechos reservados.',
