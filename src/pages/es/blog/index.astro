@@ -42,7 +42,7 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 								<span class="featured-badge">Destacado</span>
 								<FormattedDate date={featuredPost.data.pubDate} locale="es" />
 							</div>
-							<h2>{featuredPost.data.title}</h2>
+							<h2 transition:name={`post-title-${featuredPost.id.replace(/\//g, '-')}`}>{featuredPost.data.title}</h2>
 							<p>{featuredPost.data.description}</p>
 							{featuredPost.data.tags && (
 								<div class="featured-tags">
@@ -60,7 +60,7 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 					<section class="posts-section animate-fade-in delay-2">
 						<div class="posts-list">
 							{otherPosts.map((post) => (
-								<PostPreview id={post.id} title={post.data.title} description={post.data.description} pubDate={post.data.pubDate} tags={post.data.tags} basePath="/blog" locale="es" />
+								<PostPreview id={post.id} title={post.data.title} description={post.data.description} pubDate={post.data.pubDate} tags={post.data.tags} basePath="/blog" locale="es" enableTransition />
 							))}
 						</div>
 					</section>
@@ -96,3 +96,24 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 	.posts-list{display:flex;flex-direction:column}
 	@media(max-width:640px){.blog-hero{padding:3rem var(--space-lg) 2rem}.featured-inner{padding:1.5rem}}
 </style>
+
+<script>
+	import {
+		initPageEntrance,
+		cleanupAll,
+		isReducedMotion,
+	} from '../../../lib/animations';
+
+	function initBlogList() {
+		if (isReducedMotion()) return;
+		if (!document.documentElement.hasAttribute('data-vt-nav')) {
+			initPageEntrance('.blog-hero-content.animate-fade-in');
+		}
+	}
+	function initAndCleanup() {
+		initBlogList();
+		document.addEventListener('astro:before-swap', cleanupAll, { once: true });
+	}
+	initAndCleanup();
+	document.addEventListener('astro:after-swap', initAndCleanup);
+</script>

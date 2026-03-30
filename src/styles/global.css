@@ -116,7 +116,6 @@
 }
 
 html {
-	scroll-behavior: smooth;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	overflow-x: hidden;
@@ -367,6 +366,66 @@ th {
 .delay-3 { animation-delay: 0.3s; }
 .delay-4 { animation-delay: 0.4s; }
 .delay-5 { animation-delay: 0.5s; }
+
+/* --- View Transition Customizations --- */
+@keyframes vt-fade-in {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes vt-fade-out {
+	from { opacity: 1; }
+	to { opacity: 0; }
+}
+
+/* Post titles morph smoothly between list and detail views */
+::view-transition-group(*) {
+	animation-duration: 0.35s;
+	animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+/* Header stays perfectly still during transitions */
+::view-transition-old(site-header),
+::view-transition-new(site-header) {
+	animation: none;
+	mix-blend-mode: normal;
+}
+
+::view-transition-group(site-header) {
+	animation-duration: 0s;
+}
+
+/* Default page transition: smooth crossfade */
+::view-transition-old(root) {
+	animation: vt-fade-out 0.25s ease both;
+}
+
+::view-transition-new(root) {
+	animation: vt-fade-in 0.25s ease both;
+}
+
+/* Suppress CSS entrance animations during VT navigation */
+[data-vt-nav] .animate-fade-in,
+[data-vt-nav] .animate-fade-in-scale,
+[data-vt-nav] .animate-slide-up,
+[data-vt-nav] .section {
+	animation: none !important;
+	opacity: 1 !important;
+	transform: none !important;
+	transition: none !important;
+}
+
+/* Reduced motion: disable all animations */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
+}
 
 /* --- Grain texture overlay --- */
 body::after {

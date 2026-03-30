@@ -104,7 +104,32 @@ const certs = [
 			</article>
 		</main>
 		<script>
-			function initAbout(){const o=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');o.unobserve(e.target)}})},{threshold:.08,rootMargin:'0px 0px -60px 0px'});document.querySelectorAll('.section:not(.animate-fade-in)').forEach(s=>o.observe(s))}initAbout();document.addEventListener('astro:after-swap',initAbout);
+			import {
+				initPageEntrance,
+				initScrollReveals,
+				initStaggeredReveal,
+				cleanupAll,
+				isReducedMotion,
+			} from '../../lib/animations';
+
+			function initAbout() {
+				if (isReducedMotion()) return;
+				const isVT = document.documentElement.hasAttribute('data-vt-nav');
+				if (!isVT) {
+					initPageEntrance('.about-hero-content.animate-fade-in');
+				}
+				initScrollReveals('.section:not(.animate-fade-in)');
+				initStaggeredReveal('.domains-grid', '.domain-card');
+				initStaggeredReveal('.timeline', '.timeline-item');
+				initStaggeredReveal('.beliefs', '.belief');
+				initStaggeredReveal('.certs', '.cert-item');
+			}
+			function initAndCleanup() {
+				initAbout();
+				document.addEventListener('astro:before-swap', cleanupAll, { once: true });
+			}
+			initAndCleanup();
+			document.addEventListener('astro:after-swap', initAndCleanup);
 		</script>
 		<Footer />
 	</body>

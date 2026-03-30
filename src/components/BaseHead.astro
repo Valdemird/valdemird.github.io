@@ -82,7 +82,18 @@ const structuredData = jsonLd || defaultJsonLd;
 			}
 		}
 		applyTheme();
-		document.addEventListener('astro:after-swap', applyTheme);
+		// Apply theme BEFORE swap so the new page snapshot already has the correct theme
+		// — prevents flash of wrong theme during View Transition
+		document.addEventListener('astro:before-swap', function(e) {
+			var saved = localStorage.getItem('theme');
+			var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : null);
+			if (theme) {
+				e.newDocument.documentElement.setAttribute('data-theme', theme);
+			}
+		});
+		document.addEventListener('astro:after-swap', function() {
+			document.documentElement.setAttribute('data-vt-nav', '');
+		});
 	})();
 </script>
 

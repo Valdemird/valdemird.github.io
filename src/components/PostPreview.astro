@@ -9,9 +9,10 @@ interface Props {
 	tags?: string[];
 	basePath?: string;
 	locale?: string;
+	enableTransition?: boolean;
 }
 
-const { id, title, description, pubDate, tags, basePath = '/blog', locale = 'en' } = Astro.props;
+const { id, title, description, pubDate, tags, basePath = '/blog', locale = 'en', enableTransition = false } = Astro.props;
 const readingTime = Math.max(1, Math.ceil(description.length / 50));
 ---
 
@@ -23,7 +24,11 @@ const readingTime = Math.max(1, Math.ceil(description.length / 50));
 			<span class="separator">&middot;</span>
 			<span>{readingTime} min</span>
 		</div>
-		<h3>{title}</h3>
+		{enableTransition ? (
+			<h3 transition:name={`post-title-${id.replace(/\//g, '-')}`}>{title}</h3>
+		) : (
+			<h3 data-vt-name={`post-title-${id.replace(/\//g, '-')}`}>{title}</h3>
+		)}
 		<p>{description}</p>
 		{tags && tags.length > 0 && (
 			<div class="post-preview-tags">

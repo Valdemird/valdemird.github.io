@@ -41,7 +41,12 @@
       "Bash(curl:*)",
       "Read(//usr/share/fonts/**)",
       "Skill(performance)",
-      "Skill(architecture)"
+      "Skill(architecture)",
+      "Skill(spec-plan)",
+      "Bash(npm ls:*)",
+      "Bash(gzip -c /home/valdemird/github/valdemird.github.io/dist/_astro/animations.CvzEF4IG.js)",
+      "Bash(du -sh /home/valdemird/github/valdemird.github.io/dist/_astro/*.js)",
+      "Bash(gzip -c /home/valdemird/github/valdemird.github.io/dist/_astro/animations.*.js)"
     ]
   }
 }

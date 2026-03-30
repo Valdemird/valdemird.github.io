@@ -25,6 +25,22 @@ const homePath = isEs ? '/es/' : '/';
 	<body>
 		<Header />
 		<main>
+			<script>
+				import { initPageEntrance, cleanupAll, isReducedMotion } from '../lib/animations';
+
+				function init404() {
+					if (isReducedMotion()) return;
+					if (!document.documentElement.hasAttribute('data-vt-nav')) {
+						initPageEntrance('.not-found > .animate-fade-in');
+					}
+				}
+				function initAndCleanup() {
+					init404();
+					document.addEventListener('astro:before-swap', cleanupAll, { once: true });
+				}
+				initAndCleanup();
+				document.addEventListener('astro:after-swap', initAndCleanup);
+			</script>
 			<div class="not-found">
 				<span class="error-code animate-fade-in">404</span>
 				<h1 class="animate-fade-in delay-1">{message}</h1>
@@ -56,6 +72,7 @@ const homePath = isEs ? '/es/' : '/';
 		justify-content: center;
 		text-align: center;
 		min-height: 60vh;
+		min-height: 60dvh;
 		padding: 4rem var(--space-lg);
 	}
 

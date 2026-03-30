@@ -123,120 +123,87 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 </html>
 
 <script>
+	import {
+		initMouseParallax,
+		cleanupAll,
+		isReducedMotion,
+	} from '../../lib/animations';
+	import { initTerminalAnimation } from '../../lib/terminal-animation';
+	import type { TerminalAnimation } from '../../lib/terminal-animation';
+
+	let terminalAnim: TerminalAnimation | null = null;
+	let parallaxCleanup: (() => void) | null = null;
+	let sectionObserver: IntersectionObserver | null = null;
+
 	function initLandingPage() {
 		const hero = document.getElementById('hero');
+		if (!hero) return;
+
+		terminalAnim = initTerminalAnimation([
+			{ cmd: '/spec-create auth-jwt', output: '  Creando spec... listo\n  Guardado en .claude/specs/auth-jwt.md' },
+			{ cmd: '/spec-audit auth-jwt', output: '  Analizando codebase... 47 archivos\n  Spec enriquecido con contexto técnico' },
+			{ cmd: '/spec-plan auth-jwt', output: '  Plan de 3 fases generado\n  Listo para implementar' },
+		]);
+
+		if (isReducedMotion()) return;
+
+		sectionObserver = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((e) => {
+					if (e.isIntersecting) {
+						e.target.classList.add('visible');
+						sectionObserver?.unobserve(e.target);
+					}
+				});
+			},
+			{ threshold: 0.08, rootMargin: '0px 0px -60px 0px' }
+		);
+		document.querySelectorAll('.section').forEach((s) => sectionObserver!.observe(s));
+
 		const terminal = document.getElementById('floating-terminal');
 		const shape1 = document.getElementById('shape-1');
 		const shape2 = document.getElementById('shape-2');
 		const shape3 = document.getElementById('shape-3');
 
-		if (!hero) return;
+		const targets = [
+			terminal && { element: terminal, x: 14, y: 10, rotateX: 3, rotateY: 3 },
+			shape1 && { element: shape1, x: -22, y: -18 },
+			shape2 && { element: shape2, x: 28, y: 20 },
+			shape3 && { element: shape3, x: -18, y: 25 },
+		].filter(Boolean) as Parameters<typeof initMouseParallax>[1];
 
-		let mouseX = 0, mouseY = 0, currentX = 0, currentY = 0;
-		let stopped = false;
-		let animFrameId = 0;
-
-		function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
-
-		hero.addEventListener('mousemove', (e) => {
-			const r = hero.getBoundingClientRect();
-			mouseX = ((e.clientX - r.left) / r.width - 0.5) * 2;
-			mouseY = ((e.clientY - r.top) / r.height - 0.5) * 2;
-		});
-		hero.addEventListener('mouseleave', () => { mouseX = 0; mouseY = 0; });
-
-		function animP() {
-			if (stopped) return;
-			currentX = lerp(currentX, mouseX, 0.06);
-			currentY = lerp(currentY, mouseY, 0.06);
-			if (terminal) terminal.style.transform = `translate(${currentX * 14}px,${currentY * 10}px) rotateY(${currentX * 3}deg) rotateX(${-currentY * 3}deg)`;
-			if (shape1) shape1.style.transform = `translate(${currentX * -22}px,${currentY * -18}px)`;
-			if (shape2) shape2.style.transform = `translate(${currentX * 28}px,${currentY * 20}px)`;
-			if (shape3) shape3.style.transform = `translate(${currentX * -18}px,${currentY * 25}px)`;
-			animFrameId = requestAnimationFrame(animP);
+		if (targets.length) {
+			parallaxCleanup = initMouseParallax('hero', targets);
 		}
-		animP();
-
-		// --- Terminal typing ---
-		const cmds = [
-			{ cmd: '/spec-create auth-jwt', output: '  Creando spec... listo\n  Guardado en .claude/specs/auth-jwt.md' },
-			{ cmd: '/spec-audit auth-jwt', output: '  Analizando codebase... 47 archivos\n  Spec enriquecido con contexto técnico' },
-			{ cmd: '/spec-plan auth-jwt', output: '  Plan de 3 fases generado\n  Listo para implementar' },
-		];
-		const cmdEl = document.getElementById('typed-cmd');
-		const outputEl = document.getElementById('terminal-output');
-		const cursorEl = document.querySelector('.terminal-cursor') as HTMLElement;
-		let ci = 0;
-
-		async function sl(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-
-		function waitForVisible(): Promise<void> {
-			if (!document.hidden) return Promise.resolve();
-			return new Promise(resolve => {
-				const handler = () => {
-					if (!document.hidden) {
-						document.removeEventListener('visibilitychange', handler);
-						resolve();
-					}
-				};
-				document.addEventListener('visibilitychange', handler);
-			});
-		}
-
-		async function tc(t: string) {
-			if (!cmdEl) return;
-			cmdEl.textContent = '';
-			for (let i = 0; i < t.length; i++) {
-				if (stopped) return;
-				await waitForVisible();
-				cmdEl.textContent += t[i];
-				await sl(45 + Math.random() * 35);
-			}
-		}
-		async function so(t: string) {
-			if (!outputEl) return;
-			await sl(300);
-			if (cursorEl) cursorEl.style.display = 'none';
-			for (const l of t.split('\n')) {
-				if (stopped) return;
-				await waitForVisible();
-				const d = document.createElement('div');
-				d.className = 'output-line';
-				d.textContent = l;
-				outputEl.appendChild(d);
-				await sl(150);
-			}
-		}
-		async function rtl() {
-			while (!stopped) {
-				await waitForVisible();
-				const { cmd, output } = cmds[ci % cmds.length];
-				if (cmdEl) cmdEl.textContent = '';
-				if (outputEl) outputEl.innerHTML = '';
-				if (cursorEl) cursorEl.style.display = '';
-				await sl(800); await tc(cmd); await so(output); await sl(2500);
-				ci++;
-			}
-		}
-		rtl();
-
-		// --- Intersection Observer ---
-		const obs = new IntersectionObserver(
-			(es) => { es.forEach((e) => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); } }); },
-			{ threshold: 0.08, rootMargin: '0px 0px -60px 0px' }
-		);
-		document.querySelectorAll('.section').forEach(s => obs.observe(s));
-
-		// --- Cleanup on View Transition ---
-		document.addEventListener('astro:before-swap', () => {
-			stopped = true;
-			cancelAnimationFrame(animFrameId);
-			obs.disconnect();
-		}, { once: true });
 	}
 
-	initLandingPage();
-	document.addEventListener('astro:after-swap', initLandingPage);
+	function cleanupLanding() {
+		terminalAnim?.stop();
+		terminalAnim = null;
+		parallaxCleanup?.();
+		parallaxCleanup = null;
+		sectionObserver?.disconnect();
+		sectionObserver = null;
+		cleanupAll();
+	}
+
+	function initPostTransitions() {
+		document.querySelectorAll<HTMLAnchorElement>('.posts-list .post-preview').forEach((link) => {
+			link.addEventListener('click', () => {
+				const h3 = link.querySelector<HTMLElement>('h3[data-vt-name]');
+				if (h3) h3.style.viewTransitionName = h3.dataset.vtName!;
+			});
+		});
+	}
+
+	function initAndRegisterCleanup() {
+		initLandingPage();
+		initPostTransitions();
+		document.addEventListener('astro:before-swap', cleanupLanding, { once: true });
+	}
+
+	initAndRegisterCleanup();
+	document.addEventListener('astro:after-swap', initAndRegisterCleanup);
 </script>
 
 <style is:global>
@@ -250,12 +217,12 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 
 <style>
 	main{max-width:var(--full-width);margin:0 auto;padding:0;overflow-x:hidden}
-	.hero{position:relative;min-height:85vh;display:flex;align-items:center;justify-content:center;padding:6rem var(--space-lg) 4rem;perspective:900px;overflow:hidden}
+	.hero{position:relative;min-height:85vh;min-height:85dvh;display:flex;align-items:center;justify-content:center;padding:6rem var(--space-lg) 4rem;perspective:900px;overflow:hidden}
 	.hero-bg{position:absolute;inset:0;overflow:hidden;z-index:0}
 	.orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.12;animation:orbFloat 20s ease-in-out infinite}
-	.orb-1{width:500px;height:500px;top:-10%;right:-5%;background:var(--color-accent);animation-duration:18s}
-	.orb-2{width:400px;height:400px;bottom:-15%;left:-10%;background:var(--color-success);animation-duration:22s;animation-delay:-5s}
-	.orb-3{width:300px;height:300px;top:40%;left:50%;background:var(--color-warning);animation-duration:25s;animation-delay:-10s;opacity:.08}
+	.orb-1{width:clamp(200px,40vw,500px);height:clamp(200px,40vw,500px);top:-10%;right:-5%;background:var(--color-accent);animation-duration:18s}
+	.orb-2{width:clamp(160px,32vw,400px);height:clamp(160px,32vw,400px);bottom:-15%;left:-10%;background:var(--color-success);animation-duration:22s;animation-delay:-5s}
+	.orb-3{width:clamp(120px,25vw,300px);height:clamp(120px,25vw,300px);top:40%;left:50%;background:var(--color-warning);animation-duration:25s;animation-delay:-10s;opacity:.08}
 	@keyframes orbFloat{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.05)}66%{transform:translate(-20px,15px) scale(.95)}}
 	.grid-pattern{position:absolute;inset:0;background-image:linear-gradient(var(--color-border) 1px,transparent 1px),linear-gradient(90deg,var(--color-border) 1px,transparent 1px);background-size:60px 60px;opacity:.3;mask-image:radial-gradient(ellipse 60% 60% at 50% 40%,black 20%,transparent 70%);-webkit-mask-image:radial-gradient(ellipse 60% 60% at 50% 40%,black 20%,transparent 70%)}
 	.hero-inner{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;max-width:var(--wide-width);width:100%;gap:4rem}
@@ -269,13 +236,13 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 	.hero-links{display:flex;gap:.6rem;margin-top:2rem}
 	.hero-link{display:inline-flex;align-items:center;gap:.45rem;padding:.55rem 1.1rem;font-size:.85rem;font-weight:500;color:var(--color-text-secondary);text-decoration:none;border:1px solid var(--color-border);border-radius:var(--radius-md);background:oklch(from var(--color-surface) l c h/.6);backdrop-filter:blur(8px);transition:all var(--duration-normal) var(--ease-spring)}
 	.hero-link:hover{color:var(--color-text);border-color:var(--color-border-strong);background:var(--color-surface);box-shadow:var(--shadow-md);transform:translateY(-2px)}
-	.hero-visual{position:relative;flex-shrink:0;width:400px;height:290px}
+	.hero-visual{position:relative;flex-shrink:0;width:clamp(280px,35vw,400px);height:290px}
 	.floating-terminal{position:relative;width:100%;border-radius:var(--radius-lg);border:1px solid var(--color-border);background:oklch(from var(--color-surface) l c h/.8);backdrop-filter:blur(16px);box-shadow:var(--shadow-xl);overflow:hidden;z-index:2;transition:transform .1s linear;will-change:transform;animation:terminalEnter .8s var(--ease-smooth) .3s both}
 	@keyframes terminalEnter{from{opacity:0;transform:translateY(24px) scale(.94)}to{opacity:1;transform:translateY(0) scale(1)}}
 	.terminal-header{display:flex;align-items:center;gap:.75rem;padding:.65rem 1rem;border-bottom:1px solid var(--color-border);background:oklch(from var(--color-bg-secondary) l c h/.5)}
 	.terminal-dots{display:flex;gap:5px}.terminal-dots span{width:10px;height:10px;border-radius:50%}.terminal-dots span:first-child{background:oklch(.65 .2 27)}.terminal-dots span:nth-child(2){background:oklch(.78 .15 85)}.terminal-dots span:last-child{background:oklch(.6 .18 145)}
 	.terminal-title{font-family:var(--font-mono);font-size:.72rem;color:var(--color-text-muted)}
-	.terminal-body{padding:1.1rem 1.25rem;font-family:var(--font-mono);font-size:.82rem;line-height:1.6;min-height:170px}
+	.terminal-body{padding:1.1rem 1.25rem;font-family:var(--font-mono);font-size:.82rem;line-height:1.6;min-height:clamp(120px,20vw,170px)}
 	.terminal-line{display:flex;align-items:center;gap:.5rem}.terminal-prompt{color:var(--color-accent);font-weight:600}.terminal-cmd{color:var(--color-text)}.terminal-cursor{color:var(--color-accent);animation:blink 1s step-end infinite;font-weight:300}
 	@keyframes blink{50%{opacity:0}}.terminal-output{margin-top:.5rem}.terminal-output :global(.output-line){color:var(--color-text-muted);font-size:.78rem;animation:lineIn .3s var(--ease-smooth) both}
 	@keyframes lineIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}

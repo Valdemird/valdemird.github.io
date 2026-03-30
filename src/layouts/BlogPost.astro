@@ -78,6 +78,55 @@ if (lang === 'en') {
 		<ReadingProgress />
 		<Header />
 		<main>
+			<script>
+				import {
+					initPageEntrance,
+					initScrollReveals,
+					cleanupAll,
+					isReducedMotion,
+					gsap,
+					ScrollTrigger,
+					DURATION,
+					EASE,
+				} from '../lib/animations';
+
+				const isVTNav = () => document.documentElement.hasAttribute('data-vt-nav');
+
+				function initBlogPost() {
+					if (isReducedMotion()) return;
+
+					// Skip entrance animations during VT navigation — the morph handles it
+					if (!isVTNav()) {
+						initPageEntrance('.article-header .meta, .article-header .lead, .article-header .article-tags');
+					}
+
+					// Gentle heading reveals on scroll
+					const headings = document.querySelectorAll('.article-body h2, .article-body h3');
+					if (headings.length) {
+						gsap.set(headings, { opacity: 0, y: 12 });
+						ScrollTrigger.batch(headings, {
+							onEnter: (batch: Element[]) => {
+								gsap.to(batch, {
+									opacity: 1,
+									y: 0,
+									duration: DURATION.normal,
+									ease: EASE.enter,
+									stagger: 0.05,
+									overwrite: true,
+								});
+							},
+							start: 'top 90%',
+							once: true,
+						});
+					}
+				}
+				function initAndCleanup() {
+					initBlogPost();
+					document.addEventListener('astro:before-swap', cleanupAll, { once: true });
+				}
+				initAndCleanup();
+				document.addEventListener('astro:after-swap', initAndCleanup);
+			</script>
 			<article>
 				{heroImage && (
 					<div class="hero-image">
@@ -94,7 +143,7 @@ if (lang === 'en') {
 								</span>
 							)}
 						</div>
-						<h1>{title}</h1>
+						<h1 transition:name={`post-title-${slug.replace(/\//g, '-')}`}>{title}</h1>
 						{description && <p class="lead">{description}</p>}
 						{tags && tags.length > 0 && (
 							<div class="article-tags">

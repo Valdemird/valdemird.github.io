@@ -27,7 +27,7 @@ function getAltPath(pathname: string, currentLocale: string): string {
 const altPath = getAltPath(Astro.url.pathname, locale);
 ---
 
-<header id="site-header">
+<header id="site-header" transition:name="site-header" transition:animate="none">
 	<nav>
 		<a href={locale === 'es' ? '/es/' : '/'} class="logo">
 			<span class="logo-text">{SITE_TITLE}</span>
@@ -351,7 +351,8 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 
 	@media (max-width: 640px) {
 		.nav-links { display: none; }
-		.menu-toggle { display: flex; }
+		.menu-toggle { display: flex; width: 44px; height: 44px; }
+		#theme-toggle { width: 44px; height: 44px; }
 		.mobile-nav.open { display: flex; }
 		.menu-toggle.open .line-1 { transform: rotate(45deg) translate(5px, 5px); }
 		.menu-toggle.open .line-2 { opacity: 0; }
