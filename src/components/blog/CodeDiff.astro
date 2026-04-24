@@ -1,0 +1,211 @@
+---
+/**
+ * CodeDiff — side-by-side annotated code diff with narrator text per hunk.
+ *
+ *   <CodeDiff
+ *     filename="src/middleware/auth.ts"
+ *     before={[
+ *       { line: 1,  text: "function auth(req) {" },
+ *       { line: 2,  text: "  const token = req.headers.get('Authorization');" },
+ *       { line: 3,  text: "  return verify(token);" },
+ *       { line: 4,  text: "}" },
+ *     ]}
+ *     after={[
+ *       { line: 1,  text: "function auth(req) {" },
+ *       { line: 2,  text: "  const token = req.headers.get('Authorization')?.slice(7);" },
+ *       { line: 3,  text: "  if (!token) throw new UnauthorizedError();" },
+ *       { line: 4,  text: "  return verify(token);" },
+ *       { line: 5,  text: "}" },
+ *     ]}
+ *     removed={[3]}
+ *     added={[2, 3]}
+ *     note="The bug was silently passing 'Bearer <token>' to verify() because we never stripped the scheme."
+ *   />
+ *
+ * Author marks `removed` line numbers against `before`, and `added` line
+ * numbers against `after`. Renders as two columns at ≥ 900px; stacks below.
+ */
+interface Line {
+  line: number;
+  text: string;
+}
+interface Props {
+  filename?: string;
+  before: Line[];
+  after: Line[];
+  /** 1-indexed lines in `before` that should render as removed. */
+  removed?: number[];
+  /** 1-indexed lines in `after` that should render as added. */
+  added?: number[];
+  /** Narrator text explaining the change. */
+  note?: string;
+  language?: string;
+}
+const { filename, before, after, removed = [], added = [], note, language } = Astro.props;
+const removedSet = new Set(removed);
+const addedSet = new Set(added);
+---
+
+<figure class="cdiff">
+  {filename && (
+    <div class="cdiff-filename">
+      <span class="cdiff-filename-path">{filename}</span>
+      {language && <span class="cdiff-filename-lang">{language}</span>}
+    </div>
+  )}
+  <div class="cdiff-grid">
+    <div class="cdiff-col" data-side="before">
+      <div class="cdiff-col-label">Before</div>
+      <pre class="cdiff-pre"><code>{before.map((l) => (
+        <div class="cdiff-line" data-state={removedSet.has(l.line) ? "removed" : ""}>
+          <span class="cdiff-ln">{l.line}</span>
+          <span class="cdiff-marker">{removedSet.has(l.line) ? "−" : " "}</span>
+          <span class="cdiff-text">{l.text}</span>
+        </div>
+      ))}</code></pre>
+    </div>
+    <div class="cdiff-col" data-side="after">
+      <div class="cdiff-col-label">After</div>
+      <pre class="cdiff-pre"><code>{after.map((l) => (
+        <div class="cdiff-line" data-state={addedSet.has(l.line) ? "added" : ""}>
+          <span class="cdiff-ln">{l.line}</span>
+          <span class="cdiff-marker">{addedSet.has(l.line) ? "+" : " "}</span>
+          <span class="cdiff-text">{l.text}</span>
+        </div>
+      ))}</code></pre>
+    </div>
+  </div>
+  {note && <figcaption class="cdiff-note">{note}</figcaption>}
+</figure>
+
+<style>
+  .cdiff {
+    margin: 2em 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-surface);
+  }
+
+  .cdiff-filename {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
+
+  .cdiff-filename-path {
+    color: var(--color-text-secondary);
+  }
+
+  .cdiff-filename-lang {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.65rem;
+    color: var(--color-text-muted);
+  }
+
+  .cdiff-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  @media (min-width: 900px) {
+    .cdiff-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .cdiff-col[data-side="before"] {
+      border-right: 1px solid var(--color-border);
+    }
+  }
+
+  .cdiff-col {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cdiff-col[data-side="before"] + .cdiff-col[data-side="after"] {
+    border-top: 1px solid var(--color-border);
+  }
+  @media (min-width: 900px) {
+    .cdiff-col[data-side="before"] + .cdiff-col[data-side="after"] {
+      border-top: 0;
+    }
+  }
+
+  .cdiff-col-label {
+    padding: 0.35rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .cdiff-pre {
+    margin: 0;
+    padding: 0.75rem 0;
+    background: transparent;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.55;
+  }
+
+  .cdiff-line {
+    display: grid;
+    grid-template-columns: 2.25rem 1.1rem 1fr;
+    padding: 0 1rem;
+    color: var(--color-text);
+  }
+
+  .cdiff-ln {
+    color: var(--color-text-muted);
+    font-size: 0.7rem;
+    text-align: right;
+    padding-right: 0.5rem;
+    user-select: none;
+  }
+
+  .cdiff-marker {
+    color: var(--color-text-muted);
+    text-align: center;
+    user-select: none;
+  }
+
+  .cdiff-text {
+    white-space: pre;
+  }
+
+  .cdiff-line[data-state="removed"] {
+    background: oklch(from var(--color-destructive) l c h / 0.08);
+  }
+  .cdiff-line[data-state="removed"] .cdiff-marker {
+    color: var(--color-destructive);
+  }
+
+  .cdiff-line[data-state="added"] {
+    background: oklch(from var(--color-success) l c h / 0.1);
+  }
+  .cdiff-line[data-state="added"] .cdiff-marker {
+    color: var(--color-success);
+  }
+
+  .cdiff-note {
+    padding: 0.85rem 1rem;
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: var(--color-text);
+    font-style: italic;
+  }
+</style>

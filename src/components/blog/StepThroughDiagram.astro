@@ -1,0 +1,216 @@
+---
+/**
+ * StepThroughDiagram — a hand-authored SVG diagram whose highlights advance
+ * as the reader scrolls through a list of steps.
+ *
+ *   <StepThroughDiagram
+ *     steps={[
+ *       { id: "s1", label: "The client sends a request." },
+ *       { id: "s2", label: "The gateway authenticates it." },
+ *       { id: "s3", label: "The backend resolves the response." },
+ *     ]}
+ *   >
+ *     <svg slot="diagram" viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg">
+ *       <g data-diagram-step="s1"><!-- client node --></g>
+ *       <g data-diagram-step="s2"><!-- gateway node --></g>
+ *       <g data-diagram-step="s3"><!-- backend node --></g>
+ *     </svg>
+ *   </StepThroughDiagram>
+ *
+ * Any SVG element with `data-diagram-step="<id>"` is visible only when the
+ * matching step is active. All earlier steps remain visible (cumulative reveal).
+ * For non-cumulative ("exclusive") reveal, pass `exclusive`.
+ */
+interface Step {
+  id: string;
+  label: string;
+}
+interface Props {
+  steps: Step[];
+  /** If true, only the active step element is shown; earlier ones are hidden. */
+  exclusive?: boolean;
+}
+const { steps, exclusive = false } = Astro.props;
+---
+
+<div class="sdiag" data-stepdiagram data-exclusive={exclusive ? "1" : ""}>
+  <div class="sdiag-graphic" aria-hidden="true">
+    <slot name="diagram" />
+  </div>
+  <ol class="sdiag-steps">
+    {steps.map((s, i) => (
+      <li
+        class="sdiag-step"
+        data-stepdiagram-step
+        data-step-id={s.id}
+        data-step-index={i + 1}
+      >
+        <span class="sdiag-step-index">{i + 1}</span>
+        <span class="sdiag-step-label">{s.label}</span>
+      </li>
+    ))}
+  </ol>
+</div>
+
+<script>
+  import { getGsap, onReducedMotion } from "../../lib/gsap";
+
+  async function initOne(root: HTMLElement) {
+    if (root.dataset.stepdiagramReady) return;
+    root.dataset.stepdiagramReady = "1";
+
+    const graphic = root.querySelector<HTMLElement>(".sdiag-graphic");
+    const steps = Array.from(root.querySelectorAll<HTMLElement>("[data-stepdiagram-step]"));
+    const exclusive = root.dataset.exclusive === "1";
+    if (!graphic || steps.length === 0) return;
+
+    const stepEls = new Map<string, SVGElement[]>();
+    for (const step of steps) {
+      const id = step.dataset.stepId;
+      if (!id) continue;
+      const nodes = Array.from(graphic.querySelectorAll<SVGElement>(`[data-diagram-step="${id}"]`));
+      stepEls.set(id, nodes);
+      for (const n of nodes) {
+        n.style.opacity = "0";
+        n.style.transition = "opacity 0.35s var(--ease-smooth)";
+      }
+    }
+
+    function setActive(activeIndex: number) {
+      const activeIds = steps.slice(0, activeIndex + 1).map((s) => s.dataset.stepId!);
+      const onlyActiveId = steps[activeIndex].dataset.stepId!;
+      for (const [id, nodes] of stepEls) {
+        const show = exclusive ? id === onlyActiveId : activeIds.includes(id);
+        for (const n of nodes) n.style.opacity = show ? "1" : "0";
+      }
+      for (const [i, step] of steps.entries()) {
+        if (i <= activeIndex) step.setAttribute("data-active", "true");
+        else step.removeAttribute("data-active");
+      }
+    }
+
+    if (onReducedMotion()) {
+      // Show everything, skip the scroll choreography.
+      for (const [, nodes] of stepEls) for (const n of nodes) n.style.opacity = "1";
+      for (const step of steps) step.setAttribute("data-active", "true");
+      return;
+    }
+
+    const { ScrollTrigger } = await getGsap();
+    steps.forEach((step, i) => {
+      ScrollTrigger.create({
+        trigger: step,
+        start: "top 70%",
+        end: "bottom 30%",
+        onEnter: () => setActive(i),
+        onEnterBack: () => setActive(i),
+      });
+    });
+  }
+
+  function init() {
+    document.querySelectorAll<HTMLElement>("[data-stepdiagram]").forEach(initOne);
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .sdiag {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+    gap: 2rem;
+    margin: 3rem 0;
+    align-items: start;
+  }
+
+  @media (max-width: 768px) {
+    .sdiag {
+      grid-template-columns: 1fr;
+    }
+    .sdiag-graphic {
+      position: sticky;
+      top: 4rem;
+      z-index: 1;
+    }
+  }
+
+  .sdiag-graphic {
+    align-self: start;
+    position: sticky;
+    top: 5rem;
+    padding: 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .sdiag-graphic :global(svg) {
+    width: 100%;
+    height: auto;
+    max-height: 60vh;
+  }
+
+  .sdiag-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 40vh;
+    padding-bottom: 50vh;
+  }
+
+  .sdiag-step {
+    display: grid;
+    grid-template-columns: 2.5rem 1fr;
+    align-items: start;
+    gap: 0.85rem;
+    padding: 1rem 1.25rem;
+    border-left: 3px solid var(--color-border);
+    transition:
+      border-color 0.4s var(--ease-smooth),
+      background 0.4s var(--ease-smooth);
+  }
+
+  .sdiag-step-index {
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface);
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    transition: background 0.4s var(--ease-smooth), color 0.4s var(--ease-smooth),
+                border-color 0.4s var(--ease-smooth);
+  }
+
+  .sdiag-step-label {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.55;
+    color: var(--color-text-muted);
+    padding-top: 0.25rem;
+  }
+
+  .sdiag-step[data-active="true"] {
+    border-left-color: var(--color-accent);
+    background: oklch(from var(--color-accent) l c h / 0.04);
+  }
+  .sdiag-step[data-active="true"] .sdiag-step-index {
+    background: var(--color-accent);
+    color: var(--color-bg);
+    border-color: var(--color-accent);
+  }
+  .sdiag-step[data-active="true"] .sdiag-step-label {
+    color: var(--color-text);
+  }
+</style>

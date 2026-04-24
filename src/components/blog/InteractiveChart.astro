@@ -1,212 +1,720 @@
 ---
+/**
+ * InteractiveChart — multi-type chart with optional annotations and a
+ * story-first headline.
+ *
+ * Types:
+ *   - "bar" (vertical bars, CSS-animated)                    [original]
+ *   - "horizontal" (horizontal bars, CSS-animated)          [original]
+ *   - "line" (single-series line, SVG, GSAP entrance)       [v2]
+ *   - "area" (line + filled area, SVG, GSAP entrance)       [v2]
+ *   - "donut" (radial part-of-whole, SVG, GSAP entrance)    [v2]
+ *
+ * New props:
+ *   - story: a finding-first headline rendered above the chart with serif
+ *     emphasis. Editorial tone — state the point, not the topic.
+ *   - annotations: per-data-point callouts. Supported on bar / horizontal /
+ *     line / area. `{ targetIndex, text, emphasize? }`.
+ *   - source: a caption below the chart (e.g. "Source: internal metrics").
+ *
+ * Respects prefers-reduced-motion: bars snap via the global CSS rule; SVG
+ * types skip GSAP entrance and render at final state immediately.
+ */
+interface DataPoint {
+  label: string;
+  value: number;
+  color?: string;
+}
+interface Annotation {
+  /** 0-indexed position in `data` the annotation points to. */
+  targetIndex: number;
+  /** Annotation text. Keep it short (≤ 12 words). */
+  text: string;
+  /** Visually emphasize this data point as the story's focus. */
+  emphasize?: boolean;
+}
 interface Props {
-	type?: 'bar' | 'horizontal';
-	title?: string;
-	data: { label: string; value: number; color?: string }[];
+  type?: "bar" | "horizontal" | "line" | "area" | "donut";
+  /** Small meta label shown in the chart header bar (not the story). */
+  title?: string;
+  /** Finding-first headline. Editorial voice. */
+  story?: string;
+  /** Optional attribution shown below the chart in muted mono. */
+  source?: string;
+  data: DataPoint[];
+  /** Per-point callouts. */
+  annotations?: Annotation[];
+  /** Y-axis / value axis label for line and area charts. */
+  yLabel?: string;
+  /** X-axis / category axis label for line and area charts. */
+  xLabel?: string;
 }
 
-const { type = 'bar', title, data } = Astro.props;
-const maxValue = Math.max(...data.map(d => d.value));
+const {
+  type = "bar",
+  title,
+  story,
+  source,
+  data,
+  annotations = [],
+  yLabel,
+  xLabel,
+} = Astro.props;
+
+const maxValue = Math.max(...data.map((d) => d.value));
+const minValue = Math.min(...data.map((d) => d.value));
 const chartId = `chart-${Math.random().toString(36).slice(2, 7)}`;
+
+// --- SVG layout (line/area only) ---
+const SVG_W = 720;
+const SVG_H = 320;
+const PAD = { top: 16, right: 32, bottom: 40, left: 48 };
+const plotW = SVG_W - PAD.left - PAD.right;
+const plotH = SVG_H - PAD.top - PAD.bottom;
+
+function xFor(i: number): number {
+  if (data.length < 2) return PAD.left + plotW / 2;
+  return PAD.left + (i / (data.length - 1)) * plotW;
+}
+function yFor(v: number): number {
+  if (maxValue === minValue) return PAD.top + plotH / 2;
+  const rangeMin = Math.min(0, minValue);
+  const rangeMax = maxValue;
+  const t = (v - rangeMin) / (rangeMax - rangeMin);
+  return PAD.top + plotH - t * plotH;
+}
+const linePath =
+  type === "line" || type === "area"
+    ? data.map((d, i) => `${i === 0 ? "M" : "L"}${xFor(i).toFixed(2)},${yFor(d.value).toFixed(2)}`).join(" ")
+    : "";
+const areaPath =
+  type === "area"
+    ? `${linePath} L${xFor(data.length - 1).toFixed(2)},${(PAD.top + plotH).toFixed(2)} L${xFor(0).toFixed(2)},${(PAD.top + plotH).toFixed(2)} Z`
+    : "";
+
+// 5 y-ticks for line/area.
+const yTicks = (() => {
+  if (type !== "line" && type !== "area") return [];
+  const steps = 4;
+  const out: number[] = [];
+  const rangeMin = Math.min(0, minValue);
+  for (let i = 0; i <= steps; i++) {
+    out.push(rangeMin + (maxValue - rangeMin) * (i / steps));
+  }
+  return out;
+})();
+
+// --- Donut geometry ---
+const total = data.reduce((s, d) => s + d.value, 0);
+const donutR = 100;
+const donutInner = 62;
+const donutCx = SVG_W / 2;
+const donutCy = 170;
+function donutArcs() {
+  if (type !== "donut" || total === 0) return [] as { path: string; color: string; label: string; value: number; pct: number }[];
+  let acc = 0;
+  return data.map((d) => {
+    const a0 = (acc / total) * Math.PI * 2 - Math.PI / 2;
+    acc += d.value;
+    const a1 = (acc / total) * Math.PI * 2 - Math.PI / 2;
+    const x0 = donutCx + donutR * Math.cos(a0);
+    const y0 = donutCy + donutR * Math.sin(a0);
+    const x1 = donutCx + donutR * Math.cos(a1);
+    const y1 = donutCy + donutR * Math.sin(a1);
+    const ix0 = donutCx + donutInner * Math.cos(a0);
+    const iy0 = donutCy + donutInner * Math.sin(a0);
+    const ix1 = donutCx + donutInner * Math.cos(a1);
+    const iy1 = donutCy + donutInner * Math.sin(a1);
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const path = `M${x0},${y0} A${donutR},${donutR} 0 ${large} 1 ${x1},${y1} L${ix1},${iy1} A${donutInner},${donutInner} 0 ${large} 0 ${ix0},${iy0} Z`;
+    return {
+      path,
+      color: d.color ?? "var(--color-accent)",
+      label: d.label,
+      value: d.value,
+      pct: d.value / total,
+    };
+  });
+}
+const arcs = donutArcs();
+
+// For bar annotations we need to know which indices carry an annotation.
+const annotationMap = new Map<number, Annotation>();
+for (const a of annotations) annotationMap.set(a.targetIndex, a);
 ---
 
-<div class="chart-container" id={chartId}>
-	{title && <span class="chart-title">{title}</span>}
-	<div class="chart-body">
-		{type === 'bar' && (
-			<div class="chart-bars">
-				{data.map((item, i) => (
-					<div class="chart-col">
-						<div class="chart-tooltip" aria-hidden="true">
-							<strong>{item.value}</strong>
-							<span>{item.label}</span>
-						</div>
-						<div
-							class="chart-bar"
-							style={`--bar-height: ${(item.value / maxValue) * 100}%; --bar-color: ${item.color || 'var(--color-accent)'}; --bar-delay: ${i * 0.08}s;`}
-						></div>
-						<span class="chart-label">{item.label}</span>
-					</div>
-				))}
-			</div>
-		)}
-		{type === 'horizontal' && (
-			<div class="chart-rows">
-				{data.map((item, i) => (
-					<div class="chart-row">
-						<span class="chart-row-label">{item.label}</span>
-						<div class="chart-row-track">
-							<div
-								class="chart-row-bar"
-								style={`--bar-width: ${(item.value / maxValue) * 100}%; --bar-color: ${item.color || 'var(--color-accent)'}; --bar-delay: ${i * 0.1}s;`}
-							></div>
-						</div>
-						<span class="chart-row-value">{item.value}</span>
-					</div>
-				))}
-			</div>
-		)}
-	</div>
-</div>
+<figure class="chart-container" id={chartId} data-chart-type={type} data-chart>
+  {story && <div class="chart-story">{story}</div>}
+
+  {title && <span class="chart-title">{title}</span>}
+
+  <div class="chart-body">
+    {type === "bar" && (
+      <div class="chart-bars">
+        {data.map((item, i) => {
+          const ann = annotationMap.get(i);
+          const emphasize = ann?.emphasize ? true : false;
+          return (
+            <div class="chart-col" data-emphasize={emphasize ? "true" : undefined}>
+              {ann && <div class="chart-bar-annotation">{ann.text}</div>}
+              <div class="chart-tooltip" aria-hidden="true">
+                <strong>{item.value}</strong>
+                <span>{item.label}</span>
+              </div>
+              <div
+                class="chart-bar"
+                style={`--bar-height: ${(item.value / maxValue) * 100}%; --bar-color: ${item.color || "var(--color-accent)"}; --bar-delay: ${i * 0.08}s;`}
+              ></div>
+              <span class="chart-label">{item.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {type === "horizontal" && (
+      <div class="chart-rows">
+        {data.map((item, i) => {
+          const ann = annotationMap.get(i);
+          return (
+            <div class="chart-row" data-emphasize={ann?.emphasize ? "true" : undefined}>
+              <span class="chart-row-label">{item.label}</span>
+              <div class="chart-row-track">
+                <div
+                  class="chart-row-bar"
+                  style={`--bar-width: ${(item.value / maxValue) * 100}%; --bar-color: ${item.color || "var(--color-accent)"}; --bar-delay: ${i * 0.1}s;`}
+                ></div>
+                {ann && <div class="chart-row-annotation">{ann.text}</div>}
+              </div>
+              <span class="chart-row-value">{item.value}</span>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {(type === "line" || type === "area") && (
+      <svg
+        class="chart-svg"
+        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        role="img"
+        aria-label={story ?? title ?? "chart"}
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {/* Gridlines + y-tick labels */}
+        {yTicks.map((t) => (
+          <g class="chart-svg-grid">
+            <line x1={PAD.left} y1={yFor(t)} x2={SVG_W - PAD.right} y2={yFor(t)} />
+            <text x={PAD.left - 8} y={yFor(t) + 4} text-anchor="end">
+              {Math.round(t * 100) / 100}
+            </text>
+          </g>
+        ))}
+
+        {/* X-axis category labels */}
+        {data.map((d, i) => (
+          <text class="chart-svg-xlabel" x={xFor(i)} y={SVG_H - PAD.bottom + 22} text-anchor="middle">
+            {d.label}
+          </text>
+        ))}
+
+        {type === "area" && (
+          <path
+            class="chart-svg-area"
+            d={areaPath}
+            fill="var(--color-accent)"
+            fill-opacity="0.12"
+            style="pointer-events: none"
+          />
+        )}
+
+        {/* Line itself */}
+        <path
+          class="chart-svg-line"
+          d={linePath}
+          fill="none"
+          stroke="var(--color-accent)"
+          stroke-width="2.25"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+
+        {/* Data points + annotations */}
+        {data.map((d, i) => {
+          const ann = annotationMap.get(i);
+          const cx = xFor(i);
+          const cy = yFor(d.value);
+          return (
+            <g>
+              <circle
+                class="chart-svg-dot"
+                cx={cx}
+                cy={cy}
+                r={ann?.emphasize ? 5.5 : 3.5}
+                fill={d.color ?? "var(--color-accent)"}
+                stroke="var(--color-surface)"
+                stroke-width="2"
+              />
+              {ann && (
+                <g class="chart-svg-annotation">
+                  <line
+                    x1={cx}
+                    y1={cy - 10}
+                    x2={cx}
+                    y2={Math.max(cy - 42, PAD.top + 6)}
+                    stroke="var(--color-text-muted)"
+                    stroke-dasharray="2 2"
+                    stroke-width="1"
+                  />
+                  <text
+                    x={cx}
+                    y={Math.max(cy - 48, PAD.top + 2)}
+                    text-anchor="middle"
+                  >
+                    {ann.text}
+                  </text>
+                </g>
+              )}
+            </g>
+          );
+        })}
+
+        {yLabel && (
+          <text class="chart-svg-axislabel" x={12} y={PAD.top + plotH / 2} transform={`rotate(-90 12 ${PAD.top + plotH / 2})`} text-anchor="middle">
+            {yLabel}
+          </text>
+        )}
+        {xLabel && (
+          <text class="chart-svg-axislabel" x={PAD.left + plotW / 2} y={SVG_H - 6} text-anchor="middle">
+            {xLabel}
+          </text>
+        )}
+      </svg>
+    )}
+
+    {type === "donut" && (
+      <div class="chart-donut">
+        <svg class="chart-svg" viewBox={`0 0 ${SVG_W} ${SVG_H}`} role="img" aria-label={story ?? title ?? "chart"}>
+          {arcs.map((a) => (
+            <path class="chart-svg-arc" d={a.path} fill={a.color} />
+          ))}
+          <text class="chart-donut-total" x={donutCx} y={donutCy + 4} text-anchor="middle">
+            {total}
+          </text>
+        </svg>
+        <div class="chart-donut-legend">
+          {arcs.map((a) => (
+            <div class="chart-donut-legend-item">
+              <span class="chart-donut-swatch" style={`background: ${a.color}`}></span>
+              <span class="chart-donut-label">{a.label}</span>
+              <span class="chart-donut-value">{a.value} · {(a.pct * 100).toFixed(0)}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+  </div>
+
+  {source && <figcaption class="chart-source">{source}</figcaption>}
+</figure>
 
 <script>
-	function initCharts() {
-		const observer = new IntersectionObserver((entries) => {
-			entries.forEach((entry) => {
-				if (entry.isIntersecting) {
-					entry.target.classList.add('animate');
-					observer.unobserve(entry.target);
-				}
-			});
-		}, { threshold: 0.3 });
+  import { getGsap, onReducedMotion } from "../../lib/gsap";
 
-		document.querySelectorAll('.chart-container:not(.animate)').forEach((el) => observer.observe(el));
-	}
+  function initCssAnimatedCharts() {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("animate");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.3 },
+    );
+    document
+      .querySelectorAll<HTMLElement>(
+        '[data-chart][data-chart-type="bar"]:not(.animate), [data-chart][data-chart-type="horizontal"]:not(.animate)',
+      )
+      .forEach((el) => observer.observe(el));
+  }
 
-	initCharts();
-	document.addEventListener('astro:after-swap', initCharts);
+  async function initSvgCharts() {
+    const nodes = document.querySelectorAll<HTMLElement>(
+      '[data-chart][data-chart-type="line"]:not([data-chart-ready]), [data-chart][data-chart-type="area"]:not([data-chart-ready]), [data-chart][data-chart-type="donut"]:not([data-chart-ready])',
+    );
+    if (nodes.length === 0) return;
+
+    if (onReducedMotion()) {
+      for (const n of nodes) n.dataset.chartReady = "1";
+      return;
+    }
+
+    const { gsap } = await getGsap();
+
+    for (const node of nodes) {
+      node.dataset.chartReady = "1";
+      const type = node.dataset.chartType;
+
+      if (type === "line" || type === "area") {
+        const linePath = node.querySelector<SVGPathElement>(".chart-svg-line");
+        const areaPath = node.querySelector<SVGPathElement>(".chart-svg-area");
+        const dots = node.querySelectorAll<SVGCircleElement>(".chart-svg-dot");
+        const annGroups = node.querySelectorAll<SVGGElement>(".chart-svg-annotation");
+
+        if (linePath) {
+          const len = linePath.getTotalLength();
+          linePath.style.strokeDasharray = `${len}`;
+          linePath.style.strokeDashoffset = `${len}`;
+          gsap.to(linePath, {
+            strokeDashoffset: 0,
+            duration: 1.1,
+            ease: "power2.out",
+            scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
+          });
+        }
+        if (areaPath) {
+          gsap.from(areaPath, {
+            opacity: 0,
+            duration: 1.1,
+            delay: 0.2,
+            ease: "power2.out",
+            scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
+          });
+        }
+        gsap.from(dots, {
+          opacity: 0,
+          scale: 0.4,
+          transformOrigin: "center",
+          duration: 0.4,
+          stagger: 0.06,
+          ease: "back.out(1.8)",
+          delay: 0.8,
+          scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
+        });
+        gsap.from(annGroups, {
+          opacity: 0,
+          y: -6,
+          duration: 0.5,
+          ease: "power2.out",
+          stagger: 0.08,
+          delay: 1.0,
+          scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
+        });
+      } else if (type === "donut") {
+        const arcs = node.querySelectorAll<SVGPathElement>(".chart-svg-arc");
+        gsap.from(arcs, {
+          opacity: 0,
+          scale: 0.7,
+          transformOrigin: `${node.querySelector<SVGSVGElement>(".chart-svg")?.viewBox.baseVal.width! / 2}px 170px`,
+          duration: 0.7,
+          ease: "power2.out",
+          stagger: 0.1,
+          scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
+        });
+      }
+    }
+  }
+
+  function initAll() {
+    initCssAnimatedCharts();
+    initSvgCharts();
+  }
+
+  initAll();
+  document.addEventListener("astro:after-swap", initAll);
 </script>
 
 <style>
-	.chart-container {
-		margin: 2em 0;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		overflow: hidden;
-		background: var(--color-surface);
-	}
+  .chart-container {
+    margin: 2em 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background: var(--color-surface);
+  }
 
-	.chart-title {
-		display: block;
-		padding: 0.55rem 1rem;
-		font-family: var(--font-mono);
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: var(--color-text-muted);
-		border-bottom: 1px solid var(--color-border);
-		background: var(--color-bg-secondary);
-	}
+  .chart-story {
+    padding: 1.1rem 1.25rem 0.25rem;
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: clamp(1.15rem, 2vw, 1.4rem);
+    line-height: 1.3;
+    color: var(--color-text);
+    letter-spacing: -0.01em;
+  }
 
-	.chart-body { padding: 1.5rem; }
+  .chart-title {
+    display: block;
+    padding: 0.55rem 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-secondary);
+  }
 
-	/* ---- Vertical bars ---- */
-	.chart-bars {
-		display: flex;
-		align-items: flex-end;
-		gap: 1rem;
-		height: clamp(150px, 30vw, 200px);
-		padding-top: 2rem;
-	}
+  .chart-story + .chart-title {
+    border-top: 1px solid var(--color-border);
+  }
 
-	.chart-col {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		height: 100%;
-		justify-content: flex-end;
-		position: relative;
-	}
+  .chart-body {
+    padding: 1.5rem;
+  }
 
-	.chart-bar {
-		width: 100%;
-		max-width: 48px;
-		height: 0;
-		background: var(--bar-color);
-		border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-		transition: height 0.6s var(--ease-spring);
-		transition-delay: var(--bar-delay);
-		cursor: pointer;
-	}
+  .chart-source {
+    padding: 0 1.25rem 0.85rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--color-text-muted);
+  }
 
-	.chart-container.animate .chart-bar {
-		height: var(--bar-height);
-	}
+  /* ---- Vertical bars ---- */
+  .chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    height: clamp(150px, 30vw, 200px);
+    padding-top: 2rem;
+  }
 
-	.chart-bar:hover {
-		opacity: 0.85;
-	}
+  .chart-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+    position: relative;
+  }
 
-	.chart-bar:hover + .chart-label,
-	.chart-col:hover .chart-tooltip {
-		opacity: 1;
-	}
+  .chart-bar {
+    width: 100%;
+    max-width: 48px;
+    height: 0;
+    background: var(--bar-color);
+    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    transition: height 0.6s var(--ease-spring);
+    transition-delay: var(--bar-delay);
+    cursor: pointer;
+  }
 
-	.chart-tooltip {
-		position: absolute;
-		top: -0.5rem;
-		transform: translateY(-100%);
-		background: var(--color-text);
-		color: var(--color-bg);
-		padding: 0.3em 0.6em;
-		border-radius: var(--radius-sm);
-		font-family: var(--font-mono);
-		font-size: 0.7rem;
-		white-space: nowrap;
-		opacity: 0;
-		pointer-events: none;
-		transition: opacity var(--duration-fast) var(--ease-smooth);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.1em;
-	}
+  .chart-container.animate .chart-bar {
+    height: var(--bar-height);
+  }
 
-	.chart-label {
-		margin-top: 0.5rem;
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		color: var(--color-text-muted);
-		text-align: center;
-	}
+  .chart-bar:hover {
+    opacity: 0.85;
+  }
 
-	/* ---- Horizontal bars ---- */
-	.chart-rows {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
+  .chart-bar:hover + .chart-label,
+  .chart-col:hover .chart-tooltip {
+    opacity: 1;
+  }
 
-	.chart-row {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-	}
+  .chart-col[data-emphasize="true"] .chart-bar {
+    outline: 2px solid oklch(from var(--color-accent) l c h / 0.6);
+    outline-offset: 2px;
+  }
 
-	.chart-row-label {
-		font-family: var(--font-mono);
-		font-size: 0.75rem;
-		color: var(--color-text-secondary);
-		min-width: 80px;
-		text-align: right;
-	}
+  .chart-bar-annotation {
+    position: absolute;
+    top: -0.25rem;
+    transform: translateY(-100%);
+    max-width: 14ch;
+    padding: 0.35em 0.55em;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    font-family: var(--font-sans);
+    font-size: 0.7rem;
+    line-height: 1.3;
+    color: var(--color-text-secondary);
+    text-align: center;
+    pointer-events: none;
+  }
 
-	.chart-row-track {
-		flex: 1;
-		height: 24px;
-		background: var(--color-bg-secondary);
-		border-radius: var(--radius-sm);
-		overflow: hidden;
-	}
+  .chart-tooltip {
+    position: absolute;
+    top: -0.5rem;
+    transform: translateY(-100%);
+    background: var(--color-text);
+    color: var(--color-bg);
+    padding: 0.3em 0.6em;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--duration-fast) var(--ease-smooth);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.1em;
+  }
 
-	.chart-row-bar {
-		height: 100%;
-		width: 0;
-		background: var(--bar-color);
-		border-radius: var(--radius-sm);
-		transition: width 0.8s var(--ease-spring);
-		transition-delay: var(--bar-delay);
-	}
+  .chart-label {
+    margin-top: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    color: var(--color-text-muted);
+    text-align: center;
+  }
 
-	.chart-container.animate .chart-row-bar {
-		width: var(--bar-width);
-	}
+  /* ---- Horizontal bars ---- */
+  .chart-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
 
-	.chart-row-value {
-		font-family: var(--font-mono);
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: var(--color-text);
-		min-width: 32px;
-	}
+  .chart-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    position: relative;
+  }
+
+  .chart-row-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    min-width: 80px;
+    text-align: right;
+  }
+
+  .chart-row-track {
+    flex: 1;
+    height: 24px;
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .chart-row-bar {
+    height: 100%;
+    width: 0;
+    background: var(--bar-color);
+    border-radius: var(--radius-sm);
+    transition: width 0.8s var(--ease-spring);
+    transition-delay: var(--bar-delay);
+  }
+
+  .chart-container.animate .chart-row-bar {
+    width: var(--bar-width);
+  }
+
+  .chart-row[data-emphasize="true"] .chart-row-bar {
+    outline: 2px solid oklch(from var(--color-accent) l c h / 0.5);
+    outline-offset: 1px;
+  }
+
+  .chart-row-annotation {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--font-sans);
+    font-size: 0.68rem;
+    color: var(--color-text-muted);
+    font-style: italic;
+    pointer-events: none;
+  }
+
+  .chart-row-value {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--color-text);
+    min-width: 32px;
+  }
+
+  /* ---- SVG (line / area / donut) ---- */
+  .chart-svg {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .chart-svg-grid line {
+    stroke: var(--color-border);
+    stroke-width: 0.5;
+  }
+
+  .chart-svg-grid text,
+  .chart-svg-xlabel {
+    fill: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  .chart-svg-annotation text {
+    fill: var(--color-text);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-style: italic;
+  }
+
+  .chart-svg-axislabel {
+    fill: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+  }
+
+  /* ---- Donut ---- */
+  .chart-donut {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: center;
+  }
+
+  @media (max-width: 600px) {
+    .chart-donut {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .chart-donut-total {
+    font-family: var(--font-serif);
+    font-size: 36px;
+    font-weight: 500;
+    fill: var(--color-text);
+  }
+
+  .chart-donut-legend {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .chart-donut-legend-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.85rem;
+  }
+
+  .chart-donut-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+  }
+
+  .chart-donut-label {
+    font-family: var(--font-sans);
+    color: var(--color-text);
+  }
+
+  .chart-donut-value {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+  }
 </style>

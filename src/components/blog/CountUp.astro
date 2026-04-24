@@ -1,0 +1,166 @@
+---
+/**
+ * CountUp — animated number counter that triggers when it enters the viewport.
+ *
+ * <CountUp to={4200} duration={1200} prefix="$" suffix=" MRR" decimals={0} />
+ *
+ * Uses Fraunces serif for the big number (editorial feel) and Geist Mono for
+ * the caption. Respects prefers-reduced-motion — shows the final value
+ * immediately without animation.
+ */
+interface Props {
+  /** Final value to animate to. */
+  to: number;
+  /** Starting value. Default 0. */
+  from?: number;
+  /** Duration of the animation in ms. Default 1200. */
+  duration?: number;
+  /** Decimals to show. Default 0. */
+  decimals?: number;
+  /** Text rendered before the number (e.g. "$"). */
+  prefix?: string;
+  /** Text rendered after the number (e.g. "%", "ms"). */
+  suffix?: string;
+  /** Label shown below the number (editorial caption). */
+  label?: string;
+  /** Optional smaller context line under the label. */
+  context?: string;
+}
+const {
+  to,
+  from = 0,
+  duration = 1200,
+  decimals = 0,
+  prefix = "",
+  suffix = "",
+  label,
+  context,
+} = Astro.props;
+---
+
+<div
+  class="countup"
+  data-countup
+  data-from={from}
+  data-to={to}
+  data-duration={duration}
+  data-decimals={decimals}
+>
+  <div class="countup-number">
+    <span class="countup-prefix">{prefix}</span>
+    <span class="countup-value">{from.toFixed(decimals)}</span>
+    <span class="countup-suffix">{suffix}</span>
+  </div>
+  {label && <div class="countup-label">{label}</div>}
+  {context && <div class="countup-context">{context}</div>}
+</div>
+
+<script>
+  import { onReducedMotion } from "../../lib/gsap";
+
+  function formatValue(n: number, decimals: number): string {
+    return n.toFixed(decimals);
+  }
+
+  function runCounter(el: HTMLElement) {
+    const from = Number(el.dataset.from ?? "0");
+    const to = Number(el.dataset.to ?? "0");
+    const duration = Number(el.dataset.duration ?? "1200");
+    const decimals = Number(el.dataset.decimals ?? "0");
+    const valueEl = el.querySelector<HTMLElement>(".countup-value");
+    if (!valueEl) return;
+
+    if (onReducedMotion()) {
+      valueEl.textContent = formatValue(to, decimals);
+      return;
+    }
+
+    const start = performance.now();
+    const delta = to - from;
+
+    function step(now: number) {
+      const t = Math.min((now - start) / duration, 1);
+      // easeOutCubic for a confident finish
+      const eased = 1 - Math.pow(1 - t, 3);
+      const current = from + delta * eased;
+      valueEl!.textContent = formatValue(current, decimals);
+      if (t < 1) requestAnimationFrame(step);
+      else valueEl!.textContent = formatValue(to, decimals);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function init() {
+    const nodes = document.querySelectorAll<HTMLElement>("[data-countup]:not([data-countup-ready])");
+    if (nodes.length === 0) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const el = entry.target as HTMLElement;
+            if (!el.dataset.countupReady) {
+              el.dataset.countupReady = "1";
+              runCounter(el);
+              io.unobserve(el);
+            }
+          }
+        }
+      },
+      { threshold: 0.4 },
+    );
+    for (const n of nodes) io.observe(n);
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .countup {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: var(--space-lg) 0;
+  }
+
+  .countup-number {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: clamp(3rem, 7vw, 5.5rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .countup-prefix,
+  .countup-suffix {
+    font-size: 0.55em;
+    color: var(--color-text-muted);
+    font-weight: 400;
+    vertical-align: 0.3em;
+  }
+
+  .countup-value {
+    display: inline-block;
+    min-width: 2ch;
+  }
+
+  .countup-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+    margin-top: 0.25rem;
+  }
+
+  .countup-context {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    max-width: 28ch;
+  }
+</style>

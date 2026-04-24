@@ -1,0 +1,115 @@
+---
+/**
+ * ProgressGate — content revealed only when the reader scrolls past a
+ * threshold. Useful for the "you made it this far, here's the thing" moment.
+ *
+ *   <ProgressGate hint="Keep scrolling for the full breakdown.">
+ *     The actual payoff content goes here.
+ *   </ProgressGate>
+ *
+ * When the gate enters the viewport, the gate wall fades out and the slot
+ * content fades in. Fully static under prefers-reduced-motion (slot content
+ * is always visible; hint wall is hidden).
+ */
+interface Props {
+  /** Placeholder text shown before the gate opens. */
+  hint?: string;
+  /** Optional minimum height so the layout doesn't jump when content reveals. */
+  minHeight?: string;
+}
+const { hint = "Keep scrolling.", minHeight = "10rem" } = Astro.props;
+---
+
+<div class="gate" data-gate style={`min-height: ${minHeight}`}>
+  <div class="gate-wall" aria-hidden="true">
+    <span class="gate-hint">{hint}</span>
+    <span class="gate-arrow" aria-hidden="true">↓</span>
+  </div>
+  <div class="gate-content">
+    <slot />
+  </div>
+</div>
+
+<script>
+  import { getGsap, onReducedMotion } from "../../lib/gsap";
+
+  async function init() {
+    const gates = document.querySelectorAll<HTMLElement>("[data-gate]:not([data-gate-ready])");
+    if (gates.length === 0) return;
+
+    if (onReducedMotion()) {
+      for (const g of gates) {
+        g.dataset.gateReady = "1";
+        g.classList.add("open");
+      }
+      return;
+    }
+
+    const { gsap, ScrollTrigger } = await getGsap();
+
+    for (const gate of gates) {
+      gate.dataset.gateReady = "1";
+      ScrollTrigger.create({
+        trigger: gate,
+        start: "top 70%",
+        onEnter: () => {
+          const tl = gsap.timeline();
+          const wall = gate.querySelector(".gate-wall");
+          const content = gate.querySelector(".gate-content");
+          if (wall) tl.to(wall, { opacity: 0, y: -8, duration: 0.4, ease: "power2.out" });
+          if (content) tl.from(content, { opacity: 0, y: 12, duration: 0.6, ease: "power2.out" }, "-=0.1");
+          gate.classList.add("open");
+        },
+      });
+    }
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .gate {
+    position: relative;
+    margin: 2rem 0;
+    border-top: 1px dashed var(--color-border);
+    border-bottom: 1px dashed var(--color-border);
+  }
+
+  .gate-wall {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+    text-align: center;
+    padding: 2rem;
+    background: oklch(from var(--color-bg) l c h / 0.92);
+    backdrop-filter: blur(2px);
+    pointer-events: none;
+  }
+
+  .gate-arrow {
+    font-size: 1.2rem;
+    color: var(--color-accent);
+    animation: gate-bounce 1.8s ease-in-out infinite;
+  }
+
+  @keyframes gate-bounce {
+    0%, 100% { transform: translateY(0); opacity: 0.6; }
+    50% { transform: translateY(4px); opacity: 1; }
+  }
+
+  .gate.open .gate-wall {
+    display: none;
+  }
+
+  .gate-content {
+    padding: 1.5rem 0;
+  }
+</style>
