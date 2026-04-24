@@ -102,6 +102,8 @@ For bilingual posts, create two files:
 
 These components are imported at the top of the MDX file. Use them generously — they exist to make posts feel alive, not to decorate.
 
+> **Full catalogue with every component, signature, and decision tree**: `.claude/docs/STORYTELLING_SYSTEM.md`. Read it when you're deciding *which* component fits, not just that one does.
+
 ### Callout — For insights that deserve emphasis
 
 ```mdx
@@ -226,23 +228,45 @@ Supports all Mermaid diagram types: flowcharts, sequence diagrams, ER diagrams, 
 
 ### InteractiveChart — For data visualization
 
-Animated bar charts (vertical or horizontal) with hover tooltips:
+Multi-type chart with optional finding-first headline, annotations, and source caption. Types: `bar | horizontal | line | area | donut`.
 
 ```mdx
 import InteractiveChart from '../../components/blog/InteractiveChart.astro';
 
 <InteractiveChart
-  title="Bundle Size Comparison"
-  type="bar"
+  story="Small teams ship 4× more often once they cross three engineers."
+  type="horizontal"
+  source="Source: internal survey, 2026"
   data={[
-    { label: "React", value: 42, color: "oklch(0.6 0.15 220)" },
-    { label: "Svelte", value: 8, color: "oklch(0.65 0.2 27)" },
-    { label: "Astro", value: 0, color: "oklch(0.6 0.18 145)" },
+    { label: "1–2 engs",  value: 1.0 },
+    { label: "3–5 engs",  value: 4.2 },
+    { label: "6–10 engs", value: 3.8 },
   ]}
+  annotations={[{ targetIndex: 1, text: "The inflection point", emphasize: true }]}
 />
 ```
 
-Types: `bar` (vertical) and `horizontal`. Bars animate in with stagger when scrolled into view. Use for comparisons, benchmarks, survey results, and any numerical data.
+Use `story` to state the *finding* (not the topic). Use `annotations` to call out the specific data points that carry the argument. For line/area/donut, see `STORYTELLING_SYSTEM.md` for full props.
+
+### Storytelling-tier components
+
+These carry narrative weight. Use at least one in any `featured: true` post.
+
+- **CountUp** — animated number on viewport entry. Big serif digit, mono label, optional context line.
+- **StatGrid** — 2–4 column KPI cards with staggered reveal.
+- **PullQuote** — editorial quote with accent bar (default) or centered block variant.
+- **BeforeAfter** — drag-slider comparison (images, text, any HTML). Pointer + keyboard.
+- **Timeline** — vertical milestone list with scroll-revealed entries.
+- **Scrollytelling + ScrollStep** — NYT-style pinned graphic driven by scrolling steps. The active step publishes `data-scrolly-state` on the section root; drive your graphic with CSS off that attribute.
+- **StepThroughDiagram** — hand-authored SVG where elements marked `data-diagram-step="<id>"` light up as their matching step activates.
+- **CodeDiff** — side-by-side annotated before/after with narrator text per hunk.
+
+### Utility-tier components
+
+- **DataTable** — sortable table with optional heatmap column coloring.
+- **DecisionTree** — click-based branching narrative. Reader walks the tree; breadcrumbs track the path.
+- **ProgressGate** — content that reveals only after the reader scrolls past a threshold. Use sparingly — once per post at most.
+- **Callout**, **CodeBlock**, **Tabs + TabPanel**, **Collapsible**, **FileTree**, **CopyableCommand**, **MermaidDiagram** — already documented below.
 
 ### Standard Markdown — Still Powerful
 
@@ -280,26 +304,38 @@ End with conviction, not summary. Don't rehash — deliver a final thought that 
 
 ## Interactivity Philosophy
 
-The components aren't decoration — they're information architecture. Think about which format best serves each piece of information:
+The components aren't decoration — they're information architecture. Think about which format best serves each piece of information. The full decision tree lives in `.claude/docs/STORYTELLING_SYSTEM.md`; here's the abridged version:
 
 | Information Type | Best Format |
 |---|---|
 | A process or workflow | MermaidDiagram |
+| A narrated sequence tied to a visual | **StepThroughDiagram** |
 | A configuration or real code | CodeBlock with filename |
-| Same code in multiple languages | Tabs + TabPanel with code blocks inside |
-| A practical tip | Callout type="tip" |
-| A common mistake | Callout type="warning" |
-| A core insight | Callout type="important" |
-| Comparing options | Markdown table or Tabs |
-| A memorable principle | Blockquote |
+| Before/after code change | **CodeDiff** |
+| Same code in multiple languages | Tabs + TabPanel |
+| Numerical comparison | InteractiveChart (bar/horizontal) |
+| Change over time | InteractiveChart (line/area) |
+| Part of a whole | InteractiveChart (donut) |
+| Tabular data | **DataTable** |
+| A single big stat | **CountUp** |
+| 3–6 KPIs at once | **StatGrid** |
+| A memorable quote | **PullQuote** |
+| Before/after image / UI | **BeforeAfter** |
+| Chronology | **Timeline** |
+| Scrolling narrative with a pinned graphic | **Scrollytelling + ScrollStep** |
+| Branching reader choice | **DecisionTree** |
+| Payoff behind a scroll threshold | **ProgressGate** |
+| A practical tip / warning / insight | Callout (tip/warning/note/important) |
 | Step-by-step instructions | Ordered list |
 | Project file structure | FileTree with highlight |
 | Terminal install command | CopyableCommand |
-| Numerical comparison/benchmark | InteractiveChart |
 | Optional deep-dive details | Collapsible |
-| Before/after comparison | Tabs with 2 panels |
 
-**Density target**: Aim for an interactive element every 200-300 words. This creates a rhythm — text explains, component demonstrates, text transitions, component reinforces.
+**Density target**: Aim for an interactive element every 200–300 words. This creates a rhythm — text explains, component demonstrates, text transitions, component reinforces.
+
+**Minimum for every post**: at least 4 different interactive components.
+
+**Minimum for `featured: true` posts**: 4 components *and* at least one story-tier component (in **bold** above).
 
 ## Bilingual Writing
 
@@ -308,6 +344,75 @@ When writing the Spanish version:
 - **Keep technical terms in English** when they're industry standard (API, JWT, middleware, deploy). Don't force-translate what developers actually say.
 - **Match the energy** — if the English version is direct and punchy, the Spanish should be too. Don't slip into formal academic Spanish.
 - **Code stays identical** — only prose and Callout text get translated. Code blocks, filenames, and technical commands stay in English.
+
+## Image Generation (optional, last resort)
+
+Posts are interactive-first. An image is the right call only when:
+- The post is genuinely editorial and a hero banner carries the mood (a flagship `featured: true` post, a narrative piece).
+- A concept is inherently visual-photographic and no interactive component fits (a physical artifact, a stylized portrait, a mood piece).
+- An infographic condenses comparative data that would be clumsy as Mermaid or the existing `InteractiveChart`.
+
+If it can be a Mermaid diagram, an InteractiveChart, a FileTree, Tabs, or (when they exist) Scrollytelling/Timeline/BeforeAfter/StatGrid/DecisionTree/StepThroughDiagram — use those instead.
+
+### How to invoke
+
+The `/blog-image` slash command (implemented in `.claude/commands/blog-image.md`) shells out to `scripts/blog/generate-image.mjs`. Call it at your discretion while drafting. You may continue composing the post while it runs.
+
+**Never send a raw user prompt to the API.** Always pass through the matching prompt-architect template first. Templates live in `.claude/skills/blog-writer/prompts/`:
+- `hero-editorial.md` for `--slot hero`
+- `infographic-dataviz.md` for `--slot infographic`
+- `inline-illustration.md` for `--slot inline`
+
+(These templates are part of Phase 2 of the authoring system. Until they exist, write the prompt to the same standards described in them: fill subject / composition / lighting / palette / style-anchor / mood / text-in-image policy / audience for hero; and chart-type-from-data-relationship / annotation-first / data-to-ink ratio / colorblind-safe palette for infographic.)
+
+### Size per slot
+
+Pick size so the output fits its render slot without resize blur:
+
+- **Hero** — `1536x1024`. The `.hero-image` block in `src/layouts/BlogPost.astro` renders 1020×510 (≈ 2:1); 1536×1024 downscales cleanly for both 1x and 2x displays.
+- **Infographic** — `1536x1024` at `--quality high`. Needed because data text must remain legible.
+- **Inline** — `1024x1024` default. Square reads well between paragraphs.
+
+All other sizes must satisfy gpt-image-2 constraints (edges multiple of 16, max edge 3840, ratio ≤ 3:1, total pixels 655,360–8,294,400).
+
+### Variation flow (you are the judge)
+
+When the subject is tricky, run `--variations 3 --quality low`. The script writes three candidates to `public/images/blog/<slug>/.candidates/`. You then `Read` each webp (you're multimodal; the images come through), pick the best, and run the same command again with `--promote <n>`. Briefly tell the user *why* you picked that one. Delete any notes of the losers afterward — they don't exist.
+
+### Editing
+
+Once a hero exists and the user wants a tweak, use `--edit public/images/blog/<slug>/hero.webp --prompt "<change>"`. This uses `/v1/images/edits`, preserves composition, and overwrites the file. The sidecar JSON keeps the edit lineage in `.history.jsonl`.
+
+### Dry-run before spending
+
+For any new slug, always run once with `--dry-run` first. It prints the estimated USD cost without calling the API. If the user wants, proceed for real.
+
+### Wiring the result into the post
+
+After a successful (non-variation) run, the stdout JSON contains `path` (a public URL like `/images/blog/<slug>/hero.webp`). Wire it in:
+
+- Hero: add `heroImage: "<path>"` to frontmatter of **both** EN and ES versions — images are shared across the pair because filenames are slug-matched.
+- Inline: insert `![descriptive alt](<path>)` at the relevant paragraph.
+
+## Cost Transparency
+
+Every `/blog-image` call prints a cost in its stdout JSON (`cost_usd` per run, `post_total_usd` cumulative for the slug). Relay this to the user verbatim on a single line after each successful run:
+
+```
+Imagen generada: /images/blog/<slug>/hero.webp · tamaño <WxH> · calidad <q> · costo $<c> · total del post $<t>.
+```
+
+This is innegociable. Never silently spend credits. If the user wants to cap spend on a post, pass `--budget <usd>` — the script aborts with a clear error before the API call if it would exceed the cap.
+
+Current pricing (validated, hard-coded in `scripts/blog/pricing-table.mjs`):
+
+| Quality | 1024×1024 | 1024×1536 / 1536×1024 |
+|---|---|---|
+| low | $0.006 | $0.005 |
+| medium | $0.053 | $0.041 |
+| high | $0.211 | $0.165 |
+
+Drafts and variations → `low`. Production heroes → `medium`. Infographics with legible in-image text → `high`. Budget a flagship post around $0.05–$0.25; anything higher means you're over-iterating.
 
 ## Quality Checklist
 

@@ -1,0 +1,206 @@
+---
+/**
+ * Scrollytelling — NYT-style pinned-graphic + scrolling-steps layout.
+ *
+ * Usage in MDX:
+ *
+ *   <Scrollytelling>
+ *     <div slot="graphic">
+ *       <img id="gfx" src="..." alt="" />
+ *     </div>
+ *     <ScrollStep state="a">First step text here.</ScrollStep>
+ *     <ScrollStep state="b">Second step text here.</ScrollStep>
+ *     <ScrollStep state="c">Third step text here.</ScrollStep>
+ *   </Scrollytelling>
+ *
+ * As the reader scrolls, the `data-scrolly-state` attribute on the section
+ * root updates to the active step's `state` value. Style transitions off that
+ * attribute in your own CSS:
+ *
+ *   [data-scrolly-state="b"] #gfx { transform: scale(1.2); }
+ *
+ * Respects prefers-reduced-motion via the central GSAP singleton — pinning is
+ * disabled and steps simply reveal on scroll without sticky behavior.
+ */
+interface Props {
+  /** Visual alignment — graphic on the left or right. Default "right". */
+  graphic?: "left" | "right";
+}
+const { graphic = "right" } = Astro.props;
+---
+
+<section class="scrolly" data-graphic={graphic} data-scrolly-state="">
+  <div class="scrolly-graphic">
+    <div class="scrolly-graphic-inner">
+      <slot name="graphic" />
+    </div>
+  </div>
+  <div class="scrolly-steps">
+    <slot />
+  </div>
+</section>
+
+<script>
+  import { getGsap, onReducedMotion } from "../../lib/gsap";
+
+  async function init() {
+    const sections = document.querySelectorAll<HTMLElement>(".scrolly:not([data-scrolly-ready])");
+    if (sections.length === 0) return;
+
+    const reduced = onReducedMotion();
+    const { gsap, ScrollTrigger } = await getGsap();
+
+    for (const section of sections) {
+      section.dataset.scrollyReady = "1";
+
+      const graphicCol = section.querySelector<HTMLElement>(".scrolly-graphic");
+      const steps = Array.from(section.querySelectorAll<HTMLElement>("[data-scrolly-step]"));
+      if (!graphicCol || steps.length === 0) continue;
+
+      if (reduced) {
+        // Reveal all steps and do not pin — static comprehension still works.
+        for (const s of steps) s.setAttribute("data-active", "true");
+        const lastState = steps[steps.length - 1].dataset.scrollyState;
+        if (lastState != null) section.setAttribute("data-scrolly-state", lastState);
+        continue;
+      }
+
+      // Pin the graphic column for the duration of the steps column.
+      ScrollTrigger.create({
+        trigger: section,
+        start: "top top",
+        end: "bottom bottom",
+        pin: graphicCol,
+        pinSpacing: false,
+      });
+
+      // Activate steps as they enter the viewport.
+      steps.forEach((step, i) => {
+        ScrollTrigger.create({
+          trigger: step,
+          start: "top 65%",
+          end: "bottom 35%",
+          onEnter: () => activate(step, i),
+          onEnterBack: () => activate(step, i),
+          onLeave: () => deactivate(step, i),
+          onLeaveBack: () => deactivate(step, i),
+        });
+      });
+
+      function activate(step: HTMLElement, _i: number) {
+        for (const s of steps) s.removeAttribute("data-active");
+        step.setAttribute("data-active", "true");
+        const state = step.dataset.scrollyState;
+        if (state != null) section.setAttribute("data-scrolly-state", state);
+      }
+
+      function deactivate(step: HTMLElement, i: number) {
+        // Only clear "active" if nothing else will own it. Simpler: do nothing;
+        // the next activate() call will move the flag.
+        void step;
+        void i;
+      }
+
+      // Entry animation for steps. Fade in while still respecting scroll.
+      for (const step of steps) {
+        gsap.fromTo(
+          step.querySelectorAll(".scrolly-step-body > *"),
+          { opacity: 0, y: 16 },
+          {
+            opacity: 1,
+            y: 0,
+            duration: 0.6,
+            ease: "power2.out",
+            stagger: 0.06,
+            scrollTrigger: {
+              trigger: step,
+              start: "top 80%",
+              toggleActions: "play none none reverse",
+            },
+          },
+        );
+      }
+    }
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .scrolly {
+    position: relative;
+    display: grid;
+    gap: 2rem;
+    margin: 4rem 0;
+  }
+
+  .scrolly[data-graphic="right"] {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  }
+  .scrolly[data-graphic="left"] {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  }
+  .scrolly[data-graphic="right"] .scrolly-steps { order: 1; }
+  .scrolly[data-graphic="right"] .scrolly-graphic { order: 2; }
+  .scrolly[data-graphic="left"] .scrolly-graphic { order: 1; }
+  .scrolly[data-graphic="left"] .scrolly-steps { order: 2; }
+
+  @media (max-width: 768px) {
+    .scrolly {
+      grid-template-columns: 1fr !important;
+    }
+    .scrolly[data-graphic="right"] .scrolly-steps,
+    .scrolly[data-graphic="left"] .scrolly-steps {
+      order: 2;
+    }
+    .scrolly-graphic {
+      position: sticky;
+      top: 4rem;
+      z-index: 1;
+      order: 1 !important;
+    }
+  }
+
+  .scrolly-graphic {
+    align-self: start;
+  }
+
+  .scrolly-graphic-inner {
+    position: relative;
+    height: 80vh;
+    max-height: 720px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    overflow: hidden;
+  }
+
+  .scrolly-graphic-inner :global(img),
+  .scrolly-graphic-inner :global(svg) {
+    max-width: 100%;
+    max-height: 100%;
+    transition: transform 0.6s var(--ease-smooth), opacity 0.4s var(--ease-smooth);
+  }
+
+  .scrolly-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 60vh;
+    padding: 20vh 0;
+  }
+
+  .scrolly-steps :global(.scrolly-step) {
+    padding: 1.5rem;
+    border-left: 3px solid var(--color-border);
+    transition: border-color 0.4s var(--ease-smooth), background 0.4s var(--ease-smooth);
+  }
+
+  .scrolly-steps :global(.scrolly-step[data-active="true"]) {
+    border-left-color: var(--color-accent);
+    background: oklch(from var(--color-accent) l c h / 0.04);
+  }
+</style>

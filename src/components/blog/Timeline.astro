@@ -1,0 +1,162 @@
+---
+/**
+ * Timeline — vertical milestone timeline with scroll-revealed entries.
+ *
+ *   <Timeline
+ *     items={[
+ *       { date: "2025-Q1", title: "Spec-driven v0",
+ *         body: "We stopped writing prompts; we started writing specs." },
+ *       { date: "2025-Q3", title: "Every feature has a spec",
+ *         body: "~70% less rework. Shipped in 2 months." },
+ *       { date: "2026-Q1", title: "Specs as the source of truth",
+ *         body: "Onboarding time cut from 3 weeks to 4 days.", emphasize: true },
+ *     ]}
+ *   />
+ */
+interface Item {
+  date: string;
+  title: string;
+  body?: string;
+  emphasize?: boolean;
+}
+interface Props {
+  items: Item[];
+}
+const { items } = Astro.props;
+---
+
+<ol class="timeline" data-timeline>
+  {items.map((item) => (
+    <li class="timeline-item" data-timeline-item data-emphasize={item.emphasize ? "true" : undefined}>
+      <div class="timeline-node" aria-hidden="true">
+        <span class="timeline-dot"></span>
+      </div>
+      <div class="timeline-content">
+        <div class="timeline-date">{item.date}</div>
+        <h4 class="timeline-title">{item.title}</h4>
+        {item.body && <p class="timeline-body">{item.body}</p>}
+      </div>
+    </li>
+  ))}
+</ol>
+
+<script>
+  import { getGsap, onReducedMotion } from "../../lib/gsap";
+
+  async function init() {
+    const lists = document.querySelectorAll<HTMLElement>("[data-timeline]:not([data-timeline-ready])");
+    if (lists.length === 0) return;
+
+    if (onReducedMotion()) {
+      for (const l of lists) l.dataset.timelineReady = "1";
+      return;
+    }
+
+    const { gsap, ScrollTrigger } = await getGsap();
+
+    for (const list of lists) {
+      list.dataset.timelineReady = "1";
+      const items = list.querySelectorAll<HTMLElement>("[data-timeline-item]");
+      ScrollTrigger.batch(items, {
+        start: "top 85%",
+        onEnter: (batch) => {
+          gsap.from(batch, {
+            opacity: 0,
+            x: -16,
+            duration: 0.6,
+            ease: "power2.out",
+            stagger: 0.08,
+          });
+        },
+      });
+    }
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .timeline {
+    list-style: none;
+    padding: 0;
+    margin: 2.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    position: relative;
+  }
+
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 11px;
+    top: 8px;
+    bottom: 8px;
+    width: 1px;
+    background: var(--color-border);
+  }
+
+  .timeline-item {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 1rem;
+    align-items: start;
+    position: relative;
+  }
+
+  .timeline-node {
+    width: 24px;
+    display: flex;
+    justify-content: center;
+    padding-top: 4px;
+  }
+
+  .timeline-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-bg);
+    border: 2px solid var(--color-border-strong);
+    box-shadow: 0 0 0 4px var(--color-bg);
+  }
+
+  .timeline-item[data-emphasize="true"] .timeline-dot {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 4px oklch(from var(--color-accent) l c h / 0.15);
+  }
+
+  .timeline-content {
+    padding-top: 0;
+  }
+
+  .timeline-date {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-muted);
+  }
+
+  .timeline-title {
+    font-family: var(--font-serif);
+    font-size: 1.2rem;
+    font-weight: 500;
+    margin: 0.15rem 0 0.4rem 0;
+    color: var(--color-text);
+    letter-spacing: -0.01em;
+  }
+
+  .timeline-item[data-emphasize="true"] .timeline-title {
+    color: var(--color-accent);
+  }
+
+  .timeline-body {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: var(--color-text-muted);
+  }
+</style>

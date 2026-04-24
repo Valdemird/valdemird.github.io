@@ -1,0 +1,237 @@
+---
+/**
+ * BeforeAfter — drag-slider comparison between two slots ("before" and
+ * "after"). Works for images, text blocks, or arbitrary HTML.
+ *
+ *   <BeforeAfter labelBefore="Before" labelAfter="After">
+ *     <img slot="before" src="/images/ui-v1.png" alt="v1" />
+ *     <img slot="after" src="/images/ui-v2.png" alt="v2" />
+ *   </BeforeAfter>
+ *
+ * Interaction: drag the divider with pointer, or focus it and use ←/→ arrows
+ * (steps ±5%). The "before" side is clipped from the right; the "after" side
+ * sits underneath. Both slots must be the same size for images — otherwise
+ * the container height follows the "after" slot.
+ */
+interface Props {
+  labelBefore?: string;
+  labelAfter?: string;
+  /** Initial split in percent. 0–100. Default 50. */
+  initial?: number;
+}
+const { labelBefore = "Before", labelAfter = "After", initial = 50 } = Astro.props;
+---
+
+<div class="ba" data-beforeafter style={`--ba-split: ${initial}%`}>
+  <div class="ba-after" aria-label={labelAfter}>
+    <slot name="after" />
+  </div>
+  <div class="ba-before" aria-label={labelBefore}>
+    <div class="ba-before-inner">
+      <slot name="before" />
+    </div>
+  </div>
+  <button
+    class="ba-divider"
+    type="button"
+    role="slider"
+    aria-label="Compare before and after"
+    aria-valuemin="0"
+    aria-valuemax="100"
+    aria-valuenow={initial}
+    tabindex="0"
+  >
+    <span class="ba-divider-grip" aria-hidden="true"></span>
+  </button>
+  <div class="ba-labels" aria-hidden="true">
+    <span class="ba-label ba-label-before">{labelBefore}</span>
+    <span class="ba-label ba-label-after">{labelAfter}</span>
+  </div>
+</div>
+
+<script>
+  function initOne(root: HTMLElement) {
+    if (root.dataset.beforeafterReady) return;
+    root.dataset.beforeafterReady = "1";
+
+    const divider = root.querySelector<HTMLButtonElement>(".ba-divider");
+    if (!divider) return;
+
+    function setSplit(pct: number) {
+      const clamped = Math.max(0, Math.min(100, pct));
+      root.style.setProperty("--ba-split", `${clamped}%`);
+      divider!.setAttribute("aria-valuenow", String(Math.round(clamped)));
+    }
+
+    function pctFromClientX(x: number): number {
+      const rect = root.getBoundingClientRect();
+      return ((x - rect.left) / rect.width) * 100;
+    }
+
+    let dragging = false;
+    divider.addEventListener("pointerdown", (e) => {
+      dragging = true;
+      divider.setPointerCapture(e.pointerId);
+      setSplit(pctFromClientX(e.clientX));
+    });
+    divider.addEventListener("pointermove", (e) => {
+      if (!dragging) return;
+      setSplit(pctFromClientX(e.clientX));
+    });
+    const stop = () => { dragging = false; };
+    divider.addEventListener("pointerup", stop);
+    divider.addEventListener("pointercancel", stop);
+
+    // Keyboard
+    divider.addEventListener("keydown", (e) => {
+      const current = Number(divider.getAttribute("aria-valuenow") ?? "50");
+      if (e.key === "ArrowLeft") { setSplit(current - 5); e.preventDefault(); }
+      if (e.key === "ArrowRight") { setSplit(current + 5); e.preventDefault(); }
+      if (e.key === "Home") { setSplit(0); e.preventDefault(); }
+      if (e.key === "End") { setSplit(100); e.preventDefault(); }
+    });
+
+    // Click anywhere in the container snaps the divider
+    root.addEventListener("pointerdown", (e) => {
+      if (e.target === divider || divider.contains(e.target as Node)) return;
+      setSplit(pctFromClientX(e.clientX));
+    });
+  }
+
+  function init() {
+    document.querySelectorAll<HTMLElement>("[data-beforeafter]").forEach(initOne);
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .ba {
+    position: relative;
+    width: 100%;
+    margin: 2rem 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--color-surface);
+    user-select: none;
+  }
+
+  .ba-after,
+  .ba-before {
+    width: 100%;
+  }
+
+  .ba-after :global(img),
+  .ba-after :global(video),
+  .ba-before :global(img),
+  .ba-before :global(video) {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .ba-before {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    clip-path: polygon(0 0, var(--ba-split) 0, var(--ba-split) 100%, 0 100%);
+  }
+
+  .ba-before-inner {
+    width: 100%;
+  }
+
+  .ba-divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--ba-split);
+    transform: translateX(-50%);
+    width: 32px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: ew-resize;
+    z-index: 3;
+    touch-action: none;
+  }
+
+  .ba-divider::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    background: var(--color-accent);
+    opacity: 0.9;
+  }
+
+  .ba-divider-grip {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    box-shadow: var(--shadow-md);
+    display: grid;
+    place-items: center;
+    transition: transform var(--duration-normal) var(--ease-spring),
+                box-shadow var(--duration-normal) var(--ease-smooth);
+  }
+
+  .ba-divider-grip::before,
+  .ba-divider-grip::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-top: 2px solid var(--color-surface);
+    border-right: 2px solid var(--color-surface);
+  }
+  .ba-divider-grip::before { left: 8px; transform: translateY(-50%) rotate(-135deg); }
+  .ba-divider-grip::after  { right: 8px; transform: translateY(-50%) rotate(45deg); }
+
+  .ba-divider:hover .ba-divider-grip,
+  .ba-divider:focus-visible .ba-divider-grip {
+    transform: translate(-50%, -50%) scale(1.08);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .ba-divider:focus-visible {
+    outline: none;
+  }
+  .ba-divider:focus-visible .ba-divider-grip {
+    outline: 3px solid oklch(from var(--color-accent) l c h / 0.4);
+    outline-offset: 3px;
+  }
+
+  .ba-labels {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    right: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .ba-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.25em 0.55em;
+    background: oklch(from var(--color-text) l c h / 0.85);
+    color: var(--color-bg);
+    border-radius: var(--radius-sm);
+  }
+</style>

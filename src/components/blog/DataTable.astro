@@ -1,0 +1,263 @@
+---
+/**
+ * DataTable — sortable table with optional heatmap column coloring.
+ *
+ *   <DataTable
+ *     columns={[
+ *       { key: "team", label: "Team", align: "left" },
+ *       { key: "deploys", label: "Deploys/day", align: "right", heatmap: true },
+ *       { key: "mttr", label: "MTTR (min)", align: "right", heatmap: true, heatmapDirection: "descending" },
+ *     ]}
+ *     rows={[
+ *       { team: "Gateway",  deploys: 4.2, mttr: 9 },
+ *       { team: "Billing",  deploys: 1.1, mttr: 42 },
+ *       { team: "Mobile",   deploys: 2.6, mttr: 23 },
+ *     ]}
+ *     defaultSort={{ key: "deploys", direction: "desc" }}
+ *   />
+ */
+interface Column {
+  key: string;
+  label: string;
+  align?: "left" | "right" | "center";
+  heatmap?: boolean;
+  /** "ascending" = higher value is "better" (darker). "descending" = lower is better. */
+  heatmapDirection?: "ascending" | "descending";
+  /** Optional suffix appended to each cell value (e.g. "%", "×"). */
+  suffix?: string;
+}
+type Row = Record<string, string | number>;
+interface Props {
+  columns: Column[];
+  rows: Row[];
+  defaultSort?: { key: string; direction: "asc" | "desc" };
+  caption?: string;
+}
+const { columns, rows, defaultSort, caption } = Astro.props;
+const sortAttr = defaultSort ? `${defaultSort.key}:${defaultSort.direction}` : "";
+const colsJson = JSON.stringify(columns);
+---
+
+<figure class="dtable" data-datatable data-default-sort={sortAttr} data-columns={colsJson}>
+  {caption && <figcaption class="dtable-caption">{caption}</figcaption>}
+  <div class="dtable-scroll">
+    <table>
+      <thead>
+        <tr>
+          {columns.map((c) => (
+            <th
+              scope="col"
+              data-col={c.key}
+              data-align={c.align ?? "left"}
+              class="dtable-th"
+              tabindex="0"
+              aria-sort="none"
+            >
+              <span class="dtable-th-label">{c.label}</span>
+              <span class="dtable-sort-indicator" aria-hidden="true">↕</span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr>
+            {columns.map((c) => {
+              const raw = r[c.key];
+              return (
+                <td data-col={c.key} data-align={c.align ?? "left"} data-raw={String(raw)}>
+                  {raw}{c.suffix ?? ""}
+                </td>
+              );
+            })}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</figure>
+
+<script>
+  type Col = { key: string; align?: string; heatmap?: boolean; heatmapDirection?: "ascending" | "descending" };
+
+  function applyHeatmap(table: HTMLTableElement, cols: Col[]) {
+    for (const col of cols) {
+      if (!col.heatmap) continue;
+      const cells = Array.from(
+        table.querySelectorAll<HTMLTableCellElement>(`tbody td[data-col="${col.key}"]`),
+      );
+      const values = cells
+        .map((c) => Number(c.dataset.raw))
+        .filter((v) => Number.isFinite(v));
+      if (values.length === 0) continue;
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      const range = max - min || 1;
+      for (const cell of cells) {
+        const v = Number(cell.dataset.raw);
+        if (!Number.isFinite(v)) continue;
+        let t = (v - min) / range;
+        if (col.heatmapDirection === "descending") t = 1 - t;
+        // Alpha 0.06..0.36 for subtle intensity
+        const alpha = 0.06 + t * 0.3;
+        cell.style.background = `oklch(from var(--color-accent) l c h / ${alpha})`;
+      }
+    }
+  }
+
+  function compare(a: unknown, b: unknown): number {
+    const na = Number(a);
+    const nb = Number(b);
+    if (Number.isFinite(na) && Number.isFinite(nb)) return na - nb;
+    return String(a).localeCompare(String(b));
+  }
+
+  function sortBy(table: HTMLTableElement, key: string, dir: "asc" | "desc") {
+    const tbody = table.querySelector("tbody");
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    rows.sort((r1, r2) => {
+      const a = r1.querySelector<HTMLTableCellElement>(`td[data-col="${key}"]`)?.dataset.raw;
+      const b = r2.querySelector<HTMLTableCellElement>(`td[data-col="${key}"]`)?.dataset.raw;
+      const cmp = compare(a, b);
+      return dir === "asc" ? cmp : -cmp;
+    });
+    for (const r of rows) tbody.appendChild(r);
+    for (const th of table.querySelectorAll<HTMLTableCellElement>("thead th")) {
+      th.setAttribute("aria-sort", th.dataset.col === key ? (dir === "asc" ? "ascending" : "descending") : "none");
+    }
+  }
+
+  function initOne(root: HTMLElement) {
+    if (root.dataset.datatableReady) return;
+    root.dataset.datatableReady = "1";
+
+    const table = root.querySelector<HTMLTableElement>("table");
+    if (!table) return;
+    let cols: Col[] = [];
+    try { cols = JSON.parse(root.dataset.columns ?? "[]"); } catch {}
+
+    applyHeatmap(table, cols);
+
+    const def = root.dataset.defaultSort ?? "";
+    if (def) {
+      const [k, d] = def.split(":");
+      if (k && (d === "asc" || d === "desc")) sortBy(table, k, d);
+    }
+
+    const ths = table.querySelectorAll<HTMLTableCellElement>("thead th");
+    for (const th of ths) {
+      const onActivate = () => {
+        const key = th.dataset.col;
+        if (!key) return;
+        const current = th.getAttribute("aria-sort");
+        const next: "asc" | "desc" = current === "ascending" ? "desc" : "asc";
+        sortBy(table, key, next);
+      };
+      th.addEventListener("click", onActivate);
+      th.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onActivate();
+        }
+      });
+    }
+  }
+
+  function init() {
+    document.querySelectorAll<HTMLElement>("[data-datatable]").forEach((el) => initOne(el));
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .dtable {
+    margin: 2rem 0;
+  }
+
+  .dtable-caption {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    margin-bottom: 0.5rem;
+    text-align: left;
+  }
+
+  .dtable-scroll {
+    overflow-x: auto;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+  }
+
+  .dtable table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+  }
+
+  .dtable thead tr {
+    background: var(--color-bg-secondary);
+  }
+
+  .dtable th.dtable-th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+    transition: color var(--duration-fast) var(--ease-smooth);
+  }
+
+  .dtable th.dtable-th[data-align="right"] { text-align: right; }
+  .dtable th.dtable-th[data-align="center"] { text-align: center; }
+
+  .dtable th.dtable-th:hover,
+  .dtable th.dtable-th:focus-visible {
+    color: var(--color-text);
+    outline: none;
+  }
+
+  .dtable-sort-indicator {
+    margin-left: 0.35em;
+    opacity: 0.4;
+    font-size: 0.8em;
+  }
+
+  .dtable th[aria-sort="ascending"] .dtable-sort-indicator,
+  .dtable th[aria-sort="descending"] .dtable-sort-indicator {
+    opacity: 1;
+    color: var(--color-accent);
+  }
+
+  .dtable th[aria-sort="ascending"] .dtable-sort-indicator::before { content: "↑"; }
+  .dtable th[aria-sort="ascending"] .dtable-sort-indicator { font-size: 0; }
+  .dtable th[aria-sort="ascending"] .dtable-sort-indicator::before { font-size: 0.8rem; }
+  .dtable th[aria-sort="descending"] .dtable-sort-indicator::before { content: "↓"; }
+  .dtable th[aria-sort="descending"] .dtable-sort-indicator { font-size: 0; }
+  .dtable th[aria-sort="descending"] .dtable-sort-indicator::before { font-size: 0.8rem; }
+
+  .dtable tbody td {
+    padding: 0.55rem 0.85rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dtable tbody td[data-align="right"] { text-align: right; font-family: var(--font-mono); font-size: 0.85rem; }
+  .dtable tbody td[data-align="center"] { text-align: center; }
+
+  .dtable tbody tr:last-child td {
+    border-bottom: 0;
+  }
+</style>

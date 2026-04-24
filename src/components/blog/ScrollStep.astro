@@ -1,0 +1,55 @@
+---
+/**
+ * ScrollStep — a single step inside a <Scrollytelling> parent.
+ *
+ * The `state` prop is published to the parent `data-scrolly-state` attribute
+ * when this step is active. Use it to switch what the pinned graphic shows.
+ *
+ *   <ScrollStep state="intro">
+ *     Most pipelines fail here.
+ *   </ScrollStep>
+ */
+interface Props {
+  /** State name this step publishes when active. */
+  state?: string;
+  /** Optional heading rendered with editorial emphasis. */
+  heading?: string;
+}
+const { state, heading } = Astro.props;
+---
+
+<div class="scrolly-step" data-scrolly-step data-scrolly-state={state ?? ""}>
+  {heading && <h3 class="scrolly-step-heading">{heading}</h3>}
+  <div class="scrolly-step-body">
+    <slot />
+  </div>
+</div>
+
+<style>
+  .scrolly-step-heading {
+    font-family: var(--font-serif);
+    font-size: 1.4rem;
+    font-weight: 500;
+    margin: 0 0 0.75rem 0;
+    color: var(--color-text);
+  }
+
+  .scrolly-step-body {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.65;
+    color: var(--color-text-muted);
+  }
+
+  .scrolly-step-body :global(p) {
+    margin: 0 0 0.75rem 0;
+  }
+
+  .scrolly-step-body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .scrolly-step[data-active="true"] .scrolly-step-body {
+    color: var(--color-text);
+  }
+</style>

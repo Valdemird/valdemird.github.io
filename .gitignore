@@ -22,3 +22,7 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# blog image authoring — ephemeral state, not committed
+public/images/blog/**/.candidates/
+public/images/blog/**/.history.jsonl

@@ -1,0 +1,116 @@
+---
+/**
+ * PullQuote — editorial pull quote with accent bar and on-scroll entrance.
+ *
+ * <PullQuote cite="Anna Karlin, UW">
+ *   A good benchmark is one that everyone wants to game. That means it
+ *   actually measures something worth gaming.
+ * </PullQuote>
+ *
+ * Ships with a serif large-display body (Fraunces) and a small mono cite
+ * (Geist Mono). The accent bar on the left uses the site's primary accent.
+ */
+interface Props {
+  /** Attribution — person, source, or title. */
+  cite?: string;
+  /** Accent alignment — left bar (default) or centered (large-block). */
+  variant?: "bar" | "block";
+}
+const { cite, variant = "bar" } = Astro.props;
+---
+
+<figure class="pullquote" data-variant={variant} data-pullquote>
+  <blockquote class="pullquote-body">
+    <slot />
+  </blockquote>
+  {cite && <figcaption class="pullquote-cite">— {cite}</figcaption>}
+</figure>
+
+<script>
+  import { getGsap, onReducedMotion } from "../../lib/gsap";
+
+  async function init() {
+    const nodes = document.querySelectorAll<HTMLElement>("[data-pullquote]:not([data-pullquote-ready])");
+    if (nodes.length === 0) return;
+
+    if (onReducedMotion()) {
+      for (const n of nodes) {
+        n.dataset.pullquoteReady = "1";
+        n.classList.add("is-visible");
+      }
+      return;
+    }
+
+    const { gsap } = await getGsap();
+
+    for (const node of nodes) {
+      node.dataset.pullquoteReady = "1";
+      gsap.from(node, {
+        opacity: 0,
+        y: 20,
+        duration: 0.8,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: node,
+          start: "top 85%",
+          toggleActions: "play none none reverse",
+        },
+      });
+    }
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .pullquote {
+    margin: 3rem 0;
+    padding: 0.5rem 0;
+    position: relative;
+  }
+
+  .pullquote[data-variant="bar"] {
+    padding-left: 1.75rem;
+    border-left: 3px solid var(--color-accent);
+  }
+
+  .pullquote[data-variant="block"] {
+    text-align: center;
+    max-width: 48ch;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 2rem 0;
+  }
+
+  .pullquote-body {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-weight: 400;
+    font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+    line-height: 1.35;
+    color: var(--color-text);
+    letter-spacing: -0.01em;
+  }
+
+  .pullquote[data-variant="block"] .pullquote-body {
+    font-style: italic;
+  }
+
+  .pullquote-body :global(p) {
+    margin: 0 0 0.75rem 0;
+  }
+
+  .pullquote-body :global(p:last-child) {
+    margin-bottom: 0;
+  }
+
+  .pullquote-cite {
+    margin-top: 1rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-secondary);
+  }
+</style>

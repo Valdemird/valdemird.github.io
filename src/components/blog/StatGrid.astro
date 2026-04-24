@@ -1,0 +1,148 @@
+---
+/**
+ * StatGrid — KPI card grid with staggered reveal on scroll.
+ *
+ * <StatGrid
+ *   stats={[
+ *     { value: "4.2×", label: "Deploy rate", context: "vs teams of 11+" },
+ *     { value: "3m", label: "Main CI", context: "down from 14m" },
+ *     { value: "$0.04", label: "Per hero image" },
+ *   ]}
+ * />
+ *
+ * Each card: big serif number, mono uppercase label, optional context line.
+ * Cards enter with staggered fade + y-offset. Respects reduced-motion.
+ */
+interface Stat {
+  value: string | number;
+  label: string;
+  context?: string;
+}
+interface Props {
+  stats: Stat[];
+  /** Columns at desktop. 2–4. Default 3. */
+  columns?: 2 | 3 | 4;
+}
+const { stats, columns = 3 } = Astro.props;
+---
+
+<div class="statgrid" data-statgrid data-columns={columns}>
+  {stats.map((s) => (
+    <div class="statgrid-card" data-statgrid-card>
+      <div class="statgrid-value">{s.value}</div>
+      <div class="statgrid-label">{s.label}</div>
+      {s.context && <div class="statgrid-context">{s.context}</div>}
+    </div>
+  ))}
+</div>
+
+<script>
+  import { getGsap, onReducedMotion } from "../../lib/gsap";
+
+  async function init() {
+    const grids = document.querySelectorAll<HTMLElement>("[data-statgrid]:not([data-statgrid-ready])");
+    if (grids.length === 0) return;
+
+    if (onReducedMotion()) {
+      for (const g of grids) {
+        g.dataset.statgridReady = "1";
+        g.classList.add("is-visible");
+      }
+      return;
+    }
+
+    const { gsap, ScrollTrigger } = await getGsap();
+
+    for (const grid of grids) {
+      grid.dataset.statgridReady = "1";
+      const cards = grid.querySelectorAll<HTMLElement>("[data-statgrid-card]");
+      gsap.from(cards, {
+        opacity: 0,
+        y: 24,
+        duration: 0.7,
+        ease: "power2.out",
+        stagger: 0.1,
+        scrollTrigger: {
+          trigger: grid,
+          start: "top 80%",
+          toggleActions: "play none none reverse",
+        },
+      });
+    }
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .statgrid {
+    display: grid;
+    gap: 1.5rem;
+    margin: 2.5rem 0;
+  }
+
+  .statgrid[data-columns="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .statgrid[data-columns="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .statgrid[data-columns="4"] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  @media (max-width: 768px) {
+    .statgrid[data-columns="3"],
+    .statgrid[data-columns="4"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 480px) {
+    .statgrid {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  .statgrid-card {
+    padding: 1.5rem 1.5rem 1.25rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    transition:
+      transform var(--duration-normal) var(--ease-spring),
+      border-color var(--duration-normal) var(--ease-smooth),
+      box-shadow var(--duration-normal) var(--ease-smooth);
+  }
+
+  .statgrid-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-border-strong);
+    box-shadow: var(--shadow-md);
+  }
+
+  .statgrid-value {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: clamp(2.25rem, 4vw, 3.25rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    font-feature-settings: "tnum" 1, "lnum" 1;
+  }
+
+  .statgrid-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--color-text-secondary);
+    margin-top: 0.25rem;
+  }
+
+  .statgrid-context {
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    color: var(--color-text-muted);
+    line-height: 1.5;
+    margin-top: 0.1rem;
+  }
+</style>

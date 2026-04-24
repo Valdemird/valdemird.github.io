@@ -1,0 +1,290 @@
+---
+/**
+ * DecisionTree — click-based branching narrative. The author defines a set
+ * of nodes; the reader walks the tree by picking options.
+ *
+ *   <DecisionTree
+ *     root="start"
+ *     nodes={{
+ *       start: {
+ *         question: "Is this a feature flag or a temporary workaround?",
+ *         choices: [
+ *           { label: "Feature flag", next: "flag" },
+ *           { label: "Workaround",   next: "wa" },
+ *         ],
+ *       },
+ *       flag: {
+ *         verdict: "Schedule a cleanup agent for 2 weeks out.",
+ *         detail: "Flags without expiry dates become tech debt.",
+ *         choices: [{ label: "Start over", next: "start" }],
+ *       },
+ *       wa: {
+ *         verdict: "Open a tracking issue before merging.",
+ *         choices: [{ label: "Start over", next: "start" }],
+ *       },
+ *     }}
+ *   />
+ *
+ * Fully keyboard-navigable — choices are real buttons in a <ul>.
+ */
+interface Choice {
+  label: string;
+  next: string;
+}
+interface Node {
+  /** Heading prompt when this is a question node. */
+  question?: string;
+  /** Answer headline when this is a verdict node. */
+  verdict?: string;
+  /** Supplemental body text. */
+  detail?: string;
+  /** Available moves. */
+  choices?: Choice[];
+}
+interface Props {
+  root: string;
+  nodes: Record<string, Node>;
+}
+const { root, nodes } = Astro.props;
+const serialized = JSON.stringify(nodes);
+---
+
+<div class="dt" data-decisiontree data-root={root} data-nodes={serialized}>
+  <div class="dt-breadcrumbs" aria-label="Path so far"></div>
+  <div class="dt-node" role="group" aria-live="polite">
+    {/* Initial render mirrors the root node server-side for SEO/first paint. */}
+    {nodes[root]?.question && <h4 class="dt-question">{nodes[root].question}</h4>}
+    {nodes[root]?.verdict && <div class="dt-verdict">{nodes[root].verdict}</div>}
+    {nodes[root]?.detail && <p class="dt-detail">{nodes[root].detail}</p>}
+    <ul class="dt-choices">
+      {(nodes[root]?.choices ?? []).map((c) => (
+        <li><button type="button" class="dt-choice" data-next={c.next}>{c.label}</button></li>
+      ))}
+    </ul>
+  </div>
+  <button type="button" class="dt-reset" data-reset aria-label="Reset decision tree">Reset</button>
+</div>
+
+<script>
+  type Choice = { label: string; next: string };
+  type Node = { question?: string; verdict?: string; detail?: string; choices?: Choice[] };
+
+  function render(root: HTMLElement, nodes: Record<string, Node>, path: string[]) {
+    const current = path[path.length - 1];
+    const node = nodes[current];
+    if (!node) return;
+
+    const nodeEl = root.querySelector<HTMLElement>(".dt-node");
+    if (!nodeEl) return;
+    nodeEl.innerHTML = "";
+
+    if (node.question) {
+      const h = document.createElement("h4");
+      h.className = "dt-question";
+      h.textContent = node.question;
+      nodeEl.appendChild(h);
+    }
+    if (node.verdict) {
+      const v = document.createElement("div");
+      v.className = "dt-verdict";
+      v.textContent = node.verdict;
+      nodeEl.appendChild(v);
+    }
+    if (node.detail) {
+      const p = document.createElement("p");
+      p.className = "dt-detail";
+      p.textContent = node.detail;
+      nodeEl.appendChild(p);
+    }
+    const ul = document.createElement("ul");
+    ul.className = "dt-choices";
+    for (const c of node.choices ?? []) {
+      const li = document.createElement("li");
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dt-choice";
+      btn.dataset.next = c.next;
+      btn.textContent = c.label;
+      li.appendChild(btn);
+      ul.appendChild(li);
+    }
+    nodeEl.appendChild(ul);
+
+    // Breadcrumbs
+    const crumbsEl = root.querySelector<HTMLElement>(".dt-breadcrumbs");
+    if (crumbsEl) {
+      crumbsEl.innerHTML = "";
+      path.forEach((id, i) => {
+        const span = document.createElement("span");
+        span.className = "dt-crumb";
+        span.textContent = nodes[id]?.question ? "?" : (nodes[id]?.verdict ? "✓" : "·");
+        span.title = id;
+        crumbsEl.appendChild(span);
+        if (i < path.length - 1) {
+          const sep = document.createElement("span");
+          sep.className = "dt-crumb-sep";
+          sep.textContent = "›";
+          crumbsEl.appendChild(sep);
+        }
+      });
+    }
+
+    // Focus first choice for keyboard flow
+    const firstBtn = nodeEl.querySelector<HTMLButtonElement>(".dt-choice");
+    firstBtn?.focus({ preventScroll: true });
+  }
+
+  function initOne(root: HTMLElement) {
+    if (root.dataset.decisiontreeReady) return;
+    root.dataset.decisiontreeReady = "1";
+
+    const rootNode = root.dataset.root ?? "";
+    let nodes: Record<string, Node> = {};
+    try {
+      nodes = JSON.parse(root.dataset.nodes ?? "{}");
+    } catch {
+      return;
+    }
+
+    let path = [rootNode];
+    root.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const btn = target.closest<HTMLButtonElement>(".dt-choice");
+      if (btn) {
+        const next = btn.dataset.next;
+        if (next) {
+          path = [...path, next];
+          render(root, nodes, path);
+        }
+        return;
+      }
+      if (target.closest("[data-reset]")) {
+        path = [rootNode];
+        render(root, nodes, path);
+      }
+    });
+  }
+
+  function init() {
+    document.querySelectorAll<HTMLElement>("[data-decisiontree]").forEach(initOne);
+  }
+
+  init();
+  document.addEventListener("astro:after-swap", init);
+</script>
+
+<style>
+  .dt {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    position: relative;
+  }
+
+  .dt-breadcrumbs {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+    margin-bottom: 1rem;
+    min-height: 16px;
+  }
+
+  .dt-crumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    background: var(--color-bg-secondary);
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+  }
+  .dt-crumb-sep {
+    color: var(--color-text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .dt-question {
+    font-family: var(--font-serif);
+    font-size: 1.25rem;
+    font-weight: 500;
+    margin: 0 0 0.75rem 0;
+    color: var(--color-text);
+    line-height: 1.3;
+  }
+
+  .dt-verdict {
+    font-family: var(--font-serif);
+    font-size: 1.35rem;
+    font-weight: 500;
+    color: var(--color-accent);
+    line-height: 1.3;
+    margin-bottom: 0.5rem;
+  }
+
+  .dt-detail {
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    line-height: 1.55;
+    color: var(--color-text-muted);
+    margin: 0 0 1rem 0;
+  }
+
+  .dt-choices {
+    list-style: none;
+    padding: 0;
+    margin: 0.75rem 0 0 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .dt-choice {
+    padding: 0.5em 0.9em;
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    background: var(--color-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition:
+      transform var(--duration-normal) var(--ease-spring),
+      border-color var(--duration-normal) var(--ease-smooth),
+      background var(--duration-normal) var(--ease-smooth);
+  }
+
+  .dt-choice:hover,
+  .dt-choice:focus-visible {
+    transform: translateY(-1px);
+    border-color: var(--color-accent);
+    background: oklch(from var(--color-accent) l c h / 0.08);
+    outline: none;
+  }
+
+  .dt-reset {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.25em 0.6em;
+    background: transparent;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: color var(--duration-fast) var(--ease-smooth);
+  }
+
+  .dt-reset:hover {
+    color: var(--color-text);
+  }
+</style>
