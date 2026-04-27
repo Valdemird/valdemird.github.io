@@ -1,6 +1,6 @@
 ---
 title: "AI Gave Me Speed. Tests Gave Me Control."
-description: "I generated a usage report after a month of building a side project with Claude Code. The numbers I expected weren't the interesting ones. Here's what was."
+description: "I ran /insights after a month with Claude Code in a side project. The numbers I expected weren't the interesting ones. Here's what was."
 pubDate: 2026-04-27
 tags: ["ai-tools", "testing", "developer-workflow", "claude-code"]
 featured: true
@@ -17,10 +17,8 @@ import FileTree from '../../components/blog/FileTree.astro';
 import TLDR from '../../components/blog/TLDR.astro';
 
 <TLDR bullets={[
-  "Working with AI without tests is flying blind. Speed without control isn't speed, it's debt.",
-  "The Twitter narrative says AI makes you faster. The honest version: AI lowers the cost of starting and raises the cost of validating.",
-  "Tests are the seatbelt. They turn AI iterations from a leap of faith into a 10-second feedback loop.",
-  "Specs upfront beat improvising in chat. Every time. The data on my own usage made that uncomfortable to deny.",
+  "I worked a month with Claude Code on a side project. /insights showed me two things: AI patches symptoms before understanding causes, and tests are the only thing that lets me trust its changes.",
+  "This post is what I changed because of that.",
 ]} />
 
 I built a side project this past month. A small calendar/PWA, a personal sandbox to learn Next.js patterns I don't get to use at work. Outside hours, no consulting overlap, just a place to break things on purpose.
@@ -39,7 +37,7 @@ The flattering parts were the ones I already knew:
 
 - Multi-file changes are where AI actually earns its keep. A schema change that touches a migration, a route, a hook, and three components. That's the kind of work where typing speed becomes the bottleneck and AI removes it.
 - Features that started with a written spec ended cleaner than features I improvised in chat. No surprise, but seeing it in my own data made it harder to wave away.
-- Custom skills with eval benchmarks pay off. I'd been building these for fun. The report tagged them as the most reliable lever I had.
+- Custom skills with eval benchmarks pay off. I'd been building these for fun. `/insights` tagged them as the most reliable lever I had.
 
 That was the boring half. The part I didn't expect to see hit harder.
 
@@ -174,7 +172,7 @@ Without the loop, you're asking your gut whether AI got it right. Your gut didn'
 
 ## Spec First, Code Second
 
-The other thing the report made obvious: features I started with a written spec ended cleaner than features I improvised in chat.
+The other thing `/insights` made obvious: features I started with a written spec ended cleaner than features I improvised in chat.
 
 A spec doesn't need to be long. Goals, non-goals, edge cases, a test plan, an acceptance checklist. Maybe a paragraph each. The point isn't the document. The point is that you've made the decisions before the model has to guess them.
 
@@ -182,9 +180,7 @@ When I improvised, AI guessed. Sometimes well, sometimes badly. The bad guesses 
 
 When I specced, AI executed. The first draft was usually 80% there. The remaining 20% was real engineering, not prompt archaeology.
 
-<Collapsible title="What one of my specs looks like (recurring calendar events)">
-
-A real example, kept short on purpose:
+Here's what one of my specs looks like, kept short on purpose. This one was for recurring calendar events:
 
 - **Goal:** create recurring events (daily, weekly, monthly) that can be edited individually without breaking the series.
 - **Non-goals:** full iCal RRULE support, timezone-based exceptions.
@@ -194,8 +190,6 @@ A real example, kept short on purpose:
 
 One screen of bullets. The model stops guessing and starts executing.
 
-</Collapsible>
-
 I'm not the first person to notice this. I'm just one more data point.
 
 ## What I'm Not Going to Tell You
@@ -204,6 +198,6 @@ I'm not going to tell you AI makes you a better engineer. I don't know if it doe
 
 What I can tell you is what changed for me. The cost of starting something dropped. The cost of validating it went up. Tests are how I paid the second cost without giving up the first.
 
-If you're working with AI without tests, I think you're operating on faith. Maybe it's working out for you. Or maybe you just haven't found the regression yet. The honest answer is I don't know which one you are, and neither do you.
+If you're working with AI without tests, you're operating on faith. Maybe it's working out for you. Or maybe you just haven't found the regression yet. The honest answer is I don't know which one you are, and neither do you.
 
-That's the part the report wouldn't let me hide from.
+That's the part `/insights` wouldn't let me hide from.
