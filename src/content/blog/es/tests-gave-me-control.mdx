@@ -49,15 +49,15 @@ Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los
 A mitad de sesión pedí un stash para pausar trabajo en una rama medio rota. El pop no restauró todo porque había tocado archivos en directorios que el stash no rastreó limpiamente. Perdí toda una tarde de código en progreso que aún no había commiteado. La solución fue aburrida: commit temprano, commit seguido, incluso en ramas WIP basura. La lección fue menos aburrida: había asumido que la IA iba a tratar las operaciones de git con la misma cautela que yo. No lo hace. Git es uno de esos lugares donde "delegar completo" es el default equivocado.
 </Collapsible>
 
-Esta es la parte de trabajar con IA que nadie postea en Twitter. Las hero shots son reales. Lo que las rodea se parece mucho a ingeniería normal. Estás confundido un rato, hasta que cae la ficha.
+Esta es la parte de trabajar con IA que nadie postea en Twitter. Los demos perfectos son reales. Lo que los rodea se parece mucho a ingeniería normal. Estás confundido un rato, hasta que cae la ficha.
 
 ## El patrón que sí encontré
 
-El modo de falla interesante no era "la IA se equivocó." Era más sutil. La IA llegaba a una solución antes de tener un diagnóstico.
+El modo de falla interesante no era "la IA se equivocó." Era más sutil. La IA saltaba a una solución antes de tener un diagnóstico.
 
 El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible* antes de subir por la cascada. Ahí se fueron las diez rondas en scroll-snap.
 
-El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA optimizó por "el comando que falló" en vez de "qué entorno se cargó."
+El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA se enfocó en "el comando que falló" en vez de "qué entorno se cargó."
 
 <Callout type="warning" title="La pista del CSS">
 Si la IA cambia una propiedad sobre el elemento roto y el bug no se mueve, para. La restricción está río arriba. Hazla caminar la cadena de padres antes de tocar otra propiedad.
@@ -91,7 +91,7 @@ Un loop de feedback de diez segundos es lo bastante rápido para correrlo despu�
 
 Te muestro dos cosas de la configuración real que hicieron más por mi confianza que cualquier plantilla de prompt.
 
-La primera es el threshold de coverage tratado como un trinquete. Números que solo suben:
+La primera es el threshold de coverage tratado como un piso. Números que solo suben:
 
 <CodeBlock filename="vitest.config.ts">
 ```ts
@@ -112,7 +112,7 @@ coverage: {
 ```
 </CodeBlock>
 
-Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?" sino "¿puede el número bajar sin que te enteres?". Como trinquete, no puede.
+Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?" sino "¿puede el número bajar sin que te enteres?". Como piso, no puede.
 
 La segunda es el setup de E2E corriendo contra un Postgres real, no contra un mock:
 
@@ -169,7 +169,7 @@ El diagrama que ahora tengo en la cabeza:
   E --> F[Fix dirigido]
   F --> B`} />
 
-Sin el loop, le estás preguntando a tu intuición si la IA acertó. Tu intuición no leyó el diff completo.
+Sin el loop, le estás preguntando a tu intuición si la IA acertó. Pero tu intuición no leyó el diff completo.
 
 ## Spec primero, código después
 
@@ -179,7 +179,7 @@ Un spec no necesita ser largo. Objetivos, no-objetivos, casos borde, plan de tes
 
 Cuando improvisé, la IA adivinó. A veces bien, a veces mal. Las adivinanzas malas aparecieron como las iteraciones de diez rondas.
 
-Cuando especifiqué, la IA ejecutó. El primer borrador solía estar al 80%. El 20% restante era ingeniería real, no escarbar en prompts viejos.
+Cuando especifiqué, la IA ejecutó. El primer borrador solía estar al 80%. El 20% restante era ingeniería real, no pelear con prompts.
 
 Así se ve uno de mis specs, corto a propósito. Este era para eventos recurrentes de calendario:
 
@@ -190,8 +190,6 @@ Así se ve uno de mis specs, corto a propósito. Este era para eventos recurrent
 - **Aceptación:** crear serie semanal, editar la del jueves, confirmar que las otras quedan intactas.
 
 Una pantalla de bullets. El modelo deja de adivinar y pasa a ejecutar.
-
-No soy la primera persona en notar esto. Soy un dato más.
 
 ## Lo que no te voy a decir
 
