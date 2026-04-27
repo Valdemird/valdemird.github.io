@@ -59,6 +59,8 @@ CSS layout was the clearest example. A child element overflowing isn't usually a
 
 Same pattern in Postgres migrations. I asked AI to apply a migration. It failed. AI retried the same `prisma migrate deploy` three times, swapping flags. When I stopped and looked, the problem was that `.env.local` and `.env` pointed at different databases, and `dotenv` was loading the wrong one. The migration was never the problem. AI optimized for "the command that failed" instead of "which environment got loaded."
 
+This isn't a bad habit you can prompt away. The model predicts tokens that statistically surround the symptom. Until you move the diagnosis upstream, into a spec or a failing test, it has nowhere else to look.
+
 <Callout type="warning" title="The CSS tell">
 If your AI fix changes a property on the broken element and the bug doesn't move, stop. The constraint is upstream. Make it walk the parent chain before touching another property.
 </Callout>
@@ -89,6 +91,8 @@ The number of tests isn't the story. What matters is which surfaces are covered 
 
 A ten-second feedback loop is fast enough to run after every meaningful change. AI can make a wrong assumption and I'll know within one breath instead of one deploy.
 
+One trap I had to watch for. If AI writes the code and AI writes the tests, the suite passes because both reflect the model's reading of the spec, not the spec itself. For anything that matters — auth, hooks, server actions — I write the test plan in the spec before AI touches code. AI fills in assertions; deciding what to test stays with me.
+
 I'll show you two things from the actual config that did more for my confidence than any prompt template.
 
 The first is the coverage threshold treated as a ratchet. Numbers that only go up:
@@ -111,7 +115,7 @@ coverage: {
 ```
 </CodeBlock>
 
-Those numbers are low on purpose. They're not aspirational, they're today's floor. The question isn't "how much coverage do you have?" but "can the number drop without you noticing?" As a ratchet, it can't.
+Those numbers are low on purpose. They're not aspirational, they're today's floor. The question isn't "how much coverage do you have?" but "can the number drop without you noticing?" As a ratchet, it can't. At this floor it only catches gross regressions. The subtle ones need higher coverage to show up. Right now I care about whether the number is moving up, not where it sits.
 
 The second is the E2E setup running against a real Postgres, not a mock:
 
@@ -139,7 +143,7 @@ export default defineConfig({
 
 The E2E tests insert a real session row into the DB to bypass NextAuth, then drive the actual server. No mocks. The two `@smoke` tests do nothing fancy. One navigates every main page, the other creates a task. They exist so that if AI rewires routing or breaks auth in a way that compiles, I know in seconds.
 
-Now compare what AI iteration looks like with and without that scaffolding:
+Compare the same change with and without that scaffolding. These are composite sketches of what I lived with all month, not transcripts of one session:
 
 <Tabs labels={["Without tests", "With tests"]}>
 <TabPanel>
@@ -168,7 +172,7 @@ The diagram I now keep in my head:
   E --> F[Targeted fix]
   F --> B`} />
 
-Without the loop, you're asking your gut whether AI got it right. Your gut didn't read the full diff.
+Without the loop, you're asking your gut whether AI got it right. On a one-line tweak, sure, your eyes catch it. On a multi-file refactor, your gut didn't read the full diff.
 
 ## Spec First, Code Second
 
@@ -195,6 +199,8 @@ One screen of bullets. The model stops guessing and starts executing.
 I'm not going to tell you AI makes you a better engineer. I don't know if it does. The data I have is on me, in one project, over one month.
 
 What I can tell you is what changed for me. The cost of starting something dropped. The cost of validating it went up. Tests are how I paid the second cost without giving up the first.
+
+They catch what I thought to check for. The bugs I never anticipated still ship. AI-assisted work shifts the territory under your feet faster than your test plan shifts with it. That gap is real. Tests narrow it; they don't close it.
 
 If you're working with AI without tests, you're operating on faith. Maybe it's working out for you. Or maybe you just haven't found the regression yet. The honest answer is I don't know which one you are, and neither do you.
 

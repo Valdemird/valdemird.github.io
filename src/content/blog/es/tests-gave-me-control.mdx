@@ -59,6 +59,8 @@ El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda cas
 
 El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA se enfocó en "el comando que falló" en vez de "qué entorno se cargó."
 
+No es un mal hábito que se cura con mejor prompt. El modelo predice tokens que estadísticamente rodean al síntoma. Hasta que no muevas el diagnóstico río arriba, a un spec o a un test que falla, no tiene a dónde mirar.
+
 <Callout type="warning" title="La pista del CSS">
 Si la IA cambia una propiedad sobre el elemento roto y el bug no se mueve, para. La restricción está río arriba. Hazla caminar la cadena de padres antes de tocar otra propiedad.
 </Callout>
@@ -89,6 +91,8 @@ La cantidad de tests no es la historia. Lo que importa es qué superficies está
 
 Un loop de feedback de diez segundos es lo bastante rápido para correrlo después de cada cambio significativo. La IA puede hacer una suposición equivocada y yo me entero en un respiro, no en un deploy.
 
+Una trampa que tuve que cuidar. Si la IA escribe el código y la IA escribe los tests, la suite pasa porque ambos reflejan la lectura del modelo del spec, no el spec en sí. Para lo que importa — auth, hooks, server actions — el plan de tests lo escribo yo en el spec antes de que la IA toque código. La IA llena las assertions; decidir qué se testea se queda conmigo.
+
 Te muestro dos cosas de la configuración real que hicieron más por mi confianza que cualquier plantilla de prompt.
 
 La primera es el threshold de coverage tratado como un piso. Números que solo suben:
@@ -112,7 +116,7 @@ coverage: {
 ```
 </CodeBlock>
 
-Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?" sino "¿puede el número bajar sin que te enteres?". Como piso, no puede.
+Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?" sino "¿puede el número bajar sin que te enteres?". Como piso, no puede. Con números así de bajos solo atrapa regresiones gruesas. Las sutiles necesitan más cobertura para aparecer. Ahora me importa si el número está subiendo, no dónde está.
 
 La segunda es el setup de E2E corriendo contra un Postgres real, no contra un mock:
 
@@ -140,7 +144,7 @@ export default defineConfig({
 
 Los tests E2E insertan una sesión real en la DB para saltarse NextAuth, y después manejan el server real. Nada de mocks. Los dos `@smoke` no hacen nada raro. Uno navega cada página principal, otro crea una tarea. Existen para que si la IA recablea el routing o rompe la auth de una forma que igual compila, me entere en segundos.
 
-Compara cómo se ve iterar con la IA con y sin ese andamiaje:
+Compara el mismo cambio con y sin ese andamiaje. Son bocetos compuestos de lo que viví todo el mes, no transcripciones de una sola sesión:
 
 <Tabs labels={["Sin tests", "Con tests"]}>
 <TabPanel>
@@ -169,7 +173,7 @@ El diagrama que ahora tengo en la cabeza:
   E --> F[Fix dirigido]
   F --> B`} />
 
-Sin el loop, le estás preguntando a tu intuición si la IA acertó. Pero tu intuición no leyó el diff completo.
+Sin el loop, le estás preguntando a tu intuición si la IA acertó. En un cambio de una línea, claro, tus ojos lo agarran. En un refactor multi-archivo, tu intuición no leyó el diff completo.
 
 ## Spec primero, código después
 
@@ -196,6 +200,8 @@ Una pantalla de bullets. El modelo deja de adivinar y pasa a ejecutar.
 No te voy a decir que la IA te hace mejor ingeniero. No sé si lo haga. Los datos que tengo son sobre mí, en un proyecto, durante un mes.
 
 Lo que sí te puedo decir es lo que cambió para mí. El costo de empezar algo bajó. El costo de validarlo subió. Los tests son la forma en que pagué el segundo costo sin renunciar al primero.
+
+Atrapan lo que se me ocurrió revisar. Los bugs que no anticipé igual se publican. Trabajar con IA mueve el terreno bajo tus pies más rápido de lo que tu plan de tests se mueve con él. Esa brecha es real. Los tests la achican; no la cierran.
 
 Si trabajas con IA sin tests, estás operando con fe. Tal vez te está saliendo bien. O tal vez no has encontrado la regresión todavía. La respuesta honesta es que yo no sé en cuál de las dos estás, y tú tampoco.
 
