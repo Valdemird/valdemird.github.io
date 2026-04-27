@@ -1,0 +1,85 @@
+---
+/**
+ * TLDR — key takeaways rendered above the fold.
+ *
+ *   <TLDR bullets={[
+ *     "Ship less, decide more.",
+ *     "Components earn their place by teaching.",
+ *     "Sidenotes beat footnotes for tangents.",
+ *   ]} />
+ *
+ * Can also be declared once in frontmatter (`tldr: [...]`) — the layout
+ * renders it automatically, so authors rarely import this directly.
+ */
+interface Props {
+	bullets: string[];
+	title?: string;
+}
+const { bullets, title = 'TL;DR' } = Astro.props;
+---
+
+<aside class="tldr" aria-label={title}>
+	<div class="tldr-label">{title}</div>
+	<ul class="tldr-list">
+		{bullets.map((b) => <li>{b}</li>)}
+	</ul>
+</aside>
+
+<style>
+	.tldr {
+		margin: 2rem 0 2.5rem;
+		padding: 1.25rem 1.5rem 1.35rem;
+		border-left: 3px solid var(--color-accent);
+		background: oklch(from var(--color-accent) l c h / 0.04);
+		border-radius: 0 var(--radius-md) var(--radius-md) 0;
+	}
+
+	.tldr-label {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-accent);
+		margin-bottom: 0.65rem;
+	}
+
+	.tldr-list {
+		list-style: none;
+		padding: 0;
+		margin: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+
+	.tldr-list li {
+		position: relative;
+		padding-left: 1.25rem;
+		font-family: var(--font-sans);
+		font-size: 1rem;
+		line-height: 1.55;
+		color: var(--color-text);
+		margin-bottom: 0;
+	}
+
+	.tldr-list li::before {
+		content: "";
+		position: absolute;
+		left: 0;
+		top: 0.7em;
+		width: 6px;
+		height: 6px;
+		border-radius: 50%;
+		background: var(--color-accent);
+		opacity: 0.75;
+	}
+
+	@media (max-width: 600px) {
+		.tldr {
+			padding: 1rem 1.1rem 1.1rem;
+		}
+		.tldr-list li {
+			font-size: 0.95rem;
+		}
+	}
+</style>
