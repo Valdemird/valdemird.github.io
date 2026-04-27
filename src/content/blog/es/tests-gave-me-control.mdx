@@ -13,7 +13,7 @@ import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Tabs from '../../../components/blog/Tabs.astro';
 import TabPanel from '../../../components/blog/TabPanel.astro';
-import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import FileTree from '../../../components/blog/FileTree.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
 
 <TLDR bullets={[
@@ -25,29 +25,25 @@ import TLDR from '../../../components/blog/TLDR.astro';
 
 Construí un side project este último mes. Un calendario/PWA pequeño, un sandbox personal para aprender patrones de Next.js que no uso en mi trabajo en la consultora. Fuera de horas laborales, sin mezcla con clientes, solo un lugar donde romper cosas a propósito.
 
-Al final del mes generé un reporte sobre cómo había estado trabajando con Claude Code. Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo.
+Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando. Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
 
-Este post es lo que vi en ese reporte y el cambio que hice por culpa de eso.
+Este post es lo que `/insights` me mostró y el cambio que hice por culpa de eso.
 
 <Callout type="important" title="La tesis">
 El cuello de botella no era la IA. Era yo, confiando en la IA sin un loop de feedback. Los tests son la forma más barata de comprar ese loop de vuelta.
 </Callout>
 
-## Lo que esperaba ver
+## Lo que mostró `/insights`
 
-La parte halagadora del reporte era la que ya conocía:
+La parte halagadora era la que ya conocía:
 
 - Los cambios multi-archivo son donde la IA realmente paga su sueldo. Un cambio de schema que toca una migración, una ruta, un hook y tres componentes. Ese es el tipo de trabajo donde tu velocidad de tipeo es el cuello de botella, y la IA lo elimina.
 - Las features que arranqué con un spec escrito terminaron más limpias que las que improvisé en chat. No es novedad, pero verlo en mis propios datos lo hace más difícil de ignorar.
-- Las skills personalizadas con benchmarks de evaluación rinden. Las venía construyendo por gusto. El reporte las mostró como la palanca más confiable que tenía.
+- Las skills personalizadas con benchmarks de evaluación rinden. Las venía construyendo por gusto. El reporte las marcó como la palanca más confiable que tenía.
 
-Nada revelador. Confirmación, sobre todo.
+Esa era la mitad aburrida. La que no esperaba ver pegó más fuerte.
 
-## Lo que no quería ver
-
-La parte incómoda pegó más fuerte.
-
-Un comportamiento de scroll en una landing page tomó cerca de diez rondas de feedback antes de converger. Un overflow de kanban se "arregló" dos veces con la propiedad de CSS equivocada antes de que parara y preguntara qué estaba haciendo el contenedor padre. Un layout de escritorio se "corrigió" dos veces sin que cambiara nada visible, hasta que escribí algo parecido a "no resolviste el problema, analiza profundamente." El reporte marcó esa frase exacta como un patrón recurrente.
+Un comportamiento de scroll en una landing page tomó cerca de diez rondas de feedback antes de converger. Un overflow de kanban se "arregló" dos veces con la propiedad de CSS equivocada antes de que parara y preguntara qué estaba haciendo el contenedor padre. Un layout de escritorio se "corrigió" dos veces sin que cambiara nada visible, hasta que escribí algo parecido a "no resolviste el problema, analiza profundamente." `/insights` marcó esa frase exacta como un patrón recurrente.
 
 Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los que estaba trabajando. No voy a fingir que fue elegante.
 
@@ -61,9 +57,9 @@ Esta es la parte de trabajar con IA que nadie postea en Twitter. Las hero shots 
 
 El modo de falla interesante no era "la IA se equivocó." Era "la IA parchó el síntoma antes de entender la causa."
 
-El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible* antes de subir por la cascada. Eso es lo que quemó las diez rondas en scroll-snap.
+El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible* antes de subir por la cascada. Ahí se fueron las diez rondas en scroll-snap.
 
-El mismo patrón apareció en migraciones de base de datos. El diagnóstico solía ser correcto. La ejecución se trababa en conflictos de `.env` y rarezas de CLI, y la IA seguía reintentando comandos de superficie en vez de dar un paso atrás y preguntar qué archivo de env estaba realmente cargado.
+El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA optimizó por "el comando que falló" en vez de "qué entorno se cargó."
 
 <Callout type="warning" title="La pista del CSS">
 Si la IA cambia una propiedad sobre el elemento roto y el bug no se mueve, para. La restricción está río arriba. Hazla caminar la cadena de padres antes de tocar otra propiedad.
@@ -73,20 +69,27 @@ Si la IA cambia una propiedad sobre el elemento roto y el bug no se mueve, para.
 
 Esto es lo que cambió mi relación con la IA en el side project. Me apoyé fuerte en tests, y dejé de sentir ansiedad por cuánto estaba delegando.
 
-El estado actual del repo:
+La cantidad de tests no es la historia. Lo que importa es qué superficies están cubiertas y qué tan rápido corre la suite. La suite completa termina en unos diez segundos, y los archivos están organizados por la cosa que cuidan, no por la cosa que ejercitan.
 
-<InteractiveChart
-  title="Superficie de tests en el side project"
-  type="horizontal"
-  data={[
-    { label: "Unit tests (1.207 casos, 107 archivos)", value: 1207, color: "oklch(0.65 0.15 145)" },
-    { label: "E2E (Playwright, 16 archivos)", value: 55, color: "oklch(0.6 0.15 220)" },
-    { label: "Storybook stories (contratos visuales)", value: 29, color: "oklch(0.65 0.18 50)" },
-    { label: "Smoke tests (DB real, server real)", value: 2, color: "oklch(0.6 0.2 27)" },
-  ]}
-/>
+<FileTree>
+<div class="folder">
+<div class="folder-label">__tests__</div>
+<div class="folder-children">
+<div class="file">auth/ (sesión, JWT, route guards)</div>
+<div class="file">hooks/ (timezones, recurrencia, optimistic updates)</div>
+<div class="file">server-actions/ (create, update, delete)</div>
+</div>
+</div>
+<div class="folder">
+<div class="folder-label">e2e</div>
+<div class="folder-children">
+<div class="file">smoke.spec.ts (navegación + crear tarea)</div>
+<div class="file">auth.spec.ts (login real contra Postgres)</div>
+</div>
+</div>
+</FileTree>
 
-La suite de unit completa corre en unos diez segundos. Ese es el número que importa. Un loop de feedback de diez segundos es lo bastante rápido para correrlo después de cada cambio significativo, lo que significa que la IA puede hacer una suposición equivocada y yo me entero en un respiro, no en un deploy.
+Un loop de feedback de diez segundos es lo bastante rápido para correrlo después de cada cambio significativo. La IA puede hacer una suposición equivocada y yo me entero en un respiro, no en un deploy.
 
 Te muestro dos cosas de la configuración real que hicieron más por mi confianza que cualquier plantilla de prompt.
 
@@ -111,7 +114,7 @@ coverage: {
 ```
 </CodeBlock>
 
-Esos números son bajos a propósito. No son aspiracionales. Son el piso, el lugar donde estoy hoy. Código nuevo sin tests los hace bajar y el CI falla. Cada vez que agrego un lote de tests, subo el piso. El punto no es coverage al 100%. El punto es que el número no puede bajar en silencio sin que yo lo note.
+Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?" sino "¿puede el número bajar sin que te enteres?". Como trinquete, no puede.
 
 La segunda es el setup de E2E corriendo contra un Postgres real, no contra un mock:
 
@@ -168,7 +171,7 @@ El diagrama que ahora tengo en la cabeza:
   E --> F[Fix dirigido]
   F --> B`} />
 
-Sin el loop, reemplazas tests con intuición. La intuición funciona hasta que deja de funcionar.
+Sin el loop, le estás preguntando a tu intuición si la IA acertó. Tu intuición no leyó el diff completo.
 
 ## Spec primero, código después
 
@@ -178,7 +181,21 @@ Un spec no necesita ser largo. Objetivos, no-objetivos, casos borde, plan de tes
 
 Cuando improvisé, la IA adivinó. A veces bien, a veces mal. Las adivinanzas malas aparecieron como las iteraciones de diez rondas.
 
-Cuando especifiqué, la IA ejecutó. El primer borrador solía estar al 80%. El 20% restante era ingeniería real, no arqueología de prompts.
+Cuando especifiqué, la IA ejecutó. El primer borrador solía estar al 80%. El 20% restante era ingeniería real, no escarbar en prompts viejos.
+
+<Collapsible title="Cómo se ve un spec mío (eventos recurrentes de calendario)">
+
+Un ejemplo real, corto a propósito:
+
+- **Objetivo:** crear eventos recurrentes (diaria, semanal, mensual) editables individualmente sin romper la serie.
+- **No-objetivos:** soporte completo de RRULE de iCal, excepciones por zona horaria.
+- **Casos borde:** evento que cae en cambio de DST, instancia eliminada vs. serie eliminada, semántica de "este y los siguientes".
+- **Plan de tests:** unit para la generación de instancias, E2E para edición de una sola ocurrencia.
+- **Aceptación:** crear serie semanal, editar la del jueves, confirmar que las otras quedan intactas.
+
+Una pantalla de bullets. El modelo deja de adivinar y pasa a ejecutar.
+
+</Collapsible>
 
 No soy la primera persona en notar esto. Soy un dato más.
 

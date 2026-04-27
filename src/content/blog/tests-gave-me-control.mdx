@@ -13,7 +13,7 @@ import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import Tabs from '../../components/blog/Tabs.astro';
 import TabPanel from '../../components/blog/TabPanel.astro';
-import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+import FileTree from '../../components/blog/FileTree.astro';
 import TLDR from '../../components/blog/TLDR.astro';
 
 <TLDR bullets={[
@@ -25,29 +25,25 @@ import TLDR from '../../components/blog/TLDR.astro';
 
 I built a side project this past month. A small calendar/PWA, a personal sandbox to learn Next.js patterns I don't get to use at work. Outside hours, no consulting overlap, just a place to break things on purpose.
 
-At the end of the month I generated a usage report on how I'd been working with Claude Code. I opened it expecting a pat on the back. I got something more uncomfortable.
+At the end of the month I ran `/insights` in Claude Code to see how I'd been working. I opened it expecting a pat on the back. I got something more uncomfortable: the things AI was doing badly weren't the ones I thought.
 
-This post is what I found in that report and the one shift I made because of it.
+This post is what `/insights` showed me and the one shift I made because of it.
 
 <Callout type="important" title="The thesis">
 The bottleneck wasn't AI. It was me, trusting AI without a feedback loop. Tests are the cheapest way to buy that loop back.
 </Callout>
 
-## What I Expected to See
+## What `/insights` Showed
 
-The flattering parts of the report were the ones I already knew:
+The flattering parts were the ones I already knew:
 
 - Multi-file changes are where AI actually earns its keep. A schema change that touches a migration, a route, a hook, and three components. That's the kind of work where typing speed becomes the bottleneck and AI removes it.
 - Features that started with a written spec ended cleaner than features I improvised in chat. No surprise, but seeing it in my own data made it harder to wave away.
-- Custom skills with eval benchmarks pay off. I'd been building these for fun. The report showed them as the most reliable lever I had.
+- Custom skills with eval benchmarks pay off. I'd been building these for fun. The report tagged them as the most reliable lever I had.
 
-Nothing groundbreaking. Confirmation, mostly.
+That was the boring half. The part I didn't expect to see hit harder.
 
-## What I Didn't Want to See
-
-The unflattering parts hit harder.
-
-A landing page scroll behavior took roughly ten rounds of feedback before it converged. A kanban overflow got patched twice with the wrong CSS property before I stopped and asked what the parent container was actually doing. A desktop layout got "fixed" twice without changing anything visible, until I typed something close to "you didn't fix the problem, analyze deeply." The report flagged this exact phrase as a recurring pattern.
+A landing page scroll behavior took roughly ten rounds of feedback before it converged. A kanban overflow got patched twice with the wrong CSS property before I stopped and asked what the parent container was actually doing. A desktop layout got "fixed" twice without changing anything visible, until I typed something close to "you didn't fix the problem, analyze deeply." `/insights` flagged this exact phrase as a recurring pattern.
 
 There was a session where `git stash` ate eight out of ten files I'd been working on. I won't pretend that was elegant.
 
@@ -63,7 +59,7 @@ The interesting failure mode wasn't "AI got it wrong." It was "AI patched the sy
 
 CSS layout was the clearest example. A child element overflowing isn't usually a child problem. It's usually a parent that forgot to constrain height, or a flex axis that nobody set explicitly. AI tends to reach for `items-start`, `max-h-full`, `overflow-hidden`. Properties on the *visible* element. It almost never walks up the cascade first. That's what burned the ten rounds on scroll-snap.
 
-The same pattern showed up in database migrations. The diagnosis was usually correct. The execution stalled on `.env` conflicts and CLI quirks, and AI kept retrying surface-level commands instead of stepping back and asking what env file was actually loaded.
+Same pattern in Postgres migrations. I asked AI to apply a migration. It failed. AI retried the same `prisma migrate deploy` three times, swapping flags. When I stopped and looked, the problem was that `.env.local` and `.env` pointed at different databases, and `dotenv` was loading the wrong one. The migration was never the problem. AI optimized for "the command that failed" instead of "which environment got loaded."
 
 <Callout type="warning" title="The CSS tell">
 If your AI fix changes a property on the broken element and the bug doesn't move, stop. The constraint is upstream. Make it walk the parent chain before touching another property.
@@ -73,20 +69,27 @@ If your AI fix changes a property on the broken element and the bug doesn't move
 
 Here's what changed my relationship with AI in the side project: I leaned hard on tests, and I stopped feeling anxious about how much I was delegating.
 
-The current state of the repo:
+The number of tests isn't the story. What matters is which surfaces are covered and how fast the suite runs. The full suite finishes in about ten seconds, and the test files are organized by the thing they protect, not by the thing they exercise.
 
-<InteractiveChart
-  title="Test surface area in the side project"
-  type="horizontal"
-  data={[
-    { label: "Unit tests (1,207 cases, 107 files)", value: 1207, color: "oklch(0.65 0.15 145)" },
-    { label: "E2E tests (Playwright, 16 spec files)", value: 55, color: "oklch(0.6 0.15 220)" },
-    { label: "Storybook stories (visual contracts)", value: 29, color: "oklch(0.65 0.18 50)" },
-    { label: "Smoke tests (real DB, real server)", value: 2, color: "oklch(0.6 0.2 27)" },
-  ]}
-/>
+<FileTree>
+<div class="folder">
+<div class="folder-label">__tests__</div>
+<div class="folder-children">
+<div class="file">auth/ (session, JWT, route guards)</div>
+<div class="file">hooks/ (timezone, recurrence, optimistic updates)</div>
+<div class="file">server-actions/ (create, update, delete)</div>
+</div>
+</div>
+<div class="folder">
+<div class="folder-label">e2e</div>
+<div class="folder-children">
+<div class="file">smoke.spec.ts (navigation + create task)</div>
+<div class="file">auth.spec.ts (real login against Postgres)</div>
+</div>
+</div>
+</FileTree>
 
-The full unit suite runs in about ten seconds. That's the number that matters. A ten-second feedback loop is fast enough to run after every meaningful change, which means AI can make a wrong assumption and I'll know within one breath instead of one deploy.
+A ten-second feedback loop is fast enough to run after every meaningful change. AI can make a wrong assumption and I'll know within one breath instead of one deploy.
 
 I'll show you two things from the actual config that did more for my confidence than any prompt template.
 
@@ -110,7 +113,7 @@ coverage: {
 ```
 </CodeBlock>
 
-Those numbers are low on purpose. They're not aspirational. They're the floor, wherever I am today. New untested code makes them slip, and CI fails. Whenever I add a batch of tests, I bump the floor. The point isn't 100% coverage. The point is that the number can't quietly go down without me noticing.
+Those numbers are low on purpose. They're not aspirational, they're today's floor. The question isn't "how much coverage do you have?" but "can the number drop without you noticing?" As a ratchet, it can't.
 
 The second is the E2E setup running against a real Postgres, not a mock:
 
@@ -167,7 +170,7 @@ The diagram I now keep in my head:
   E --> F[Targeted fix]
   F --> B`} />
 
-Without the loop, you replace tests with vibes. Vibes work until they don't.
+Without the loop, you're asking your gut whether AI got it right. Your gut didn't read the full diff.
 
 ## Spec First, Code Second
 
@@ -178,6 +181,20 @@ A spec doesn't need to be long. Goals, non-goals, edge cases, a test plan, an ac
 When I improvised, AI guessed. Sometimes well, sometimes badly. The bad guesses showed up as the ten-round iterations.
 
 When I specced, AI executed. The first draft was usually 80% there. The remaining 20% was real engineering, not prompt archaeology.
+
+<Collapsible title="What one of my specs looks like (recurring calendar events)">
+
+A real example, kept short on purpose:
+
+- **Goal:** create recurring events (daily, weekly, monthly) that can be edited individually without breaking the series.
+- **Non-goals:** full iCal RRULE support, timezone-based exceptions.
+- **Edge cases:** event falling on a DST switch, deleted instance vs. deleted series, "edit this and following" semantics.
+- **Test plan:** unit tests for instance generation, E2E for editing a single occurrence.
+- **Acceptance:** create a weekly series, edit Thursday's instance, confirm the others stay intact.
+
+One screen of bullets. The model stops guessing and starts executing.
+
+</Collapsible>
 
 I'm not the first person to notice this. I'm just one more data point.
 
