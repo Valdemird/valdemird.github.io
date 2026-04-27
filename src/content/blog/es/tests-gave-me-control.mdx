@@ -37,23 +37,23 @@ La parte cómoda era la que ya conocía:
 
 - Los cambios multi-archivo son donde la IA realmente paga su sueldo. Un cambio de schema que toca una migración, una ruta, un hook y tres componentes. Ese es el tipo de trabajo donde tu velocidad de tipeo es el cuello de botella, y la IA lo elimina.
 - Las features que arranqué con un spec escrito terminaron más limpias que las que improvisé en chat. No es novedad, pero verlo en mis propios datos lo hace más difícil de ignorar.
-- Las skills personalizadas con benchmarks de evaluación rinden. Las venía construyendo por gusto. `/insights` las marcó como la palanca más confiable que tenía.
+- Las skills personalizadas con benchmarks de evaluación rinden. Las venía construyendo por gusto, cosas como auditar accesibilidad o revisar PRs contra un checklist fijo. `/insights` las marcó como la palanca más confiable que tenía.
 
 Esa era la mitad aburrida. La que no esperaba ver pegó más fuerte.
 
 Un comportamiento de scroll en una landing page tomó cerca de diez rondas de feedback antes de converger. Un overflow de kanban se "arregló" dos veces con la propiedad de CSS equivocada antes de que parara y preguntara qué estaba haciendo el contenedor padre. Un layout de escritorio se "corrigió" dos veces sin que cambiara nada visible, hasta que escribí algo parecido a "no resolviste el problema, analiza profundamente." `/insights` marcó esa frase exacta como un patrón recurrente.
 
-Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los que estaba trabajando. No voy a fingir que fue elegante.
+Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los que estaba trabajando. No voy a fingir que fue elegante. Eso fue antes de que apretara la disciplina de tests y commits frecuentes. La recuperación fue desde memoria.
 
 <Collapsible title="La historia del git stash (puedes saltarla)">
 A mitad de sesión pedí un stash para pausar trabajo en una rama medio rota. El pop no restauró todo porque había tocado archivos en directorios que el stash no rastreó limpiamente. Perdí toda una tarde de código en progreso que aún no había commiteado. La solución fue aburrida: commit temprano, commit seguido, incluso en ramas WIP basura. La lección fue menos aburrida: había asumido que la IA iba a tratar las operaciones de git con la misma cautela que yo. No lo hace. Git es uno de esos lugares donde "delegar completo" es el default equivocado.
 </Collapsible>
 
-Esta es la parte de trabajar con IA que nadie postea en Twitter. Las hero shots son reales. Lo que las rodea son loops de iteración que se parecen mucho a ingeniería normal. Estás confundido un rato, hasta que cae la ficha.
+Esta es la parte de trabajar con IA que nadie postea en Twitter. Las hero shots son reales. Lo que las rodea se parece mucho a ingeniería normal. Estás confundido un rato, hasta que cae la ficha.
 
 ## El patrón que sí encontré
 
-El modo de falla interesante no era "la IA se equivocó." Era "la IA parchó el síntoma antes de entender la causa."
+El modo de falla interesante no era "la IA se equivocó." Era más sutil. La IA llegaba a una solución antes de tener un diagnóstico.
 
 El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible* antes de subir por la cascada. Ahí se fueron las diez rondas en scroll-snap.
 

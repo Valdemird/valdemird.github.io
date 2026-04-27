@@ -37,23 +37,23 @@ The flattering parts were the ones I already knew:
 
 - Multi-file changes are where AI actually earns its keep. A schema change that touches a migration, a route, a hook, and three components. That's the kind of work where typing speed becomes the bottleneck and AI removes it.
 - Features that started with a written spec ended cleaner than features I improvised in chat. No surprise, but seeing it in my own data made it harder to wave away.
-- Custom skills with eval benchmarks pay off. I'd been building these for fun. `/insights` tagged them as the most reliable lever I had.
+- Custom skills with eval benchmarks pay off. I'd been building these for fun, things like auditing accessibility or reviewing PRs against a fixed checklist. `/insights` tagged them as the most reliable lever I had.
 
 That was the boring half. The part I didn't expect to see hit harder.
 
 A landing page scroll behavior took roughly ten rounds of feedback before it converged. A kanban overflow got patched twice with the wrong CSS property before I stopped and asked what the parent container was actually doing. A desktop layout got "fixed" twice without changing anything visible, until I typed something close to "you didn't fix the problem, analyze deeply." `/insights` flagged this exact phrase as a recurring pattern.
 
-There was a session where `git stash` ate eight out of ten files I'd been working on. I won't pretend that was elegant.
+There was a session where `git stash` ate eight out of ten files I'd been working on. I won't pretend that was elegant. That was before I tightened up tests and commit-often discipline. Recovery was from memory.
 
 <Collapsible title="The git stash story (skip if you want)">
 Mid-session, I asked for a stash to pause work on a half-broken branch. The pop didn't restore everything because I'd touched files in directories the stash didn't track cleanly. I lost an afternoon's worth of in-progress code that wasn't yet committed. The fix was boring: commit early, commit often, even on garbage WIP branches. The lesson was less boring: I'd assumed AI would treat git operations with the same caution I would. It doesn't. Git is one of the places where "delegate fully" is the wrong default.
 </Collapsible>
 
-This is the part of working with AI that nobody posts on Twitter. The hero shots are real. They sit in the middle of iteration loops that look a lot like normal engineering. You're confused for a while, then it clicks.
+This is the part of working with AI that nobody posts on Twitter. The hero shots are real. What surrounds them looks a lot like normal engineering. You're confused for a while, then it clicks.
 
 ## The Pattern I Actually Found
 
-The interesting failure mode wasn't "AI got it wrong." It was "AI patched the symptom before understanding the cause."
+The interesting failure mode wasn't "AI got it wrong." It was subtler. AI reached for a fix before it had a diagnosis.
 
 CSS layout was the clearest example. A child element overflowing isn't usually a child problem. It's usually a parent that forgot to constrain height, or a flex axis that nobody set explicitly. AI tends to reach for `items-start`, `max-h-full`, `overflow-hidden`. Properties on the *visible* element. It almost never walks up the cascade first. That's what burned the ten rounds on scroll-snap.
 
