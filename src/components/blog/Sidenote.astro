@@ -1,0 +1,104 @@
+---
+/**
+ * Sidenote — Tufte-inspired inline-expandable note.
+ *
+ *   This is the main argument.<Sidenote>And here is a related tangent
+ *   that would derail the flow as a full paragraph.</Sidenote> The
+ *   argument continues.
+ *
+ * Renders as a superscript marker (auto-numbered). Clicking/tapping
+ * the marker reveals the note inline between paragraphs — the note
+ * slides in smoothly without a page jump. Better than a footnote:
+ * context stays in place, no round-trip to the bottom of the page.
+ *
+ * Fully keyboard-accessible (label+checkbox pattern, focus-visible).
+ */
+---
+
+<span class="sidenote" data-sidenote>
+	<label class="sidenote-toggle">
+		<input type="checkbox" class="sidenote-input" aria-label="Toggle sidenote" />
+		<span class="sidenote-marker" aria-hidden="true"></span>
+	</label>
+	<span class="sidenote-body" role="note">
+		<slot />
+	</span>
+</span>
+
+<style>
+	.sidenote {
+		counter-increment: sidenote;
+	}
+
+	.sidenote-toggle {
+		cursor: pointer;
+	}
+
+	.sidenote-input {
+		position: absolute;
+		opacity: 0;
+		pointer-events: none;
+		width: 1px;
+		height: 1px;
+	}
+
+	.sidenote-marker {
+		display: inline-block;
+		font-family: var(--font-mono);
+		font-size: 0.68em;
+		color: var(--color-accent);
+		vertical-align: super;
+		line-height: 0;
+		padding: 0 0.1em 0 0.15em;
+		border-radius: var(--radius-sm);
+		transition: color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth);
+	}
+
+	.sidenote-marker::before {
+		content: counter(sidenote);
+	}
+
+	.sidenote-toggle:hover .sidenote-marker,
+	.sidenote-input:focus-visible + .sidenote-marker {
+		color: var(--color-accent-hover);
+		background: oklch(from var(--color-accent) l c h / 0.12);
+	}
+
+	.sidenote-body {
+		display: block;
+		max-height: 0;
+		overflow: hidden;
+		padding: 0 1rem;
+		margin: 0;
+		border-left: 2px solid transparent;
+		background: oklch(from var(--color-accent) l c h / 0);
+		font-family: var(--font-sans);
+		font-size: 0.92rem;
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+		transition: max-height var(--duration-normal) var(--ease-smooth),
+			padding var(--duration-normal) var(--ease-smooth),
+			margin var(--duration-normal) var(--ease-smooth),
+			background var(--duration-normal) var(--ease-smooth),
+			border-left-color var(--duration-normal) var(--ease-smooth);
+	}
+
+	.sidenote-body::before {
+		content: counter(sidenote);
+		display: inline-block;
+		margin-right: 0.4em;
+		font-family: var(--font-mono);
+		font-size: 0.75em;
+		color: var(--color-accent);
+		vertical-align: baseline;
+	}
+
+	.sidenote:has(.sidenote-input:checked) .sidenote-body {
+		max-height: 40rem;
+		padding: 0.75rem 1rem;
+		margin: 0.65rem 0 0.85rem;
+		background: oklch(from var(--color-accent) l c h / 0.04);
+		border-left-color: var(--color-accent);
+	}
+</style>

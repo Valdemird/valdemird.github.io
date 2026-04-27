@@ -14,6 +14,7 @@ interface Props {
 	title: string;
 	description: string;
 	image?: string;
+	imageAlt?: string;
 	lang?: string;
 	type?: 'website' | 'article';
 	alternates?: Alternate[];
@@ -26,8 +27,9 @@ interface Props {
 const AUTHOR_NAME = 'Valdemir D.';
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const { title, description, image: imageProp, lang, type = 'website', alternates = [], jsonLd, publishedTime, modifiedTime, tags } = Astro.props;
+const { title, description, image: imageProp, imageAlt, lang, type = 'website', alternates = [], jsonLd, publishedTime, modifiedTime, tags } = Astro.props;
 const image = imageProp || '/og/default.png';
+const ogImageAlt = imageAlt || title;
 
 const defaultJsonLd = {
 	'@context': 'https://schema.org',
@@ -115,10 +117,15 @@ const structuredData = jsonLd || defaultJsonLd;
 
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content={type} />
+<meta property="og:site_name" content="valdemird" />
 <meta property="og:url" content={Astro.url} />
 <meta property="og:title" content={title} />
 <meta property="og:description" content={description} />
 <meta property="og:image" content={new URL(image, Astro.url)} />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content={ogImageAlt} />
 <meta property="og:locale" content={lang === 'es' ? 'es_ES' : 'en_US'} />
 {lang === 'es' && <meta property="og:locale:alternate" content="en_US" />}
 {lang !== 'es' && <meta property="og:locale:alternate" content="es_ES" />}
@@ -140,6 +147,7 @@ const structuredData = jsonLd || defaultJsonLd;
 <meta property="twitter:title" content={title} />
 <meta property="twitter:description" content={description} />
 <meta property="twitter:image" content={new URL(image, Astro.url)} />
+<meta property="twitter:image:alt" content={ogImageAlt} />
 
 <!-- Structured Data (JSON-LD) -->
 <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />

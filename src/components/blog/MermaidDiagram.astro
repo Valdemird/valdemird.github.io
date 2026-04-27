@@ -36,8 +36,16 @@ const mermaidId = `mermaid-${Math.random().toString(36).slice(2, 7)}`;
 				(window as any).mermaid.initialize({
 					startOnLoad: false,
 					theme: isDark ? 'dark' : 'default',
-					fontFamily: 'system-ui, sans-serif',
+					fontFamily: 'system-ui, -apple-system, sans-serif',
 					fontSize: 14,
+					flowchart: {
+						htmlLabels: true,
+						useMaxWidth: true,
+						padding: 18,
+						nodeSpacing: 55,
+						rankSpacing: 65,
+						curve: 'basis',
+					},
 				});
 				mermaidLoaded = true;
 				resolve();
@@ -53,6 +61,12 @@ const mermaidId = `mermaid-${Math.random().toString(36).slice(2, 7)}`;
 		if (containers.length === 0) return;
 
 		await loadMermaid();
+
+		// Wait for fonts to settle before rendering — Mermaid measures text
+		// against the actual rendered font, and stale metrics cause text clipping.
+		if (document.fonts && (document.fonts as any).ready) {
+			try { await (document.fonts as any).ready; } catch {}
+		}
 
 		for (const container of containers) {
 			if (container.querySelector('.mermaid-rendered')) continue;
@@ -125,6 +139,7 @@ const mermaidId = `mermaid-${Math.random().toString(36).slice(2, 7)}`;
 		justify-content: center;
 		align-items: center;
 		min-height: 120px;
+		overflow-x: auto;
 	}
 
 	.mermaid-loading {
@@ -156,5 +171,17 @@ const mermaidId = `mermaid-${Math.random().toString(36).slice(2, 7)}`;
 	.mermaid-diagram :global(.mermaid-rendered svg) {
 		max-width: 100%;
 		height: auto;
+	}
+
+	/* Prevent Mermaid HTML labels from being clipped inside foreignObject. */
+	.mermaid-diagram :global(.mermaid-rendered foreignObject) {
+		overflow: visible;
+	}
+
+	.mermaid-diagram :global(.mermaid-rendered .nodeLabel),
+	.mermaid-diagram :global(.mermaid-rendered .edgeLabel),
+	.mermaid-diagram :global(.mermaid-rendered .label) {
+		white-space: nowrap;
+		overflow: visible;
 	}
 </style>

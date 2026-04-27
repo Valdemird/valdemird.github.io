@@ -1,0 +1,208 @@
+---
+title: "La IA me dio velocidad. Los tests me dieron control."
+description: "Corrí /insights después de un mes con Claude Code en un side project. Los números que esperaba no eran los interesantes. Esto es lo que sí lo era."
+pubDate: 2026-04-27
+tags: ["ai-tools", "testing", "developer-workflow", "claude-code"]
+featured: true
+lang: es
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+import FileTree from '../../../components/blog/FileTree.astro';
+import TLDR from '../../../components/blog/TLDR.astro';
+
+<TLDR bullets={[
+  "Trabajé un mes con Claude Code en un side project. /insights me mostró dos cosas: la IA parcha síntomas antes de entender causas, y los tests son lo único que me deja confiar en sus cambios.",
+  "Esto es lo que cambié por culpa de eso.",
+]} />
+
+Construí un side project este último mes. Un calendario/PWA pequeño, un sandbox personal para aprender patrones de Next.js que no uso en mi trabajo en la consultora. Fuera de horas laborales, sin mezcla con clientes, solo un lugar donde romper cosas a propósito.
+
+Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando. Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
+
+Este post es lo que `/insights` me mostró y el cambio que hice por culpa de eso.
+
+<Callout type="important" title="La tesis">
+El cuello de botella no era la IA. Era yo, confiando en la IA sin un loop de feedback. Los tests son la forma más barata de comprar ese loop de vuelta.
+</Callout>
+
+## Lo que mostró `/insights`
+
+La parte cómoda era la que ya conocía:
+
+- Los cambios multi-archivo son donde la IA realmente paga su sueldo. Un cambio de schema que toca una migración, una ruta, un hook y tres componentes. Ese es el tipo de trabajo donde tu velocidad de tipeo es el cuello de botella, y la IA lo elimina.
+- Las features que arranqué con un spec escrito terminaron más limpias que las que improvisé en chat. No es novedad, pero verlo en mis propios datos lo hace más difícil de ignorar.
+- Las skills personalizadas con benchmarks de evaluación rinden. Las venía construyendo por gusto, cosas como auditar accesibilidad o revisar PRs contra un checklist fijo. `/insights` las marcó como la palanca más confiable que tenía.
+
+Esa era la mitad aburrida. La que no esperaba ver pegó más fuerte.
+
+Un comportamiento de scroll en una landing page tomó cerca de diez rondas de feedback antes de converger. Un overflow de kanban se "arregló" dos veces con la propiedad de CSS equivocada antes de que parara y preguntara qué estaba haciendo el contenedor padre. Un layout de escritorio se "corrigió" dos veces sin que cambiara nada visible, hasta que escribí algo parecido a "no resolviste el problema, analiza profundamente." `/insights` marcó esa frase exacta como un patrón recurrente.
+
+Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los que estaba trabajando. No voy a fingir que fue elegante. Eso fue antes de que apretara la disciplina de tests y commits frecuentes. La recuperación fue desde memoria.
+
+<Collapsible title="La historia del git stash (puedes saltarla)">
+A mitad de sesión pedí un stash para pausar trabajo en una rama medio rota. El pop no restauró todo porque había tocado archivos en directorios que el stash no rastreó limpiamente. Perdí toda una tarde de código en progreso que aún no había commiteado. La solución fue aburrida: commit temprano, commit seguido, incluso en ramas WIP basura. La lección fue menos aburrida: había asumido que la IA iba a tratar las operaciones de git con la misma cautela que yo. No lo hace. Git es uno de esos lugares donde "delegar completo" es el default equivocado.
+</Collapsible>
+
+Esta es la parte de trabajar con IA que nadie postea en Twitter. Los demos perfectos son reales. Lo que los rodea se parece mucho a ingeniería normal. Estás confundido un rato, hasta que cae la ficha.
+
+## El patrón que sí encontré
+
+El modo de falla interesante no era "la IA se equivocó." Era más sutil. La IA saltaba a una solución antes de tener un diagnóstico.
+
+El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible* antes de subir por la cascada. Ahí se fueron las diez rondas en scroll-snap.
+
+El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA se enfocó en "el comando que falló" en vez de "qué entorno se cargó."
+
+No es un mal hábito que se cura con mejor prompt. El modelo predice tokens que estadísticamente rodean al síntoma. Hasta que no muevas el diagnóstico río arriba, a un spec o a un test que falla, no tiene a dónde mirar.
+
+<Callout type="warning" title="La pista del CSS">
+Si la IA cambia una propiedad sobre el elemento roto y el bug no se mueve, para. La restricción está río arriba. Hazla caminar la cadena de padres antes de tocar otra propiedad.
+</Callout>
+
+## El cinturón de seguridad: los tests
+
+Esto es lo que cambió mi relación con la IA en el side project. Me apoyé fuerte en tests, y dejé de sentir ansiedad por cuánto estaba delegando.
+
+La cantidad de tests no es la historia. Lo que importa es qué superficies están cubiertas y qué tan rápido corre la suite. La suite completa termina en unos diez segundos, y los archivos están organizados por la cosa que cuidan, no por la cosa que ejercitan.
+
+<FileTree>
+<div class="folder">
+<div class="folder-label">__tests__</div>
+<div class="folder-children">
+<div class="file">auth/ (sesión, JWT, route guards)</div>
+<div class="file">hooks/ (timezones, recurrencia, optimistic updates)</div>
+<div class="file">server-actions/ (create, update, delete)</div>
+</div>
+</div>
+<div class="folder">
+<div class="folder-label">e2e</div>
+<div class="folder-children">
+<div class="file">smoke.spec.ts (navegación + crear tarea)</div>
+<div class="file">auth.spec.ts (login real contra Postgres)</div>
+</div>
+</div>
+</FileTree>
+
+Un loop de feedback de diez segundos es lo bastante rápido para correrlo después de cada cambio significativo. La IA puede hacer una suposición equivocada y yo me entero en un respiro, no en un deploy.
+
+Una trampa que tuve que cuidar. Si la IA escribe el código y la IA escribe los tests, la suite pasa porque ambos reflejan la lectura del modelo del spec, no el spec en sí. Para lo que importa — auth, hooks, server actions — el plan de tests lo escribo yo en el spec antes de que la IA toque código. La IA llena las assertions; decidir qué se testea se queda conmigo.
+
+Te muestro dos cosas de la configuración real que hicieron más por mi confianza que cualquier plantilla de prompt.
+
+La primera es el threshold de coverage tratado como un piso. Números que solo suben:
+
+<CodeBlock filename="vitest.config.ts">
+```ts
+coverage: {
+  provider: "v8",
+  reporter: ["text-summary", "html", "lcov"],
+  // Coverage es un trinquete contra regresiones: los thresholds
+  // arrancan en el baseline actual para que código nuevo sin tests
+  // rompa el CI. Sube los números cada vez que agregues un lote
+  // de tests de server-action y hooks.
+  thresholds: {
+    lines: 22,
+    functions: 14,
+    branches: 17,
+    statements: 22,
+  },
+},
+```
+</CodeBlock>
+
+Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?" sino "¿puede el número bajar sin que te enteres?". Como piso, no puede. Con números así de bajos solo atrapa regresiones gruesas. Las sutiles necesitan más cobertura para aparecer. Ahora me importa si el número está subiendo, no dónde está.
+
+La segunda es el setup de E2E corriendo contra un Postgres real, no contra un mock:
+
+<CodeBlock filename="playwright.config.ts">
+```ts
+export default defineConfig({
+  testDir: "./e2e/tests",
+  globalSetup: "./e2e/global-setup.ts",
+  fullyParallel: true,
+  workers: process.env.CI ? 1 : parallelWorkers,
+  retries: process.env.CI ? 2 : 0,
+  use: {
+    baseURL: "http://localhost:3000",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+  },
+  webServer: {
+    command: process.env.CI ? "npm run start" : "npm run dev",
+    url: "http://localhost:3000",
+    reuseExistingServer: !process.env.CI,
+  },
+});
+```
+</CodeBlock>
+
+Los tests E2E insertan una sesión real en la DB para saltarse NextAuth, y después manejan el server real. Nada de mocks. Los dos `@smoke` no hacen nada raro. Uno navega cada página principal, otro crea una tarea. Existen para que si la IA recablea el routing o rompe la auth de una forma que igual compila, me entere en segundos.
+
+Compara el mismo cambio con y sin ese andamiaje. Son bocetos compuestos de lo que viví todo el mes, no transcripciones de una sola sesión:
+
+<Tabs labels={["Sin tests", "Con tests"]}>
+<TabPanel>
+
+Le pides a la IA que refactorice un hook. Reescribe el archivo. Escaneas el diff. Se ve razonable. Sigues. Tres días después un usuario reporta que las zonas horarias se desfasan un día en noviembre. Pasas dos horas haciendo bisect de commits para encontrar aquel donde la IA rompió en silencio el manejo de DST.
+
+El costo no fue el código roto. El costo fue la brecha entre el momento en que se rompió y el momento en que te enteraste.
+
+</TabPanel>
+<TabPanel>
+
+Le pides a la IA que refactorice un hook. Reescribe el archivo. Corres la suite de unit. Diez segundos. Pasan ochenta y nueve tests de timezone, fallan dos. Los dos fallos apuntan a las líneas exactas que cambiaron.
+
+O lo arreglas, o lo reviertes, o le dices a la IA qué se rompió y dejas que parche. Total transcurrido: menos de dos minutos. El bug nunca sale de tu laptop.
+
+</TabPanel>
+</Tabs>
+
+El diagrama que ahora tengo en la cabeza:
+
+<MermaidDiagram title="El loop de confianza" chart={`graph LR
+  A[IA propone cambio] --> B[Corren los tests]
+  B --> C{Verde?}
+  C -->|Sí| D[Confío y subo]
+  C -->|No| E[Falla real expuesta]
+  E --> F[Fix dirigido]
+  F --> B`} />
+
+Sin el loop, le estás preguntando a tu intuición si la IA acertó. En un cambio de una línea, claro, tus ojos lo agarran. En un refactor multi-archivo, tu intuición no leyó el diff completo.
+
+## Spec primero, código después
+
+La otra cosa que `/insights` dejó obvia: las features que arranqué con un spec escrito terminaron más limpias que las que improvisé en chat.
+
+Un spec no necesita ser largo. Objetivos, no-objetivos, casos borde, plan de tests, checklist de aceptación. Quizá un párrafo cada uno. El punto no es el documento. El punto es que ya tomaste las decisiones antes de que el modelo tenga que adivinarlas.
+
+Cuando improvisé, la IA adivinó. A veces bien, a veces mal. Las adivinanzas malas aparecieron como las iteraciones de diez rondas.
+
+Cuando especifiqué, la IA ejecutó. El primer borrador solía estar al 80%. El 20% restante era ingeniería real, no pelear con prompts.
+
+Así se ve uno de mis specs, corto a propósito. Este era para eventos recurrentes de calendario:
+
+- **Objetivo:** crear eventos recurrentes (diaria, semanal, mensual) editables individualmente sin romper la serie.
+- **No-objetivos:** soporte completo de RRULE de iCal, excepciones por zona horaria.
+- **Casos borde:** evento que cae en cambio de DST, instancia eliminada vs. serie eliminada, semántica de "este y los siguientes".
+- **Plan de tests:** unit para la generación de instancias, E2E para edición de una sola ocurrencia.
+- **Aceptación:** crear serie semanal, editar la del jueves, confirmar que las otras quedan intactas.
+
+Una pantalla de bullets. El modelo deja de adivinar y pasa a ejecutar.
+
+## Lo que no te voy a decir
+
+No te voy a decir que la IA te hace mejor ingeniero. No sé si lo haga. Los datos que tengo son sobre mí, en un proyecto, durante un mes.
+
+Lo que sí te puedo decir es lo que cambió para mí. El costo de empezar algo bajó. El costo de validarlo subió. Los tests son la forma en que pagué el segundo costo sin renunciar al primero.
+
+Atrapan lo que se me ocurrió revisar. Los bugs que no anticipé igual se publican. Trabajar con IA mueve el terreno bajo tus pies más rápido de lo que tu plan de tests se mueve con él. Esa brecha es real. Los tests la achican; no la cierran.
+
+Si trabajas con IA sin tests, estás operando con fe. Tal vez te está saliendo bien. O tal vez no has encontrado la regresión todavía. La respuesta honesta es que yo no sé en cuál de las dos estás, y tú tampoco.
+
+Esa fue la parte de la que `/insights` no me dejó esconderme.

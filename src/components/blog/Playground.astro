@@ -1,0 +1,263 @@
+---
+/**
+ * Playground — slider-driven interactive explorer (Bret Victor lite).
+ *
+ *   <Playground
+ *     inputs={[
+ *       { id: "attempts", label: "Retry attempts", min: 0, max: 8, default: 3 },
+ *       { id: "base",     label: "Base delay (ms)", min: 100, max: 2000, step: 100, default: 300, suffix: "ms" },
+ *     ]}
+ *   >
+ *     <div class="playground-demo">
+ *       Total wait: <output data-pg-bind="sum"></output>ms
+ *     </div>
+ *   </Playground>
+ *
+ * How it works:
+ *  1. Each input renders a labeled slider. Its current value is exposed as
+ *     a CSS variable on the playground root (`--pg-<id>`) and via
+ *     `[data-pg-bind="<id>"]` output elements inside the slot.
+ *  2. The slot content can read these vars with CSS (e.g.,
+ *     `cx: calc(var(--pg-attempts) * 10px)` on an SVG circle) or via
+ *     a `playground:update` CustomEvent dispatched on the root whenever
+ *     any slider changes — detail.values is a `{ [id]: number }` map.
+ *
+ * Accessibility: sliders are real `<input type="range">` with
+ * `aria-valuetext`. Reduced-motion: transitions honor the global CSS rule.
+ */
+interface Input {
+	id: string;
+	label: string;
+	min: number;
+	max: number;
+	step?: number;
+	default: number;
+	/** Rendered after the value (e.g. "ms", "%"). */
+	suffix?: string;
+	/** Rendered before the value (e.g. "$"). */
+	prefix?: string;
+}
+interface Props {
+	inputs: Input[];
+	/** Caption shown below the inputs; authors can use it for context. */
+	caption?: string;
+	/** Layout hint — "stack" (default) puts sliders above, "side" splits 50/50 on wide. */
+	layout?: 'stack' | 'side';
+}
+const { inputs, caption, layout = 'stack' } = Astro.props;
+const initialVars = inputs.map((i) => `--pg-${i.id}: ${i.default};`).join(' ');
+---
+
+<section class="playground" data-playground data-layout={layout} style={initialVars}>
+	<div class="playground-controls">
+		{inputs.map((i) => (
+			<label class="playground-input">
+				<span class="playground-label">{i.label}</span>
+				<input
+					type="range"
+					min={i.min}
+					max={i.max}
+					step={i.step ?? 1}
+					value={i.default}
+					data-pg-id={i.id}
+					data-pg-prefix={i.prefix ?? ''}
+					data-pg-suffix={i.suffix ?? ''}
+					aria-label={i.label}
+				/>
+				<output class="playground-value" data-pg-value-for={i.id}>
+					{i.prefix ?? ''}{i.default}{i.suffix ?? ''}
+				</output>
+			</label>
+		))}
+	</div>
+	<div class="playground-stage">
+		<slot />
+	</div>
+	{caption && <p class="playground-caption">{caption}</p>}
+</section>
+
+<script>
+	function initOne(root: HTMLElement) {
+		if (root.dataset.playgroundReady) return;
+		root.dataset.playgroundReady = '1';
+
+		const inputs = Array.from(root.querySelectorAll<HTMLInputElement>('input[data-pg-id]'));
+		if (inputs.length === 0) return;
+
+		function collect(): Record<string, number> {
+			const values: Record<string, number> = {};
+			for (const input of inputs) {
+				const id = input.dataset.pgId!;
+				values[id] = Number(input.value);
+			}
+			return values;
+		}
+
+		function apply(input: HTMLInputElement) {
+			const id = input.dataset.pgId!;
+			const value = input.value;
+			const prefix = input.dataset.pgPrefix || '';
+			const suffix = input.dataset.pgSuffix || '';
+
+			// CSS variable
+			root.style.setProperty(`--pg-${id}`, value);
+
+			// Output display
+			const out = root.querySelector<HTMLOutputElement>(`[data-pg-value-for="${id}"]`);
+			if (out) out.textContent = `${prefix}${value}${suffix}`;
+
+			// Bound outputs inside the slot
+			for (const bind of root.querySelectorAll<HTMLElement>(`[data-pg-bind="${id}"]`)) {
+				bind.textContent = value;
+			}
+
+			// aria-valuetext for screen readers
+			input.setAttribute('aria-valuetext', `${prefix}${value}${suffix}`);
+		}
+
+		function emit() {
+			root.dispatchEvent(
+				new CustomEvent('playground:update', { detail: { values: collect() } }),
+			);
+		}
+
+		for (const input of inputs) {
+			apply(input);
+			input.addEventListener('input', () => {
+				apply(input);
+				emit();
+			});
+		}
+		// Fire once so author scripts can initialize without waiting for interaction.
+		emit();
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-playground]').forEach(initOne);
+	}
+
+	init();
+	document.addEventListener('astro:after-swap', init);
+</script>
+
+<style>
+	.playground {
+		margin: 2.5rem 0;
+		padding: 1.25rem 1.25rem 1.5rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		background: var(--color-surface);
+		display: grid;
+		gap: 1.25rem;
+	}
+
+	.playground[data-layout="side"] {
+		grid-template-columns: 1fr;
+	}
+	@media (min-width: 720px) {
+		.playground[data-layout="side"] {
+			grid-template-columns: minmax(0, 20rem) minmax(0, 1fr);
+			align-items: start;
+		}
+	}
+
+	.playground-controls {
+		display: grid;
+		gap: 0.85rem;
+	}
+
+	.playground-input {
+		display: grid;
+		grid-template-columns: 1fr auto;
+		grid-template-rows: auto auto;
+		grid-template-areas:
+			"label value"
+			"slider slider";
+		column-gap: 1rem;
+		row-gap: 0.35rem;
+		align-items: center;
+	}
+
+	.playground-label {
+		grid-area: label;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-text-secondary);
+	}
+
+	.playground-value {
+		grid-area: value;
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
+		color: var(--color-accent);
+		font-variant-numeric: tabular-nums;
+	}
+
+	.playground-input input[type="range"] {
+		grid-area: slider;
+		appearance: none;
+		-webkit-appearance: none;
+		width: 100%;
+		height: 4px;
+		background: var(--color-border);
+		border-radius: 999px;
+		outline: none;
+		cursor: ew-resize;
+	}
+
+	.playground-input input[type="range"]::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: var(--color-accent);
+		border: 2px solid var(--color-surface);
+		box-shadow: var(--shadow-sm);
+		cursor: ew-resize;
+		transition: transform var(--duration-fast) var(--ease-spring),
+			box-shadow var(--duration-fast) var(--ease-smooth);
+	}
+	.playground-input input[type="range"]::-moz-range-thumb {
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		background: var(--color-accent);
+		border: 2px solid var(--color-surface);
+		box-shadow: var(--shadow-sm);
+		cursor: ew-resize;
+	}
+	.playground-input input[type="range"]:hover::-webkit-slider-thumb,
+	.playground-input input[type="range"]:focus-visible::-webkit-slider-thumb {
+		transform: scale(1.15);
+		box-shadow: var(--shadow-md);
+	}
+	.playground-input input[type="range"]:focus-visible {
+		outline: 2px solid oklch(from var(--color-accent) l c h / 0.4);
+		outline-offset: 4px;
+	}
+
+	.playground-stage {
+		min-height: 4rem;
+		display: grid;
+		place-items: center;
+		padding: 0.5rem;
+		border-radius: var(--radius-md);
+		background: var(--color-bg-secondary);
+	}
+
+	.playground-stage :global(svg) {
+		max-width: 100%;
+		height: auto;
+	}
+
+	.playground-caption {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-text-muted);
+		text-align: center;
+	}
+</style>

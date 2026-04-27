@@ -1,0 +1,48 @@
+---
+/**
+ * ReadingMeta — compact metadata line: reading time + word count.
+ *
+ * Values are computed at build time by `remark-reading-meta` and come
+ * from the post's frontmatter (`readingTime` and `wordCount`).
+ */
+interface Props {
+	readingTime?: number;
+	wordCount?: number;
+	lang?: 'en' | 'es';
+}
+const { readingTime, wordCount, lang = 'en' } = Astro.props;
+if (!readingTime || !wordCount) return null;
+
+const minLabel = lang === 'es' ? 'min de lectura' : 'min read';
+const wordsLabel = lang === 'es' ? 'palabras' : 'words';
+const formattedWords = new Intl.NumberFormat(lang === 'es' ? 'es-CO' : 'en-US').format(wordCount);
+---
+
+<span class="reading-meta">
+	<span class="reading-meta-item">
+		<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+		{readingTime} {minLabel}
+	</span>
+	<span class="reading-meta-sep" aria-hidden="true">·</span>
+	<span class="reading-meta-item">{formattedWords} {wordsLabel}</span>
+</span>
+
+<style>
+	.reading-meta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5em;
+		font-family: var(--font-sans);
+		font-size: 0.88rem;
+		color: var(--color-text-muted);
+	}
+	.reading-meta-item {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35em;
+	}
+	.reading-meta-sep {
+		color: var(--color-text-muted);
+		opacity: 0.6;
+	}
+</style>

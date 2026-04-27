@@ -1,0 +1,207 @@
+---
+title: "AI Gave Me Speed. Tests Gave Me Control."
+description: "I ran /insights after a month with Claude Code in a side project. The numbers I expected weren't the interesting ones. Here's what was."
+pubDate: 2026-04-27
+tags: ["ai-tools", "testing", "developer-workflow", "claude-code"]
+featured: true
+lang: en
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import FileTree from '../../components/blog/FileTree.astro';
+import TLDR from '../../components/blog/TLDR.astro';
+
+<TLDR bullets={[
+  "I worked a month with Claude Code on a side project. /insights showed me two things: AI patches symptoms before understanding causes, and tests are the only thing that lets me trust its changes.",
+  "This post is what I changed because of that.",
+]} />
+
+I built a side project this past month. A small calendar/PWA, a personal sandbox to learn Next.js patterns I don't get to use at work. Outside hours, no consulting overlap, just a place to break things on purpose.
+
+At the end of the month I ran `/insights` in Claude Code to see how I'd been working. I opened it expecting a pat on the back. I got something more uncomfortable: the things AI was doing badly weren't the ones I thought.
+
+This post is what `/insights` showed me and the one shift I made because of it.
+
+<Callout type="important" title="The thesis">
+The bottleneck wasn't AI. It was me, trusting AI without a feedback loop. Tests are the cheapest way to buy that loop back.
+</Callout>
+
+## What `/insights` Showed
+
+The flattering parts were the ones I already knew:
+
+- Multi-file changes are where AI actually earns its keep. A schema change that touches a migration, a route, a hook, and three components. That's the kind of work where typing speed becomes the bottleneck and AI removes it.
+- Features that started with a written spec ended cleaner than features I improvised in chat. No surprise, but seeing it in my own data made it harder to wave away.
+- Custom skills with eval benchmarks pay off. I'd been building these for fun, things like auditing accessibility or reviewing PRs against a fixed checklist. `/insights` tagged them as the most reliable lever I had.
+
+That was the boring half. The part I didn't expect to see hit harder.
+
+A landing page scroll behavior took roughly ten rounds of feedback before it converged. A kanban overflow got patched twice with the wrong CSS property before I stopped and asked what the parent container was actually doing. A desktop layout got "fixed" twice without changing anything visible, until I typed something close to "you didn't fix the problem, analyze deeply." `/insights` flagged this exact phrase as a recurring pattern.
+
+There was a session where `git stash` ate eight out of ten files I'd been working on. I won't pretend that was elegant. That was before I tightened up tests and commit-often discipline. Recovery was from memory.
+
+<Collapsible title="The git stash story (skip if you want)">
+Mid-session, I asked for a stash to pause work on a half-broken branch. The pop didn't restore everything because I'd touched files in directories the stash didn't track cleanly. I lost an afternoon's worth of in-progress code that wasn't yet committed. The fix was boring: commit early, commit often, even on garbage WIP branches. The lesson was less boring: I'd assumed AI would treat git operations with the same caution I would. It doesn't. Git is one of the places where "delegate fully" is the wrong default.
+</Collapsible>
+
+This is the part of working with AI that nobody posts on Twitter. The hero shots are real. What surrounds them looks a lot like normal engineering. You're confused for a while, then it clicks.
+
+## The Pattern I Actually Found
+
+The interesting failure mode wasn't "AI got it wrong." It was subtler. AI reached for a fix before it had a diagnosis.
+
+CSS layout was the clearest example. A child element overflowing isn't usually a child problem. It's usually a parent that forgot to constrain height, or a flex axis that nobody set explicitly. AI tends to reach for `items-start`, `max-h-full`, `overflow-hidden`. Properties on the *visible* element. It almost never walks up the cascade first. That's what burned the ten rounds on scroll-snap.
+
+Same pattern in Postgres migrations. I asked AI to apply a migration. It failed. AI retried the same `prisma migrate deploy` three times, swapping flags. When I stopped and looked, the problem was that `.env.local` and `.env` pointed at different databases, and `dotenv` was loading the wrong one. The migration was never the problem. AI optimized for "the command that failed" instead of "which environment got loaded."
+
+This isn't a bad habit you can prompt away. The model predicts tokens that statistically surround the symptom. Until you move the diagnosis upstream, into a spec or a failing test, it has nowhere else to look.
+
+<Callout type="warning" title="The CSS tell">
+If your AI fix changes a property on the broken element and the bug doesn't move, stop. The constraint is upstream. Make it walk the parent chain before touching another property.
+</Callout>
+
+## The Seatbelt: Tests
+
+Here's what changed my relationship with AI in the side project: I leaned hard on tests, and I stopped feeling anxious about how much I was delegating.
+
+The number of tests isn't the story. What matters is which surfaces are covered and how fast the suite runs. The full suite finishes in about ten seconds, and the test files are organized by the thing they protect, not by the thing they exercise.
+
+<FileTree>
+<div class="folder">
+<div class="folder-label">__tests__</div>
+<div class="folder-children">
+<div class="file">auth/ (session, JWT, route guards)</div>
+<div class="file">hooks/ (timezone, recurrence, optimistic updates)</div>
+<div class="file">server-actions/ (create, update, delete)</div>
+</div>
+</div>
+<div class="folder">
+<div class="folder-label">e2e</div>
+<div class="folder-children">
+<div class="file">smoke.spec.ts (navigation + create task)</div>
+<div class="file">auth.spec.ts (real login against Postgres)</div>
+</div>
+</div>
+</FileTree>
+
+A ten-second feedback loop is fast enough to run after every meaningful change. AI can make a wrong assumption and I'll know within one breath instead of one deploy.
+
+One trap I had to watch for. If AI writes the code and AI writes the tests, the suite passes because both reflect the model's reading of the spec, not the spec itself. For anything that matters — auth, hooks, server actions — I write the test plan in the spec before AI touches code. AI fills in assertions; deciding what to test stays with me.
+
+I'll show you two things from the actual config that did more for my confidence than any prompt template.
+
+The first is the coverage threshold treated as a ratchet. Numbers that only go up:
+
+<CodeBlock filename="vitest.config.ts">
+```ts
+coverage: {
+  provider: "v8",
+  reporter: ["text-summary", "html", "lcov"],
+  // Coverage is a regression-prevention ratchet: thresholds start at
+  // current baseline so new untested code fails CI. Raise numbers
+  // after adding server-action + hook tests.
+  thresholds: {
+    lines: 22,
+    functions: 14,
+    branches: 17,
+    statements: 22,
+  },
+},
+```
+</CodeBlock>
+
+Those numbers are low on purpose. They're not aspirational, they're today's floor. The question isn't "how much coverage do you have?" but "can the number drop without you noticing?" As a ratchet, it can't. At this floor it only catches gross regressions. The subtle ones need higher coverage to show up. Right now I care about whether the number is moving up, not where it sits.
+
+The second is the E2E setup running against a real Postgres, not a mock:
+
+<CodeBlock filename="playwright.config.ts">
+```ts
+export default defineConfig({
+  testDir: "./e2e/tests",
+  globalSetup: "./e2e/global-setup.ts",
+  fullyParallel: true,
+  workers: process.env.CI ? 1 : parallelWorkers,
+  retries: process.env.CI ? 2 : 0,
+  use: {
+    baseURL: "http://localhost:3000",
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+  },
+  webServer: {
+    command: process.env.CI ? "npm run start" : "npm run dev",
+    url: "http://localhost:3000",
+    reuseExistingServer: !process.env.CI,
+  },
+});
+```
+</CodeBlock>
+
+The E2E tests insert a real session row into the DB to bypass NextAuth, then drive the actual server. No mocks. The two `@smoke` tests do nothing fancy. One navigates every main page, the other creates a task. They exist so that if AI rewires routing or breaks auth in a way that compiles, I know in seconds.
+
+Compare the same change with and without that scaffolding. These are composite sketches of what I lived with all month, not transcripts of one session:
+
+<Tabs labels={["Without tests", "With tests"]}>
+<TabPanel>
+
+You ask AI to refactor a hook. It rewrites the file. You scan the diff. It looks reasonable. You move on. Three days later a user reports that timezones are off by a day in November. You spend two hours bisecting commits to find the one where AI quietly broke DST handling.
+
+The cost wasn't the broken code. The cost was the gap between when it broke and when you found out.
+
+</TabPanel>
+<TabPanel>
+
+You ask AI to refactor a hook. It rewrites the file. You run the unit suite. Ten seconds later, eighty-nine timezone tests pass and two fail. The two failures point at the exact lines that changed.
+
+You either fix it, revert it, or tell AI what's broken and let it patch. Total elapsed: under two minutes. The bug never leaves your laptop.
+
+</TabPanel>
+</Tabs>
+
+The diagram I now keep in my head:
+
+<MermaidDiagram title="The trust loop" chart={`graph LR
+  A[AI proposes change] --> B[Run tests]
+  B --> C{Green?}
+  C -->|Yes| D[Trust + ship]
+  C -->|No| E[Surface real failure]
+  E --> F[Targeted fix]
+  F --> B`} />
+
+Without the loop, you're asking your gut whether AI got it right. On a one-line tweak, sure, your eyes catch it. On a multi-file refactor, your gut didn't read the full diff.
+
+## Spec First, Code Second
+
+The other thing `/insights` made obvious: features I started with a written spec ended cleaner than features I improvised in chat.
+
+A spec doesn't need to be long. Goals, non-goals, edge cases, a test plan, an acceptance checklist. Maybe a paragraph each. The point isn't the document. The point is that you've made the decisions before the model has to guess them.
+
+When I improvised, AI guessed. Sometimes well, sometimes badly. The bad guesses showed up as the ten-round iterations.
+
+When I specced, AI executed. The first draft was usually 80% there. The remaining 20% was real engineering, not prompt archaeology.
+
+Here's what one of my specs looks like, kept short on purpose. This one was for recurring calendar events:
+
+- **Goal:** create recurring events (daily, weekly, monthly) that can be edited individually without breaking the series.
+- **Non-goals:** full iCal RRULE support, timezone-based exceptions.
+- **Edge cases:** event falling on a DST switch, deleted instance vs. deleted series, "edit this and following" semantics.
+- **Test plan:** unit tests for instance generation, E2E for editing a single occurrence.
+- **Acceptance:** create a weekly series, edit Thursday's instance, confirm the others stay intact.
+
+One screen of bullets. The model stops guessing and starts executing.
+
+## What I'm Not Going to Tell You
+
+I'm not going to tell you AI makes you a better engineer. I don't know if it does. The data I have is on me, in one project, over one month.
+
+What I can tell you is what changed for me. The cost of starting something dropped. The cost of validating it went up. Tests are how I paid the second cost without giving up the first.
+
+They catch what I thought to check for. The bugs I never anticipated still ship. AI-assisted work shifts the territory under your feet faster than your test plan shifts with it. That gap is real. Tests narrow it; they don't close it.
+
+If you're working with AI without tests, you're operating on faith. Maybe it's working out for you. Or maybe you just haven't found the regression yet. The honest answer is I don't know which one you are, and neither do you.
+
+That's the part `/insights` wouldn't let me hide from.
