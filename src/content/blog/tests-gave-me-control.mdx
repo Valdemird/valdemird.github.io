@@ -21,7 +21,7 @@ import TLDR from '../../components/blog/TLDR.astro';
   "This post is what I changed because of that.",
 ]} />
 
-I built a side project this past month. A small calendar/PWA. A sandbox to try Next.js patterns I hadn't touched and break things on purpose.
+I built a side project this past month. A small todo app with an AI assistant and a built-in Pomodoro timer. A sandbox to try Next.js patterns I hadn't touched and break things on purpose.
 
 At the end of the month I ran `/insights` in Claude Code to see how I'd been working. I opened it expecting a pat on the back. I got something more uncomfortable: the things AI was doing badly weren't the ones I thought.
 
@@ -184,11 +184,11 @@ When I improvised, AI guessed. Sometimes well, sometimes badly. The bad guesses 
 
 When I specced, AI executed. The first draft was usually 80% there. The remaining 20% was real engineering, not prompt archaeology.
 
-Here's what one of my specs looks like, kept short on purpose. This one was for recurring calendar events:
+Here's what one of my specs looks like, kept short on purpose. This one was for recurring tasks:
 
-- **Goal:** create recurring events (daily, weekly, monthly) that can be edited individually without breaking the series.
+- **Goal:** create recurring tasks (daily, weekly, monthly) that can be edited individually without breaking the series.
 - **Non-goals:** full iCal RRULE support, timezone-based exceptions.
-- **Edge cases:** event falling on a DST switch, deleted instance vs. deleted series, "edit this and following" semantics.
+- **Edge cases:** task falling on a DST switch, deleted instance vs. deleted series, "edit this and following" semantics.
 - **Test plan:** unit tests for instance generation, E2E for editing a single occurrence.
 - **Acceptance:** create a weekly series, edit Thursday's instance, confirm the others stay intact.
 

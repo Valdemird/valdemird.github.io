@@ -21,7 +21,7 @@ import TLDR from '../../../components/blog/TLDR.astro';
   "Esto es lo que cambié por culpa de eso.",
 ]} />
 
-Construí un side project este último mes. Un calendario/PWA pequeño. Un sandbox para probar patrones de Next.js que no había tocado y romper cosas a propósito.
+Construí un side project este último mes. Un todo list pequeño con asistente de IA y timer pomodoro integrado. Un sandbox para probar patrones de Next.js que no había tocado y romper cosas a propósito.
 
 Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando. Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
 
@@ -185,11 +185,11 @@ Cuando improvisé, la IA adivinó. A veces bien, a veces mal. Las adivinanzas ma
 
 Cuando especifiqué, la IA ejecutó. El primer borrador solía estar al 80%. El 20% restante era ingeniería real, no pelear con prompts.
 
-Así se ve uno de mis specs, corto a propósito. Este era para eventos recurrentes de calendario:
+Así se ve uno de mis specs, corto a propósito. Este era para tareas recurrentes:
 
-- **Objetivo:** crear eventos recurrentes (diaria, semanal, mensual) editables individualmente sin romper la serie.
+- **Objetivo:** crear tareas recurrentes (diaria, semanal, mensual) editables individualmente sin romper la serie.
 - **No-objetivos:** soporte completo de RRULE de iCal, excepciones por zona horaria.
-- **Casos borde:** evento que cae en cambio de DST, instancia eliminada vs. serie eliminada, semántica de "este y los siguientes".
+- **Casos borde:** tarea que cae en cambio de DST, instancia eliminada vs. serie eliminada, semántica de "este y los siguientes".
 - **Plan de tests:** unit para la generación de instancias, E2E para edición de una sola ocurrencia.
 - **Aceptación:** crear serie semanal, editar la del jueves, confirmar que las otras quedan intactas.
 
