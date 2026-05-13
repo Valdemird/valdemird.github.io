@@ -79,6 +79,97 @@ Spanish versions must feel like they were written in Spanish from the start, not
 - Don't drop articles that Spanish requires: "la habilidad", "el perfeccionismo", not bare nouns.
 - Accents matter everywhere, including in chart labels and component props.
 
+## Voice Reference: tests-gave-me-control.mdx
+
+This post is the gold standard for voice on this site. When in doubt about tone, structure, or how to handle a moment — pattern-match against it. The Spanish version (`src/content/blog/es/tests-gave-me-control.mdx`) carries the same patterns. Below are literal passages and the pattern to extract from each.
+
+### Pattern 1 — Open with a lived-in detail, not a generalization
+
+> "I built a side project this past month. A small calendar/PWA, a personal sandbox to learn Next.js patterns I don't get to use at work. Outside hours, no consulting overlap, just a place to break things on purpose."
+
+A specific person, a specific window ("this past month"), a specific thing. The aside ("break things on purpose") tells you *why* he was there.
+
+Anti-pattern from `building-to-learn`: *"I've watched developers spend months on courses..."* — the "I" is generic, the writer is reporting on other people.
+
+**Apply**: every post opens with something you actually did, in a window you can name. Not "engineers often...", not "developers struggle with...". You, somewhere, recently, doing something concrete.
+
+### Pattern 2 — Tension before thesis
+
+> "I opened it expecting a pat on the back. I got something more uncomfortable: the things AI was doing badly weren't the ones I thought."
+
+Only after the reader feels the tension does the thesis land (here, in a Callout). The reader has been primed to want an answer.
+
+**Apply**: never lead with the lesson. Lead with the moment that made the lesson necessary. The Callout thesis comes *after* the discomfort, not before.
+
+### Pattern 3 — Numbers and exact phrases over adjectives
+
+> "A landing page scroll behavior took roughly ten rounds of feedback before it converged. A kanban overflow got patched twice with the wrong CSS property... I typed something close to 'you didn't fix the problem, analyze deeply.'"
+
+Three claims, each anchored to a counted thing: "ten rounds", "twice", a literal quoted prompt. Even the "roughly" and "something close to" earn trust — they signal honest recall instead of fabricated precision.
+
+Compare to: *"It took many iterations and the wrong fixes were applied repeatedly until I had to push back."* Same content, zero credibility.
+
+**Apply**: when describing what happened, find the number, the count, the literal phrase. If you can't, the claim isn't lived enough yet — go back and remember harder before writing it.
+
+### Pattern 4 — Self-deprecation as authenticity signal
+
+> "There was a session where `git stash` ate eight out of ten files I'd been working on. I won't pretend that was elegant. That was before I tightened up tests and commit-often discipline. Recovery was from memory."
+
+The second sentence is the move. Saying "this was not elegant" instantly separates the post from a vendor pitch.
+
+**Apply**: at least one moment per post should acknowledge something that went badly *because of you*, not because of the tool. If every failure in the post is the tool's fault, the reader stops believing.
+
+### Pattern 5 — Hide pain behind a click when it's not the thesis
+
+The full `git stash` story lives inside a `<Collapsible title="The git stash story (skip if you want)">`. Relevant, painful, real — but not load-bearing for the argument. So it's skippable.
+
+**Apply**: anecdotes that color the argument but aren't load-bearing belong in Collapsibles. Default is "show only what advances the thesis." Side-quests go behind a click.
+
+### Pattern 6 — Honesty about format
+
+> "Compare the same change with and without that scaffolding. These are composite sketches of what I lived with all month, not transcripts of one session:"
+
+Almost nobody volunteers that an example is composite. Doing it builds trust on every other claim in the post.
+
+**Apply**: if a comparison, dialogue, diagram, or example is reconstructed or simplified, say so in one short line. The honesty cost is zero, the credibility gain is large.
+
+### Pattern 7 — Technical insight with cascade specificity
+
+> "AI tends to reach for `items-start`, `max-h-full`, `overflow-hidden`. Properties on the *visible* element. It almost never walks up the cascade first."
+
+Property names by name, with a diagnosis of *why* the failure mode exists. The same paragraph also walks the reader through the postgres-migration example with the exact misstep: "`prisma migrate deploy` three times, swapping flags" while the real bug was `.env.local` vs `.env`.
+
+**Apply**: when you have a technical insight, write the most specific version you can. Property names. Library functions. Exact endpoints or flags. Generic insight is forgettable; specific insight is quotable.
+
+### Pattern 8 — Close with conviction, not summary
+
+> "If you're working with AI without tests, you're operating on faith. Maybe it's working out for you. Or maybe you just haven't found the regression yet. The honest answer is I don't know which one you are, and neither do you. That's the part `/insights` wouldn't let me hide from."
+
+That second-to-last clause turns the post inward. The reader leaves with the same discomfort the writer felt, not a recipe.
+
+Anti-pattern from `building-to-learn`: *"Stop preparing. Start building. The learning follows."* Three sentences, each shorter than the last, motivational. LinkedIn-shaped.
+
+**Apply**: the close should put the reader on the same footing as the writer — not graduate them out of the post with a tidy recipe.
+
+### The Litmus Test
+
+Before declaring a post done, ask one question:
+
+**Can the reader name something concrete about your week or month after reading? Is there a moment that only you could have written?**
+
+If yes, ship it. If no, the post is replaceable content. Go back and add a specific moment, a number, a literal phrase you said or typed. One real moment is worth ten well-organized paragraphs.
+
+## Anti-Patterns from Earlier Posts
+
+`building-to-learn.mdx` (March 2026) is the direction this site has moved away from. When drafting, watch for these specific shapes:
+
+- **Generic opening that reports on other people**: "I've watched developers spend months on courses, tutorials, and documentation..." — no specific moment, no time window, no specific person.
+- **Authority by citation instead of lived evidence**: leaning on PNAS meta-analyses, Feynman, Polanyi as the primary support. Citations work fine *under* a lived claim ("here's what I tried — and here's the research that explains why it worked"). They don't work *in place of* one.
+- **Listicle close**: "1. Pick a problem... 2. Constrain scope... 3. Write one thing... 4. Ship it." — formatted advice without surrounding context. LinkedIn-post shape.
+- **Motivational triplet ending**: "Stop preparing. Start building. The learning follows." — three sentences, escalating brevity, optimized for screenshots. Easy to spot, easy to avoid.
+
+`custom-commands-ai-coding.mdx` (March 2026) is closer to the target but still tutorial-shaped. The "Command 1: Create / Command 2: Audit / Command 3: ..." structure imposes a flat rhythm — no moment surprises the reader. When the topic genuinely is a system to enumerate, that structure is OK, but weave in 2-3 lived moments to break the flatness. Otherwise the post becomes information without a person attached.
+
 ## File Structure
 
 Posts live in `src/content/blog/` as `.mdx` files. Every post needs frontmatter:
