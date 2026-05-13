@@ -36,7 +36,6 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 			<div class="blog-content">
 				{featuredPost && (
 					<a href={`/blog/${featuredPost.id}/`} class="featured-post animate-fade-in delay-1">
-						<div class="featured-accent" aria-hidden="true"></div>
 						<div class="featured-inner">
 							<div class="featured-meta">
 								<span class="featured-badge">Destacado</span>
@@ -82,8 +81,6 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 	.blog-content{max-width:var(--wide-width);margin:0 auto;padding:0 var(--space-lg) 4rem}
 	.featured-post{position:relative;display:block;text-decoration:none;color:inherit;border-radius:var(--radius-lg);border:1px solid var(--color-border);overflow:hidden;background:var(--color-surface);margin-bottom:3rem;transition:box-shadow var(--duration-normal) var(--ease-smooth),transform var(--duration-normal) var(--ease-spring),border-color var(--duration-normal) var(--ease-smooth)}
 	.featured-post:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px);border-color:var(--color-accent)}
-	.featured-accent{position:absolute;top:0;left:0;width:4px;height:100%;background:linear-gradient(180deg,var(--color-accent),var(--color-success));border-radius:4px 0 0 4px;opacity:0;transition:opacity var(--duration-normal) var(--ease-smooth)}
-	.featured-post:hover .featured-accent{opacity:1}
 	.featured-inner{padding:2rem 2.5rem}
 	.featured-meta{display:flex;align-items:center;gap:.75rem;margin-bottom:1rem;font-size:.82rem;color:var(--color-text-muted)}
 	.featured-badge{font-family:var(--font-mono);font-size:.68rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--color-accent);background:var(--color-accent-subtle);padding:.25em .65em;border-radius:var(--radius-sm)}

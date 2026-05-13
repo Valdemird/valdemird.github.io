@@ -13,7 +13,7 @@ const icons: Record<string, string> = {
 	important: '🔑',
 };
 
-const defaultTitles: Record<string, string> = {
+const labels: Record<string, string> = {
 	tip: 'Tip',
 	warning: 'Warning',
 	note: 'Note',
@@ -22,10 +22,11 @@ const defaultTitles: Record<string, string> = {
 ---
 
 <aside class:list={['callout', `callout-${type}`]} role="note">
-	<div class="callout-header">
-		<span class="callout-icon">{icons[type]}</span>
-		<span class="callout-title">{title || defaultTitles[type]}</span>
+	<div class="callout-eyebrow">
+		<span class="callout-icon" aria-hidden="true">{icons[type]}</span>
+		<span class="callout-label">{labels[type]}</span>
 	</div>
+	{title && <div class="callout-title">{title}</div>}
 	<div class="callout-content">
 		<slot />
 	</div>
@@ -33,83 +34,58 @@ const defaultTitles: Record<string, string> = {
 
 <style>
 	.callout {
-		margin: 2em 0;
-		padding: 1.25em 1.5em;
+		--callout-accent: var(--color-accent);
+		margin: 2.5em 0;
+		padding: 1.35em 1.6em 1.45em;
 		border-radius: var(--radius-md);
-		border-left: 4px solid;
+		background: oklch(from var(--callout-accent) l c h / 0.045);
 	}
 
-	.callout-note {
-		background: var(--color-accent-subtle);
-		border-left-color: var(--color-accent);
-	}
+	.callout-tip { --callout-accent: var(--color-success); }
+	.callout-warning { --callout-accent: var(--color-warning); }
+	.callout-note { --callout-accent: var(--color-accent); }
+	.callout-important { --callout-accent: oklch(0.62 0.18 300); }
 
-	.callout-tip {
-		background: oklch(0.95 0.03 145);
-		border-left-color: var(--color-success);
-	}
-
-	.callout-warning {
-		background: oklch(0.96 0.03 75);
-		border-left-color: var(--color-warning);
-	}
-
-	.callout-important {
-		background: oklch(0.95 0.03 300);
-		border-left-color: oklch(0.6 0.15 300);
-	}
-
-	/* Dark mode overrides */
-	:global([data-theme='dark']) .callout-tip {
-		background: oklch(0.22 0.02 145);
-	}
-
-	:global([data-theme='dark']) .callout-warning {
-		background: oklch(0.22 0.02 75);
-	}
-
-	:global([data-theme='dark']) .callout-important {
-		background: oklch(0.22 0.02 300);
-	}
-
-	:global([data-theme='dark']) .callout-note {
-		background: var(--color-accent-subtle);
+	:global([data-theme='dark']) .callout {
+		background: oklch(from var(--callout-accent) l c h / 0.085);
 	}
 
 	@media (prefers-color-scheme: dark) {
-		:global(:root:not([data-theme='light'])) .callout-tip {
-			background: oklch(0.22 0.02 145);
-		}
-		:global(:root:not([data-theme='light'])) .callout-warning {
-			background: oklch(0.22 0.02 75);
-		}
-		:global(:root:not([data-theme='light'])) .callout-important {
-			background: oklch(0.22 0.02 300);
+		:global(:root:not([data-theme='light'])) .callout {
+			background: oklch(from var(--callout-accent) l c h / 0.085);
 		}
 	}
 
-	.callout-header {
+	.callout-eyebrow {
 		display: flex;
 		align-items: center;
-		gap: 0.5em;
-		margin-bottom: 0.5em;
+		gap: 0.55em;
+		margin-bottom: 0.55em;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--callout-accent);
 	}
 
 	.callout-icon {
-		font-size: 1.1em;
+		font-size: 0.95rem;
 		line-height: 1;
 	}
 
 	.callout-title {
 		font-family: var(--font-sans);
 		font-weight: 600;
-		font-size: 0.9rem;
+		font-size: 1rem;
 		color: var(--color-text);
+		margin-bottom: 0.4em;
+		letter-spacing: -0.005em;
 	}
 
 	.callout-content {
 		font-size: 0.95rem;
-		line-height: 1.6;
+		line-height: 1.65;
 		color: var(--color-text-secondary);
 	}
 
@@ -118,6 +94,10 @@ const defaultTitles: Record<string, string> = {
 	}
 
 	.callout-content :global(p + p) {
-		margin-top: 0.5em;
+		margin-top: 0.6em;
+	}
+
+	.callout-content :global(code) {
+		font-size: 0.88em;
 	}
 </style>
