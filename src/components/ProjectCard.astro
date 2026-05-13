@@ -4,9 +4,11 @@ interface Props {
 	description: string;
 	url: string;
 	tech: readonly string[];
+	/** Optional preview screenshot. When omitted, the card shows a wireframe fallback. */
+	thumbnail?: string;
 }
 
-const { title, description, url, tech } = Astro.props;
+const { title, description, url, tech, thumbnail } = Astro.props;
 ---
 
 <a href={url} target="_blank" rel="noopener noreferrer" class="project-card">
@@ -20,27 +22,27 @@ const { title, description, url, tech } = Astro.props;
 				<span class="preview-live-badge">LIVE</span>
 			</div>
 			<div class="preview-viewport">
-				<!-- Scaled iframe of the real site -->
-				<iframe
-					src={url}
-					title={`Preview of ${title}`}
-					loading="lazy"
-					sandbox="allow-scripts allow-same-origin"
-					tabindex="-1"
-				></iframe>
-				<!-- Overlay to prevent iframe interaction (card is the link) -->
-				<div class="preview-overlay"></div>
-				<!-- Fallback wireframe shown while iframe loads -->
-				<div class="preview-fallback" aria-hidden="true">
-					<div class="preview-line w-60"></div>
-					<div class="preview-line w-80"></div>
-					<div class="preview-line w-40"></div>
-					<div class="preview-grid">
-						<div class="preview-block"></div>
-						<div class="preview-block"></div>
-						<div class="preview-block"></div>
+				{thumbnail ? (
+					<img
+						src={thumbnail}
+						alt={`Preview of ${title}`}
+						loading="lazy"
+						width="1440"
+						height="810"
+						class="preview-image"
+					/>
+				) : (
+					<div class="preview-fallback" aria-hidden="true">
+						<div class="preview-line w-60"></div>
+						<div class="preview-line w-80"></div>
+						<div class="preview-line w-40"></div>
+						<div class="preview-grid">
+							<div class="preview-block"></div>
+							<div class="preview-block"></div>
+							<div class="preview-block"></div>
+						</div>
 					</div>
-				</div>
+				)}
 			</div>
 		</div>
 
@@ -59,37 +61,6 @@ const { title, description, url, tech } = Astro.props;
 		</div>
 	</div>
 </a>
-
-<script>
-	function initPreviews() {
-		document.querySelectorAll('.preview-viewport').forEach((viewport) => {
-			const iframe = viewport.querySelector('iframe') as HTMLIFrameElement;
-			if (!iframe) return;
-
-			// Scale iframe to fit container width exactly
-			const setScale = () => {
-				const containerWidth = viewport.clientWidth;
-				const scale = containerWidth / 1440;
-				iframe.style.transform = `scale(${scale})`;
-			};
-
-			setScale();
-			window.addEventListener('resize', setScale);
-
-			iframe.addEventListener('load', () => {
-				const fallback = viewport.querySelector('.preview-fallback') as HTMLElement;
-				if (fallback) {
-					fallback.style.opacity = '0';
-					setTimeout(() => { fallback.style.display = 'none'; }, 300);
-				}
-				iframe.style.opacity = '1';
-			});
-		});
-	}
-
-	initPreviews();
-	document.addEventListener('astro:after-swap', initPreviews);
-</script>
 
 <style>
 	.project-card {
@@ -193,26 +164,18 @@ const { title, description, url, tech } = Astro.props;
 		overflow: hidden;
 	}
 
-	.preview-viewport iframe {
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 1440px;
-		max-width: none;
-		height: 810px;
-		border: none;
-		transform-origin: top left;
-		opacity: 0;
-		transition: opacity 0.4s var(--ease-smooth);
-		pointer-events: none;
-	}
-
-	/* Invisible overlay to block iframe interaction */
-	.preview-overlay {
+	.preview-image {
 		position: absolute;
 		inset: 0;
-		z-index: 2;
-		cursor: pointer;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+		transition: transform var(--duration-slow) var(--ease-smooth);
+	}
+
+	.project-card:hover .preview-image {
+		transform: scale(1.02);
 	}
 
 	/* Fallback wireframe while iframe loads */
