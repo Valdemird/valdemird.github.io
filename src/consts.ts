@@ -7,14 +7,23 @@ export const SOCIAL_LINKS = {
 	linkedin: 'https://www.linkedin.com/in/sebastiancaja',
 } as const;
 
-export const PROJECTS = [
+type Project = {
+	readonly title: string;
+	readonly description: string;
+	readonly url: string;
+	readonly tech: readonly string[];
+	/** Optional screenshot path (e.g. /images/projects/<slug>.webp). When omitted, the card renders a wireframe fallback. */
+	readonly thumbnail?: string;
+};
+
+export const PROJECTS: readonly Project[] = [
 	{
 		title: 'Todo App',
 		description: 'Task manager with AI scheduling, Pomodoro timer, and drag-and-drop. Built because every other todo app annoyed me.',
 		url: 'https://todo.valdemird.com',
 		tech: ['Next.js 15', 'React 19', 'Prisma', 'Tailwind CSS 4', 'Vercel AI SDK'],
 	},
-] as const;
+];
 
 // i18n UI strings
 export const UI_STRINGS = {
