@@ -29,13 +29,13 @@ A git worktree isn't a productivity hack for humans. It's a file-level isolation
 
 ## How I Got Here
 
-The honest version is not sophisticated. I'd ask Claude to do something — a multi-file refactor, a phased hardening pass, anything that took more than a few minutes — and I'd sit there watching the tool calls scroll. After a while I started wondering if I could just open another terminal and start the next task in parallel. Two Claudes, two tasks, one me.
+I started out of impatience, not sophistication. I'd ask Claude to do something — a multi-file refactor, a phased hardening pass, anything that took more than a few minutes — and I'd sit there watching the tool calls scroll. After a while I started wondering if I could just open another terminal and start the next task in parallel. Two Claudes, two tasks, one me.
 
-The naive version of that idea is dangerous. If both sessions share the same working tree, the second one is editing files the first one hasn't finished reasoning about. Or worse, the second one stashes changes from the first one because git looks at the index and sees uncommitted work. The cost isn't theoretical. The cost is your afternoon.
+Doing it that way without thinking is dangerous. If both sessions share the same working tree, the second one is editing files the first one hasn't finished reasoning about. Or worse, the second one stashes changes from the first one because git looks at the index and sees uncommitted work. The cost isn't theoretical. The cost is your afternoon.
 
-Worktrees are how you make the naive idea safe. Each agent gets its own checkout, its own branch, its own working directory. They can't see each other's in-flight files. Two terminals, two trees, no collisions.
+Worktrees are how you make the same impulse safe. Each agent gets its own checkout, its own branch, its own working directory. They can't see each other's in-flight files. Two terminals, two trees, no collisions.
 
-That's the clean version of the story. The actual version starts with me breaking it.
+That's the clean story. The actual one starts with me breaking it.
 
 ## The First Time It Broke
 
@@ -48,7 +48,7 @@ What was happening, once I figured it out, was almost comically simple. Next.js 
 I copied the error stream into a fresh Claude session and Claude figured it out. The same tool that had put me in the hole helped me climb out. That part I won't pretend was elegant.
 
 <Callout type="warning" title="Where you put the worktree matters">
-If your dev server uses file watchers (Next.js, Vite, Webpack, any HMR setup), the worktree must live outside the watched tree. A sibling directory (`../worktree-name`) or a hidden subdirectory the watcher ignores (`.claude/worktrees/...` with a matching `.gitignore`) both work. Inside the repo's source root, you'll watch yourself recompile forever.
+If your dev server uses file watchers (Next.js, Vite, Webpack, any HMR setup), the worktree must live outside the watched tree. The safest option is a sibling directory: `../worktree-name`, outside the repo entirely. Hidden subdirectories like `.claude/worktrees/` can work too, but you have to configure the watcher to ignore them. `.gitignore` alone won't, since most watchers don't read it. Inside the watched source root with no exclusion, you'll watch yourself recompile forever.
 </Callout>
 
 After that I changed two things. First, I told Claude in `CLAUDE.md` to place all worktrees under `.claude/worktrees/<branch-name>` and never inside the source tree. Second, I added that path to `.gitignore` so nothing accidental would end up in a commit.
@@ -78,7 +78,7 @@ I opened three worktrees and started three Claude sessions, one per bug. The ses
 </div>
 </FileTree>
 
-Three trees. Three branches. Three agents, each one only able to see and edit its own checkout. None of them could stash on top of another. None of them could switch the main repo's branch out from under me. None of them could cd somewhere they shouldn't.
+Three trees. Three branches. Three agents, each one editing only its own checkout. None of them could stash on top of another. None of them could switch the main repo's branch out from under me. None of them could cd somewhere they shouldn't.
 
 By the end of the afternoon I had merged three PRs. Roughly:
 
@@ -132,6 +132,8 @@ Worktrees in `.claude/worktrees/` work for me because that path is gitignored on
 I picked Saturday's three bugs because they sat in three different layers of the stack. That wasn't strategy. It was the queue. If I'd had three bugs that all touched the same hook, or three changes that each modified a shared type, the worktrees would have kept the diffs apart and the merge would have been a war. Physical isolation doesn't buy semantic isolation.
 
 This shows up everywhere once you start looking. Three agents bumping the same package to three different versions. Three migrations against the same table. Three refactors of a shared internal API. Each PR individually correct, together a broken build. Worktrees give you the *ability* to parallelize. They don't give you the *judgment* to know which work can safely parallelize.
+
+The other thing worktrees don't isolate: shared runtime resources. Three dev servers want port 3000. Three Prisma clients regenerate the same generated files. Three sets of migrations want to run against the same database. Three `npm install` calls fight over the same `node_modules`. Worktrees give each agent its own files. They don't give each agent its own port or its own database. For anything beyond filesystem state (sockets, processes, caches, shared services), you still need to think about it explicitly.
 
 The other thing nobody mentions out loud: parallelism shifts where your time goes. Saturday afternoon I wasn't typing code. I was reading three diffs, integrating three branches, and looking for invisible coupling between them. The agents worked in parallel. The reviewer didn't. If the bottleneck used to be writing code, the bottleneck now is reading it.
 

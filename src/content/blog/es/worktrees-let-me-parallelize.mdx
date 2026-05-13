@@ -29,13 +29,13 @@ Un worktree de git no es un truco de productividad para humanos. Es un límite d
 
 ## Cómo llegué acá
 
-La versión honesta no es sofisticada. Le pedía a Claude algo (un refactor multi-archivo, una pasada de hardening en fases, cualquier cosa que tomara más de unos minutos) y me quedaba mirando cómo las tool calls subían por la pantalla. Después de un rato empecé a preguntarme si no podía abrir otra terminal y arrancar la siguiente tarea en paralelo. Dos Claudes, dos tareas, un yo.
+Empecé por impaciencia, no por sofisticación. Le pedía a Claude algo (un refactor multi-archivo, una pasada de hardening en fases, cualquier cosa que tomara más de unos minutos) y me quedaba mirando cómo las tool calls subían por la pantalla. Después de un rato empecé a preguntarme si no podía abrir otra terminal y arrancar la siguiente tarea en paralelo. Dos Claudes, dos tareas, un yo.
 
-La versión ingenua de esa idea es peligrosa. Si las dos sesiones comparten el mismo working tree, la segunda está editando archivos sobre los que la primera todavía no terminó de razonar. O peor, la segunda hace stash de los cambios de la primera porque git mira el index y ve trabajo sin commitear. El costo no es teórico. El costo es tu tarde.
+Hacerlo así, sin más, es peligroso. Si las dos sesiones comparten el mismo working tree, la segunda está editando archivos sobre los que la primera todavía no terminó de razonar. O peor, la segunda hace stash de los cambios de la primera porque git mira el index y ve trabajo sin commitear. El costo no es teórico. El costo es tu tarde.
 
-Los worktrees son la forma de hacer segura la idea ingenua. Cada agente tiene su propio checkout, su propia rama, su propio directorio. No pueden ver los archivos en vuelo de los otros. Dos terminales, dos árboles, cero colisiones.
+Los worktrees son la forma de volver ese mismo impulso seguro. Cada agente tiene su propio checkout, su propia rama, su propio directorio. No pueden ver los archivos en vuelo de los otros. Dos terminales, dos árboles, cero colisiones.
 
-Esa es la versión limpia. La real arranca conmigo rompiéndola.
+Esa es la teoría limpia. La realidad arranca conmigo rompiéndola.
 
 ## La primera vez que se rompió
 
@@ -48,7 +48,7 @@ Lo que estaba pasando, una vez que caí, era casi cómicamente simple. Next.js v
 Copié el stream de errores a una sesión nueva de Claude y Claude lo diagnosticó. La misma herramienta que me había metido en el pozo me ayudó a salir. Esa parte no voy a fingir que fue elegante.
 
 <Callout type="warning" title="Dónde pones el worktree importa">
-Si tu dev server usa file watchers (Next.js, Vite, Webpack, cualquier setup de HMR), el worktree tiene que vivir afuera del árbol vigilado. Un directorio hermano (`../worktree-name`) o un subdirectorio escondido que el watcher ignore (`.claude/worktrees/...` con su `.gitignore` correspondiente) funcionan. Adentro del source root del repo, te vas a quedar viendo cómo se recompila a sí mismo para siempre.
+Si tu dev server usa file watchers (Next.js, Vite, Webpack, cualquier setup de HMR), el worktree tiene que vivir afuera del árbol vigilado. La opción más segura es un directorio hermano: `../worktree-name`, afuera del repo. Subdirectorios escondidos como `.claude/worktrees/` también pueden funcionar, pero tienes que configurar el watcher explícitamente para que los ignore. `.gitignore` por sí solo no alcanza: la mayoría de los watchers no lo leen. Adentro del source root vigilado y sin exclusión, te vas a quedar viendo cómo se recompila a sí mismo para siempre.
 </Callout>
 
 Después de eso cambié dos cosas. Primero, le dije a Claude en `CLAUDE.md` que pusiera todos los worktrees bajo `.claude/worktrees/<branch-name>` y nunca adentro del árbol fuente. Segundo, agregué esa ruta a `.gitignore` para que nada accidental terminara en un commit.
@@ -78,7 +78,7 @@ Abrí tres worktrees y arranqué tres sesiones de Claude, una por bug. Las sesio
 </div>
 </FileTree>
 
-Tres árboles. Tres ramas. Tres agentes, cada uno solo podía ver y editar su propio checkout. Ninguno podía hacer stash encima del otro. Ninguno podía cambiar la rama del repo principal por debajo. Ninguno podía hacer `cd` a algún lugar al que no debía.
+Tres árboles. Tres ramas. Tres agentes, cada uno editando solo su propio checkout. Ninguno podía hacer stash encima del otro. Ninguno podía cambiar la rama del repo principal por debajo. Ninguno podía hacer `cd` a algún lugar al que no debía.
 
 Al final de la tarde tenía tres PRs mergeados. A grandes rasgos:
 
@@ -132,6 +132,8 @@ Los worktrees en `.claude/worktrees/` me funcionan porque esa ruta está en el `
 Elegí los tres bugs del sábado porque cada uno vivía en una capa distinta del stack. Eso no fue estrategia. Fue la cola. Si hubiera tenido tres bugs que tocaban el mismo hook, o tres cambios que modificaban un tipo compartido, los worktrees habrían mantenido los diffs separados pero el merge habría sido una guerra. El aislamiento físico no compra el aislamiento semántico.
 
 Esto aparece por todos lados una vez que empiezas a buscarlo. Tres agentes subiendo el mismo paquete a tres versiones distintas. Tres migrations contra la misma tabla. Tres refactors de la misma API interna. Cada PR correcto por separado, todos juntos un build roto. Los worktrees te dan la *capacidad* de paralelizar. No te dan el *criterio* para saber cuál trabajo se puede paralelizar de forma segura.
+
+La otra cosa que los worktrees no aíslan: los recursos compartidos en runtime. Tres dev servers quieren el puerto 3000. Tres clientes de Prisma regenerando los mismos archivos. Tres sets de migrations corriendo contra la misma base. Tres `npm install` peleándose por el mismo `node_modules`. Los worktrees le dan a cada agente sus propios archivos. No le dan a cada uno su propio puerto o su propia base. Para todo lo que excede el estado del filesystem (sockets, procesos, caches, servicios compartidos), todavía tienes que pensarlo explícitamente.
 
 La otra cosa que casi nadie dice en voz alta: el paralelismo mueve a dónde va tu tiempo. Esa tarde del sábado no estaba escribiendo código. Estaba leyendo tres diffs, integrando tres ramas, y buscando acoplamiento invisible entre ellas. Los agentes trabajaban en paralelo. El reviewer no. Si antes el cuello de botella era escribir código, ahora es leerlo.
 
