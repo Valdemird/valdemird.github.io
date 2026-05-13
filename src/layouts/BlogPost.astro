@@ -290,7 +290,7 @@ if (lang === 'en') {
 		margin-bottom: 0.4em;
 	}
 
-	.article-body :global(blockquote) {
+	.article-body :global(blockquote:not(.pullquote-body)) {
 		border-left: 3px solid var(--color-accent);
 		padding: 0.25em 0 0.25em 1.5em;
 		margin: 2em 0;
@@ -298,7 +298,7 @@ if (lang === 'en') {
 		color: var(--color-text-secondary);
 	}
 
-	.article-body :global(blockquote p) {
+	.article-body :global(blockquote:not(.pullquote-body) p) {
 		margin-bottom: 0.5em;
 	}
 
