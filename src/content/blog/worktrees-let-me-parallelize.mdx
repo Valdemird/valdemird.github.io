@@ -1,0 +1,154 @@
+---
+title: "Tests Gave Me Control. Worktrees Let Me Parallelize."
+description: "I had three Claude agents working on three bugs at once this Saturday. Without worktrees, that's a recipe for losing the weekend. Here's the discipline I had to learn — partly by breaking it."
+pubDate: 2026-05-13
+tags: ["ai-tools", "developer-workflow", "git", "claude-code"]
+featured: true
+lang: en
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import FileTree from '../../components/blog/FileTree.astro';
+import PullQuote from '../../components/blog/PullQuote.astro';
+import TLDR from '../../components/blog/TLDR.astro';
+
+<TLDR bullets={[
+  "I ran three Claude agents in parallel this Saturday on a side project nobody uses yet. Three bugs, three branches, three PRs merged in one afternoon.",
+  "That only worked because each agent lived in its own git worktree. The first time I tried this without that discipline, Claude placed a worktree inside the repo and Next.js spent the rest of the morning compiling itself in a loop.",
+]} />
+
+This Saturday I had three Claude sessions running in parallel on a small Next.js side project with no users, just a place to fix things without breaking anyone's day. Each session was working on a different bug. By dinner I had merged three PRs.
+
+That worked because of one thing: each Claude lived in its own git worktree. The first time I tried this without that discipline, my morning ended with Next.js compiling itself in a loop and me copying the error into a fresh Claude to figure out what had gone wrong. That was the lesson tax. This post is what I bought with it.
+
+<Callout type="important" title="The thesis">
+A git worktree isn't a productivity hack for humans. It's a file-level isolation boundary between agents. The moment you have two Claudes touching the same tree, you need one.
+</Callout>
+
+## How I Got Here
+
+I started out of impatience, not sophistication. I'd ask Claude to do something — a multi-file refactor, a phased hardening pass, anything that took more than a few minutes — and I'd sit there watching the tool calls scroll. After a while I started wondering if I could just open another terminal and start the next task in parallel. Two Claudes, two tasks, one me.
+
+Doing it that way without thinking is dangerous. If both sessions share the same working tree, the second one is editing files the first one hasn't finished reasoning about. Or worse, the second one stashes changes from the first one because git looks at the index and sees uncommitted work. The cost isn't theoretical. The cost is your afternoon.
+
+Worktrees are how you make the same impulse safe. Each agent gets its own checkout, its own branch, its own working directory. They can't see each other's in-flight files. Two terminals, two trees, no collisions.
+
+That's the clean story. The actual one starts with me breaking it.
+
+## The First Time It Broke
+
+The first time I asked Claude to create a worktree, it created the worktree *inside* the repo it was working in. Not as a sibling directory, not somewhere safe — inside the source tree that Next.js was actively watching.
+
+I didn't notice immediately. What I noticed was that `next dev` started compiling and never stopped. The spinner would tick, finish, restart. Tick, finish, restart. I couldn't load the app. I couldn't tell if my code was broken or if the dev server was broken or if my computer was on fire.
+
+What was happening, once I figured it out, was almost comically simple. Next.js was watching the entire repo for changes. The worktree Claude had created contained a literal copy of the repo's source files, sitting *inside* the directory being watched. Every time Next.js finished a compile, the file watchers saw "new" files in the worktree (same content, different paths), kicked off another compile, finished it, saw the worktree files *again*, and the loop never ended. The repo was watching itself.
+
+I copied the error stream into a fresh Claude session and Claude figured it out. The same tool that had put me in the hole helped me climb out. That part I won't pretend was elegant.
+
+<Callout type="warning" title="Where you put the worktree matters">
+If your dev server uses file watchers (Next.js, Vite, Webpack, any HMR setup), the worktree must live outside the watched tree. The safest option is a sibling directory: `../worktree-name`, outside the repo entirely. Hidden subdirectories like `.claude/worktrees/` can work too, but you have to configure the watcher to ignore them. `.gitignore` alone won't, since most watchers don't read it. Inside the watched source root with no exclusion, you'll watch yourself recompile forever.
+</Callout>
+
+After that I changed two things. First, I told Claude in `CLAUDE.md` to place all worktrees under `.claude/worktrees/<branch-name>` and never inside the source tree. Second, I added that path to `.gitignore` so nothing accidental would end up in a commit.
+
+That was the lesson tax. Everything that follows happened because of it.
+
+## The Saturday
+
+This Saturday I had three bugs open on the side project — deployed on Vercel, no users, low stakes. Each bug sat in a different layer of the stack: one in an OAuth reconnect, one in the database pool, one in a piece of UI navigation. Genuinely independent. None of them blocked anything; the app has no users, so "blocked" is theoretical. But they were each annoying enough that I wanted them gone.
+
+I opened three worktrees and started three Claude sessions, one per bug. The sessions ran in parallel for most of the afternoon.
+
+<FileTree>
+<div class="folder">
+<div class="folder-label">project/</div>
+<div class="folder-children">
+<div class="file">src/ (main, untouched)</div>
+<div class="folder">
+<div class="folder-label">.claude/worktrees/</div>
+<div class="folder-children">
+<div class="file">fix-oauth-reconnect/</div>
+<div class="file">fix-db-pool/</div>
+<div class="file">fix-banner-redirect/</div>
+</div>
+</div>
+</div>
+</div>
+</FileTree>
+
+Three trees. Three branches. Three agents, each one editing only its own checkout. None of them could stash on top of another. None of them could switch the main repo's branch out from under me. None of them could cd somewhere they shouldn't.
+
+By the end of the afternoon I had merged three PRs. Roughly:
+
+- An OAuth reconnect was redirecting before its bootstrap finished, so state arrived partial. The fix moved the await.
+- A pooled DB connection was getting exhausted under realistic load and throwing `P2037`. The fix capped the per-instance pool size.
+- A stale UI banner was triggering a navigation into an empty view. The fix bootstrapped the right state before the redirect.
+
+I'm being short on product detail on purpose. The bugs themselves are not the interesting part. The interesting part is that three agents could work on three of them in the same afternoon without colliding once.
+
+## When the First Pass Isn't Enough
+
+Worktrees solve collisions between agents. They don't solve incomplete fixes from any single one.
+
+One of the three worktrees had a Storybook story that broke on push because the test setup didn't mock everything the component imported. The first attempt mocked `@/lib/analytics` and called it done. The story still failed in CI. The agent had only mocked the import it could see; it hadn't walked the dependency tree to find that the same component also pulled in a server action that pulled in `next/server`. So the suite kept failing on a different import each time, and the fix came in three separate commits:
+
+<CodeBlock filename="git log --oneline">
+```
+7c22818 test(storybook): mock taskActions to break next/server import chain
+fb7b925 docs(storybook): note why @/lib/analytics is mocked
+026f614 test(storybook): mock @/lib/analytics in storybook vitest setup
+```
+</CodeBlock>
+
+Three commits for one fix. The pattern is the same one I wrote about last month with CSS — the agent patches the visible surface and stops. The adjacent surfaces (other imports, other themes, other breakpoints) only surface when you actually run the thing in the environment that fails. Worktrees gave me parallelism. They did not give me a smarter first pass.
+
+<Callout type="tip" title="The cheap rule that prevents this">
+Before declaring a Storybook fix done, ask the agent to enumerate every import the changed story's component touches and confirm each is either real-or-mocked. Same idea for any test setup. The "what else does this thing transitively need" question costs five seconds; the alternative is two CI cycles per fix.
+</Callout>
+
+## What I Wrote Down
+
+After all of this I added three lines to my `CLAUDE.md` for projects where I might run parallel sessions. They're not aspirational — they're the rules I broke at least once.
+
+<CodeBlock filename="CLAUDE.md">
+```markdown
+## Worktree Discipline
+- When working in a git worktree, NEVER switch branches in the main repo or stash changes there.
+- Stay confined to the worktree directory for all file operations.
+- After pushing from a worktree, do not checkout other branches that could disrupt a parallel dev server.
+```
+</CodeBlock>
+
+The first line is the one that costs you the most when violated. If an agent stashes in the main repo while you're running a dev server off that repo, your in-progress work disappears into a stash entry whose existence you didn't know about. I learned that the hard way once. I have not learned it again.
+
+<Collapsible title="The thing I almost forgot to say">
+Worktrees in `.claude/worktrees/` work for me because that path is gitignored on the projects where I do this. If you use a different location, make sure it's either outside the repo or hidden from both git and your dev server's file watcher. Otherwise you'll either ship a worktree as part of your repo (embarrassing) or you'll trigger an infinite compile loop (humbling). Both are doable.
+</Collapsible>
+
+## What Worktrees Don't Solve
+
+I picked Saturday's three bugs because they sat in three different layers of the stack. That wasn't strategy. It was the queue. If I'd had three bugs that all touched the same hook, or three changes that each modified a shared type, the worktrees would have kept the diffs apart and the merge would have been a war. Physical isolation doesn't buy semantic isolation.
+
+This shows up everywhere once you start looking. Three agents bumping the same package to three different versions. Three migrations against the same table. Three refactors of a shared internal API. Each PR individually correct, together a broken build. Worktrees give you the *ability* to parallelize. They don't give you the *judgment* to know which work can safely parallelize.
+
+The other thing worktrees don't isolate: shared runtime resources. Three dev servers want port 3000. Three Prisma clients regenerate the same generated files. Three sets of migrations want to run against the same database. Three `npm install` calls fight over the same `node_modules`. Worktrees give each agent its own files. They don't give each agent its own port or its own database. For anything beyond filesystem state (sockets, processes, caches, shared services), you still need to think about it explicitly.
+
+The other thing nobody mentions out loud: parallelism shifts where your time goes. Saturday afternoon I wasn't typing code. I was reading three diffs, integrating three branches, and looking for invisible coupling between them. The agents worked in parallel. The reviewer didn't. If the bottleneck used to be writing code, the bottleneck now is reading it.
+
+That doesn't make worktrees less useful. It makes them more honest. The story isn't "three agents do the work of three engineers." It's "three agents do the work of three typists, and one engineer still has to integrate them."
+
+## The Real Constraint
+
+This whole post is a sequel to one I wrote a month ago about tests. The argument there was that delegating to AI is only safe when there's a feedback loop fast enough to catch its mistakes. Tests are that loop on the *what* axis — did the change do the thing.
+
+Worktrees are the same idea on the *where* axis. They let me trust that an agent's mistakes stay contained in the branch and the directory I gave it. Not contained in the agent's good intentions. Contained physically, by the filesystem.
+
+<PullQuote>
+Tests gave me control over what the agent writes. Worktrees gave me control over where it writes.
+</PullQuote>
+
+There's a third axis past those two. Not what the agent writes, not where. What every parallel agent believes about the system around them — the contracts, the shared types, the schemas, the conventions. Keeping that coherent when each session only sees the slice you handed it is the deeper problem. I haven't solved it. Maybe it's next month's post.
+
+If you've been running one Claude session at a time and wondering whether two would be reckless, the answer is: not if each one has its own tree. Recklessness is sharing the tree.
