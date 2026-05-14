@@ -12,10 +12,11 @@ export async function getStaticPaths() {
 
 export const GET: APIRoute = ({ props }) => {
 	const { post } = props as { post: Awaited<ReturnType<typeof getCollection<'blog'>>>[number] };
-	const { title, description, pubDate, updatedDate, tags, lang } = post.data;
+	const { title, description, pubDate, updatedDate, reviewedDate, status, tags, lang } = post.data;
 
 	const date = pubDate.toISOString().split('T')[0];
 	const updated = updatedDate?.toISOString().split('T')[0];
+	const reviewed = reviewedDate?.toISOString().split('T')[0];
 	const canonical = `https://valdemird.com/blog/${post.id}/`;
 	const body = post.body ? cleanMdxBody(post.body) : '';
 
@@ -25,6 +26,8 @@ export const GET: APIRoute = ({ props }) => {
 		`description: ${JSON.stringify(description)}`,
 		`date: ${date}`,
 		...(updated ? [`updated: ${updated}`] : []),
+		...(reviewed ? [`reviewed: ${reviewed}`] : []),
+		...(status ? [`status: ${JSON.stringify(status)}`] : []),
 		`url: ${canonical}`,
 		`lang: ${lang ?? 'en'}`,
 		...(tags && tags.length ? [`tags: [${tags.map((t) => JSON.stringify(t)).join(', ')}]`] : []),
