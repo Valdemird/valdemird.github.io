@@ -6,11 +6,13 @@
  *
  *   PUBLISHED · APR 26, 2026   REVIEWED · MAY 12, 2026   STATUS · UP TO DATE
  *
- * Each segment hides when its source field is empty. Authors set the
- * status freely (it's a string — "Up to date for Claude 5", "Revised
- * for Sonnet 4.6", "Outdated — see successor"). When the status looks
- * like a warning (case-insensitive match on "outdated", "deprecated",
- * "archived"), that segment renders in the warning color.
+ * Each segment hides when its source field is empty. Status is
+ * author-curated — speak in YOUR voice, not the tool's. Good:
+ * "Still reflects my workflow", "Updated for new tooling", "Outdated
+ * — see successor". Avoid: "Reviewed with <some LLM>" — that signals
+ * "AI-checked content", which is the opposite of editorial trust.
+ * When status contains "outdated", "deprecated", or "archived"
+ * (case-insensitive), the segment renders in the warning color.
  */
 
 import FormattedDate from '../FormattedDate.astro';
