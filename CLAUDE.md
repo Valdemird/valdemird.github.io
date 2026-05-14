@@ -35,7 +35,8 @@ There are no tests or linting configured.
 - **i18n**: Built-in Astro routing with `en` (default, no prefix) and `es` (`/es/` prefix). UI strings in `src/consts.ts`
 - **Dynamic routes** for blog posts via `src/pages/blog/[...slug].astro` using `getStaticPaths()` with `post.id` (not slug)
 - **Layouts**: `BlogPost.astro` layout with reading progress bar, editorial typography, and SEO metadata
-- **MDX Components**: `Callout` (tip/warning/note/important), `CodeBlock` (with filename + copy button) — imported in `.mdx` files
+- **MDX Components**: `Callout` (tip/warning/note/important), `CodeBlock` (with filename + copy button), `Sidenote` (short editorial margin note — see usage rule below) — imported in `.mdx` files
+- **Sidenote usage**: use `<Sidenote>...</Sidenote>` mid-sentence for quick context, references, mini-opinions, clarifications. Renders as an auto-numbered superscript button; click reveals the note inline below the paragraph. Keep notes to 1–2 sentences — if it needs a paragraph, leave it inline or promote it to a `Callout`. Do NOT add visual containers (boxes, borders, washes) to the sidenote — the minimal style is intentional.
 - **Global constants** (site title, i18n strings, social links, projects) in `src/consts.ts`
 - **Styling**: OKLch color system in `src/styles/global.css` with CSS custom properties, dark mode via `data-theme` attribute
 - **Fonts**: Fraunces (serif display), Geist (sans body), Geist Mono (code/meta) — loaded from Google Fonts
