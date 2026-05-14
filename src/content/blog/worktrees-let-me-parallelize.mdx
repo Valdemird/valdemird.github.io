@@ -15,11 +15,11 @@ import PullQuote from '../../components/blog/PullQuote.astro';
 import TLDR from '../../components/blog/TLDR.astro';
 
 <TLDR bullets={[
-  "I ran three Claude agents in parallel this Saturday on a side project nobody uses yet. Three bugs, three branches, three PRs merged in one afternoon.",
+  "I ran three Claude agents in parallel this Saturday on a small side project. Three bugs, three branches, three PRs merged in one afternoon.",
   "That only worked because each agent lived in its own git worktree. The first time I tried this without that discipline, Claude placed a worktree inside the repo and Next.js spent the rest of the morning compiling itself in a loop.",
 ]} />
 
-This Saturday I had three Claude sessions running in parallel on a small Next.js side project with no users, just a place to fix things without breaking anyone's day. Each session was working on a different bug. By dinner I had merged three PRs.
+This Saturday I had three Claude sessions running in parallel on a small Next.js side project. Each session was working on a different bug. By dinner I had merged three PRs.
 
 That worked because of one thing: each Claude lived in its own git worktree. The first time I tried this without that discipline, my morning ended with Next.js compiling itself in a loop and me copying the error into a fresh Claude to figure out what had gone wrong. That was the lesson tax. This post is what I bought with it.
 
@@ -57,7 +57,7 @@ That was the lesson tax. Everything that follows happened because of it.
 
 ## The Saturday
 
-This Saturday I had three bugs open on the side project — deployed on Vercel, no users, low stakes. Each bug sat in a different layer of the stack: one in an OAuth reconnect, one in the database pool, one in a piece of UI navigation. Genuinely independent. None of them blocked anything; the app has no users, so "blocked" is theoretical. But they were each annoying enough that I wanted them gone.
+This Saturday I had three bugs open on the side project. None of them was urgent. Each bug sat in a different layer of the stack: one in an OAuth reconnect, one in the database pool, one in a piece of UI navigation. Genuinely independent. But they were each annoying enough that I wanted them gone.
 
 I opened three worktrees and started three Claude sessions, one per bug. The sessions ran in parallel for most of the afternoon.
 
