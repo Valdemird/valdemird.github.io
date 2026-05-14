@@ -78,9 +78,12 @@ const labels = {
 <script>
 	type Provider = 'chatgpt' | 'claude';
 
+	// Short intro pre-filled in the chat input. The actual post markdown is
+	// staged on the clipboard; the user pastes it after the intro. Keeping the
+	// URL short avoids HTTP 431 errors when ChatGPT's edge rejects long URIs.
 	const AI_INTRO: Record<'en' | 'es', string> = {
-		en: 'Here is a blog post I would like to discuss with you:',
-		es: 'Aquí tienes un post que me gustaría discutir contigo:',
+		en: "I'd like to discuss this blog post — pasting it next:\n\n",
+		es: 'Quiero discutir este post — lo pego a continuación:\n\n',
 	};
 
 	const AI_BASE: Record<Provider, string> = {
@@ -131,16 +134,17 @@ const labels = {
 				const markdown = await fetchMarkdown(mdUrl);
 				if (markdown === null) return;
 
-				// Always stage the full markdown on the clipboard as a fallback —
-				// some chat URLs truncate very long query strings.
+				// Stage the full markdown on the clipboard so the user can paste it
+				// into the chat. ChatGPT's edge returns HTTP 431 for long URIs, so
+				// we keep the URL itself short and only pre-fill a brief intro.
 				try {
 					await navigator.clipboard.writeText(markdown);
+					flashCopied();
 				} catch {
 					/* clipboard unavailable */
 				}
 
-				const prompt = `${AI_INTRO[lang]}\n\n${markdown}`;
-				const url = AI_BASE[provider] + encodeURIComponent(prompt);
+				const url = AI_BASE[provider] + encodeURIComponent(AI_INTRO[lang]);
 				window.open(url, '_blank', 'noopener');
 			}
 
