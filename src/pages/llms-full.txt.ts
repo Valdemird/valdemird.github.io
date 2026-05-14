@@ -28,6 +28,7 @@ export const GET: APIRoute = async () => {
 		lines.push(`# ${label}`, '');
 		for (const post of posts) {
 			const date = post.data.pubDate.toISOString().split('T')[0];
+			const reviewed = post.data.reviewedDate?.toISOString().split('T')[0];
 			const tagList = post.data.tags?.join(', ') || '';
 			const plainText = post.body ? cleanMdxBody(post.body) : '(Content not available in plain text)';
 
@@ -37,6 +38,8 @@ export const GET: APIRoute = async () => {
 				`- URL: https://valdemird.com/blog/${post.id}/`,
 				`- Markdown: https://valdemird.com/blog/${post.id}.md`,
 				`- Date: ${date}`,
+				...(reviewed ? [`- Reviewed: ${reviewed}`] : []),
+				...(post.data.status ? [`- Status: ${post.data.status}`] : []),
 				`- Description: ${post.data.description}`,
 				...(tagList ? [`- Tags: ${tagList}`] : []),
 				'',

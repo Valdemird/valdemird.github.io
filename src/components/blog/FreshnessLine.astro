@@ -1,0 +1,112 @@
+---
+/**
+ * FreshnessLine — editorial header line for blog posts.
+ *
+ * Renders a mono eyebrow row:
+ *
+ *   PUBLISHED · APR 26, 2026   REVIEWED · MAY 12, 2026   STATUS · UP TO DATE
+ *
+ * Each segment hides when its source field is empty. Authors set the
+ * status freely (it's a string — "Up to date for Claude 5", "Revised
+ * for Sonnet 4.6", "Outdated — see successor"). When the status looks
+ * like a warning (case-insensitive match on "outdated", "deprecated",
+ * "archived"), that segment renders in the warning color.
+ */
+
+import FormattedDate from '../FormattedDate.astro';
+
+interface Props {
+	pubDate: Date;
+	reviewedDate?: Date;
+	status?: string;
+	lang?: 'en' | 'es';
+}
+
+const { pubDate, reviewedDate, status, lang = 'en' } = Astro.props;
+
+const labels = {
+	en: { published: 'Published', reviewed: 'Reviewed', status: 'Status' },
+	es: { published: 'Publicado', reviewed: 'Revisado', status: 'Estado' },
+}[lang];
+
+const isWarning = !!status && /outdated|deprecated|archived/i.test(status);
+---
+
+<p class="freshness">
+	<span class="seg">
+		<span class="key">{labels.published}</span>
+		<span class="sep">·</span>
+		<FormattedDate date={pubDate} locale={lang} />
+	</span>
+	{reviewedDate && (
+		<span class="seg">
+			<span class="key">{labels.reviewed}</span>
+			<span class="sep">·</span>
+			<FormattedDate date={reviewedDate} locale={lang} />
+		</span>
+	)}
+	{status && (
+		<span class={`seg seg-status${isWarning ? ' is-warning' : ''}`}>
+			<span class="key">{labels.status}</span>
+			<span class="sep">·</span>
+			<span class="status-value">{status}</span>
+		</span>
+	)}
+</p>
+
+<style>
+	.freshness {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		align-items: center;
+		gap: 0.4rem 1.4rem;
+		margin: 0 0 0.6em;
+		padding: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 500;
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--color-text-muted);
+		line-height: 1.4;
+	}
+
+	.seg {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 0.45em;
+	}
+
+	.key {
+		color: var(--color-text-muted);
+		opacity: 0.7;
+	}
+
+	.sep {
+		color: var(--color-border-strong);
+	}
+
+	.freshness :global(time) {
+		color: var(--color-text-secondary);
+	}
+
+	.status-value {
+		color: var(--color-text-secondary);
+		letter-spacing: 0.1em;
+	}
+
+	.seg-status.is-warning .status-value,
+	.seg-status.is-warning .key {
+		color: var(--color-warning);
+		opacity: 1;
+	}
+
+	@media (max-width: 540px) {
+		.freshness {
+			gap: 0.3rem 0.9rem;
+			font-size: 0.62rem;
+			letter-spacing: 0.1em;
+		}
+	}
+</style>

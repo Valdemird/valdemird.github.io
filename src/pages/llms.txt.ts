@@ -11,12 +11,15 @@ export const GET: APIRoute = async () => {
 
 	const postBlock = (post: typeof all[number]) => {
 		const date = post.data.pubDate.toISOString().split('T')[0];
+		const reviewed = post.data.reviewedDate?.toISOString().split('T')[0];
 		const tagList = post.data.tags?.join(', ') || '';
 		return [
 			`### ${post.data.title}`,
 			`- URL: https://valdemird.com/blog/${post.id}/`,
 			`- Markdown: https://valdemird.com/blog/${post.id}.md`,
 			`- Date: ${date}`,
+			...(reviewed ? [`- Reviewed: ${reviewed}`] : []),
+			...(post.data.status ? [`- Status: ${post.data.status}`] : []),
 			`- Description: ${post.data.description}`,
 			...(tagList ? [`- Tags: ${tagList}`] : []),
 			'',
