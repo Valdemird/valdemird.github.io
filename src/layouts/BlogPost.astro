@@ -136,7 +136,11 @@ if (lang === 'en') {
 				)}
 				<div class="prose">
 					<div class="article-utility">
-						<CopyPageButton markdownUrl={`/blog/${slug}.md`} lang={lang} />
+						<CopyPageButton
+							markdownUrl={`/blog/${slug}.md`}
+							canonicalMarkdownUrl={`https://valdemird.com/blog/${slug}.md`}
+							lang={lang}
+						/>
 					</div>
 					<header class="article-header">
 						<div class="meta">
