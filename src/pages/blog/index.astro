@@ -43,7 +43,6 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 				<!-- Featured post -->
 				{featuredPost && (
 					<a href={`/blog/${featuredPost.id}/`} class="featured-post animate-fade-in delay-1">
-						<div class="featured-accent" aria-hidden="true"></div>
 						<div class="featured-inner">
 							<div class="featured-meta">
 								<span class="featured-badge">Featured</span>
@@ -201,22 +200,6 @@ const otherPosts = posts.filter((p) => p !== featuredPost);
 		box-shadow: var(--shadow-lg);
 		transform: translateY(-3px);
 		border-color: var(--color-accent);
-	}
-
-	.featured-accent {
-		position: absolute;
-		top: 0;
-		left: 0;
-		width: 4px;
-		height: 100%;
-		background: linear-gradient(180deg, var(--color-accent), var(--color-success));
-		border-radius: 4px 0 0 4px;
-		opacity: 0;
-		transition: opacity var(--duration-normal) var(--ease-smooth);
-	}
-
-	.featured-post:hover .featured-accent {
-		opacity: 1;
 	}
 
 	.featured-inner {

@@ -1,19 +1,20 @@
 ---
 /**
- * PullQuote — editorial pull quote with accent bar and on-scroll entrance.
+ * PullQuote — editorial pull quote with on-scroll entrance.
  *
  * <PullQuote cite="Anna Karlin, UW">
  *   A good benchmark is one that everyone wants to game. That means it
  *   actually measures something worth gaming.
  * </PullQuote>
  *
- * Ships with a serif large-display body (Fraunces) and a small mono cite
- * (Geist Mono). The accent bar on the left uses the site's primary accent.
+ * Editorial pattern: italic Fraunces at display size, framed by short
+ * hairline rules above and below, em-dash attribution in mono. No
+ * colored side bar — typography carries the emphasis.
  */
 interface Props {
   /** Attribution — person, source, or title. */
   cite?: string;
-  /** Accent alignment — left bar (default) or centered (large-block). */
+  /** Layout — left-aligned (default, wider) or centered (compact). */
   variant?: "bar" | "block";
 }
 const { cite, variant = "bar" } = Astro.props;
@@ -65,36 +66,47 @@ const { cite, variant = "bar" } = Astro.props;
 
 <style>
   .pullquote {
-    margin: 3rem 0;
-    padding: 0.5rem 0;
+    margin: 3.5rem 0;
+    padding: 0;
     position: relative;
-  }
-
-  .pullquote[data-variant="bar"] {
-    padding-left: 1.75rem;
-    border-left: 3px solid var(--color-accent);
+    max-width: 38rem;
   }
 
   .pullquote[data-variant="block"] {
     text-align: center;
-    max-width: 48ch;
+    max-width: 36rem;
     margin-left: auto;
     margin-right: auto;
-    padding: 2rem 0;
+  }
+
+  .pullquote::before,
+  .pullquote::after {
+    content: "";
+    display: block;
+    width: 2.75rem;
+    height: 1px;
+    background: var(--color-accent);
+    opacity: 0.55;
+  }
+
+  .pullquote::before { margin-bottom: 1.75rem; }
+  .pullquote::after { margin-top: 1.75rem; }
+
+  .pullquote[data-variant="block"]::before,
+  .pullquote[data-variant="block"]::after {
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .pullquote-body {
     margin: 0;
     font-family: var(--font-serif);
+    font-style: italic;
     font-weight: 400;
-    font-size: clamp(1.35rem, 2.5vw, 1.75rem);
-    line-height: 1.35;
+    font-size: clamp(1.35rem, 2.4vw, 1.75rem);
+    line-height: 1.42;
     color: var(--color-text);
     letter-spacing: -0.01em;
-  }
-
-  .pullquote[data-variant="block"] .pullquote-body {
-    font-style: italic;
   }
 
   .pullquote-body :global(p) {
@@ -106,11 +118,11 @@ const { cite, variant = "bar" } = Astro.props;
   }
 
   .pullquote-cite {
-    margin-top: 1rem;
+    margin-top: 1.25rem;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: var(--color-text-secondary);
+    letter-spacing: 0.1em;
+    color: var(--color-text-muted);
   }
 </style>
