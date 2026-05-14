@@ -19,15 +19,18 @@ interface Props {
 	type?: 'website' | 'article';
 	alternates?: Alternate[];
 	jsonLd?: Record<string, unknown>;
+	extraJsonLd?: Record<string, unknown>[];
 	publishedTime?: Date;
 	modifiedTime?: Date;
 	tags?: string[];
+	/** Public URL of a markdown alternate for this page — surfaces the .md to AI agents */
+	markdownAlternate?: string;
 }
 
 const AUTHOR_NAME = 'Valdemir D.';
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const { title, description, image: imageProp, imageAlt, lang, type = 'website', alternates = [], jsonLd, publishedTime, modifiedTime, tags } = Astro.props;
+const { title, description, image: imageProp, imageAlt, lang, type = 'website', alternates = [], jsonLd, extraJsonLd = [], publishedTime, modifiedTime, tags, markdownAlternate } = Astro.props;
 const image = imageProp || '/og/default.png';
 const ogImageAlt = imageAlt || title;
 
@@ -47,6 +50,14 @@ const defaultJsonLd = {
 		],
 	},
 	inLanguage: ['en', 'es'],
+	potentialAction: {
+		'@type': 'SearchAction',
+		target: {
+			'@type': 'EntryPoint',
+			urlTemplate: 'https://valdemird.com/blog/?q={search_term_string}',
+		},
+		'query-input': 'required name=search_term_string',
+	},
 };
 
 const structuredData = jsonLd || defaultJsonLd;
@@ -59,6 +70,13 @@ const structuredData = jsonLd || defaultJsonLd;
 <link rel="apple-touch-icon" href="/favicon.svg" />
 <link rel="manifest" href="/site.webmanifest" />
 <meta name="generator" content={Astro.generator} />
+<meta name="color-scheme" content="light dark" />
+<meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#1a1a2e" media="(prefers-color-scheme: dark)" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="format-detection" content="telephone=no" />
 
 <!-- Security -->
 <meta http-equiv="X-Content-Type-Options" content="nosniff" />
@@ -110,6 +128,9 @@ const structuredData = jsonLd || defaultJsonLd;
 	<link rel="alternate" hreflang="x-default" href={alternates.find(a => a.hreflang === 'en')?.href || canonicalURL.toString()} />
 )}
 
+<!-- Markdown alternate — pista descubrible para agentes AI -->
+{markdownAlternate && <link rel="alternate" type="text/markdown" href={markdownAlternate} />}
+
 <!-- Primary Meta Tags -->
 <title>{title}</title>
 <meta name="title" content={title} />
@@ -151,3 +172,6 @@ const structuredData = jsonLd || defaultJsonLd;
 
 <!-- Structured Data (JSON-LD) -->
 <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+{extraJsonLd.map((doc) => (
+	<script type="application/ld+json" set:html={JSON.stringify(doc)} />
+))}

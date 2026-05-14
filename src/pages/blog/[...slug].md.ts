@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
+import { cleanMdxBody } from '../../lib/mdx-plaintext';
 
 export async function getStaticPaths() {
 	const posts = await getCollection('blog');
@@ -7,21 +8,6 @@ export async function getStaticPaths() {
 		params: { slug: post.id },
 		props: { post },
 	}));
-}
-
-function cleanMdxBody(raw: string): string {
-	return raw
-		.replace(/^import\s+.*from\s+['"].*['"];?\s*$/gm, '')
-		.replace(/<\w+[\s\S]*?\/>/g, '')
-		.replace(/<\/?\w+[^>]*>/g, '')
-		.replace(/&amp;/g, '&')
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/&quot;/g, '"')
-		.replace(/&#39;/g, "'")
-		.replace(/&nbsp;/g, ' ')
-		.replace(/\n{3,}/g, '\n\n')
-		.trim();
 }
 
 export const GET: APIRoute = ({ props }) => {
