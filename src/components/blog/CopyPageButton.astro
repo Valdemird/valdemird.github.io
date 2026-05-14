@@ -1,0 +1,326 @@
+---
+interface Props {
+	/** Public path to the post's raw markdown file, e.g. /blog/foo.md */
+	markdownUrl: string;
+	lang?: 'en' | 'es';
+}
+
+const { markdownUrl, lang = 'en' } = Astro.props;
+
+const labels = {
+	en: {
+		copy: 'Copy page',
+		copied: 'Copied',
+		menu: 'Open menu',
+		md: 'Copy as Markdown',
+		txt: 'Copy as Plain Text',
+		view: 'View as Markdown',
+		hint: 'Best for pasting into Claude, ChatGPT, or notes.',
+	},
+	es: {
+		copy: 'Copiar página',
+		copied: 'Copiado',
+		menu: 'Abrir menú',
+		md: 'Copiar como Markdown',
+		txt: 'Copiar como texto',
+		view: 'Ver como Markdown',
+		hint: 'Ideal para pegar en Claude, ChatGPT o tus notas.',
+	},
+}[lang];
+---
+
+<div class="copy-page" data-md-url={markdownUrl}>
+	<button class="cp-main" type="button" aria-label={labels.copy}>
+		<svg class="cp-icon-copy" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+			<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+		</svg>
+		<svg class="cp-icon-check" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<polyline points="20 6 9 17 4 12"></polyline>
+		</svg>
+		<span class="cp-label-copy">{labels.copy}</span>
+		<span class="cp-label-copied">{labels.copied}</span>
+	</button>
+	<button class="cp-chevron" type="button" aria-label={labels.menu} aria-haspopup="menu" aria-expanded="false">
+		<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<polyline points="6 9 12 15 18 9"></polyline>
+		</svg>
+	</button>
+	<div class="cp-menu" role="menu" hidden>
+		<button class="cp-menu-item" data-action="md" role="menuitem" type="button">
+			<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
+				<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
+			</svg>
+			<span>{labels.md}</span>
+		</button>
+		<button class="cp-menu-item" data-action="txt" role="menuitem" type="button">
+			<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+				<polyline points="14 2 14 8 20 8"></polyline>
+				<line x1="9" y1="13" x2="15" y2="13"></line>
+				<line x1="9" y1="17" x2="15" y2="17"></line>
+			</svg>
+			<span>{labels.txt}</span>
+		</button>
+		<a class="cp-menu-item" data-action="view" role="menuitem" href={markdownUrl} target="_blank" rel="noopener">
+			<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+				<polyline points="15 3 21 3 21 9"></polyline>
+				<line x1="10" y1="14" x2="21" y2="3"></line>
+			</svg>
+			<span>{labels.view}</span>
+		</a>
+		<p class="cp-hint">{labels.hint}</p>
+	</div>
+</div>
+
+<script>
+	function initCopyPage() {
+		document.querySelectorAll<HTMLElement>('.copy-page').forEach((root) => {
+			if (root.dataset.cpReady === '1') return;
+			root.dataset.cpReady = '1';
+
+			const main = root.querySelector<HTMLButtonElement>('.cp-main')!;
+			const chevron = root.querySelector<HTMLButtonElement>('.cp-chevron')!;
+			const menu = root.querySelector<HTMLElement>('.cp-menu')!;
+			const mdUrl = root.dataset.mdUrl!;
+
+			let flashTimer: number | undefined;
+			const flashCopied = () => {
+				root.classList.add('copied');
+				window.clearTimeout(flashTimer);
+				flashTimer = window.setTimeout(() => root.classList.remove('copied'), 1800);
+			};
+
+			async function getMarkdown() {
+				const res = await fetch(mdUrl);
+				return res.ok ? await res.text() : '';
+			}
+
+			function getPlainText() {
+				const header = document.querySelector('.article-header');
+				const body = document.querySelector('.article-body');
+				const title = header?.querySelector('h1')?.textContent?.trim() ?? '';
+				const lead = header?.querySelector('.lead')?.textContent?.trim() ?? '';
+				const bodyText = (body as HTMLElement | null)?.innerText ?? '';
+				return [title, lead, bodyText].filter(Boolean).join('\n\n');
+			}
+
+			async function copy(text: string) {
+				try {
+					await navigator.clipboard.writeText(text);
+					flashCopied();
+				} catch {
+					/* clipboard unavailable */
+				}
+			}
+
+			const closeMenu = () => {
+				menu.hidden = true;
+				chevron.setAttribute('aria-expanded', 'false');
+			};
+			const openMenu = () => {
+				menu.hidden = false;
+				chevron.setAttribute('aria-expanded', 'true');
+			};
+
+			main.addEventListener('click', async () => {
+				const md = await getMarkdown();
+				if (md) await copy(md);
+			});
+
+			chevron.addEventListener('click', (e) => {
+				e.stopPropagation();
+				menu.hidden ? openMenu() : closeMenu();
+			});
+
+			menu.addEventListener('click', async (e) => {
+				const item = (e.target as HTMLElement).closest<HTMLElement>('.cp-menu-item');
+				if (!item) return;
+				const action = item.dataset.action;
+				if (action === 'md') {
+					const md = await getMarkdown();
+					if (md) await copy(md);
+					closeMenu();
+				} else if (action === 'txt') {
+					await copy(getPlainText());
+					closeMenu();
+				}
+				// 'view' is an <a> — let the browser handle it, just close
+				if (action === 'view') closeMenu();
+			});
+
+			document.addEventListener('click', (e) => {
+				if (!root.contains(e.target as Node)) closeMenu();
+			});
+			document.addEventListener('keydown', (e) => {
+				if (e.key === 'Escape') closeMenu();
+			});
+		});
+	}
+
+	initCopyPage();
+	document.addEventListener('astro:after-swap', initCopyPage);
+</script>
+
+<style>
+	.copy-page {
+		position: relative;
+		display: inline-flex;
+		align-items: stretch;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-surface);
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		color: var(--color-text-secondary);
+		transition: border-color var(--duration-fast) var(--ease-smooth),
+			box-shadow var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-smooth);
+	}
+
+	.copy-page:hover {
+		border-color: var(--color-border-strong);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.cp-main,
+	.cp-chevron {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		padding: 0.42em 0.85em;
+		background: transparent;
+		border: none;
+		color: inherit;
+		cursor: pointer;
+		font: inherit;
+		transition: color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth);
+	}
+
+	.cp-main {
+		border-top-left-radius: 999px;
+		border-bottom-left-radius: 999px;
+	}
+
+	.cp-chevron {
+		padding: 0.42em 0.65em;
+		border-left: 1px solid var(--color-border);
+		border-top-right-radius: 999px;
+		border-bottom-right-radius: 999px;
+	}
+
+	.cp-main:hover,
+	.cp-chevron:hover {
+		color: var(--color-text);
+		background: var(--color-accent-subtle);
+	}
+
+	.cp-icon-check,
+	.cp-label-copied {
+		display: none;
+	}
+
+	.copy-page.copied .cp-icon-copy,
+	.copy-page.copied .cp-label-copy {
+		display: none;
+	}
+
+	.copy-page.copied .cp-icon-check,
+	.copy-page.copied .cp-label-copied {
+		display: inline-flex;
+	}
+
+	.copy-page.copied .cp-icon-check {
+		color: var(--color-success);
+	}
+
+	.copy-page.copied .cp-main {
+		color: var(--color-text);
+	}
+
+	/* Dropdown */
+	.cp-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		min-width: 220px;
+		padding: 0.35rem;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-lg);
+		z-index: 50;
+		display: flex;
+		flex-direction: column;
+		gap: 0.1rem;
+	}
+
+	.cp-menu[hidden] {
+		display: none;
+	}
+
+	.cp-menu-item {
+		display: flex;
+		align-items: center;
+		gap: 0.55em;
+		width: 100%;
+		padding: 0.5em 0.7em;
+		background: transparent;
+		border: none;
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		font: inherit;
+		font-size: 0.85rem;
+		text-align: left;
+		text-decoration: none;
+		cursor: pointer;
+		transition: background var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.cp-menu-item:hover,
+	.cp-menu-item:focus-visible {
+		background: var(--color-accent-subtle);
+		color: var(--color-text);
+		outline: none;
+	}
+
+	.cp-menu-item svg {
+		flex-shrink: 0;
+		color: var(--color-text-muted);
+	}
+
+	.cp-menu-item:hover svg {
+		color: var(--color-accent);
+	}
+
+	.cp-hint {
+		margin: 0.25rem 0.5rem 0.1rem;
+		padding-top: 0.5rem;
+		border-top: 1px solid var(--color-border);
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		color: var(--color-text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		line-height: 1.4;
+	}
+
+	@media (max-width: 540px) {
+		.cp-main {
+			padding: 0.4em 0.7em;
+		}
+
+		.cp-label-copy,
+		.cp-label-copied {
+			display: none;
+		}
+
+		.copy-page.copied .cp-label-copied {
+			display: none;
+		}
+	}
+</style>
