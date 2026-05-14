@@ -15,11 +15,11 @@ import PullQuote from '../../../components/blog/PullQuote.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
 
 <TLDR bullets={[
-  "Este sábado corrí tres agentes de Claude en paralelo sobre un side project que todavía no usa nadie. Tres bugs, tres ramas, tres PRs mergeados en una tarde.",
+  "Este sábado corrí tres agentes de Claude en paralelo sobre un side project. Tres bugs, tres ramas, tres PRs mergeados en una tarde.",
   "Eso funcionó porque cada agente vivía en su propio worktree de git. La primera vez que lo intenté sin esa disciplina, Claude creó un worktree adentro del repo y Next.js se pasó el resto de la mañana compilando en loop.",
 ]} />
 
-Este sábado tuve tres sesiones de Claude corriendo en paralelo sobre un side project de Next.js que todavía no usa nadie, un lugar donde arreglar cosas sin romperle el día a nadie. Cada sesión estaba trabajando en un bug distinto. Cuando llegó la noche ya tenía tres PRs mergeados.
+Este sábado tuve tres sesiones de Claude corriendo en paralelo sobre un side project de Next.js. Cada sesión estaba trabajando en un bug distinto. Cuando llegó la noche ya tenía tres PRs mergeados.
 
 Eso funcionó por una sola razón: cada Claude vivía en su propio worktree de git. La primera vez que intenté esto sin esa disciplina, mi mañana terminó con Next.js compilando en loop y yo copiando el error a un Claude nuevo para entender qué había pasado. Ese fue el costo de la lección. Este post es lo que compré con él.
 
@@ -57,7 +57,7 @@ Ese fue el costo de la lección. Todo lo que sigue pasó por eso.
 
 ## El sábado
 
-Este sábado tenía tres bugs abiertos en el side project: deployed en Vercel, sin usuarios, sin stakes reales. Cada bug vivía en una capa distinta del stack: uno en un reconnect de OAuth, otro en el pool de base de datos, otro en un pedazo de navegación de UI. Genuinamente independientes. Ninguno bloqueaba nada; la app no tiene usuarios, así que "bloqueado" es teórico. Pero cada uno me molestaba lo suficiente como para querer sacármelos de encima.
+Este sábado tenía tres bugs abiertos en el side project. Ninguno era urgente. Cada bug vivía en una capa distinta del stack: uno en un reconnect de OAuth, otro en el pool de base de datos, otro en un pedazo de navegación de UI. Genuinamente independientes. Pero cada uno me molestaba lo suficiente como para querer sacármelos de encima.
 
 Abrí tres worktrees y arranqué tres sesiones de Claude, una por bug. Las sesiones corrieron en paralelo durante casi toda la tarde.
 
