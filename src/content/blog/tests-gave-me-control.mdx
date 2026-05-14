@@ -15,6 +15,7 @@ import Tabs from '../../components/blog/Tabs.astro';
 import TabPanel from '../../components/blog/TabPanel.astro';
 import FileTree from '../../components/blog/FileTree.astro';
 import TLDR from '../../components/blog/TLDR.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
 
 <TLDR bullets={[
   "I worked a month with Claude Code on a side project. /insights showed me two things: AI patches symptoms before understanding causes, and tests are the only thing that lets me trust its changes.",
@@ -23,7 +24,7 @@ import TLDR from '../../components/blog/TLDR.astro';
 
 I built a side project this past month. A small calendar/PWA, a personal sandbox to learn Next.js patterns I don't get to use at work. Outside hours, no consulting overlap, just a place to break things on purpose.
 
-At the end of the month I ran `/insights` in Claude Code to see how I'd been working. I opened it expecting a pat on the back. I got something more uncomfortable: the things AI was doing badly weren't the ones I thought.
+At the end of the month I ran `/insights` in Claude Code to see how I'd been working.<Sidenote>`/insights` is a custom slash command I wrote — it inspects the session transcript and surfaces patterns in how I prompted, where I iterated, and where I stalled.</Sidenote> I opened it expecting a pat on the back. I got something more uncomfortable: the things AI was doing badly weren't the ones I thought.
 
 This post is what `/insights` showed me and the one shift I made because of it.
 
@@ -41,7 +42,7 @@ The flattering parts were the ones I already knew:
 
 That was the boring half. The part I didn't expect to see hit harder.
 
-A landing page scroll behavior took roughly ten rounds of feedback before it converged. A kanban overflow got patched twice with the wrong CSS property before I stopped and asked what the parent container was actually doing. A desktop layout got "fixed" twice without changing anything visible, until I typed something close to "you didn't fix the problem, analyze deeply." `/insights` flagged this exact phrase as a recurring pattern.
+A landing page scroll behavior took roughly ten rounds of feedback before it converged.<Sidenote>For context: ten rounds of "no, the other thing" is the kind of session where a junior engineer would have been told to step away. With AI, I kept pushing because the cost felt low. The cost of *time*, less so.</Sidenote> A kanban overflow got patched twice with the wrong CSS property before I stopped and asked what the parent container was actually doing. A desktop layout got "fixed" twice without changing anything visible, until I typed something close to "you didn't fix the problem, analyze deeply." `/insights` flagged this exact phrase as a recurring pattern.
 
 There was a session where `git stash` ate eight out of ten files I'd been working on. I won't pretend that was elegant. That was before I tightened up tests and commit-often discipline. Recovery was from memory.
 

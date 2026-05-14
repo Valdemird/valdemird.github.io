@@ -15,6 +15,7 @@ import Tabs from '../../../components/blog/Tabs.astro';
 import TabPanel from '../../../components/blog/TabPanel.astro';
 import FileTree from '../../../components/blog/FileTree.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
 
 <TLDR bullets={[
   "Trabajé un mes con Claude Code en un side project. /insights me mostró dos cosas: la IA parcha síntomas antes de entender causas, y los tests son lo único que me deja confiar en sus cambios.",
@@ -23,7 +24,7 @@ import TLDR from '../../../components/blog/TLDR.astro';
 
 Construí un side project este último mes. Un calendario/PWA pequeño, un sandbox personal para aprender patrones de Next.js que no uso en mi trabajo en la consultora. Fuera de horas laborales, sin mezcla con clientes, solo un lugar donde romper cosas a propósito.
 
-Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando. Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
+Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando.<Sidenote>`/insights` es un slash command custom que escribí — inspecciona el transcript de la sesión y saca patrones sobre cómo prompteé, dónde iteré y dónde me quedé pegado.</Sidenote> Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
 
 Este post es lo que `/insights` me mostró y el cambio que hice por culpa de eso.
 
@@ -41,7 +42,7 @@ La parte cómoda era la que ya conocía:
 
 Esa era la mitad aburrida. La que no esperaba ver pegó más fuerte.
 
-Un comportamiento de scroll en una landing page tomó cerca de diez rondas de feedback antes de converger. Un overflow de kanban se "arregló" dos veces con la propiedad de CSS equivocada antes de que parara y preguntara qué estaba haciendo el contenedor padre. Un layout de escritorio se "corrigió" dos veces sin que cambiara nada visible, hasta que escribí algo parecido a "no resolviste el problema, analiza profundamente." `/insights` marcó esa frase exacta como un patrón recurrente.
+Un comportamiento de scroll en una landing page tomó cerca de diez rondas de feedback antes de converger.<Sidenote>Para contexto: diez rondas de "no, lo otro" es el tipo de sesión donde a un ingeniero junior le habrían dicho que se levante un rato. Con la IA seguí empujando porque el costo se sentía bajo. El costo de *tiempo*, no tanto.</Sidenote> Un overflow de kanban se "arregló" dos veces con la propiedad de CSS equivocada antes de que parara y preguntara qué estaba haciendo el contenedor padre. Un layout de escritorio se "corrigió" dos veces sin que cambiara nada visible, hasta que escribí algo parecido a "no resolviste el problema, analiza profundamente." `/insights` marcó esa frase exacta como un patrón recurrente.
 
 Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los que estaba trabajando. No voy a fingir que fue elegante. Eso fue antes de que apretara la disciplina de tests y commits frecuentes. La recuperación fue desde memoria.
 
