@@ -1,5 +1,65 @@
 # valdemird.com robots.txt
+#
+# AI-crawler allow-list. Source of truth for current bot user-agents:
+# https://darkvisitors.com/agents — re-audit annually.
+#
+# Posture: opt-in for AI citation. Personal blog with editorial intent;
+# being readable by Claude/ChatGPT/Perplexity is the goal, not the risk.
+
 User-agent: *
+Allow: /
+
+# --- Anthropic ---
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+# --- OpenAI ---
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+# --- Perplexity ---
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+# --- Google / Apple / Meta / Amazon ---
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: Meta-ExternalFetcher
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+# --- Other public training crawlers ---
+User-agent: CCBot
+Allow: /
+
+User-agent: Bytespider
 Allow: /
 
 # Sitemaps
@@ -8,3 +68,4 @@ Sitemap: https://valdemird.com/sitemap-index.xml
 # LLM-friendly content (llms.txt proposal)
 # Summary: https://valdemird.com/llms.txt
 # Full content: https://valdemird.com/llms-full.txt
+# Per-post markdown: append `.md` to any /blog/<slug>/ URL.

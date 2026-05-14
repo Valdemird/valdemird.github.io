@@ -7,6 +7,7 @@ import Footer from '../components/Footer.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import ReadingProgress from '../components/blog/ReadingProgress.astro';
 import CopyPageButton from '../components/blog/CopyPageButton.astro';
+import { cleanMdxBody, countWords } from '../lib/mdx-plaintext';
 
 type Props = CollectionEntry<'blog'>['data'];
 
@@ -17,8 +18,20 @@ const allPosts = await getCollection('blog');
 const currentPath = Astro.url.pathname;
 const slug = currentPath.replace(/^\/blog\//, '').replace(/\/$/, '');
 
+// Lookup current post entry to count words for JSON-LD
+const currentPost = allPosts.find((p) => p.id === slug);
+const wordCount = currentPost?.body ? countWords(cleanMdxBody(currentPost.body)) : undefined;
+
 // OG image: use heroImage if provided, otherwise use generated OG image
 const ogImage = heroImage || `/og/${slug}.png`;
+
+// Markdown alternate for AI discovery
+const markdownAlternate = `https://valdemird.com/blog/${slug}.md`;
+
+// Capitalize first tag as articleSection (Entity SEO)
+const articleSection = tags?.[0]
+	? tags[0].split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
+	: undefined;
 
 // Build JSON-LD BlogPosting structured data
 const blogPostingJsonLd: Record<string, unknown> = {
@@ -32,6 +45,12 @@ const blogPostingJsonLd: Record<string, unknown> = {
 		'@type': 'Person',
 		name: 'Valdemir D.',
 		url: 'https://valdemird.com',
+		jobTitle: 'Software Engineer & Consultant',
+		...(tags && tags.length > 0 && { knowsAbout: tags }),
+		sameAs: [
+			'https://github.com/valdemird',
+			'https://www.linkedin.com/in/sebastiancaja',
+		],
 	},
 	publisher: {
 		'@type': 'Person',
@@ -45,6 +64,21 @@ const blogPostingJsonLd: Record<string, unknown> = {
 	inLanguage: lang,
 	...(heroImage && { image: `https://valdemird.com${heroImage}` }),
 	...(tags && tags.length > 0 && { keywords: tags.join(', ') }),
+	...(articleSection && { articleSection }),
+	...(wordCount && wordCount > 0 && { wordCount }),
+};
+
+// BreadcrumbList: Home > Blog > Post
+const blogIndexPath = lang === 'es' ? '/es/blog/' : '/blog/';
+const homePath = lang === 'es' ? '/es/' : '/';
+const breadcrumbJsonLd: Record<string, unknown> = {
+	'@context': 'https://schema.org',
+	'@type': 'BreadcrumbList',
+	itemListElement: [
+		{ '@type': 'ListItem', position: 1, name: lang === 'es' ? 'Inicio' : 'Home', item: `https://valdemird.com${homePath}` },
+		{ '@type': 'ListItem', position: 2, name: 'Blog', item: `https://valdemird.com${blogIndexPath}` },
+		{ '@type': 'ListItem', position: 3, name: title, item: `https://valdemird.com${currentPath}` },
+	],
 };
 
 const alternates: { hreflang: string; href: string }[] = [];
@@ -72,7 +106,7 @@ if (lang === 'en') {
 
 <html lang={lang}>
 	<head>
-		<BaseHead title={title} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} publishedTime={pubDate} modifiedTime={updatedDate} tags={tags} />
+		<BaseHead title={title} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} extraJsonLd={[breadcrumbJsonLd]} publishedTime={pubDate} modifiedTime={updatedDate} tags={tags} markdownAlternate={markdownAlternate} />
 	</head>
 
 	<body>
