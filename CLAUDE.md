@@ -41,6 +41,7 @@ There are no tests or linting configured.
 - **Styling**: OKLch color system in `src/styles/global.css` with CSS custom properties, dark mode via `data-theme` attribute
 - **Fonts**: Fraunces (serif display), Geist (sans body), Geist Mono (code/meta) — loaded from Google Fonts
 - **Deployment**: Push to `main` triggers `.github/workflows/deploy.yml` (Node 22, `withastro/action@v2`)
+- **Comments**: Giscus embed via `Comments.astro`, mapped per-pathname. Threads live in the separate public repo `Valdemird/valdemird-comments` (this blog repo stays private). Moderation is GitHub-native: open the Discussions tab on `valdemird-comments` → hide / lock / ban offending replies. Categories are "Announcements" type, so only the maintainer can open threads — visitors only reply. To switch comment repos or category later, edit `REPO`, `REPO_ID`, `CATEGORY`, `CATEGORY_ID` constants at the top of `Comments.astro`.
 
 ## Design System
 

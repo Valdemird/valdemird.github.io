@@ -7,6 +7,7 @@ import Footer from '../components/Footer.astro';
 import ReadingProgress from '../components/blog/ReadingProgress.astro';
 import CopyPageButton from '../components/blog/CopyPageButton.astro';
 import FreshnessLine from '../components/blog/FreshnessLine.astro';
+import Comments from '../components/blog/Comments.astro';
 import { cleanMdxBody, countWords } from '../lib/mdx-plaintext';
 
 type Props = CollectionEntry<'blog'>['data'];
@@ -195,6 +196,7 @@ if (lang === 'en') {
 					<div class="article-body">
 						<slot />
 					</div>
+					<Comments lang={lang} pathname={currentPath} />
 				</div>
 			</article>
 		</main>
