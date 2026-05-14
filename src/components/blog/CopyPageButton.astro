@@ -78,12 +78,18 @@ const labels = {
 <script>
 	type Provider = 'chatgpt' | 'claude';
 
-	// Short intro pre-filled in the chat input. The actual post markdown is
-	// staged on the clipboard; the user pastes it after the intro. Keeping the
-	// URL short avoids HTTP 431 errors when ChatGPT's edge rejects long URIs.
-	const AI_INTRO: Record<'en' | 'es', string> = {
-		en: "I'd like to discuss this blog post — pasting it next:\n\n",
-		es: 'Quiero discutir este post — lo pego a continuación:\n\n',
+	// Intro used when the chat receives the full markdown inline (Claude).
+	const AI_INTRO_FULL: Record<'en' | 'es', string> = {
+		en: 'Here is a blog post I would like to discuss with you:',
+		es: 'Aquí tienes un post que me gustaría discutir contigo:',
+	};
+
+	// Intro used when we can only send a link. ChatGPT's edge returns HTTP 431
+	// for long URIs, so we fall back to passing the canonical post URL and let
+	// the model fetch it (the full markdown is also staged on the clipboard).
+	const AI_INTRO_LINK: Record<'en' | 'es', string> = {
+		en: 'Please read and discuss this blog post:',
+		es: 'Por favor lee y discutamos este post:',
 	};
 
 	const AI_BASE: Record<Provider, string> = {
@@ -134,9 +140,8 @@ const labels = {
 				const markdown = await fetchMarkdown(mdUrl);
 				if (markdown === null) return;
 
-				// Stage the full markdown on the clipboard so the user can paste it
-				// into the chat. ChatGPT's edge returns HTTP 431 for long URIs, so
-				// we keep the URL itself short and only pre-fill a brief intro.
+				// Always stage the markdown on the clipboard as a fallback —
+				// the user can paste it manually if the chat can't reach the URL.
 				try {
 					await navigator.clipboard.writeText(markdown);
 					flashCopied();
@@ -144,7 +149,21 @@ const labels = {
 					/* clipboard unavailable */
 				}
 
-				const url = AI_BASE[provider] + encodeURIComponent(AI_INTRO[lang]);
+				let prompt: string;
+				if (provider === 'claude') {
+					// Claude.ai's edge accepts long URIs — inline the full post.
+					prompt = `${AI_INTRO_FULL[lang]}\n\n${markdown}`;
+				} else {
+					// ChatGPT rejects long URIs with HTTP 431; pass the canonical
+					// post URL instead and let the model fetch it.
+					const canonicalUrl = new URL(
+						mdUrl.replace(/\.md$/, '/'),
+						window.location.origin,
+					).href;
+					prompt = `${AI_INTRO_LINK[lang]} ${canonicalUrl}`;
+				}
+
+				const url = AI_BASE[provider] + encodeURIComponent(prompt);
 				window.open(url, '_blank', 'noopener');
 			}
 
