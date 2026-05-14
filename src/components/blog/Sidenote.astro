@@ -8,12 +8,10 @@
  *   derail the flow as a full paragraph.</Sidenote> The argument continues.
  *
  * Visual model:
- * - The marker is an auto-numbered superscript next to the word.
- * - On wide viewports (≥ 1200px), the note floats into the right margin as a
- *   small, low-contrast aside, aligned to the line where the marker appears.
- * - On narrow viewports, the marker is a button: tap to expand the note
- *   inline below the surrounding paragraph. No box, no border, no tinted
- *   wash — just smaller, lighter text with breathing room.
+ * - The marker is an auto-numbered superscript button next to the word.
+ * - Click/tap reveals the note inline below the surrounding paragraph.
+ *   No box, no border, no tinted wash — just smaller, lighter text with
+ *   a mono number prefix and breathing room.
  *
  * Intent: quick context, references, mini-opinions, clarifications.
  * Do NOT use for paragraphs — if the note is long, leave it inline or
@@ -123,40 +121,6 @@
 		max-height: 40rem;
 		margin: 0.5rem 0 0.9rem;
 		padding: 0.25rem 0 0.25rem 1.5rem;
-	}
-
-	/* ---------------- Body — wide (≥ 1200px) ---------------- */
-	/* Float into the right margin. Always visible. Aligned to marker line. */
-
-	@media (min-width: 1200px) {
-		.sidenote-body {
-			max-height: none;
-			float: right;
-			clear: right;
-			width: 12rem;
-			margin: 0 -14rem 0.6rem 1rem;
-			padding: 0;
-			font-size: 0.78rem;
-			line-height: 1.55;
-			color: var(--color-text-muted);
-			overflow: visible;
-		}
-
-		.sidenote-body::before {
-			margin-right: 0.45em;
-			font-size: 0.92em;
-		}
-
-		/* On wide screens the marker is a visual anchor, not a toggle. */
-		.sidenote-marker {
-			cursor: default;
-		}
-
-		/* Suppress the narrow-mode aria-expanded transition. */
-		.sidenote:has(.sidenote-marker[aria-expanded='true']) .sidenote-body {
-			margin: 0 -14rem 0.6rem 1rem;
-			padding: 0;
-		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {

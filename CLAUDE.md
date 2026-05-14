@@ -36,7 +36,7 @@ There are no tests or linting configured.
 - **Dynamic routes** for blog posts via `src/pages/blog/[...slug].astro` using `getStaticPaths()` with `post.id` (not slug)
 - **Layouts**: `BlogPost.astro` layout with reading progress bar, editorial typography, and SEO metadata
 - **MDX Components**: `Callout` (tip/warning/note/important), `CodeBlock` (with filename + copy button), `Sidenote` (short editorial margin note — see usage rule below) — imported in `.mdx` files
-- **Sidenote usage**: use `<Sidenote>...</Sidenote>` mid-sentence for quick context, references, mini-opinions, clarifications. Renders as auto-numbered superscript; floats into the right margin on viewports ≥ 1200px, expands inline on click below 1200px. Keep notes to 1–2 sentences — if it needs a paragraph, leave it inline or promote it to a `Callout`. Do NOT add visual containers (boxes, borders, washes) to the sidenote — the minimal style is intentional.
+- **Sidenote usage**: use `<Sidenote>...</Sidenote>` mid-sentence for quick context, references, mini-opinions, clarifications. Renders as an auto-numbered superscript button; click reveals the note inline below the paragraph. Keep notes to 1–2 sentences — if it needs a paragraph, leave it inline or promote it to a `Callout`. Do NOT add visual containers (boxes, borders, washes) to the sidenote — the minimal style is intentional.
 - **Global constants** (site title, i18n strings, social links, projects) in `src/consts.ts`
 - **Styling**: OKLch color system in `src/styles/global.css` with CSS custom properties, dark mode via `data-theme` attribute
 - **Fonts**: Fraunces (serif display), Geist (sans body), Geist Mono (code/meta) — loaded from Google Fonts
