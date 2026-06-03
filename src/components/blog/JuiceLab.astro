@@ -1,0 +1,773 @@
+---
+/**
+ * JuiceLab — interactive game-feel demos for the blog, dependency-free.
+ *
+ * Each instance renders one self-contained demo, chosen by `demo`:
+ *   squash | hitstop | shake | particles | sound | combo
+ *
+ * The motion math and synth parameters are ported from the games.valdemird.com
+ * source (apps/web/src/lib/juice.tsx and lib/sfx.ts) so the demos here behave
+ * exactly like the shipped game. Everything honors `prefers-reduced-motion`
+ * for motion and a persisted mute flag for sound.
+ *
+ *   <JuiceLab demo="shake" caption="Three magnitudes, same impulse." />
+ */
+type Demo = 'squash' | 'hitstop' | 'shake' | 'particles' | 'sound' | 'combo';
+interface Props {
+	demo: Demo;
+	caption?: string;
+}
+const { demo, caption } = Astro.props;
+---
+
+<section class="jl" data-juicelab data-demo={demo}>
+	{demo === 'squash' && (
+		<>
+			<div class="jl-stage jl-stage--center">
+				<button class="jl-pad" type="button" data-jl-target aria-label="Press the pad">
+					<span class="jl-pad__face">press</span>
+				</button>
+			</div>
+			<div class="jl-controls">
+				<button class="jl-btn" type="button" data-jl-toggle aria-pressed="true">Juice: on</button>
+				<span class="jl-hint">Click the pad. Toggle to feel the dead version.</span>
+			</div>
+		</>
+	)}
+
+	{demo === 'hitstop' && (
+		<>
+			<div class="jl-stage jl-stage--center jl-stage--hitstop" data-jl-stage>
+				<div class="jl-strike-track">
+					<div class="jl-striker" data-jl-striker aria-hidden="true"></div>
+					<div class="jl-dummy" data-jl-dummy aria-hidden="true"></div>
+				</div>
+			</div>
+			<div class="jl-controls">
+				<button class="jl-btn jl-btn--primary" type="button" data-jl-strike>Strike</button>
+				<label class="jl-slider">
+					<span class="jl-slider__label">Hitstop</span>
+					<input type="range" min="0" max="140" step="10" value="90" data-jl-range aria-label="Hitstop duration in milliseconds" />
+					<output class="jl-slider__out" data-jl-out>90ms</output>
+				</label>
+			</div>
+		</>
+	)}
+
+	{demo === 'shake' && (
+		<>
+			<div class="jl-stage jl-stage--center" data-jl-stage>
+				<div class="jl-screen" data-jl-shakeable aria-hidden="true">
+					<span class="jl-screen__label">screen</span>
+				</div>
+			</div>
+			<div class="jl-controls">
+				<button class="jl-btn" type="button" data-jl-shake="sm">small</button>
+				<button class="jl-btn" type="button" data-jl-shake="md">medium</button>
+				<button class="jl-btn" type="button" data-jl-shake="lg">large</button>
+			</div>
+		</>
+	)}
+
+	{demo === 'particles' && (
+		<>
+			<div class="jl-stage jl-stage--burst" data-jl-stage data-jl-burst tabindex="0" role="button" aria-label="Click anywhere to burst particles">
+				<span class="jl-stage__hint">click anywhere</span>
+			</div>
+			<div class="jl-controls">
+				<label class="jl-slider">
+					<span class="jl-slider__label">Particles</span>
+					<input type="range" min="4" max="40" step="2" value="14" data-jl-range aria-label="Particle count" />
+					<output class="jl-slider__out" data-jl-out>14</output>
+				</label>
+			</div>
+		</>
+	)}
+
+	{demo === 'sound' && (
+		<>
+			<div class="jl-controls jl-controls--grid">
+				<button class="jl-btn" type="button" data-jl-sound="click">click</button>
+				<button class="jl-btn" type="button" data-jl-sound="pop">pop ×<span data-jl-streaklabel>0</span></button>
+				<button class="jl-btn" type="button" data-jl-sound="chime">chime</button>
+				<button class="jl-btn" type="button" data-jl-sound="thud">thud</button>
+				<button class="jl-btn" type="button" data-jl-sound="fanfare">fanfare</button>
+			</div>
+			<div class="jl-controls">
+				<button class="jl-btn jl-btn--ghost" type="button" data-jl-mute aria-pressed="false">Sound: on</button>
+				<span class="jl-hint">No audio files. Every sound is generated live with the Web Audio API.</span>
+			</div>
+		</>
+	)}
+
+	{demo === 'combo' && (
+		<>
+			<div class="jl-stage jl-stage--center" data-jl-stage>
+				<button class="jl-coin" type="button" data-jl-target aria-label="Tap to build a streak">
+					<span class="jl-coin__face">tap</span>
+				</button>
+				<span class="jl-streak" data-jl-streak hidden></span>
+			</div>
+			<div class="jl-controls">
+				<button class="jl-btn jl-btn--ghost" type="button" data-jl-mute aria-pressed="false">Sound: on</button>
+				<span class="jl-hint">Tap fast. Tiers unlock at 10 / 20 / 30 / 50. Stop and it decays.</span>
+			</div>
+		</>
+	)}
+
+	{caption && <p class="jl-caption">{caption}</p>}
+</section>
+
+<script>
+	// ----- shared audio (ported from games.valdemird.com lib/sfx.ts) -----
+	const MUTE_KEY = 'valdemird-blog-muted';
+	let actx: AudioContext | null = null;
+	let master: GainNode | null = null;
+	let muted = (() => {
+		try { return localStorage.getItem(MUTE_KEY) === '1'; } catch { return false; }
+	})();
+	const muteListeners = new Set<() => void>();
+
+	function setMuted(v: boolean) {
+		muted = v;
+		try { localStorage.setItem(MUTE_KEY, v ? '1' : '0'); } catch { /* noop */ }
+		muteListeners.forEach((fn) => fn());
+	}
+
+	function audio(): AudioContext | null {
+		if (typeof window === 'undefined') return null;
+		if (!actx) {
+			const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+			if (!Ctor) return null;
+			actx = new Ctor();
+			master = actx.createGain();
+			master.gain.value = 0.9;
+			master.connect(actx.destination);
+		}
+		if (actx.state === 'suspended') void actx.resume();
+		return actx;
+	}
+
+	function duck(amount = 0.45, recover = 0.3) {
+		if (!actx || !master) return;
+		const now = actx.currentTime;
+		master.gain.cancelScheduledValues(now);
+		master.gain.setValueAtTime(master.gain.value, now);
+		master.gain.linearRampToValueAtTime(amount, now + 0.03);
+		master.gain.linearRampToValueAtTime(0.9, now + recover);
+	}
+
+	interface ToneOpts { type?: OscillatorType; dur?: number; gain?: number; when?: number; glideTo?: number; }
+	function tone(freq: number, { type = 'triangle', dur = 0.12, gain = 0.14, when = 0, glideTo }: ToneOpts = {}) {
+		const c = audio();
+		if (!c || !master) return;
+		const t0 = c.currentTime + when;
+		const osc = c.createOscillator();
+		const g = c.createGain();
+		osc.type = type;
+		osc.frequency.setValueAtTime(freq, t0);
+		if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, t0 + dur);
+		g.gain.setValueAtTime(0.0001, t0);
+		g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);
+		g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+		osc.connect(g);
+		g.connect(master);
+		osc.start(t0);
+		osc.stop(t0 + dur + 0.02);
+	}
+	const vary = (f: number, pct = 0.08) => f * (1 + (Math.random() * 2 - 1) * pct);
+
+	const sfx = {
+		click() { if (muted) return; tone(vary(520), { type: 'triangle', dur: 0.07, gain: 0.1 }); },
+		pop(streak = 0) {
+			if (muted) return;
+			const s = Math.min(streak, 24);
+			const base = 360 + s * 16;
+			tone(vary(base, 0.04), { type: 'square', dur: 0.07, gain: 0.12 });
+			tone(vary(base * 2, 0.04), { type: 'triangle', dur: 0.035, gain: 0.025 + s * 0.0015 });
+		},
+		chime() {
+			if (muted) return;
+			duck();
+			tone(660, { type: 'triangle', dur: 0.1, gain: 0.16 });
+			tone(990, { type: 'triangle', dur: 0.12, gain: 0.16, when: 0.06 });
+			tone(1320, { type: 'triangle', dur: 0.16, gain: 0.14, when: 0.12 });
+		},
+		thud() { if (muted) return; tone(150, { type: 'sine', dur: 0.18, gain: 0.2, glideTo: 70 }); },
+		fanfare() {
+			if (muted) return;
+			duck(0.4, 0.5);
+			[523, 659, 784, 1047].forEach((f, i) => tone(f, { type: 'triangle', dur: 0.26, gain: 0.18, when: i * 0.12 }));
+		},
+	};
+
+	// ----- shared motion helpers (ported from lib/juice.tsx) -----
+	function reduced(): boolean {
+		return typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+	}
+
+	type ShakeIntensity = 'sm' | 'md' | 'lg';
+	function shakeEl(el: HTMLElement, intensity: ShakeIntensity = 'md') {
+		if (reduced()) return;
+		const cls = `jl-shake-${intensity}`;
+		el.classList.remove('jl-shake-sm', 'jl-shake-md', 'jl-shake-lg');
+		void el.offsetWidth; // restart the animation
+		el.classList.add(cls);
+		window.setTimeout(() => el.classList.remove(cls), 600);
+	}
+
+	interface BurstOptions { count?: number; spread?: number; size?: number; colors?: string[]; }
+	function burst(stage: HTMLElement, x: number, y: number, opts: BurstOptions = {}) {
+		if (reduced()) return;
+		const accent = getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim() || 'oklch(0.7 0.12 260)';
+		const { count = 14, spread = 120, size = 10, colors = [accent, '#f0a73a', '#e85d75'] } = opts;
+		for (let i = 0; i < count; i++) {
+			const p = document.createElement('div');
+			p.className = 'jl-particle';
+			const angle = (Math.PI * 2 * i) / count + Math.random() * 0.6;
+			const dist = spread * (0.45 + Math.random() * 0.55);
+			const s = size * (0.55 + Math.random() * 0.8);
+			p.style.setProperty('--x', `${x}px`);
+			p.style.setProperty('--y', `${y}px`);
+			p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+			p.style.setProperty('--dy', `${Math.sin(angle) * dist - 30}px`);
+			p.style.setProperty('--dur', `${0.55 + Math.random() * 0.4}s`);
+			p.style.width = `${s}px`;
+			p.style.height = `${s}px`;
+			p.style.background = colors[i % colors.length]!;
+			stage.appendChild(p);
+			const kill = () => p.remove();
+			p.addEventListener('animationend', kill);
+			window.setTimeout(kill, 1100);
+		}
+	}
+
+	function flashStage(stage: HTMLElement, alpha = 0.18) {
+		if (reduced()) return;
+		const f = document.createElement('div');
+		f.className = 'jl-flash';
+		f.style.setProperty('--a', String(alpha));
+		stage.appendChild(f);
+		const kill = () => f.remove();
+		f.addEventListener('animationend', kill);
+		window.setTimeout(kill, 600);
+	}
+
+	function comboTier(streak: number): 0 | 1 | 2 | 3 | 4 {
+		if (streak >= 50) return 4;
+		if (streak >= 30) return 3;
+		if (streak >= 20) return 2;
+		if (streak >= 10) return 1;
+		return 0;
+	}
+
+	function bindMute(root: HTMLElement) {
+		const btn = root.querySelector<HTMLButtonElement>('[data-jl-mute]');
+		if (!btn) return;
+		const sync = () => {
+			btn.setAttribute('aria-pressed', String(muted));
+			btn.textContent = muted ? 'Sound: off' : 'Sound: on';
+			btn.classList.toggle('is-muted', muted);
+		};
+		sync();
+		muteListeners.add(sync);
+		btn.addEventListener('click', () => setMuted(!muted));
+	}
+
+	// ----- per-demo wiring -----
+	function initSquash(root: HTMLElement) {
+		const pad = root.querySelector<HTMLElement>('[data-jl-target]');
+		const toggle = root.querySelector<HTMLButtonElement>('[data-jl-toggle]');
+		if (!pad || !toggle) return;
+		let juiced = true;
+		toggle.addEventListener('click', () => {
+			juiced = !juiced;
+			toggle.setAttribute('aria-pressed', String(juiced));
+			toggle.textContent = `Juice: ${juiced ? 'on' : 'off'}`;
+			toggle.classList.toggle('is-off', !juiced);
+		});
+		pad.addEventListener('click', () => {
+			pad.classList.remove('is-squash', 'is-flat');
+			void pad.offsetWidth;
+			pad.classList.add(juiced && !reduced() ? 'is-squash' : 'is-flat');
+		});
+		pad.addEventListener('animationend', () => pad.classList.remove('is-squash', 'is-flat'));
+	}
+
+	function initShake(root: HTMLElement) {
+		const screen = root.querySelector<HTMLElement>('[data-jl-shakeable]');
+		if (!screen) return;
+		root.querySelectorAll<HTMLButtonElement>('[data-jl-shake]').forEach((btn) => {
+			btn.addEventListener('click', () => shakeEl(screen, btn.dataset.jlShake as ShakeIntensity));
+		});
+	}
+
+	function initParticles(root: HTMLElement) {
+		const stage = root.querySelector<HTMLElement>('[data-jl-burst]');
+		const range = root.querySelector<HTMLInputElement>('[data-jl-range]');
+		const out = root.querySelector<HTMLElement>('[data-jl-out]');
+		if (!stage) return;
+		let count = range ? Number(range.value) : 14;
+		range?.addEventListener('input', () => {
+			count = Number(range.value);
+			if (out) out.textContent = String(count);
+		});
+		const fire = (clientX: number, clientY: number) => {
+			const r = stage.getBoundingClientRect();
+			burst(stage, clientX - r.left, clientY - r.top, { count, spread: 110, size: 9 });
+		};
+		stage.addEventListener('pointerdown', (e) => fire(e.clientX, e.clientY));
+		stage.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				const r = stage.getBoundingClientRect();
+				fire(r.left + r.width / 2, r.top + r.height / 2);
+			}
+		});
+	}
+
+	function initHitstop(root: HTMLElement) {
+		const stage = root.querySelector<HTMLElement>('[data-jl-stage]');
+		const striker = root.querySelector<HTMLElement>('[data-jl-striker]');
+		const dummy = root.querySelector<HTMLElement>('[data-jl-dummy]');
+		const btn = root.querySelector<HTMLButtonElement>('[data-jl-strike]');
+		const range = root.querySelector<HTMLInputElement>('[data-jl-range]');
+		const out = root.querySelector<HTMLElement>('[data-jl-out]');
+		if (!stage || !striker || !dummy || !btn) return;
+		let hitstop = range ? Number(range.value) : 90;
+		range?.addEventListener('input', () => {
+			hitstop = Number(range.value);
+			if (out) out.textContent = `${hitstop}ms`;
+		});
+		let busy = false;
+		const strike = () => {
+			if (busy) return;
+			busy = true;
+			const travel = 150; // px from rest to contact
+			const startT = performance.now();
+			const moveDur = 260;
+			const step = (now: number) => {
+				const p = Math.min((now - startT) / moveDur, 1);
+				const eased = 1 - Math.pow(1 - p, 2);
+				striker.style.transform = `translateX(${eased * travel}px)`;
+				if (p < 1) { requestAnimationFrame(step); return; }
+				// contact — the freeze frame
+				const r = stage.getBoundingClientRect();
+				const dr = dummy.getBoundingClientRect();
+				const cx = dr.left - r.left + dr.width / 2;
+				const cy = dr.top - r.top + dr.height / 2;
+				const land = () => {
+					if (!reduced()) {
+						dummy.classList.add('is-knocked');
+						flashStage(stage, 0.16);
+						burst(stage, cx, cy, { count: 10, spread: 90, size: 8 });
+					}
+					window.setTimeout(() => {
+						dummy.classList.remove('is-knocked');
+						striker.style.transform = 'translateX(0)';
+						busy = false;
+					}, 380);
+				};
+				if (hitstop > 0 && !reduced()) window.setTimeout(land, hitstop);
+				else land();
+			};
+			requestAnimationFrame(step);
+		};
+		btn.addEventListener('click', strike);
+	}
+
+	function initSound(root: HTMLElement) {
+		bindMute(root);
+		const streakLabel = root.querySelector<HTMLElement>('[data-jl-streaklabel]');
+		let streak = 0;
+		let decay: number | undefined;
+		root.querySelectorAll<HTMLButtonElement>('[data-jl-sound]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const kind = btn.dataset.jlSound!;
+				if (kind === 'pop') {
+					streak += 1;
+					if (streakLabel) streakLabel.textContent = String(streak);
+					sfx.pop(streak);
+					window.clearTimeout(decay);
+					decay = window.setTimeout(() => { streak = 0; if (streakLabel) streakLabel.textContent = '0'; }, 1600);
+				} else {
+					(sfx as Record<string, (n?: number) => void>)[kind]?.();
+				}
+			});
+		});
+	}
+
+	function initCombo(root: HTMLElement) {
+		bindMute(root);
+		const stage = root.querySelector<HTMLElement>('[data-jl-stage]');
+		const coin = root.querySelector<HTMLElement>('[data-jl-target]');
+		const chip = root.querySelector<HTMLElement>('[data-jl-streak]');
+		if (!stage || !coin || !chip) return;
+		let streak = 0;
+		let decay: number | undefined;
+		coin.addEventListener('click', (e) => {
+			streak += 1;
+			const tier = comboTier(streak);
+			// always: sound + squash
+			sfx.pop(streak);
+			if (!reduced()) {
+				coin.classList.remove('is-squash');
+				void coin.offsetWidth;
+				coin.classList.add('is-squash');
+			}
+			// escalate with tier
+			const r = stage.getBoundingClientRect();
+			burst(stage, e.clientX - r.left, e.clientY - r.top, { count: 6 + tier * 5, spread: 64 + tier * 30, size: 7 + tier });
+			flashStage(stage, 0.06 + tier * 0.03);
+			if (tier >= 1) shakeEl(stage, tier >= 3 ? 'md' : 'sm');
+			// chip
+			chip.hidden = false;
+			chip.textContent = `×${streak}`;
+			chip.className = `jl-streak jl-streak--t${tier}`;
+			chip.classList.remove('is-pop');
+			void chip.offsetWidth;
+			chip.classList.add('is-pop');
+			window.clearTimeout(decay);
+			decay = window.setTimeout(() => { streak = 0; chip.hidden = true; }, 1600);
+		});
+		coin.addEventListener('animationend', () => coin.classList.remove('is-squash'));
+	}
+
+	function initOne(root: HTMLElement) {
+		if (root.dataset.jlReady) return;
+		root.dataset.jlReady = '1';
+		switch (root.dataset.demo) {
+			case 'squash': return initSquash(root);
+			case 'shake': return initShake(root);
+			case 'particles': return initParticles(root);
+			case 'hitstop': return initHitstop(root);
+			case 'sound': return initSound(root);
+			case 'combo': return initCombo(root);
+		}
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-juicelab]').forEach(initOne);
+	}
+	init();
+	document.addEventListener('astro:after-swap', () => {
+		// mute listeners belong to swapped-away DOM; drop them and re-init.
+		muteListeners.clear();
+		init();
+	});
+</script>
+
+<style>
+	.jl {
+		margin: 2.25rem 0;
+		padding: 1.25rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		background: var(--color-surface);
+		display: grid;
+		gap: 1rem;
+	}
+
+	.jl-stage {
+		position: relative;
+		overflow: hidden;
+		min-height: 9rem;
+		border-radius: var(--radius-md);
+		background:
+			radial-gradient(120% 130% at 50% 0%, oklch(0.24 0.04 265) 0%, oklch(0.16 0.02 265) 100%);
+		display: grid;
+	}
+	.jl-stage--center { place-items: center; }
+	.jl-stage--burst { place-items: center; cursor: crosshair; }
+	.jl-stage--burst:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+	.jl-stage__hint,
+	.jl-screen__label {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: oklch(0.7 0.02 280);
+		pointer-events: none;
+	}
+
+	/* ----- squash & stretch ----- */
+	.jl-pad {
+		width: 7rem;
+		height: 4.2rem;
+		border: none;
+		border-radius: var(--radius-md);
+		background: linear-gradient(165deg, oklch(0.72 0.14 280), oklch(0.58 0.16 285));
+		color: oklch(0.99 0.01 280);
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		cursor: pointer;
+		box-shadow: 0 14px 26px -14px oklch(0.5 0.18 285 / 0.9), inset 0 1px 0 oklch(1 0 0 / 0.25);
+		transform-origin: 50% 100%;
+	}
+	.jl-pad.is-squash { animation: jlSquash 0.42s var(--ease-spring); }
+	.jl-pad.is-flat { animation: jlFlat 0.12s ease; }
+	@keyframes jlSquash {
+		0% { transform: scale(1, 1); }
+		22% { transform: scale(1.28, 0.72); }
+		46% { transform: scale(0.88, 1.16); }
+		70% { transform: scale(1.05, 0.96); }
+		100% { transform: scale(1, 1); }
+	}
+	@keyframes jlFlat {
+		0% { filter: brightness(1.5); }
+		100% { filter: brightness(1); }
+	}
+
+	/* ----- combo coin ----- */
+	.jl-coin {
+		width: 5.4rem;
+		height: 5.4rem;
+		border-radius: 50%;
+		border: none;
+		background: radial-gradient(circle at 38% 32%, oklch(0.85 0.13 90), oklch(0.68 0.16 70) 70%);
+		color: oklch(0.25 0.08 70);
+		font-family: var(--font-mono);
+		font-size: 0.82rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		cursor: pointer;
+		box-shadow: 0 14px 28px -14px oklch(0.6 0.16 70 / 0.9), inset 0 2px 0 oklch(1 0 0 / 0.4);
+		transform-origin: 50% 70%;
+	}
+	.jl-coin.is-squash { animation: jlSquash 0.34s var(--ease-spring); }
+	.jl-streak {
+		position: absolute;
+		top: 0.7rem;
+		right: 0.9rem;
+		font-family: var(--font-mono);
+		font-weight: 600;
+		font-size: 1.05rem;
+		padding: 0.2rem 0.6rem;
+		border-radius: 999px;
+		color: oklch(0.95 0.02 90);
+		background: oklch(0.3 0.04 90 / 0.6);
+		border: 1px solid oklch(0.6 0.1 90 / 0.5);
+		font-variant-numeric: tabular-nums;
+	}
+	.jl-streak.is-pop { animation: jlComboPop 0.3s var(--ease-spring); }
+	.jl-streak--t2 { border-color: oklch(0.7 0.16 50 / 0.7); }
+	.jl-streak--t3 {
+		color: oklch(0.85 0.18 25);
+		background: oklch(0.32 0.1 25 / 0.6);
+		border-color: oklch(0.65 0.2 25 / 0.7);
+	}
+	.jl-streak--t4 {
+		color: oklch(0.9 0.2 25);
+		background: oklch(0.4 0.16 25 / 0.7);
+		border-color: oklch(0.7 0.22 25);
+	}
+	@keyframes jlComboPop {
+		0% { transform: scale(0.7); }
+		60% { transform: scale(1.12); }
+		100% { transform: scale(1); }
+	}
+
+	/* ----- shake (ported keyframes) ----- */
+	.jl-screen {
+		width: 9rem;
+		height: 5.4rem;
+		border-radius: var(--radius-sm);
+		background: linear-gradient(165deg, oklch(0.4 0.06 265), oklch(0.28 0.04 265));
+		border: 1px solid oklch(0.5 0.05 265 / 0.6);
+		display: grid;
+		place-items: center;
+		box-shadow: var(--shadow-md);
+	}
+	.jl-shake-sm { animation: jlShakeSm 0.3s ease; }
+	.jl-shake-md { animation: jlShakeMd 0.4s ease; }
+	.jl-shake-lg { animation: jlShakeLg 0.55s ease; }
+	@keyframes jlShakeSm {
+		0%, 100% { transform: translate(0, 0); }
+		25% { transform: translate(-2px, 1px); }
+		50% { transform: translate(2px, -1px); }
+		75% { transform: translate(-1px, 1px); }
+	}
+	@keyframes jlShakeMd {
+		0%, 100% { transform: translate(0, 0); }
+		15% { transform: translate(-5px, 2px) rotate(-0.3deg); }
+		30% { transform: translate(4px, -3px) rotate(0.3deg); }
+		45% { transform: translate(-4px, 3px); }
+		60% { transform: translate(3px, -2px); }
+		75% { transform: translate(-2px, 1px); }
+	}
+	@keyframes jlShakeLg {
+		0%, 100% { transform: translate(0, 0); }
+		10% { transform: translate(-8px, 4px) rotate(-0.5deg); }
+		25% { transform: translate(7px, -5px) rotate(0.5deg); }
+		40% { transform: translate(-6px, 5px) rotate(-0.4deg); }
+		55% { transform: translate(5px, -4px); }
+		70% { transform: translate(-4px, 3px); }
+		85% { transform: translate(2px, -2px); }
+	}
+
+	/* ----- hitstop ----- */
+	.jl-stage--hitstop { min-height: 8rem; }
+	.jl-strike-track {
+		position: relative;
+		width: 16rem;
+		max-width: 80%;
+		height: 3.4rem;
+		display: flex;
+		align-items: center;
+	}
+	.jl-striker {
+		width: 1.5rem;
+		height: 2.4rem;
+		border-radius: 4px;
+		background: linear-gradient(165deg, oklch(0.78 0.13 280), oklch(0.6 0.16 285));
+		box-shadow: var(--shadow-sm);
+		will-change: transform;
+	}
+	.jl-dummy {
+		position: absolute;
+		left: calc(150px + 1.5rem);
+		width: 2.6rem;
+		height: 2.9rem;
+		border-radius: 6px;
+		background: linear-gradient(165deg, oklch(0.5 0.05 30), oklch(0.4 0.05 30));
+		border: 1px solid oklch(0.6 0.08 30 / 0.6);
+		will-change: transform, filter;
+	}
+	.jl-dummy.is-knocked { animation: jlKnock 0.38s var(--ease-spring); }
+	@keyframes jlKnock {
+		0% { transform: translateX(0); filter: brightness(2.2); }
+		35% { transform: translateX(20px) rotate(4deg); }
+		100% { transform: translateX(0) rotate(0); filter: brightness(1); }
+	}
+
+	/* particle + flash rules are global (see the is:global block below):
+	   they're created in JS via createElement, so they never receive Astro's
+	   scope attribute and scoped selectors would not match them. */
+
+	/* ----- controls ----- */
+	.jl-controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.6rem;
+	}
+	.jl-controls--grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+	}
+	.jl-btn {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		padding: 0.5rem 0.9rem;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--color-border-strong);
+		background: var(--color-bg-secondary);
+		color: var(--color-text);
+		cursor: pointer;
+		transition: transform var(--duration-fast) var(--ease-spring), border-color var(--duration-fast) var(--ease-smooth), background var(--duration-fast) var(--ease-smooth);
+	}
+	.jl-btn:hover { transform: translateY(-1px); border-color: var(--color-accent); }
+	.jl-btn:active { transform: translateY(0) scale(0.97); }
+	.jl-btn:focus-visible { outline: 2px solid oklch(from var(--color-accent) l c h / 0.4); outline-offset: 2px; }
+	.jl-btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: oklch(0.99 0.01 280); }
+	.jl-btn--ghost.is-muted { opacity: 0.6; text-decoration: line-through; }
+	.jl-btn.is-off { opacity: 0.6; }
+
+	.jl-slider {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6rem;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-text-secondary);
+	}
+	.jl-slider__label { text-transform: uppercase; letter-spacing: 0.08em; }
+	.jl-slider input[type='range'] {
+		appearance: none;
+		-webkit-appearance: none;
+		width: 9rem;
+		max-width: 40vw;
+		height: 4px;
+		border-radius: 999px;
+		background: var(--color-border-strong);
+		cursor: ew-resize;
+	}
+	.jl-slider input[type='range']::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		appearance: none;
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--color-accent);
+		border: 2px solid var(--color-surface);
+		box-shadow: var(--shadow-sm);
+	}
+	.jl-slider input[type='range']::-moz-range-thumb {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		background: var(--color-accent);
+		border: 2px solid var(--color-surface);
+	}
+	.jl-slider__out { color: var(--color-accent); font-variant-numeric: tabular-nums; min-width: 3ch; }
+
+	.jl-hint {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		color: var(--color-text-muted);
+		line-height: 1.4;
+	}
+	.jl-caption {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-text-muted);
+		text-align: center;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.jl-pad.is-squash, .jl-coin.is-squash, .jl-streak.is-pop,
+		.jl-shake-sm, .jl-shake-md, .jl-shake-lg,
+		.jl-dummy.is-knocked,
+		.jl-btn { animation: none; transition: none; }
+		.jl-btn:hover, .jl-btn:active { transform: none; }
+	}
+</style>
+
+<!--
+	Particles and the screen flash are spawned in JS with createElement, so they
+	never receive Astro's component-scope attribute. Their rules must be global
+	or the scoped selectors silently fail to match (the bug: un-rounded squares
+	stacking in normal flow with no animation). Prefixed `jl-` to avoid leakage.
+-->
+<style is:global>
+	.jl-particle {
+		position: absolute;
+		top: 0;
+		left: 0;
+		border-radius: 50%;
+		pointer-events: none;
+		will-change: transform, opacity;
+		animation: jlParticle var(--dur, 0.7s) cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
+	}
+	@keyframes jlParticle {
+		0% { transform: translate(var(--x), var(--y)) scale(1); opacity: 1; }
+		100% { transform: translate(calc(var(--x) + var(--dx)), calc(var(--y) + var(--dy))) scale(0.2); opacity: 0; }
+	}
+	.jl-flash {
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: oklch(0.95 0.04 280);
+		animation: jlFlash 0.4s ease-out forwards;
+	}
+	@keyframes jlFlash {
+		0% { opacity: var(--a, 0.18); }
+		100% { opacity: 0; }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.jl-particle, .jl-flash { animation: none; opacity: 0; }
+	}
+</style>

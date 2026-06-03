@@ -1,0 +1,143 @@
+---
+/**
+ * HeadingAnchors — adds a "copy link to section" button to every h2/h3 that
+ * has an id inside `.article-body`. Rendered once by the blog layout (like
+ * ReadingProgress); it injects the buttons client-side so it works for both
+ * Astro-slugged markdown headings and explicit `<h2 id>` headings in MDX.
+ *
+ * Click → copies the absolute section URL to the clipboard, updates the hash
+ * without a jarring jump, and shows a brief confirmation. The button stays
+ * hidden until the heading is hovered or the button itself is focused.
+ */
+interface Props {
+	lang?: 'en' | 'es';
+}
+const { lang = 'en' } = Astro.props;
+const labelCopy = lang === 'es' ? 'Copiar enlace a esta sección' : 'Copy link to this section';
+const labelCopied = lang === 'es' ? '¡Enlace copiado!' : 'Link copied!';
+---
+
+<span class="heading-anchors-i18n" data-copy={labelCopy} data-copied={labelCopied} hidden></span>
+
+<script>
+	function buildAnchors() {
+		const i18n = document.querySelector<HTMLElement>('.heading-anchors-i18n');
+		const labelCopy = i18n?.dataset.copy ?? 'Copy link to this section';
+		const labelCopied = i18n?.dataset.copied ?? 'Link copied!';
+
+		const headings = document.querySelectorAll<HTMLHeadingElement>(
+			'.article-body h2[id], .article-body h3[id]',
+		);
+
+		headings.forEach((h) => {
+			if (h.querySelector('.heading-anchor')) return; // already processed
+
+			const a = document.createElement('a');
+			a.className = 'heading-anchor';
+			a.href = `#${h.id}`;
+			a.setAttribute('aria-label', labelCopy);
+			a.title = labelCopy;
+			a.innerHTML = `
+				<svg class="heading-anchor__link" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+				<svg class="heading-anchor__check" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+			`;
+
+			a.addEventListener('click', async (e) => {
+				e.preventDefault();
+				const url = `${location.origin}${location.pathname}#${h.id}`;
+				try {
+					await navigator.clipboard.writeText(url);
+				} catch {
+					/* clipboard blocked — fall through, hash still updates */
+				}
+				history.replaceState(null, '', `#${h.id}`);
+				h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				a.classList.add('is-copied');
+				a.setAttribute('aria-label', labelCopied);
+				a.title = labelCopied;
+				window.setTimeout(() => {
+					a.classList.remove('is-copied');
+					a.setAttribute('aria-label', labelCopy);
+					a.title = labelCopy;
+				}, 1600);
+			});
+
+			h.appendChild(a);
+		});
+	}
+
+	buildAnchors();
+	document.addEventListener('astro:after-swap', buildAnchors);
+</script>
+
+<style is:global>
+	.article-body h2:has(.heading-anchor),
+	.article-body h3:has(.heading-anchor) {
+		position: relative;
+	}
+
+	.heading-anchor {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 1.6rem;
+		height: 1.6rem;
+		margin-left: 0.4rem;
+		vertical-align: middle;
+		border-radius: var(--radius-sm);
+		color: var(--color-text-muted);
+		text-decoration: none;
+		opacity: 0;
+		transition:
+			opacity var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth);
+	}
+
+	/* Reveal on heading hover or when the button itself is focused. */
+	.article-body h2:hover .heading-anchor,
+	.article-body h3:hover .heading-anchor,
+	.heading-anchor:focus-visible {
+		opacity: 1;
+	}
+
+	.heading-anchor:hover,
+	.heading-anchor:focus-visible {
+		color: var(--color-accent);
+		background: var(--color-accent-subtle);
+		outline: none;
+	}
+
+	.heading-anchor:focus-visible {
+		box-shadow: 0 0 0 2px oklch(from var(--color-accent) l c h / 0.4);
+	}
+
+	.heading-anchor__check {
+		display: none;
+		color: var(--color-success);
+	}
+
+	.heading-anchor.is-copied {
+		opacity: 1;
+		background: oklch(from var(--color-success) l c h / 0.12);
+	}
+	.heading-anchor.is-copied .heading-anchor__link {
+		display: none;
+	}
+	.heading-anchor.is-copied .heading-anchor__check {
+		display: block;
+	}
+
+	/* Touch devices have no hover — keep the anchor faintly visible there. */
+	@media (hover: none) {
+		.heading-anchor {
+			opacity: 0.45;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.heading-anchor {
+			transition: none;
+		}
+	}
+</style>
