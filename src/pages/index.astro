@@ -4,7 +4,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import PostPreview from '../components/PostPreview.astro';
-import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS, SOCIAL_LINKS, t } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, t } from '../consts';
 import { getCollection } from 'astro:content';
 
 const strings = t(Astro.url);
@@ -104,7 +104,7 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 				</div>
 			</div>
 
-			<!-- Projects -->
+			<!-- Projects & Experiments -->
 			<section class="section projects-section" id="projects">
 				<div class="section-header">
 					<span class="section-label">01</span>
@@ -112,7 +112,7 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 					<div class="section-line"></div>
 				</div>
 				<div class="projects-grid">
-					{PROJECTS.map((project) => (
+					{[...PROJECTS, ...EXPERIMENTS].map((project) => (
 						<ProjectCard
 							title={project.title}
 							description={project.description}
@@ -642,8 +642,10 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 
 	.projects-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
 		gap: var(--space-lg);
+		max-width: 860px;
+		margin-inline: auto;
 	}
 
 	.posts-list {

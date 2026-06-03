@@ -4,7 +4,7 @@ import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
 import PostPreview from '../../components/PostPreview.astro';
-import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS, SOCIAL_LINKS, t } from '../../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, t } from '../../consts';
 import { getCollection } from 'astro:content';
 
 const strings = t(Astro.url);
@@ -94,7 +94,7 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 					<div class="section-line"></div>
 				</div>
 				<div class="projects-grid">
-					{PROJECTS.map((project) => (
+					{[...PROJECTS, ...EXPERIMENTS].map((project) => (
 						<ProjectCard title={project.title} description={project.description} url={project.url} tech={project.tech} thumbnail={project.thumbnail} />
 					))}
 				</div>
@@ -261,7 +261,7 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 	.section-label{font-family:var(--font-mono);font-size:.75rem;font-weight:500;color:var(--color-accent);opacity:.6;letter-spacing:.05em}
 	.section-header h2{font-size:1.5rem;margin:0;white-space:nowrap}
 	.section-line{flex:1;height:1px;background:linear-gradient(90deg,var(--color-border),transparent)}
-	.projects-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:var(--space-lg)}
+	.projects-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-lg);max-width:860px;margin-inline:auto}
 	.posts-list{display:flex;flex-direction:column}.view-all{margin-top:var(--space-xl);padding-left:var(--space-lg)}
 	.view-all a{font-size:.9rem;font-weight:500;color:var(--color-accent);text-decoration:none}.view-all a:hover{color:var(--color-accent-hover)}
 	@media(max-width:768px){.hero{min-height:auto;padding:3rem var(--space-lg) 2.5rem}.hero-inner{flex-direction:column;gap:2.5rem}.hero-visual{width:100%;max-width:360px;height:250px}.hero h1{font-size:clamp(2.8rem,13vw,4rem)}.hero-links{flex-wrap:wrap}.float-shape,.grid-pattern{display:none}.projects-grid{grid-template-columns:1fr}.section{padding:3rem var(--space-lg)}.marquee-item{font-size:.72rem}}
