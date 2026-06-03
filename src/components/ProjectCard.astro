@@ -1,14 +1,19 @@
 ---
+import { UI_STRINGS, type Locale } from '../consts';
+
 interface Props {
 	title: string;
-	description: string;
+	description: { en: string; es: string };
 	url: string;
 	tech: readonly string[];
+	locale?: Locale;
 	/** Optional preview screenshot. When omitted, the card shows a wireframe fallback. */
 	thumbnail?: string;
 }
 
-const { title, description, url, tech, thumbnail } = Astro.props;
+const { title, description, url, tech, thumbnail, locale = 'en' } = Astro.props;
+const localizedDescription = description[locale] ?? description.en;
+const previewLabel = UI_STRINGS[locale].projects.previewOf;
 ---
 
 <a href={url} target="_blank" rel="noopener noreferrer" class="project-card">
@@ -25,7 +30,7 @@ const { title, description, url, tech, thumbnail } = Astro.props;
 				{thumbnail ? (
 					<img
 						src={thumbnail}
-						alt={`Preview of ${title}`}
+						alt={`${previewLabel} ${title}`}
 						loading="lazy"
 						width="1440"
 						height="810"
@@ -54,7 +59,7 @@ const { title, description, url, tech, thumbnail } = Astro.props;
 					<polyline points="7 7 17 7 17 17"></polyline>
 				</svg>
 			</div>
-			<p>{description}</p>
+			<p>{localizedDescription}</p>
 			<div class="tech-tags">
 				{tech.map((t) => <span class="tech-tag">{t}</span>)}
 			</div>

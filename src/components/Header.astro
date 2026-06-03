@@ -47,11 +47,11 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 		</div>
 
 		<div class="nav-actions">
-			<a href={altPath} class="lang-switch" aria-label={`Switch to ${altLocale === 'en' ? 'English' : 'Español'}`}>
+			<a href={altPath} class="lang-switch" aria-label={`${strings.nav.switchLang} ${altLocale === 'en' ? 'English' : 'Español'}`}>
 				{altLocale === 'en' ? 'EN' : 'ES'}
 			</a>
 
-			<button id="menu-toggle" class="menu-toggle" aria-label="Toggle menu" type="button">
+			<button id="menu-toggle" class="menu-toggle" aria-label={strings.nav.toggleMenu} type="button">
 				<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<line class="line-1" x1="3" y1="6" x2="21" y2="6"></line>
 					<line class="line-2" x1="3" y1="12" x2="21" y2="12"></line>

@@ -4,6 +4,7 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import { ClientRouter } from 'astro:transitions';
+import { SITE_DESCRIPTION, SITE_DESCRIPTION_ES } from '../consts';
 
 interface Alternate {
 	hreflang: string;
@@ -39,7 +40,7 @@ const defaultJsonLd = {
 	'@type': 'WebSite',
 	name: 'valdemird',
 	url: 'https://valdemird.com',
-	description: 'Software engineer and builder. I make developer tools and write about what I learn.',
+	description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
 	author: {
 		'@type': 'Person',
 		name: 'Valdemir D.',

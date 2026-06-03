@@ -43,16 +43,34 @@ const homePath = isEs ? '/es/' : '/';
 			</script>
 			<div class="not-found">
 				<span class="error-code animate-fade-in">404</span>
-				<h1 class="animate-fade-in delay-1">{message}</h1>
-				<p class="animate-fade-in delay-2">{subMessage}</p>
-				<a href={homePath} class="home-btn animate-fade-in delay-3">
+				<h1 id="nf-message" class="animate-fade-in delay-1">{message}</h1>
+				<p id="nf-submessage" class="animate-fade-in delay-2">{subMessage}</p>
+				<a id="nf-home" href={homePath} class="home-btn animate-fade-in delay-3">
 					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 						<line x1="19" y1="12" x2="5" y2="12"></line>
 						<polyline points="12 19 5 12 12 5"></polyline>
 					</svg>
-					{buttonText}
+					<span id="nf-button">{buttonText}</span>
 				</a>
 			</div>
+
+			<!-- GitHub Pages serves a single static /404.html for every missing path,
+			     so locale is detected at runtime from the URL (build-time getLocale is always 'en'). -->
+			<script is:inline>
+				(function () {
+					if (!location.pathname.startsWith('/es')) return;
+					document.documentElement.setAttribute('lang', 'es');
+					document.title = 'Página no encontrada — valdemird';
+					var msg = document.getElementById('nf-message');
+					var sub = document.getElementById('nf-submessage');
+					var btn = document.getElementById('nf-button');
+					var home = document.getElementById('nf-home');
+					if (msg) msg.textContent = 'Esta página no existe.';
+					if (sub) sub.textContent = 'Puede que haya sido movida o el enlace esté incorrecto.';
+					if (btn) btn.textContent = 'Ir al inicio';
+					if (home) home.setAttribute('href', '/es/');
+				})();
+			</script>
 		</main>
 		<Footer />
 	</body>

@@ -3,7 +3,8 @@ import satori from 'satori';
 import sharp from 'sharp';
 import { getOgSatoriFonts } from '../../lib/og-fonts';
 
-export const GET: APIRoute = async () => {
+/** Builds the fallback social card PNG with a localized tagline. Shared by the EN and ES default cards. */
+export async function renderDefaultOg(subtitle: string): Promise<Buffer> {
 	const markup = {
 		type: 'div',
 		props: {
@@ -117,7 +118,7 @@ export const GET: APIRoute = async () => {
 										lineHeight: 1.5,
 										maxWidth: 600,
 									},
-									children: 'Software engineer, builder, and writer.',
+									children: subtitle,
 								},
 							},
 						],
@@ -145,8 +146,11 @@ export const GET: APIRoute = async () => {
 		fonts: getOgSatoriFonts(),
 	});
 
-	const png = await sharp(Buffer.from(svg)).png().toBuffer();
+	return sharp(Buffer.from(svg)).png().toBuffer();
+}
 
+export const GET: APIRoute = async () => {
+	const png = await renderDefaultOg('Software engineer, builder, and writer.');
 	return new Response(new Uint8Array(png), {
 		headers: {
 			'Content-Type': 'image/png',
