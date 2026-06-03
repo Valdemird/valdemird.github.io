@@ -1,0 +1,192 @@
+---
+/**
+ * Comments — minimal Giscus embed.
+ *
+ * Comments live in a separate public repo (Valdemird/valdemird-comments).
+ * The main valdemird.github.io repo stays private; only this discussion
+ * repo is public. Giscus renders the matching Discussions thread inline
+ * via its iframe.
+ *
+ * UX: collapsed by default. Visitor sees a single hairline label —
+ *   "Discussion — see thread on GitHub →"
+ * — and a button to load. The Giscus script only loads after the click,
+ * keeping the page lean for the (likely) majority of readers who scroll
+ * past without engaging.
+ */
+
+interface Props {
+	lang?: 'en' | 'es';
+	pathname: string;
+}
+
+const { lang = 'en', pathname } = Astro.props;
+
+const labels = {
+	en: {
+		discussion: 'Discussion',
+		cta: 'Load comments',
+		hint: 'Comments are hosted on GitHub Discussions — sign in with GitHub to reply.',
+		hosted: 'Powered by giscus',
+	},
+	es: {
+		discussion: 'Conversación',
+		cta: 'Cargar comentarios',
+		hint: 'Los comentarios viven en GitHub Discussions — inicia sesión con GitHub para responder.',
+		hosted: 'Vía giscus',
+	},
+}[lang];
+
+// Hard-coded repo config — see /tmp/.../README or CLAUDE.md.
+const REPO = 'Valdemird/valdemird-comments';
+const REPO_ID = 'R_kgDOSdgtKg';
+const CATEGORY = 'Announcements';
+const CATEGORY_ID = 'DIC_kwDOSdgtKs4C9DUf';
+---
+
+<section class="comments" data-comments aria-labelledby="comments-heading" data-pathname={pathname}>
+	<header class="comments-head">
+		<h2 id="comments-heading" class="comments-label">{labels.discussion}</h2>
+		<button class="comments-load" type="button">{labels.cta}</button>
+	</header>
+	<p class="comments-hint">{labels.hint}</p>
+	<div class="comments-mount" data-mount hidden></div>
+</section>
+
+<script
+	is:inline
+	define:vars={{ REPO, REPO_ID, CATEGORY, CATEGORY_ID, lang, hosted: labels.hosted }}
+>
+	function getTheme() {
+		return document.documentElement.dataset.theme === 'dark' || window.matchMedia('(prefers-color-scheme: dark)').matches
+			? 'dark'
+			: 'light';
+	}
+
+	function buildScript(theme) {
+		const s = document.createElement('script');
+		s.src = 'https://giscus.app/client.js';
+		s.async = true;
+		s.crossOrigin = 'anonymous';
+		s.dataset.repo = REPO;
+		s.dataset.repoId = REPO_ID;
+		s.dataset.category = CATEGORY;
+		s.dataset.categoryId = CATEGORY_ID;
+		s.dataset.mapping = 'pathname';
+		s.dataset.strict = '1';
+		s.dataset.reactionsEnabled = '1';
+		s.dataset.emitMetadata = '0';
+		s.dataset.inputPosition = 'bottom';
+		s.dataset.theme = theme;
+		s.dataset.lang = lang;
+		s.dataset.loading = 'lazy';
+		return s;
+	}
+
+	function initComments() {
+		document.querySelectorAll('.comments[data-comments]').forEach((root) => {
+			if (root.dataset.cReady === '1') return;
+			root.dataset.cReady = '1';
+
+			const btn = root.querySelector('.comments-load');
+			const mount = root.querySelector('[data-mount]');
+
+			btn?.addEventListener('click', () => {
+				if (mount.dataset.loaded === '1') return;
+				mount.dataset.loaded = '1';
+				mount.hidden = false;
+				root.classList.add('comments-open');
+				btn.disabled = true;
+				btn.textContent = hosted;
+
+				const script = buildScript(getTheme());
+				mount.appendChild(script);
+			});
+
+			// Keep giscus theme in sync if the visitor toggles dark mode after loading.
+			const observer = new MutationObserver(() => {
+				if (mount.dataset.loaded !== '1') return;
+				const iframe = mount.querySelector('iframe.giscus-frame');
+				if (!iframe) return;
+				iframe.contentWindow?.postMessage(
+					{ giscus: { setConfig: { theme: getTheme() } } },
+					'https://giscus.app',
+				);
+			});
+			observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+		});
+	}
+
+	initComments();
+	document.addEventListener('astro:after-swap', initComments);
+</script>
+
+<style>
+	.comments {
+		margin: var(--space-2xl) 0 0;
+		padding-top: var(--space-lg);
+		border-top: 1px solid var(--color-border);
+	}
+
+	.comments-head {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin: 0;
+	}
+
+	.comments-label {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		font-weight: 500;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--color-text-muted);
+	}
+
+	.comments-load {
+		padding: 0.45em 0.95em;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-surface);
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition:
+			border-color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.comments-load:hover,
+	.comments-load:focus-visible {
+		border-color: var(--color-border-strong);
+		background: var(--color-accent-subtle);
+		color: var(--color-text);
+		outline: none;
+	}
+
+	.comments-load:disabled {
+		cursor: default;
+		opacity: 0.55;
+	}
+
+	.comments-hint {
+		margin: 0.6rem 0 0;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		color: var(--color-text-muted);
+		max-width: 38em;
+	}
+
+	.comments-mount {
+		margin-top: var(--space-lg);
+	}
+
+	.comments-mount[hidden] {
+		display: none;
+	}
+</style>
