@@ -22,6 +22,18 @@ export const PROJECTS: readonly Project[] = [
 		description: 'Task manager with AI scheduling, Pomodoro timer, and drag-and-drop. Built because every other todo app annoyed me.',
 		url: 'https://todo.valdemird.com',
 		tech: ['Next.js 15', 'React 19', 'Prisma', 'Tailwind CSS 4', 'Vercel AI SDK'],
+		thumbnail: '/images/projects/todo.webp',
+	},
+];
+
+// Games & interactive experiments — a playground separate from the "real" projects.
+export const EXPERIMENTS: readonly Project[] = [
+	{
+		title: 'valdemird.games',
+		description: 'A space to explore games and interactive experiences. Real-time multiplayer rooms — drop in two players and race. First up: Caza Números.',
+		url: 'https://games.valdemird.com',
+		tech: ['React', 'Vite', 'TypeScript', 'Socket.IO', 'Vitest'],
+		thumbnail: '/images/projects/games.webp',
 	},
 ];
 
@@ -39,6 +51,7 @@ export const UI_STRINGS = {
 			subtitle: 'Software Engineer & Builder',
 			bio: 'I build developer tools and side projects. Right now I\'m figuring out how to make AI actually useful in day-to-day coding.',
 			projectsTitle: 'Projects',
+			gamesTitle: 'Games & Experiments',
 			recentPostsTitle: 'Recent Posts',
 			viewAllPosts: 'View all posts',
 		},
@@ -68,6 +81,7 @@ export const UI_STRINGS = {
 			subtitle: 'Ingeniero de Software & Maker',
 			bio: 'Construyo herramientas para desarrolladores y side projects. Ahora mismo estoy buscando cómo hacer que la IA sea realmente útil en el día a día de programar.',
 			projectsTitle: 'Proyectos',
+			gamesTitle: 'Juegos & Experimentos',
 			recentPostsTitle: 'Posts Recientes',
 			viewAllPosts: 'Ver todos los posts',
 		},
