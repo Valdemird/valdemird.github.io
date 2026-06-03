@@ -4,9 +4,10 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import PostPreview from '../components/PostPreview.astro';
-import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, t } from '../consts';
+import { SITE_TITLE, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, t, getLocale } from '../consts';
 import { getCollection } from 'astro:content';
 
+const locale = getLocale(Astro.url);
 const strings = t(Astro.url);
 
 const recentPosts = (await getCollection('blog'))
@@ -20,7 +21,7 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} alternates={[
+		<BaseHead title={SITE_TITLE} description={strings.home.metaDescription} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/' },
 		]} />
@@ -42,7 +43,7 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 					<div class="hero-content">
 						<div class="status-badge animate-fade-in">
 							<span class="status-dot"></span>
-							<span>Let's talk, learn, and build</span>
+							<span>{strings.home.statusBadge}</span>
 						</div>
 						<h1 class="animate-fade-in delay-1">{strings.home.name}</h1>
 						<p class="subtitle animate-fade-in delay-2">{strings.home.subtitle}</p>
@@ -119,6 +120,7 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 							url={project.url}
 							tech={project.tech}
 							thumbnail={project.thumbnail}
+							locale={locale}
 						/>
 					))}
 				</div>

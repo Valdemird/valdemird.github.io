@@ -1,5 +1,6 @@
 ---
 import FormattedDate from './FormattedDate.astro';
+import { UI_STRINGS, type Locale } from '../consts';
 
 interface Props {
 	id: string;
@@ -8,12 +9,13 @@ interface Props {
 	pubDate: Date;
 	tags?: string[];
 	basePath?: string;
-	locale?: string;
+	locale?: Locale;
 	enableTransition?: boolean;
 }
 
 const { id, title, description, pubDate, tags, basePath = '/blog', locale = 'en', enableTransition = false } = Astro.props;
 const readingTime = Math.max(1, Math.ceil(description.length / 50));
+const minReadLabel = UI_STRINGS[locale].blog.minRead;
 ---
 
 <a href={`${basePath}/${id}/`} class="post-preview">
@@ -22,7 +24,7 @@ const readingTime = Math.max(1, Math.ceil(description.length / 50));
 		<div class="post-preview-meta">
 			<FormattedDate date={pubDate} locale={locale} />
 			<span class="separator">&middot;</span>
-			<span>{readingTime} min</span>
+			<span>{readingTime} {minReadLabel}</span>
 		</div>
 		{enableTransition ? (
 			<h3 transition:name={`post-title-${id.replace(/\//g, '-')}`}>{title}</h3>

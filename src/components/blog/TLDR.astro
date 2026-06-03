@@ -14,8 +14,9 @@
 interface Props {
 	bullets: string[];
 	title?: string;
+	lang?: 'en' | 'es';
 }
-const { bullets, title = 'TL;DR' } = Astro.props;
+const { bullets, lang = 'en', title = lang === 'es' ? 'EN RESUMEN' : 'TL;DR' } = Astro.props;
 ---
 
 <aside class="tldr" aria-label={title}>

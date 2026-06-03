@@ -13,12 +13,13 @@ export const getStaticPaths: GetStaticPaths = async () => {
 			description: post.data.description,
 			pubDate: post.data.pubDate,
 			tags: post.data.tags || [],
+			lang: post.data.lang ?? 'en',
 		},
 	}));
 };
 
-function formatDate(date: Date): string {
-	return date.toLocaleDateString('en-US', {
+function formatDate(date: Date, lang: string): string {
+	return date.toLocaleDateString(lang === 'es' ? 'es-ES' : 'en-US', {
 		year: 'numeric',
 		month: 'long',
 		day: 'numeric',
@@ -26,7 +27,7 @@ function formatDate(date: Date): string {
 }
 
 export const GET: APIRoute = async ({ props }) => {
-	const { title, description, pubDate, tags } = props;
+	const { title, description, pubDate, tags, lang } = props;
 
 	const tagElements = (tags as string[]).slice(0, 4).map((tag: string) => ({
 		type: 'div',
@@ -121,7 +122,7 @@ export const GET: APIRoute = async ({ props }) => {
 													textTransform: 'uppercase' as const,
 													marginBottom: 24,
 												},
-												children: formatDate(pubDate as Date),
+												children: formatDate(pubDate as Date, lang as string),
 											},
 										},
 										// Title
