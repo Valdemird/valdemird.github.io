@@ -1,0 +1,145 @@
+---
+/**
+ * GameFeelHero — a dark "game screen" hero for the game-feel post.
+ *
+ * Renders an always-dark panel (regardless of site theme) with a serif
+ * title, a muted subtitle, and a row of chips that are anchor links into
+ * the post's sections. The chips are the table of contents in disguise.
+ *
+ *   <GameFeelHero
+ *     title="What is game feel?"
+ *     subtitle="..."
+ *     chips={[
+ *       { label: "squash & stretch", href: "#squash-stretch" },
+ *       ...
+ *     ]}
+ *   />
+ */
+interface Chip {
+	label: string;
+	href: string;
+}
+interface Props {
+	eyebrow?: string;
+	title: string;
+	subtitle: string;
+	chips: Chip[];
+}
+const { eyebrow, title, subtitle, chips } = Astro.props;
+---
+
+<section class="gf-hero" aria-label={title}>
+	<div class="gf-hero__glow" aria-hidden="true"></div>
+	{eyebrow && <p class="gf-hero__eyebrow">{eyebrow}</p>}
+	<h2 class="gf-hero__title">{title}</h2>
+	<p class="gf-hero__subtitle">{subtitle}</p>
+	<nav class="gf-hero__chips" aria-label="Sections">
+		{chips.map((c) => (
+			<a class="gf-hero__chip" href={c.href}>{c.label}</a>
+		))}
+	</nav>
+</section>
+
+<style>
+	.gf-hero {
+		position: relative;
+		margin: 2.5rem 0 3rem;
+		padding: 3rem 1.75rem 2.5rem;
+		border-radius: var(--radius-xl);
+		/* Always-dark, like a console screen, regardless of site theme. */
+		background:
+			radial-gradient(120% 140% at 50% -10%, oklch(0.26 0.05 265) 0%, oklch(0.16 0.03 265) 55%, oklch(0.13 0.02 265) 100%);
+		border: 1px solid oklch(0.4 0.04 265 / 0.5);
+		box-shadow: var(--shadow-lg);
+		overflow: hidden;
+		text-align: center;
+	}
+
+	.gf-hero__glow {
+		position: absolute;
+		inset: 0;
+		background: radial-gradient(50% 50% at 50% 0%, oklch(0.7 0.16 280 / 0.18), transparent 70%);
+		pointer-events: none;
+	}
+
+	.gf-hero__eyebrow {
+		position: relative;
+		margin: 0 0 0.75rem;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: oklch(0.72 0.12 280);
+	}
+
+	.gf-hero__title {
+		position: relative;
+		margin: 0 auto 0.9rem;
+		font-family: var(--font-serif);
+		font-weight: 600;
+		font-size: clamp(2rem, 6vw, 3.1rem);
+		line-height: 1.05;
+		letter-spacing: -0.01em;
+		color: oklch(0.97 0.005 280);
+	}
+
+	.gf-hero__subtitle {
+		position: relative;
+		max-width: 40rem;
+		margin: 0 auto 1.75rem;
+		font-size: 1.02rem;
+		line-height: 1.65;
+		color: oklch(0.74 0.015 280);
+	}
+
+	.gf-hero__chips {
+		position: relative;
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.6rem;
+		justify-content: center;
+	}
+
+	.gf-hero__chip {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		letter-spacing: 0.02em;
+		padding: 0.45rem 0.9rem;
+		border-radius: 999px;
+		color: oklch(0.85 0.02 280);
+		background: oklch(0.3 0.03 265 / 0.55);
+		border: 1px solid oklch(0.45 0.04 265 / 0.5);
+		text-decoration: none;
+		transition:
+			transform var(--duration-fast) var(--ease-spring),
+			background var(--duration-fast) var(--ease-smooth),
+			border-color var(--duration-fast) var(--ease-smooth),
+			box-shadow var(--duration-fast) var(--ease-smooth);
+	}
+
+	.gf-hero__chip:hover,
+	.gf-hero__chip:focus-visible {
+		transform: translateY(-2px);
+		background: oklch(0.4 0.06 275 / 0.7);
+		border-color: oklch(0.7 0.14 280 / 0.7);
+		box-shadow: 0 6px 18px oklch(0.1 0.02 265 / 0.5);
+		outline: none;
+		color: oklch(0.98 0.01 280);
+	}
+
+	@media (max-width: 540px) {
+		.gf-hero {
+			padding: 2.25rem 1.1rem 1.9rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.gf-hero__chip {
+			transition: none;
+		}
+		.gf-hero__chip:hover,
+		.gf-hero__chip:focus-visible {
+			transform: none;
+		}
+	}
+</style>

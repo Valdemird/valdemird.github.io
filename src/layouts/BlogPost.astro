@@ -5,6 +5,7 @@ import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import ReadingProgress from '../components/blog/ReadingProgress.astro';
+import HeadingAnchors from '../components/blog/HeadingAnchors.astro';
 import CopyPageButton from '../components/blog/CopyPageButton.astro';
 import FreshnessLine from '../components/blog/FreshnessLine.astro';
 import Comments from '../components/blog/Comments.astro';
@@ -117,6 +118,7 @@ if (lang === 'en') {
 
 	<body>
 		<ReadingProgress />
+		<HeadingAnchors lang={lang} />
 		<Header />
 		<main>
 			<script>
@@ -141,9 +143,11 @@ if (lang === 'en') {
 						initPageEntrance('.article-header .meta, .article-header .lead, .article-header .article-tags');
 					}
 
-					// Gentle heading reveals on scroll
+					// Gentle heading reveals on scroll. Skip the hide/reveal entirely
+					// when the URL carries a hash: a deep link must show its target
+					// (and everything above it) immediately, not as opacity:0.
 					const headings = document.querySelectorAll('.article-body h2, .article-body h3');
-					if (headings.length) {
+					if (headings.length && !location.hash) {
 						gsap.set(headings, { opacity: 0, y: 12 });
 						ScrollTrigger.batch(headings, {
 							onEnter: (batch: Element[]) => {
@@ -297,6 +301,7 @@ if (lang === 'en') {
 		margin-bottom: 0.6em;
 		color: var(--color-text);
 		letter-spacing: -0.01em;
+		scroll-margin-top: 5.5rem;
 	}
 
 	.article-body :global(h3) {
@@ -305,6 +310,7 @@ if (lang === 'en') {
 		margin-top: 2em;
 		margin-bottom: 0.5em;
 		color: var(--color-text);
+		scroll-margin-top: 5.5rem;
 	}
 
 	.article-body :global(h4) {
@@ -314,6 +320,16 @@ if (lang === 'en') {
 		margin-top: 1.5em;
 		margin-bottom: 0.4em;
 		color: var(--color-text);
+		scroll-margin-top: 5.5rem;
+	}
+
+	/* When the page lands on a hash, force the targeted heading visible even if
+	   the GSAP scroll-reveal hasn't fired yet (it sets inline opacity:0). */
+	.article-body :global(h2:target),
+	.article-body :global(h3:target),
+	.article-body :global(h4:target) {
+		opacity: 1 !important;
+		transform: none !important;
 	}
 
 	.article-body :global(p) {

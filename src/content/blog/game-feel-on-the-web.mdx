@@ -1,0 +1,309 @@
+---
+title: "Game feel on the web: squash, shake, and the art of juice"
+description: "A button that just works is dead. I spent an evening teaching a side-project to punch back, and these are the six techniques that did it. Each one playable, dependency-free, and respectful of your settings."
+pubDate: 2026-06-03
+tags: ["game-feel", "animation", "web-audio", "frontend", "interaction-design"]
+featured: true
+lang: en
+---
+
+import GameFeelHero from '../../components/blog/GameFeelHero.astro';
+import JuiceLab from '../../components/blog/JuiceLab.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import Timeline from '../../components/blog/Timeline.astro';
+import PullQuote from '../../components/blog/PullQuote.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+
+<GameFeelHero
+  eyebrow="Interactive"
+  title="What is game feel?"
+  subtitle="The tactile sense of a game: the weight of a button, the punch of a hit, the rush of a streak. Below I take six techniques the games industry figured out decades ago and bring them to the web, no libraries, always honoring your motion and sound settings."
+  chips={[
+    { label: "squash & stretch", href: "#squash-stretch" },
+    { label: "hitstop", href: "#hitstop" },
+    { label: "screen shake", href: "#screen-shake" },
+    { label: "particles", href: "#particles" },
+    { label: "synthesized audio", href: "#synthesized-audio" },
+    { label: "escalating celebration", href: "#escalating-celebration" },
+  ]}
+/>
+
+Last month I was building a small multiplayer party game at `games.valdemird.com`. One of the modes is a number hunt: a grid of cells, you tap the right ones before your rival does. It worked on the first try. Tapping a cell flipped it on, the score went up, the round ended. Correct, and completely dead.
+
+I sat there clicking the same cell over and over, and it felt like submitting a form. So I spent an evening doing nothing but making that one tap feel good. No new features. The cell now squashes when you hit it, throws a few particles, the pitch of the click rises as your streak climbs, and at a streak of fifty the whole board shakes. Same logic underneath. The difference is the interface finally acknowledges that you did something.
+
+That gap has a name.
+
+<Callout type="important" title="The thesis">
+Game feel isn't graphics. It's the response. The same click handler can feel like a form submission or like landing a punch, and the only thing that changed is what the interface does in the 400 milliseconds after you act.
+</Callout>
+
+The term comes from Steve Swink, who wrote the book on it in 2008. Literally: [*Game Feel: A Game Designer's Guide to Virtual Sensation*](http://www.game-feel.com/). His definition has three parts: real-time control, simulated space, and polish. The web gives you the first two for free. This post is about the third: the polish layer, the part Swink calls the "juice," and how little code it actually takes.
+
+Every demo below runs the exact functions that ship in the game. Click them. They are not videos.
+
+<Timeline items={[
+  { date: "1981", title: "The Illusion of Life", body: "Disney animators Frank Thomas and Ollie Johnston publish the 12 principles of animation. Squash & stretch is principle number one." },
+  { date: "2008", title: "Swink names it", body: "Steve Swink's book gives the field a vocabulary: 'game feel' as real-time control plus simulated space plus polish." },
+  { date: "2012", title: "Juice it or lose it", body: "Martin Jonasson and Petri Purho take a dull Breakout clone and pile on effects live on stage. The talk becomes the canonical reference for 'juice'.", emphasize: true },
+  { date: "2013", title: "The art of screen shake", body: "Jan Willem Nijman of Vlambeer enumerates around 30 tricks that make Nuclear Throne feel violent and immediate." },
+]} />
+
+<h2 id="squash-stretch">Squash &amp; stretch</h2>
+
+This is the oldest trick here, older than video games. It's the first of [Disney's twelve principles of animation](https://en.wikipedia.org/wiki/Twelve_basic_principles_of_animation), codified by Frank Thomas and Ollie Johnston. When their animators wanted a bouncing ball to feel like it had mass, they flattened it on impact and stretched it on the rebound. The volume stays constant, so wider means shorter. Your eye reads the deformation as weight and energy.
+
+On the web it's a four-keyframe animation on a `transform`. Press the pad: it crushes wide and short, overshoots tall and thin on the way back, settles. Toggle the juice off to feel the version I shipped first.
+
+<JuiceLab demo="squash" caption="Same click, ~420ms of deformation. The toggle is the before/after." />
+
+The trap is using a single `scale()`. That's a balloon inflating, not an object with weight. The trick is animating `scaleX` and `scaleY` in opposition, so the element conserves area. In the game the board uses this when it appears, planting itself rather than dropping in:
+
+<CodeBlock filename="apps/web/src/styles/theme.css">
+```css
+/* The board appears and 'plants' itself with a quick squash from the base. */
+@keyframes settleIn {
+  0%   { opacity: 0; transform: scale(0.88); }
+  50%  { opacity: 1; transform: scale(1.05, 0.92); }  /* squash: wide + short */
+  72%  { transform: scale(0.99, 1.02); }              /* stretch: narrow + tall */
+  100% { transform: scale(1); }
+}
+.grid { transform-origin: 50% 100%; animation: settleIn 0.42s cubic-bezier(0.22, 1, 0.36, 1); }
+```
+</CodeBlock>
+
+`transform-origin: 50% 100%` is doing quiet work there. Anchoring to the bottom edge makes the squash read as the object pressing into the ground, not floating in place. Move the origin to center and the same keyframes feel like a heartbeat instead of a landing.
+
+<h2 id="hitstop">Hitstop</h2>
+
+Honest disclosure: this is the one technique that isn't in the game yet. I built the demo below for this post because no list of game feel is complete without it, and once you notice it you can't stop seeing it.
+
+Hitstop is a freeze. At the exact frame of impact, the game stops time for a few dozen milliseconds, then resumes. Fighting games live on this. When Ryu lands a heavy punch in Street Fighter, both characters lock for a handful of frames. Smash Bros calls it freeze frames; the broader term is [hitlag](https://glossary.infil.net/?t=Hitstop), defined for fighting games in Infil's glossary. The pause sells the collision as something that cost energy. Without it, two objects pass through each other politely.
+
+Drag the slider to zero for the polite version. Then push it to 90 milliseconds and strike again.
+
+<JuiceLab demo="hitstop" caption="Strike with hitstop at 0ms, then at 90ms. The freeze is the whole effect." />
+
+That's the surprising part. Nothing about the motion changed. The strike speed, the recoil, the particles are identical. The only difference is a `setTimeout` between contact and reaction, and your brain reads the longer pause as a heavier hit. It's the cheapest weight you will ever add to an interface.
+
+<Callout type="tip" title="Where this lives on the web">
+You don't need a fighting game. A hitstop of 60–80ms on a destructive confirm (deleting something, a wrong answer in a quiz) makes the consequence land. The freeze is a tiny piece of friction that says 'that mattered.'
+</Callout>
+
+<h2 id="screen-shake">Screen shake</h2>
+
+If one person owns this technique, it's Jan Willem Nijman of Vlambeer. His 2013 talk [*The art of screenshake*](https://www.youtube.com/watch?v=AJdEqssNZ-U) is a rapid-fire list of tricks that turned a basic shooter into something that feels like it's recoiling at you. Nuclear Throne shakes constantly, and you stop noticing it consciously while feeling it the whole time.
+
+Three magnitudes. Small for a routine action, large for a real event.
+
+<JuiceLab demo="shake" caption="Small / medium / large. Note the rotation creeping in as the impulse grows." />
+
+The medium and large variants add a fraction of a degree of rotation. That rotation is the part most web implementations miss. Pure translation reads as a glitch. A few tenths of a degree of rotation reads as force. Here's the shipped code, including the one line everyone forgets:
+
+<CodeBlock filename="apps/web/src/lib/juice.tsx">
+```ts
+function shake(intensity: ShakeIntensity = 'md') {
+  if (reduced()) return;                       // honor prefers-reduced-motion
+  const el = document.querySelector('.shell') ?? document.body;
+  const cls = `fx-shake-${intensity}`;
+  el.classList.remove('fx-shake-sm', 'fx-shake-md', 'fx-shake-lg');
+  void el.offsetWidth;                         // force reflow → restart the animation
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 600);
+}
+```
+</CodeBlock>
+
+`void el.offsetWidth` is the load-bearing line. If you remove and re-add the same class in the same frame, the browser coalesces it and the animation never restarts. Reading `offsetWidth` forces a synchronous reflow, which commits the class removal, so re-adding it starts fresh. Without that line, rapid hits stop shaking after the first one. I lost twenty minutes to exactly this before remembering it's an old trick.
+
+<PullQuote cite="Jan Willem Nijman, Vlambeer — 'The art of screen shake' (2013)" variant="block">
+More is more. If it looks good with a little screen shake, it'll probably look better with a lot.
+</PullQuote>
+
+He's mostly right, with one caveat the talk doesn't dwell on: shaking the whole viewport on the web is a motion-sickness trigger for some people. The `if (reduced()) return` at the top of that function isn't decoration. It's the difference between juice and an accessibility complaint.
+
+<h2 id="particles">Particles</h2>
+
+Particles are the [*Juice it or lose it*](https://www.youtube.com/watch?v=Fy0aCDmgnxg) signature. In that 2012 talk, Martin Jonasson and Petri Purho take a gray Breakout clone and, effect by effect, bury it in colored debris until it's gleeful. Their version is [playable in the browser](http://grapefrukt.com/f/games/juicy-breakout/) with a slider for every effect, which is the closest thing the field has to a canonical demo. Bricks explode into dozens of bits. The screen fills with motion that means nothing mechanically and everything emotionally.
+
+Click anywhere in the stage. Drag the slider to change the count.
+
+<JuiceLab demo="particles" caption="Each particle is a div with a random angle, distance, and lifetime. Gravity is a constant offset on the Y." />
+
+The implementation detail that matters here is where the particles live. In a React app, spawning forty elements per click through state would trigger forty re-renders and tank the frame rate the moment a streak gets going. So the burst function reaches around React and touches the DOM directly:
+
+<CodeBlock filename="apps/web/src/lib/juice.tsx">
+```ts
+function burst(x: number, y: number, opts: BurstOptions = {}) {
+  if (reduced()) return;
+  const { count = 14, spread = 120, size = 10 } = opts;
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('div');
+    p.className = 'fx-particle';
+    const angle = (Math.PI * 2 * i) / count + Math.random() * 0.6;  // ring + jitter
+    const dist  = spread * (0.45 + Math.random() * 0.55);
+    p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+    p.style.setProperty('--dy', `${Math.sin(angle) * dist - 30}px`); // -30 = gravity kick
+    p.style.setProperty('--dur', `${0.55 + Math.random() * 0.4}s`);
+    document.body.appendChild(p);
+    p.addEventListener('animationend', () => p.remove());            // self-cleanup
+  }
+}
+```
+</CodeBlock>
+
+Distributing the base angle evenly around the circle (`2π · i / count`) and then adding a small random jitter gives you a burst that looks organic but never clumps. Pure `Math.random()` angles clump and leave gaps. The `- 30` on the Y is the entire physics engine: it biases every particle upward at birth so the arc looks like it fights gravity before falling. CSS animates the rest.
+
+<Callout type="note" title="Why divs and not canvas">
+For a few dozen short-lived particles, DOM elements with CSS animations are simpler than a canvas render loop and cost nothing once they're spawned. The compositor handles them. Reach for canvas when you're drawing hundreds at sustained 60fps. Below that, this is less code and survives `prefers-reduced-motion` for free.
+</Callout>
+
+<h2 id="synthesized-audio">Synthesized audio</h2>
+
+This is the one that surprises people. There are no sound files in the game. Not one `.mp3`, not one `.wav`. Every sound is generated in the browser with the [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API): an oscillator, a gain envelope, and a few numbers.
+
+<JuiceLab demo="sound" caption="All synthesized live. Hit 'pop' repeatedly and the pitch climbs with your streak." />
+
+A sound is just a frequency, a waveform, and a volume envelope over time. A short triangle wave that ramps up fast and decays is a click. A sine wave that glides downward is a thud. Here's the core, about fifteen lines:
+
+<CodeBlock filename="apps/web/src/lib/sfx.ts">
+```ts
+function tone(freq: number, { type = 'triangle', dur = 0.12, gain = 0.14, glideTo } = {}) {
+  const c = audio();                  // lazily-created shared AudioContext
+  const t0 = c.currentTime;
+  const osc = c.createOscillator();
+  const g = c.createGain();
+  osc.type = type;                    // 'sine' | 'square' | 'triangle' | 'sawtooth'
+  osc.frequency.setValueAtTime(freq, t0);
+  if (glideTo) osc.frequency.exponentialRampToValueAtTime(glideTo, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);   // fast attack
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);   // decay to silence
+  osc.connect(g); g.connect(master);
+  osc.start(t0); osc.stop(t0 + dur + 0.02);
+}
+```
+</CodeBlock>
+
+Two details make synthesized audio feel alive instead of robotic. The first is pitch variation: every click is multiplied by a small random factor, so no two are identical. Ten identical clicks in a row sound like a machine; ten clicks each detuned by a few percent sound like a person. The second is that the streak feeds the frequency directly:
+
+<CodeBlock filename="apps/web/src/lib/sfx.ts">
+```ts
+pop(streak = 0) {
+  if (muted) return;
+  const s = Math.min(streak, 24);          // cap so it never gets shrill
+  const base = 360 + s * 16;               // pitch rises 16Hz per streak step
+  tone(vary(base, 0.04), { type: 'square', dur: 0.07, gain: 0.12 });
+  tone(vary(base * 2, 0.04), { type: 'triangle', dur: 0.035,  // an octave of sparkle
+        gain: 0.025 + s * 0.0015 });       // that sparkle grows with the streak
+}
+```
+</CodeBlock>
+
+That rising pitch is doing real psychological work. An ascending line reads as accumulation, as *getting somewhere*. You feel the streak before you've consciously counted it. There's also a quieter trick called ducking: when a big sound plays, the master gain briefly dips so the important event cuts through everything else, the same move a radio DJ makes talking over a song.
+
+<Callout type="warning" title="The autoplay rule">
+Browsers suspend the AudioContext until the user interacts with the page. That's why the first click in the demo might be a hair late while the context spins up, and why audio that fires on its own won't play at all. Always trigger sound from a real gesture, and always persist a mute toggle. Mine lives in localStorage.
+</Callout>
+
+<h2 id="escalating-celebration">Escalating celebration</h2>
+
+Each technique above is fine alone. Stacked and tied to a streak, they become a feedback loop you don't want to stop. This is the whole point of the number-hunt mode, and it's the demo I'd point a skeptic at.
+
+Tap the coin. Keep tapping. The pitch climbs, the squash fires every hit, particles multiply, and at tier thresholds the stage starts to shake and tint. Stop for a moment and it all decays back to nothing.
+
+<JuiceLab demo="combo" caption="Tiers unlock at 10 / 20 / 30 / 50. Idle 1.6s and the streak resets. Sound respects the toggle." />
+
+The escalation isn't magic, it's a step function. The streak maps to a tier, and every effect reads off that tier. More particles, wider spread, a bigger shake, a redder tint, a higher pitch:
+
+<CodeBlock filename="apps/web/src/games/numberhunt/NumberHunt.tsx">
+```ts
+function comboTier(streak: number): 0 | 1 | 2 | 3 | 4 {
+  if (streak >= 50) return 4;
+  if (streak >= 30) return 3;
+  if (streak >= 20) return 2;
+  if (streak >= 10) return 1;
+  return 0;
+}
+
+// on each successful mark:
+sfx.pop(streak);                                              // pitch tracks streak
+juice.burst(x, y, { count: 8 + tier * 5, spread: 80 + tier * 35 }); // more debris per tier
+juice.flash(flashColor, 0.07 + tier * 0.025);                // brighter flash per tier
+juice.shake(tier >= 3 ? 'md' : 'sm');                        // the board only shakes when it's earned
+```
+</CodeBlock>
+
+Two decisions make this feel good instead of exhausting. The board only shakes at tier three and above, so the strongest effect stays rare and keeps meaning something. And the streak decays after 1.6 seconds of inactivity, which turns a counter into tension. You're not just racking up points, you're keeping something alive. The decay is what makes the celebration feel earned, because it can be lost.
+
+<Tabs labels={["The dead version", "The juiced version"]}>
+<TabPanel>
+
+```ts
+function onMark(cell: Cell) {
+  setMarked((m) => [...m, cell]);
+  setScore((s) => s + 1);
+}
+```
+
+Correct. Ships. Tells you nothing happened beyond a number changing. This is what I had on day one, and it's why I spent the evening.
+
+</TabPanel>
+<TabPanel>
+
+```ts
+function onMark(cell: Cell, e: PointerEvent) {
+  const next = streak + 1;
+  setStreak(next);
+  setMarked((m) => [...m, cell]);
+  sfx.pop(next);
+  juice.burst(e.clientX, e.clientY, { count: 6, spread: 64, size: 7 });
+  clearTimeout(decay.current);
+  decay.current = setTimeout(() => setStreak(0), 1600);
+}
+```
+
+Eight more lines. Same correctness, plus weight, sound, and a reason to keep going.
+
+</TabPanel>
+</Tabs>
+
+<h2 id="respect">The part that isn't optional</h2>
+
+Everything here is designed to grab attention, which means everything here can become an attack on someone who didn't ask for it. Vestibular disorders make screen shake nauseating. Some people work in silence on purpose. The web has a real signal for the first, the [`prefers-reduced-motion`](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion) media query, and a basic courtesy for the second, and both are one line.
+
+Look back at every function above. They all open the same way:
+
+<CodeBlock filename="apps/web/src/lib/juice.tsx">
+```ts
+function reduced(): boolean {
+  return matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+// shake, flash, burst all start with: if (reduced()) return;
+```
+</CodeBlock>
+
+If the operating system asks for reduced motion, the shake, the flash, and the particles simply don't happen. The game stays fully playable. <Sidenote>This is also why I scoped the blog demos to honor the same flag. If your OS has reduced motion on, the motion demos on this page suppress themselves too, and you're reading a post that mostly demonstrates its own absence.</Sidenote> Sound gets the same treatment through a persisted mute flag, defaulted to audible but one click from silent and remembered across sessions.
+
+<Collapsible title="Why I don't trust 'add juice later' as a plan">
+Every time I've told myself I'd polish feel after the logic was done, the logic calcified around having no feel. Click handlers got written assuming a synchronous, instant response, and retrofitting a 400ms reaction window meant untangling them. The evening I described at the top worked because the game was small. On anything larger, the feedback layer wants to be a sibling of the logic from the start: a `juice.burst()` call sitting next to the `setState`, not bolted on in a later pass.
+</Collapsible>
+
+<Collapsible title="Go deeper: the talks and the book that defined this">
+Almost everything here stands on a handful of well-known talks and one book. If you want the originals:
+
+- **Steve Swink, *Game Feel: A Game Designer's Guide to Virtual Sensation*** (2008) — the book that named the field. [game-feel.com](http://www.game-feel.com/), or the longer [*Game Feel: The Secret Ingredient*](https://www.gamedeveloper.com/game-platforms/feature-game-feel---the-secret-ingredient-) essay.
+- **Disney's twelve principles of animation** — squash & stretch is principle one, from Frank Thomas and Ollie Johnston's *The Illusion of Life*. [Overview](https://en.wikipedia.org/wiki/Twelve_basic_principles_of_animation).
+- **Martin Jonasson & Petri Purho, *Juice it or lose it*** (2012) — [the talk](https://www.youtube.com/watch?v=Fy0aCDmgnxg), and the [playable Breakout](http://grapefrukt.com/f/games/juicy-breakout/) they juice live on stage.
+- **Jan Willem Nijman / Vlambeer, *The art of screenshake*** (2013) — [the talk](https://www.youtube.com/watch?v=AJdEqssNZ-U). Around 30 tricks in 25 minutes.
+- **Mark Brown, *Secrets of Game Feel and Juice*** — [the Game Maker's Toolkit video essay](https://www.youtube.com/watch?v=216_5nu4aVQ), if you'd rather watch than read.
+- **Hitstop / hitlag** — defined for fighting games in [Infil's Fighting Game Glossary](https://glossary.infil.net/?t=Hitstop).
+</Collapsible>
+
+The number hunt still plays identically with every effect stripped out. Nobody loses the game because they muted it or turned off motion. That's the line. Juice is something you add on top of a thing that already works, never a load-bearing part of whether it works at all.
+
+Go back up and mash the coin one more time. That pull you feel, the small reluctance to stop, is the entire reason any of this is worth writing. It's eight lines of code standing between a form submission and something you don't want to put down.
