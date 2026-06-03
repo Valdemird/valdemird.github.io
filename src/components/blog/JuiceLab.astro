@@ -12,25 +12,88 @@
  *
  *   <JuiceLab demo="shake" caption="Three magnitudes, same impulse." />
  */
+import { getLocale } from '../../consts';
+
 type Demo = 'squash' | 'hitstop' | 'shake' | 'particles' | 'sound' | 'combo';
 interface Props {
 	demo: Demo;
 	caption?: string;
 }
 const { demo, caption } = Astro.props;
+
+// Localized UI. Language is derived from the URL (es lives under /blog/es/),
+// so posts don't need to pass it. Industry terms the post itself explains —
+// "juice", "hitstop", "tiers", "Web Audio API" — are kept in English on purpose.
+const lang = getLocale(Astro.url);
+const COPY = {
+	en: {
+		press: 'press',
+		juiceOn: 'Juice: on',
+		juiceOff: 'Juice: off',
+		squashHint: 'Click the pad. Toggle to feel the dead version.',
+		strike: 'Strike',
+		hitstop: 'Hitstop',
+		shakeSm: 'small',
+		shakeMd: 'medium',
+		shakeLg: 'large',
+		screen: 'screen',
+		particles: 'Particles',
+		clickAnywhere: 'click anywhere',
+		sndClick: 'click',
+		sndChime: 'chime',
+		sndThud: 'thud',
+		sndFanfare: 'fanfare',
+		soundOn: 'Sound: on',
+		soundOff: 'Sound: off',
+		soundHint: 'No audio files. Every sound is generated live with the Web Audio API.',
+		tap: 'tap',
+		comboHint: 'Tap fast. Tiers unlock at 10 / 20 / 30 / 50. Stop and it decays.',
+	},
+	es: {
+		press: 'pulsa',
+		juiceOn: 'Con juice',
+		juiceOff: 'Sin juice',
+		squashHint: 'Pulsa el panel. Cambia el interruptor para sentir la versión muerta.',
+		strike: 'Golpea',
+		hitstop: 'Hitstop',
+		shakeSm: 'pequeña',
+		shakeMd: 'mediana',
+		shakeLg: 'grande',
+		screen: 'pantalla',
+		particles: 'Partículas',
+		clickAnywhere: 'haz clic donde sea',
+		sndClick: 'clic',
+		sndChime: 'campana',
+		sndThud: 'golpe',
+		sndFanfare: 'fanfarria',
+		soundOn: 'Sonido: activado',
+		soundOff: 'Sonido: silenciado',
+		soundHint: 'Sin archivos de audio. Cada sonido se genera en vivo con la Web Audio API.',
+		tap: 'toca',
+		comboHint: 'Toca rápido. Los tiers se desbloquean en 10 / 20 / 30 / 50. Deja de tocar y se reinicia.',
+	},
+}[lang];
 ---
 
-<section class="jl" data-juicelab data-demo={demo}>
+<section
+	class="jl"
+	data-juicelab
+	data-demo={demo}
+	data-juice-on={COPY.juiceOn}
+	data-juice-off={COPY.juiceOff}
+	data-sound-on={COPY.soundOn}
+	data-sound-off={COPY.soundOff}
+>
 	{demo === 'squash' && (
 		<>
 			<div class="jl-stage jl-stage--center">
 				<button class="jl-pad" type="button" data-jl-target aria-label="Press the pad">
-					<span class="jl-pad__face">press</span>
+					<span class="jl-pad__face">{COPY.press}</span>
 				</button>
 			</div>
 			<div class="jl-controls">
-				<button class="jl-btn" type="button" data-jl-toggle aria-pressed="true">Juice: on</button>
-				<span class="jl-hint">Click the pad. Toggle to feel the dead version.</span>
+				<button class="jl-btn" type="button" data-jl-toggle aria-pressed="true">{COPY.juiceOn}</button>
+				<span class="jl-hint">{COPY.squashHint}</span>
 			</div>
 		</>
 	)}
@@ -44,9 +107,9 @@ const { demo, caption } = Astro.props;
 				</div>
 			</div>
 			<div class="jl-controls">
-				<button class="jl-btn jl-btn--primary" type="button" data-jl-strike>Strike</button>
+				<button class="jl-btn jl-btn--primary" type="button" data-jl-strike>{COPY.strike}</button>
 				<label class="jl-slider">
-					<span class="jl-slider__label">Hitstop</span>
+					<span class="jl-slider__label">{COPY.hitstop}</span>
 					<input type="range" min="0" max="140" step="10" value="90" data-jl-range aria-label="Hitstop duration in milliseconds" />
 					<output class="jl-slider__out" data-jl-out>90ms</output>
 				</label>
@@ -58,13 +121,13 @@ const { demo, caption } = Astro.props;
 		<>
 			<div class="jl-stage jl-stage--center" data-jl-stage>
 				<div class="jl-screen" data-jl-shakeable aria-hidden="true">
-					<span class="jl-screen__label">screen</span>
+					<span class="jl-screen__label">{COPY.screen}</span>
 				</div>
 			</div>
 			<div class="jl-controls">
-				<button class="jl-btn" type="button" data-jl-shake="sm">small</button>
-				<button class="jl-btn" type="button" data-jl-shake="md">medium</button>
-				<button class="jl-btn" type="button" data-jl-shake="lg">large</button>
+				<button class="jl-btn" type="button" data-jl-shake="sm">{COPY.shakeSm}</button>
+				<button class="jl-btn" type="button" data-jl-shake="md">{COPY.shakeMd}</button>
+				<button class="jl-btn" type="button" data-jl-shake="lg">{COPY.shakeLg}</button>
 			</div>
 		</>
 	)}
@@ -72,11 +135,11 @@ const { demo, caption } = Astro.props;
 	{demo === 'particles' && (
 		<>
 			<div class="jl-stage jl-stage--burst" data-jl-stage data-jl-burst tabindex="0" role="button" aria-label="Click anywhere to burst particles">
-				<span class="jl-stage__hint">click anywhere</span>
+				<span class="jl-stage__hint">{COPY.clickAnywhere}</span>
 			</div>
 			<div class="jl-controls">
 				<label class="jl-slider">
-					<span class="jl-slider__label">Particles</span>
+					<span class="jl-slider__label">{COPY.particles}</span>
 					<input type="range" min="4" max="40" step="2" value="14" data-jl-range aria-label="Particle count" />
 					<output class="jl-slider__out" data-jl-out>14</output>
 				</label>
@@ -87,15 +150,15 @@ const { demo, caption } = Astro.props;
 	{demo === 'sound' && (
 		<>
 			<div class="jl-controls jl-controls--grid">
-				<button class="jl-btn" type="button" data-jl-sound="click">click</button>
+				<button class="jl-btn" type="button" data-jl-sound="click">{COPY.sndClick}</button>
 				<button class="jl-btn" type="button" data-jl-sound="pop">pop ×<span data-jl-streaklabel>0</span></button>
-				<button class="jl-btn" type="button" data-jl-sound="chime">chime</button>
-				<button class="jl-btn" type="button" data-jl-sound="thud">thud</button>
-				<button class="jl-btn" type="button" data-jl-sound="fanfare">fanfare</button>
+				<button class="jl-btn" type="button" data-jl-sound="chime">{COPY.sndChime}</button>
+				<button class="jl-btn" type="button" data-jl-sound="thud">{COPY.sndThud}</button>
+				<button class="jl-btn" type="button" data-jl-sound="fanfare">{COPY.sndFanfare}</button>
 			</div>
 			<div class="jl-controls">
-				<button class="jl-btn jl-btn--ghost" type="button" data-jl-mute aria-pressed="false">Sound: on</button>
-				<span class="jl-hint">No audio files. Every sound is generated live with the Web Audio API.</span>
+				<button class="jl-btn jl-btn--ghost" type="button" data-jl-mute aria-pressed="false">{COPY.soundOn}</button>
+				<span class="jl-hint">{COPY.soundHint}</span>
 			</div>
 		</>
 	)}
@@ -104,13 +167,13 @@ const { demo, caption } = Astro.props;
 		<>
 			<div class="jl-stage jl-stage--center" data-jl-stage>
 				<button class="jl-coin" type="button" data-jl-target aria-label="Tap to build a streak">
-					<span class="jl-coin__face">tap</span>
+					<span class="jl-coin__face">{COPY.tap}</span>
 				</button>
 				<span class="jl-streak" data-jl-streak hidden></span>
 			</div>
 			<div class="jl-controls">
-				<button class="jl-btn jl-btn--ghost" type="button" data-jl-mute aria-pressed="false">Sound: on</button>
-				<span class="jl-hint">Tap fast. Tiers unlock at 10 / 20 / 30 / 50. Stop and it decays.</span>
+				<button class="jl-btn jl-btn--ghost" type="button" data-jl-mute aria-pressed="false">{COPY.soundOn}</button>
+				<span class="jl-hint">{COPY.comboHint}</span>
 			</div>
 		</>
 	)}
@@ -264,9 +327,11 @@ const { demo, caption } = Astro.props;
 	function bindMute(root: HTMLElement) {
 		const btn = root.querySelector<HTMLButtonElement>('[data-jl-mute]');
 		if (!btn) return;
+		const onLabel = root.dataset.soundOn ?? 'Sound: on';
+		const offLabel = root.dataset.soundOff ?? 'Sound: off';
 		const sync = () => {
 			btn.setAttribute('aria-pressed', String(muted));
-			btn.textContent = muted ? 'Sound: off' : 'Sound: on';
+			btn.textContent = muted ? offLabel : onLabel;
 			btn.classList.toggle('is-muted', muted);
 		};
 		sync();
@@ -280,10 +345,12 @@ const { demo, caption } = Astro.props;
 		const toggle = root.querySelector<HTMLButtonElement>('[data-jl-toggle]');
 		if (!pad || !toggle) return;
 		let juiced = true;
+		const juiceOn = root.dataset.juiceOn ?? 'Juice: on';
+		const juiceOff = root.dataset.juiceOff ?? 'Juice: off';
 		toggle.addEventListener('click', () => {
 			juiced = !juiced;
 			toggle.setAttribute('aria-pressed', String(juiced));
-			toggle.textContent = `Juice: ${juiced ? 'on' : 'off'}`;
+			toggle.textContent = juiced ? juiceOn : juiceOff;
 			toggle.classList.toggle('is-off', !juiced);
 		});
 		pad.addEventListener('click', () => {
