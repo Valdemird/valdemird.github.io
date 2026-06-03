@@ -144,10 +144,16 @@ if (lang === 'en') {
 					}
 
 					// Gentle heading reveals on scroll. Skip the hide/reveal entirely
-					// when the URL carries a hash: a deep link must show its target
-					// (and everything above it) immediately, not as opacity:0.
+					// when the URL carries a hash (a deep link must show its target and
+					// everything above it immediately) or when a language switch is about
+					// to restore the reading position mid-article — otherwise the headings
+					// above the landing point would stay opacity:0.
 					const headings = document.querySelectorAll('.article-body h2, .article-body h3');
-					if (headings.length && !location.hash) {
+					let pendingLangRestore = false;
+					try {
+						pendingLangRestore = sessionStorage.getItem('langScrollHeading') !== null;
+					} catch (e) {}
+					if (headings.length && !location.hash && !pendingLangRestore) {
 						gsap.set(headings, { opacity: 0, y: 12 });
 						ScrollTrigger.batch(headings, {
 							onEnter: (batch: Element[]) => {

@@ -114,6 +114,83 @@ const structuredData = jsonLd || defaultJsonLd;
 	})();
 </script>
 
+<!-- Scroll behavior: clean anchor arrival + keep reading position on language switch -->
+<script is:inline>
+	(function () {
+		// Header is ~58px; align a touch below it when deciding the "current" section.
+		var HEADER_OFFSET = 100;
+
+		function blogHeadings() {
+			return Array.prototype.slice.call(
+				document.querySelectorAll('.article-body h2[id], .article-body h3[id]'),
+			);
+		}
+
+		// --- Keep reading position across an EN <-> ES switch (blog posts only) ---
+		// EN/ES posts share the same heading order (only the slugs are translated),
+		// so we remember WHICH heading you were reading and land on its counterpart.
+		// Event delegation on document survives View Transitions (the DOM is swapped).
+		document.addEventListener('click', function (e) {
+			var link = e.target && e.target.closest && e.target.closest('.lang-switch');
+			if (!link) return;
+			var headings = blogHeadings();
+			if (!headings.length) return; // not a blog post — fall back to top (default)
+			if (window.scrollY <= HEADER_OFFSET) return; // at the top — nothing to restore
+			var idx = 0;
+			for (var i = 0; i < headings.length; i++) {
+				if (headings[i].getBoundingClientRect().top <= HEADER_OFFSET) idx = i;
+			}
+			try {
+				sessionStorage.setItem('langScrollHeading', String(idx));
+			} catch (err) {}
+		});
+
+		function restoreLangScroll() {
+			var raw;
+			try {
+				raw = sessionStorage.getItem('langScrollHeading');
+				sessionStorage.removeItem('langScrollHeading');
+			} catch (e) {
+				return false;
+			}
+			if (raw === null) return false;
+			var idx = parseInt(raw, 10);
+			if (isNaN(idx)) return false;
+			requestAnimationFrame(function () {
+				requestAnimationFrame(function () {
+					var h = blogHeadings()[idx];
+					if (h) h.scrollIntoView({ block: 'start', behavior: 'auto' });
+				});
+			});
+			return true;
+		}
+
+		// --- Re-align deep-link anchors after a View Transition settles ---
+		// ClientRouter scrolls to the hash before late layout reflow finishes, leaving
+		// the heading a few dozen px off. Re-aligning on page-load (which respects
+		// scroll-margin-top) makes deep-link arrivals land cleanly under the header.
+		function realignHash() {
+			if (!location.hash) return;
+			var id;
+			try {
+				id = decodeURIComponent(location.hash.slice(1));
+			} catch (e) {
+				id = location.hash.slice(1);
+			}
+			var el = document.getElementById(id);
+			if (!el) return;
+			requestAnimationFrame(function () {
+				el.scrollIntoView({ block: 'start', behavior: 'auto' });
+			});
+		}
+
+		document.addEventListener('astro:page-load', function () {
+			// A pending language restore takes precedence; lang URLs carry no hash.
+			if (!restoreLangScroll()) realignHash();
+		});
+	})();
+</script>
+
 <!-- Canonical URL -->
 <link rel="canonical" href={canonicalURL} />
 
