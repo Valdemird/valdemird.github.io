@@ -189,6 +189,39 @@ For bilingual posts, create two files:
 - `src/content/blog/my-post.mdx` (English, `lang: en`)
 - `src/content/blog/es/my-post.mdx` (Spanish, `lang: es`)
 
+## The Discoverable Surface (SEO + AI citation)
+
+The prose is for the reader who already arrived. The **discoverable surface** — `title`, `description`, and section headings — is for the reader who hasn't: someone typing a question into Google, or an LLM (ChatGPT, Perplexity, Claude) deciding whether to cite you. These are different jobs, and the voice rules above do **not** apply to the surface the same way they apply to the body.
+
+This is a real tension, so be explicit about it. The voice guide says *open with the moment, never the lesson* — and that stays true for the **body**. But the `title` and `description` are not the opening line; they're the index card. They must answer the implied question directly and front-load the words a person actually types. The body keeps the tension; the surface gives the answer. Both, at once.
+
+**Crucially: this is a metadata job, not a prose-rewrite job.** A post whose body already opens with a lived-in moment and (often) a `TLDR` is already answer-first where it counts. Do not perform prose surgery in the name of SEO. Tune the surface, leave the voice alone.
+
+### Title — the question someone types, keyword first
+
+- Lead with the searchable concept. The front of the title is the most valuable real estate; don't spend it on cleverness, a colon-prefix mood-setter, or a back-reference to another post.
+- Name the thing. A reader scanning results should know the topic from the title alone, without the description.
+- Keep the site's cadence where it survives the rewrite — but searchability wins when they conflict.
+
+> Real example. A post titled *"Tests Gave Me Control. Worktrees Let Me Parallelize."* wasted its front half referencing a different post and never named its own topic. Rewritten to *"Git Worktrees Let Me Run Three Claude Agents in Parallel"*: same voice cadence (`Worktrees Let Me …`), but now the keyword (`Git Worktrees`) is first and the real query (`run … Claude agents in parallel`) is spelled out. Trade a clever sequel-title for being findable.
+
+### Description — a self-contained answer, not a setup
+
+- The `description` becomes the meta description and is often the exact text Google or an AI engine quotes. Make it stand alone: someone who reads only this sentence should get the answer.
+- Front-load the keywords and the concrete payload. Don't open with the date, the weekend, or the scene-setting — that's the body's job. Lead with *what the post lets you do* and the terms people search for.
+- Keep the lived-in voice; just reorder so the substance comes first. (e.g. "Three Claude agents on three bugs in one afternoon, only because each ran in its own git worktree…" — voice intact, keyword and capability up front.)
+
+### Headings — flatten the generic ones, keep the evocative ones
+
+Headings are extraction anchors: Google and LLMs read them to map what a section answers. But they're also part of the voice. So split the difference:
+
+- **Flatten purely generic headings** that carry no topic and no voice: `How I Got Here`, `Some Thoughts`, `Background`. Rewrite to say what the section answers — e.g. `How I Got Here` → `Why two agents on one repo collide`.
+- **Keep evocative narrative headings** that carry voice and tension: `The First Time It Broke`, `The Saturday`, `The Knowledge You Can't Google`. These are the rhythm of the post; do not sand them into keyword strings. A post that is *all* keyword headings reads like SEO content, which is its own AI tell.
+
+### Bilingual surface
+
+Titles and descriptions must use the **native query phrasing** for each language, not a translated keyword. People search "git worktrees" in both languages, but "learn by building" is *"aprender construyendo"*, not "construir para aprender." Write the surface for how each audience actually searches.
+
 ## Interactive Components Available
 
 These components are imported at the top of the MDX file. Use them generously — they exist to make posts feel alive, not to decorate.
@@ -509,7 +542,10 @@ Drafts and variations → `low`. Production heroes → `medium`. Infographics wi
 
 Before considering a post done, verify:
 - [ ] Title is specific and promises something concrete (not "Thoughts on X")
-- [ ] Description is a hook, not a summary
+- [ ] Title leads with the searchable concept — names its own topic, doesn't spend the front on cleverness or a back-reference (see "The Discoverable Surface")
+- [ ] Description is a hook AND a self-contained answer — keywords/payload front-loaded, not the date or scene-setting
+- [ ] Generic headings ("How I Got Here", "Background") are rewritten to say what the section answers; evocative narrative headings kept intact
+- [ ] Title + description use native query phrasing in each language (not a translated keyword)
 - [ ] At least 4 different interactive components used (mix of static and interactive)
 - [ ] No more than 3 consecutive paragraphs without a visual break
 - [ ] Code examples are real and runnable (not pseudocode, unless explicitly teaching a concept)
