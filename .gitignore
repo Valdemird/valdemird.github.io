@@ -26,3 +26,6 @@ pnpm-debug.log*
 # blog image authoring — ephemeral state, not committed
 public/images/blog/**/.candidates/
 public/images/blog/**/.history.jsonl
+
+# Claude Code local permissions — machine-local, not shared
+.claude/settings.local.json
