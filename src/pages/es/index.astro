@@ -4,7 +4,7 @@ import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
 import PostPreview from '../../components/PostPreview.astro';
-import { SITE_TITLE, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, t, getLocale } from '../../consts';
+import { SITE_TITLE, SITE_DESCRIPTION_ES, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, PERSON_ID, personWithProperties, webPropertyNodes, t, getLocale } from '../../consts';
 import { getCollection } from 'astro:content';
 
 const locale = getLocale(Astro.url);
@@ -14,12 +14,34 @@ const recentPosts = (await getCollection('blog'))
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
 	.slice(0, 3);
 const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma', 'Tailwind CSS', 'PostgreSQL', 'Vercel AI SDK', 'Claude Code'];
+
+const homeJsonLd = {
+	'@context': 'https://schema.org',
+	'@graph': [
+		{
+			'@type': 'WebSite',
+			'@id': 'https://valdemird.com/#website',
+			name: SITE_TITLE,
+			url: 'https://valdemird.com',
+			description: SITE_DESCRIPTION_ES,
+			inLanguage: ['es', 'en'],
+			publisher: { '@id': PERSON_ID },
+			potentialAction: {
+				'@type': 'SearchAction',
+				target: { '@type': 'EntryPoint', urlTemplate: 'https://valdemird.com/es/blog/?q={search_term_string}' },
+				'query-input': 'required name=search_term_string',
+			},
+		},
+		personWithProperties(),
+		...webPropertyNodes(),
+	],
+};
 ---
 
 <!doctype html>
 <html lang="es">
 	<head>
-		<BaseHead title={SITE_TITLE} description={strings.home.metaDescription} image="/og/default-es.png" lang="es" alternates={[
+		<BaseHead title={SITE_TITLE} description={strings.home.metaDescription} image="/og/default-es.png" lang="es" jsonLd={homeJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/' },
 		]} />

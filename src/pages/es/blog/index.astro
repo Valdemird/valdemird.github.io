@@ -4,7 +4,7 @@ import Header from '../../../components/Header.astro';
 import Footer from '../../../components/Footer.astro';
 import PostPreview from '../../../components/PostPreview.astro';
 import FormattedDate from '../../../components/FormattedDate.astro';
-import { SITE_TITLE, t } from '../../../consts';
+import { SITE_TITLE, PERSON_ID, t } from '../../../consts';
 import { getCollection } from 'astro:content';
 
 const strings = t(Astro.url);
@@ -13,12 +13,37 @@ const posts = (await getCollection('blog'))
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 const featuredPost = posts.find((p) => p.data.featured) || posts[0];
 const otherPosts = posts.filter((p) => p !== featuredPost);
+
+const blogJsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'Blog',
+	'@id': 'https://valdemird.com/es/blog/#blog',
+	name: `${strings.blog.title} | ${SITE_TITLE}`,
+	description: strings.blog.description,
+	url: 'https://valdemird.com/es/blog/',
+	inLanguage: 'es',
+	isPartOf: { '@id': 'https://valdemird.com/#website' },
+	author: { '@id': PERSON_ID },
+	publisher: { '@id': PERSON_ID },
+	blogPost: posts.map((p) => {
+		const mod = p.data.reviewedDate ?? p.data.updatedDate;
+		return {
+			'@type': 'BlogPosting',
+			headline: p.data.title,
+			description: p.data.description,
+			url: `https://valdemird.com/blog/${p.id}/`,
+			datePublished: p.data.pubDate.toISOString(),
+			...(mod && { dateModified: mod.toISOString() }),
+			author: { '@id': PERSON_ID },
+		};
+	}),
+};
 ---
 
 <!doctype html>
 <html lang="es">
 	<head>
-		<BaseHead title={`${strings.blog.title} | ${SITE_TITLE}`} description={strings.blog.description} image="/og/default-es.png" lang="es" alternates={[
+		<BaseHead title={`${strings.blog.title} | ${SITE_TITLE}`} description={strings.blog.description} image="/og/default-es.png" lang="es" jsonLd={blogJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/blog/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/blog/' },
 		]} />
