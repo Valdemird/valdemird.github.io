@@ -10,6 +10,7 @@ import CopyPageButton from '../components/blog/CopyPageButton.astro';
 import FreshnessLine from '../components/blog/FreshnessLine.astro';
 import Comments from '../components/blog/Comments.astro';
 import { cleanMdxBody, countWords } from '../lib/mdx-plaintext';
+import { PERSON, PERSON_REF } from '../consts';
 
 type Props = CollectionEntry<'blog'>['data'];
 
@@ -48,22 +49,8 @@ const blogPostingJsonLd: Record<string, unknown> = {
 	datePublished: pubDate.toISOString(),
 	...(effectiveDateModified && { dateModified: effectiveDateModified.toISOString() }),
 	...(isArchivedStatus && { creativeWorkStatus: 'Archived' }),
-	author: {
-		'@type': 'Person',
-		name: 'Valdemir D.',
-		url: 'https://valdemird.com',
-		jobTitle: 'Software Engineer & Consultant',
-		...(tags && tags.length > 0 && { knowsAbout: tags }),
-		sameAs: [
-			'https://github.com/valdemird',
-			'https://www.linkedin.com/in/sebastiancaja',
-		],
-	},
-	publisher: {
-		'@type': 'Person',
-		name: 'Valdemir D.',
-		url: 'https://valdemird.com',
-	},
+	author: PERSON,
+	publisher: PERSON_REF,
 	mainEntityOfPage: {
 		'@type': 'WebPage',
 		'@id': `https://valdemird.com${currentPath}`,

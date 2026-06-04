@@ -8,6 +8,27 @@ export const SOCIAL_LINKS = {
 	linkedin: 'https://www.linkedin.com/in/sebastiancaja',
 } as const;
 
+// --- Canonical author entity (Entity SEO / E-E-A-T) ---
+// One stable @id reused across every page so the knowledge graph resolves a
+// SINGLE person instead of a fresh anonymous node per post. Canonical name is
+// the real name; "Valdemir D." is the pen name carried as alternateName, and
+// both profiles live in sameAs so they collapse to one entity.
+export const PERSON_ID = 'https://valdemird.com/about/#person';
+
+export const PERSON = {
+	'@type': 'Person',
+	'@id': PERSON_ID,
+	name: 'Sebastian Castano',
+	alternateName: ['Sebastian Castano Jara', 'Valdemir D.'],
+	url: 'https://valdemird.com/about/',
+	jobTitle: 'Senior Software Engineer & Consultant',
+	knowsAbout: ['Software Engineering', 'Developer Tools', 'AI-assisted development', 'Astro', 'React', 'Web Performance'],
+	sameAs: [SOCIAL_LINKS.github, SOCIAL_LINKS.linkedin],
+} as const;
+
+// Lightweight reference: link to the canonical Person by @id without re-inlining.
+export const PERSON_REF = { '@id': PERSON_ID } as const;
+
 type Project = {
 	readonly title: string;
 	/** Localized description — title and tech stay shared (brand/tech names). */
@@ -122,6 +143,35 @@ export const UI_STRINGS = {
 		},
 	},
 } as const;
+
+// --- Web properties (owned subdomains living on other servers) ---
+// Models each project/experiment as a WebApplication authored by the canonical
+// Person. This tells the knowledge graph "valdemird.com and these subdomains
+// share one creator entity" — consolidating brand authority across the domain.
+// Source of truth is PROJECTS + EXPERIMENTS, so adding a card auto-links it.
+export function webPropertyNodes() {
+	return [...PROJECTS, ...EXPERIMENTS].map((p) => ({
+		'@type': 'WebApplication',
+		'@id': `${p.url}#app`,
+		name: p.title,
+		url: p.url,
+		applicationCategory: 'DeveloperApplication',
+		operatingSystem: 'Web',
+		description: p.description.en,
+		author: { '@id': PERSON_ID },
+		publisher: { '@id': PERSON_ID },
+		isPartOf: { '@id': 'https://valdemird.com/#website' },
+	}));
+}
+
+// Canonical Person enriched with the properties it owns — use on identity pages
+// (home, about) where the full entity graph should be declared.
+export function personWithProperties() {
+	return {
+		...PERSON,
+		owns: webPropertyNodes().map((w) => ({ '@id': w['@id'] })),
+	};
+}
 
 export type Locale = keyof typeof UI_STRINGS;
 

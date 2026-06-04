@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS, EXPERIMENTS } from '../consts';
 
 export const GET: APIRoute = async () => {
 	const all = (await getCollection('blog'))
@@ -51,6 +51,14 @@ export const GET: APIRoute = async () => {
 		'- Site: https://valdemird.com',
 		'- GitHub: https://github.com/valdemird',
 		'- LinkedIn: https://www.linkedin.com/in/sebastiancaja',
+		'',
+		'## Ecosystem (same author, separate subdomains)',
+		'',
+		'These live on their own servers but are owned and built by the same person:',
+		'',
+		...[...PROJECTS, ...EXPERIMENTS].map(
+			(p) => `- ${p.title}: ${p.url} — ${p.description.en}`,
+		),
 		'',
 		'## Blog Posts (English)',
 		'',

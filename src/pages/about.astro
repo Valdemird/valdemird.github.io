@@ -2,9 +2,36 @@
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE_TITLE, SOCIAL_LINKS, t } from '../consts';
+import { SITE_TITLE, SOCIAL_LINKS, PERSON_ID, personWithProperties, webPropertyNodes, t } from '../consts';
 
 const strings = t(Astro.url);
+
+// ProfilePage + enriched canonical Person — the E-E-A-T trust anchor.
+const aboutPerson = {
+	...personWithProperties(),
+	address: { '@type': 'PostalAddress', addressLocality: 'Cali', addressCountry: 'CO' },
+	knowsLanguage: ['en', 'es'],
+	alumniOf: [{ '@type': 'CollegeOrUniversity', name: 'Universidad del Valle' }],
+	hasCredential: [
+		{ '@type': 'EducationalOccupationalCredential', credentialCategory: 'certification', name: 'AWS Certified Cloud Practitioner' },
+	],
+};
+const aboutJsonLd = {
+	'@context': 'https://schema.org',
+	'@graph': [
+		{
+			'@type': 'ProfilePage',
+			'@id': 'https://valdemird.com/about/#profilepage',
+			url: 'https://valdemird.com/about/',
+			name: `${strings.about.title} | ${SITE_TITLE}`,
+			inLanguage: 'en',
+			isPartOf: { '@id': 'https://valdemird.com/#website' },
+			mainEntity: { '@id': PERSON_ID },
+		},
+		aboutPerson,
+		...webPropertyNodes(),
+	],
+};
 
 const techDomains = [
 	{ domain: 'Frontend', tools: ['React', 'Next.js', 'Astro', 'TypeScript', 'CSS/Design Systems'], accent: 'var(--color-accent)' },
@@ -37,7 +64,7 @@ const certs = [
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={`${strings.about.title} | ${SITE_TITLE}`} description={strings.about.description} alternates={[
+		<BaseHead title={`${strings.about.title} | ${SITE_TITLE}`} description={strings.about.description} lang="en" jsonLd={aboutJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/about/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/about/' },
 		]} />

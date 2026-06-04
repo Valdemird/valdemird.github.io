@@ -4,7 +4,7 @@ import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import ProjectCard from '../components/ProjectCard.astro';
 import PostPreview from '../components/PostPreview.astro';
-import { SITE_TITLE, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, t, getLocale } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, PERSON_ID, personWithProperties, webPropertyNodes, t, getLocale } from '../consts';
 import { getCollection } from 'astro:content';
 
 const locale = getLocale(Astro.url);
@@ -16,12 +16,36 @@ const recentPosts = (await getCollection('blog'))
 	.slice(0, 3);
 
 const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma', 'Tailwind CSS', 'PostgreSQL', 'Vercel AI SDK', 'Claude Code'];
+
+// Entity graph: WebSite + canonical Person (owning the subdomains) + each owned
+// web property. Ties valdemird.com and its subdomains to one creator entity.
+const homeJsonLd = {
+	'@context': 'https://schema.org',
+	'@graph': [
+		{
+			'@type': 'WebSite',
+			'@id': 'https://valdemird.com/#website',
+			name: SITE_TITLE,
+			url: 'https://valdemird.com',
+			description: SITE_DESCRIPTION,
+			inLanguage: ['en', 'es'],
+			publisher: { '@id': PERSON_ID },
+			potentialAction: {
+				'@type': 'SearchAction',
+				target: { '@type': 'EntryPoint', urlTemplate: 'https://valdemird.com/blog/?q={search_term_string}' },
+				'query-input': 'required name=search_term_string',
+			},
+		},
+		personWithProperties(),
+		...webPropertyNodes(),
+	],
+};
 ---
 
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={SITE_TITLE} description={strings.home.metaDescription} alternates={[
+		<BaseHead title={SITE_TITLE} description={strings.home.metaDescription} jsonLd={homeJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/' },
 		]} />

@@ -4,7 +4,7 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import { ClientRouter } from 'astro:transitions';
-import { SITE_DESCRIPTION, SITE_DESCRIPTION_ES } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PERSON, PERSON_ID } from '../consts';
 
 interface Alternate {
 	hreflang: string;
@@ -37,28 +37,26 @@ const ogImageAlt = imageAlt || title;
 
 const defaultJsonLd = {
 	'@context': 'https://schema.org',
-	'@type': 'WebSite',
-	name: 'valdemird',
-	url: 'https://valdemird.com',
-	description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
-	author: {
-		'@type': 'Person',
-		name: 'Valdemir D.',
-		url: 'https://valdemird.com',
-		sameAs: [
-			'https://github.com/valdemird',
-			'https://www.linkedin.com/in/sebastiancaja',
-		],
-	},
-	inLanguage: ['en', 'es'],
-	potentialAction: {
-		'@type': 'SearchAction',
-		target: {
-			'@type': 'EntryPoint',
-			urlTemplate: 'https://valdemird.com/blog/?q={search_term_string}',
+	'@graph': [
+		{
+			'@type': 'WebSite',
+			'@id': 'https://valdemird.com/#website',
+			name: SITE_TITLE,
+			url: 'https://valdemird.com',
+			description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
+			inLanguage: ['en', 'es'],
+			publisher: { '@id': PERSON_ID },
+			potentialAction: {
+				'@type': 'SearchAction',
+				target: {
+					'@type': 'EntryPoint',
+					urlTemplate: 'https://valdemird.com/blog/?q={search_term_string}',
+				},
+				'query-input': 'required name=search_term_string',
+			},
 		},
-		'query-input': 'required name=search_term_string',
-	},
+		PERSON,
+	],
 };
 
 const structuredData = jsonLd || defaultJsonLd;

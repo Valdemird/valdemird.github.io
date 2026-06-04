@@ -2,8 +2,33 @@
 import BaseHead from '../../components/BaseHead.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
-import { SITE_TITLE, SOCIAL_LINKS, t } from '../../consts';
+import { SITE_TITLE, SOCIAL_LINKS, PERSON_ID, personWithProperties, webPropertyNodes, t } from '../../consts';
 const strings = t(Astro.url);
+const aboutPerson = {
+	...personWithProperties(),
+	address: { '@type': 'PostalAddress', addressLocality: 'Cali', addressCountry: 'CO' },
+	knowsLanguage: ['en', 'es'],
+	alumniOf: [{ '@type': 'CollegeOrUniversity', name: 'Universidad del Valle' }],
+	hasCredential: [
+		{ '@type': 'EducationalOccupationalCredential', credentialCategory: 'certification', name: 'AWS Certified Cloud Practitioner' },
+	],
+};
+const aboutJsonLd = {
+	'@context': 'https://schema.org',
+	'@graph': [
+		{
+			'@type': 'ProfilePage',
+			'@id': 'https://valdemird.com/es/about/#profilepage',
+			url: 'https://valdemird.com/es/about/',
+			name: `${strings.about.title} | ${SITE_TITLE}`,
+			inLanguage: 'es',
+			isPartOf: { '@id': 'https://valdemird.com/#website' },
+			mainEntity: { '@id': PERSON_ID },
+		},
+		aboutPerson,
+		...webPropertyNodes(),
+	],
+};
 const techDomains = [
 	{ domain: 'Frontend', tools: ['React', 'Next.js', 'Astro', 'TypeScript', 'CSS/Design Systems'], accent: 'var(--color-accent)' },
 	{ domain: 'Backend', tools: ['Node.js', 'PostgreSQL', 'Prisma', 'REST APIs'], accent: 'var(--color-success)' },
@@ -30,7 +55,7 @@ const certs = [
 ---
 <!doctype html>
 <html lang="es">
-	<head><BaseHead title={`${strings.about.title} | ${SITE_TITLE}`} description={strings.about.description} image="/og/default-es.png" lang="es" alternates={[
+	<head><BaseHead title={`${strings.about.title} | ${SITE_TITLE}`} description={strings.about.description} image="/og/default-es.png" lang="es" jsonLd={aboutJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/about/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/about/' },
 		]} /></head>
