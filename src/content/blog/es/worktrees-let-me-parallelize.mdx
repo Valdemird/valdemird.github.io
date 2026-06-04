@@ -1,6 +1,6 @@
 ---
-title: "Los tests me dieron control. Los worktrees me dejaron paralelizar."
-description: "Este sábado tuve tres agentes de Claude trabajando en tres bugs al mismo tiempo. Sin worktrees, eso es perder el fin de semana. Esta es la disciplina que tuve que aprender, en parte rompiéndola."
+title: "Git worktrees: cómo corrí tres agentes de Claude en paralelo"
+description: "Tres agentes de Claude sobre tres bugs en una sola tarde, y solo porque cada uno corría en su propio git worktree. La disciplina de aislamiento que vuelve seguros a los agentes en paralelo, y el error que me la enseñó."
 pubDate: 2026-05-13
 tags: ["ai-tools", "developer-workflow", "git", "claude-code"]
 featured: true
@@ -27,7 +27,7 @@ Eso funcionó por una sola razón: cada Claude vivía en su propio worktree de g
 Un worktree de git no es un truco de productividad para humanos. Es un límite de aislamiento a nivel de archivos entre agentes. En el momento en que tengas dos Claudes tocando el mismo árbol, necesitas uno.
 </Callout>
 
-## Cómo llegué acá
+## Por qué dos agentes en un repo chocan
 
 Empecé por impaciencia, no por sofisticación. Le pedía a Claude algo (un refactor multi-archivo, una pasada de hardening en fases, cualquier cosa que tomara más de unos minutos) y me quedaba mirando cómo las tool calls subían por la pantalla. Después de un rato empecé a preguntarme si no podía abrir otra terminal y arrancar la siguiente tarea en paralelo. Dos Claudes, dos tareas, un yo.
 
