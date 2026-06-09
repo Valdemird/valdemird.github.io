@@ -31,7 +31,7 @@ There are no tests or linting configured.
 ## Architecture
 
 - **Astro 6 static site** with file-based routing (`src/pages/`), MDX support, View Transitions (`ClientRouter`), and auto-generated sitemap
-- **Content Layer API** (`src/content.config.ts`) with `glob()` loader — blog posts use frontmatter: `title`, `description`, `pubDate` (required), `updatedDate`, `heroImage`, `tags`, `featured`, `lang` (optional)
+- **Content Layer API** (`src/content.config.ts`) with `glob()` loader — blog posts use frontmatter: `title`, `description`, `pubDate` (required), `updatedDate`, `heroImage`, `heroImageAlt`, `tags`, `featured`, `lang`, `tldr` (optional). If `heroImage` is set, always set `heroImageAlt` in the post's language.
 - **i18n**: Built-in Astro routing with `en` (default, no prefix) and `es` (`/es/` prefix). UI strings in `src/consts.ts`
 - **Dynamic routes** for blog posts via `src/pages/blog/[...slug].astro` using `getStaticPaths()` with `post.id` (not slug)
 - **Layouts**: `BlogPost.astro` layout with reading progress bar, editorial typography, and SEO metadata
@@ -40,7 +40,10 @@ There are no tests or linting configured.
 - **Global constants** (site title, i18n strings, social links, projects) in `src/consts.ts`
 - **Styling**: OKLch color system in `src/styles/global.css` with CSS custom properties, dark mode via `data-theme` attribute
 - **Fonts**: Fraunces (serif display), Geist (sans body), Geist Mono (code/meta) — loaded from Google Fonts
-- **Deployment**: Push to `main` triggers `.github/workflows/deploy.yml` (Node 22, `withastro/action@v2`)
+- **Deployment**: Push to `main` triggers `.github/workflows/deploy.yml` (Node 22, `withastro/action@v5`). This is the ONLY deploy workflow — do not add a second one.
+- **Component lab**: `/lab` (EN) and `/es/lab/` (ES) are public, indexed, bilingual galleries (linked from the site nav) that render every blog component live (real global.css, dark mode, GSAP, View Transitions). Shared markup lives in `LabIndexPage.astro`/`LabComponentPage.astro` under `src/components/pages/`; route files are thin shells. One demo file per component in `src/components/lab/demos/<Name>.demo.astro`; each exports `meta` (title, category, status, `summary`/`summaryEs`, props, and editorial `why`/`whyEs` paragraphs written with `/blog-writer`) and reads `const { lang = 'en' } = Astro.props` to localize its DemoSection labels/descriptions/captions with `es ? ... : ...`. The lab is reader-facing: `props` and `usage` metadata stay in the demo source for maintainers but are NOT rendered, and public copy must not expose project internals (libraries, plugins, CSS plumbing). When you CREATE or materially CHANGE a blog component, update its demo file in the same change. Inside a demo, import the component under an alias (the filename claims the component's own name).
+- **Charts**: `InteractiveChart` supports bar/horizontal/line/area/donut/scatter, multi-series with legend toggling, thresholds, monotone curves, hover scrub + keyboard nav. Build-time math uses d3-scale/d3-shape/d3-array in `src/lib/chart/` (never ship d3 to the client); client interactivity lives in `src/lib/chart/interact.ts`.
+- **Smoke test**: `npm run build` runs `scripts/check-dist.mjs` (postbuild) — validates internal links, hreflang reciprocity, OG images and RSS in `dist/`.
 - **Comments**: Giscus embed via `Comments.astro`, mapped per-pathname. Threads live in the separate public repo `Valdemird/valdemird-comments` (this blog repo stays private). Moderation is GitHub-native: open the Discussions tab on `valdemird-comments` → hide / lock / ban offending replies. Categories are "Announcements" type, so only the maintainer can open threads — visitors only reply. To switch comment repos or category later, edit `REPO`, `REPO_ID`, `CATEGORY`, `CATEGORY_ID` constants at the top of `Comments.astro`.
 
 ## Design System

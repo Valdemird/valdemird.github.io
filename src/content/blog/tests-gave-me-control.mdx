@@ -18,6 +18,7 @@ import TabPanel from '../../components/blog/TabPanel.astro';
 import FileTree from '../../components/blog/FileTree.astro';
 import TLDR from '../../components/blog/TLDR.astro';
 import Sidenote from '../../components/blog/Sidenote.astro';
+import FlakySuite from '../../components/blog/FlakySuite.astro';
 
 <TLDR bullets={[
   "I worked a month with Claude Code on a side project. /insights showed me two things: AI patches symptoms before understanding causes, and tests are the only thing that lets me trust its changes.",
@@ -145,6 +146,16 @@ export default defineConfig({
 </CodeBlock>
 
 The E2E tests insert a real session row into the DB to bypass NextAuth, then drive the actual server. No mocks. The two `@smoke` tests do nothing fancy. One navigates every main page, the other creates a task. They exist so that if AI rewires routing or breaks auth in a way that compiles, I know in seconds.
+
+One line in that config deserves more attention than I gave it when I wrote it: `retries: process.env.CI ? 2 : 0`. Two retries in CI is a confession. It says I expect the occasional E2E failure that has nothing to do with my code, and I'd rather re-roll than investigate every one. The reason flakiness earns that confession is that it compounds. A test that flakes 3% of the time passes 97% of runs. A suite of forty tests like that goes green on about three runs out of ten. Same 3%, same code, and the build is red most mornings. Run the math yourself:
+
+<FlakySuite
+  tests={40}
+  flakeRate={0.03}
+  caption="2,000 simulated runs per configuration. Watch the no-retry bar collapse as the suite grows."
+/>
+
+Retries pull the green bar back up, which is why that line is in my config. But look at what they actually fix: the color of the build, not the suite. Every retried failure is a real failure you trained yourself to ignore. With two smoke tests I can afford that trade. The day the E2E suite grows past a dozen, that `2` becomes the place where regressions go to hide.
 
 Compare the same change with and without that scaffolding. These are composite sketches of what I lived with all month, not transcripts of one session:
 

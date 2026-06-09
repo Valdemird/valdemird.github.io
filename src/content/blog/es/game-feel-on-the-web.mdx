@@ -17,6 +17,7 @@ import Timeline from '../../../components/blog/Timeline.astro';
 import PullQuote from '../../../components/blog/PullQuote.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Sidenote from '../../../components/blog/Sidenote.astro';
+import EasingExplorer from '../../../components/blog/EasingExplorer.astro';
 
 <GameFeelHero
   eyebrow="Interactivo"
@@ -77,6 +78,16 @@ La trampa es usar un solo `scale()`. Eso es un globo inflándose, no un objeto c
 </CodeBlock>
 
 El `transform-origin: 50% 100%` hace un trabajo silencioso ahí. Anclar al borde inferior hace que el squash se lea como el objeto presionando contra el suelo, no flotando en su sitio. Si mueves el origen al centro, los mismos keyframes se sienten como un latido en lugar de un aterrizaje.
+
+El otro trabajador silencioso es la curva de timing. `cubic-bezier(0.22, 1, 0.36, 1)` es la razón de que el asentamiento se lea como una plantada y no como un deslizamiento: casi todo el recorrido ocurre en el primer tercio, y después viene un frenado largo. Empuja cualquiera de los dos puntos de control por encima del borde superior y el elemento se pasa de su destino y regresa, que es toda la personalidad de "spring" con la que corren los hovers de este sitio. Agarra los puntos de control y mira la bola:
+
+<EasingExplorer
+  lang="es"
+  initial={[0.22, 1, 0.36, 1]}
+  caption="La curva settleIn del juego. Prueba el preset spring y después linear, para sentir qué compran esos cuatro números."
+/>
+
+Cada demo de esta página que se mueve depende de una curva como esa. Los keyframes deciden qué se deforma. El bezier decide si se siente como goma, como mantequilla o como una hoja de cálculo.
 
 <h2 id="hitstop">Hitstop</h2>
 
@@ -238,7 +249,7 @@ juice.shake(tier >= 3 ? 'md' : 'sm');                        // el tablero solo 
 ```
 </CodeBlock>
 
-Dos decisiones hacen que esto se sienta bien y no agotador. El tablero solo tiembla de tier tres en adelante, así que el efecto más fuerte se mantiene raro y sigue significando algo. Y la racha decae tras 1.6 segundos de inactividad, lo que convierte un contador en tensión. No estás solo acumulando puntos, estás manteniendo algo con vida. Ese decaimiento es lo que hace que la celebración se sienta ganada, porque se puede perder.
+Dos decisiones hacen que esto se sienta bien y no agotador. El tablero solo tiembla de tier tres en adelante, así que el efecto más fuerte se mantiene raro y sigue significando algo. Y la racha decae tras 1.6 segundos de inactividad, lo que convierte un contador en tensión. No solo estás acumulando puntos, estás manteniendo algo con vida. Ese decaimiento es lo que hace que la celebración se sienta ganada, porque se puede perder.
 
 <Tabs labels={["La versión muerta", "La versión con juice"]}>
 <TabPanel>
@@ -290,7 +301,7 @@ function reduced(): boolean {
 Si el sistema operativo pide movimiento reducido, el temblor, el flash y las partículas sencillamente no ocurren. El juego sigue siendo del todo jugable. <Sidenote>Por eso mismo las demos del blog respetan la misma preferencia. Si tu sistema tiene el movimiento reducido activado, las demos de movimiento de esta página también se silencian, y estás leyendo un artículo que sobre todo demuestra su propia ausencia.</Sidenote> El sonido recibe el mismo trato mediante un interruptor de silencio persistente, audible por defecto pero a un clic del silencio y recordado entre sesiones.
 
 <Collapsible title="Por qué no confío en 'le pongo juice después' como plan">
-Cada vez que me dije que puliría la sensación cuando la lógica estuviera lista, la lógica se endureció alrededor de no tener ninguna sensación. Los manejadores de clic quedaron escritos asumiendo una respuesta síncrona e instantánea, y meterles después una ventana de reacción de 400ms implicaba desenredarlos. La noche que describí al principio funcionó porque el juego era pequeño. En algo más grande, la capa de feedback quiere ser hermana de la lógica desde el inicio: un `juice.burst()` junto al `setState`, no atornillado en una pasada posterior.
+Cada vez que me dije que puliría la sensación cuando la lógica estuviera lista, la lógica se endureció alrededor de no tener ninguna sensación. Los manejadores de clic quedaron escritos dando por sentada una respuesta síncrona e instantánea, y meterles después una ventana de reacción de 400ms implicaba desenredarlos. La noche que describí al principio funcionó porque el juego era pequeño. En algo más grande, la capa de feedback quiere ser hermana de la lógica desde el inicio: un `juice.burst()` junto al `setState`, no atornillado en una pasada posterior.
 </Collapsible>
 
 <Collapsible title="Para profundizar: las charlas y el libro que definieron esto">

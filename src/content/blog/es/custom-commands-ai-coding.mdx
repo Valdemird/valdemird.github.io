@@ -1,6 +1,6 @@
 ---
-title: "Slash Commands Custom para Programar con IA: Construye Tu Propio Flujo Spec-Driven"
-description: "Cómo 6 archivos markdown convirtieron mi asistente de IA en un co-arquitecto estructurado — y por qué deberías construir tu propio sistema de comandos en vez de depender de prompts crudos."
+title: "Slash commands custom para programar con IA: construye tu propio flujo spec-driven"
+description: "Cómo 6 archivos markdown convirtieron mi asistente de IA en un coarquitecto estructurado — y por qué deberías construir tu propio sistema de comandos en vez de depender de prompts crudos."
 pubDate: 2026-03-10
 tags: ["herramientas-ia", "workflow", "productividad", "automatizacion"]
 featured: true
@@ -25,7 +25,7 @@ La idea es simple: en lugar de escribir las mismas instrucciones cada vez ("expl
 
 Construí 6 comandos que forman un **pipeline de desarrollo spec-driven**. Te cuento cómo, y por qué deberías armar los tuyos.
 
-## Por Qué los Prompts Crudos Fallan a Escala
+## Por qué los prompts crudos fallan a escala
 
 Cuando escribes *"agrega autenticación JWT a mi API"*, le estás pidiendo al modelo que tome docenas de decisiones implícitas:
 
@@ -46,9 +46,9 @@ Seis comandos, cada uno un archivo markdown, formando un pipeline lineal donde c
 
 <MermaidDiagram title="Pipeline Spec-Driven" chart="graph LR\n    A[Crear] --> B[Auditar]\n    B --> C[Revisar]\n    C --> D[Planear]\n    D --> E[Implementar]\n    E --> F[Listo]" />
 
-## Comando 1: Crear. De Idea a Spec Estructurado
+## Comando 1: crear. De idea a spec estructurado
 
-Le das un nombre y una descripción general. El comando genera un spec estructurado con contexto, comportamiento esperado, edge cases, restricciones, criterios de aceptación, y, crucialmente, **preguntas abiertas** que detectó que *tú* necesitas responder.
+Le das un nombre y una descripción general. El comando genera un spec estructurado con contexto, comportamiento esperado, edge cases, restricciones, criterios de aceptación y, crucialmente, **preguntas abiertas** que detectó que *tú* necesitas responder.
 
 <CodeBlock filename=".commands/spec-create.md">
 ```markdown
@@ -73,7 +73,7 @@ En lugar de adivinar tu preferencia de librería JWT, te pregunta.
 Toma 5 minutos responder preguntas en un spec. Toma 2 horas desenredar suposiciones equivocadas en código. Fuerza la especificación antes del código.
 </Callout>
 
-## Comando 2: Auditar. El Spec Se Encuentra con Tu Codebase
+## Comando 2: auditar. El spec se encuentra con tu codebase
 
 Aquí el modelo **explora tu proyecto real**: estructura de archivos, convenciones de nombrado, patrones de manejo de errores, dependencias existentes, y enriquece el spec con una sección de análisis técnico.
 
@@ -91,31 +91,31 @@ Aquí el modelo **explora tu proyecto real**: estructura de archivos, convencion
 
 Este paso previene la falla #1 del código generado por IA: **ignorar patrones existentes**. Después del audit, el modelo conoce las convenciones de tu proyecto. El código que escriba después va a *encajar*.
 
-## Comando 3: Revisar. El Semáforo de Preparación
+## Comando 3: revisar. El semáforo de preparación
 
 Antes de invertir tiempo en implementación, este comando evalúa el spec:
 
-<Tabs labels={["Listo", "Con Supuestos", "Bloqueante"]}>
+<Tabs labels={["Listo", "Con supuestos", "Bloqueante"]}>
 <TabPanel>
 
-🟢 **Listo**: Bien definido. Todas las decisiones tomadas. Avanzar al plan.
+🟢 **Listo**: bien definido. Todas las decisiones tomadas. Avanzar al plan.
 
 </TabPanel>
 <TabPanel>
 
-🟡 **Puede avanzar**: Existe ambigüedad, pero se pueden hacer suposiciones razonables. Cada supuesto se lista explícitamente para que lo apruebes.
+🟡 **Puede avanzar**: existe ambigüedad, pero se pueden hacer suposiciones razonables. Cada supuesto se lista explícitamente para que lo apruebes.
 
 </TabPanel>
 <TabPanel>
 
-🔴 **Bloqueante**: Decisiones críticas pendientes. Ejemplos: "¿Sessions o JWT?", "¿Qué base de datos?", "¿Necesita real-time?" Resuelve antes de continuar.
+🔴 **Bloqueante**: decisiones críticas pendientes. Ejemplos: "¿Sessions o JWT?", "¿Qué base de datos?", "¿Necesita real-time?" Resuelve antes de continuar.
 
 </TabPanel>
 </Tabs>
 
 Si algo está en rojo, lo arreglas ahora, no después de 3 fases de implementación.
 
-## Comando 4: Planear. Implementación por Fases
+## Comando 4: planear. Implementación por fases
 
 El plan genera una implementación paso a paso. Cada fase es pequeña (1-3 archivos), verificable (criterio claro de "está listo") e independiente (revisable antes de continuar).
 
@@ -134,16 +134,16 @@ El plan genera una implementación paso a paso. Cada fase es pequeña (1-3 archi
 </CodeBlock>
 
 <Callout type="warning">
-Regla dura: **máximo 3-4 fases** para features medianas. Si necesita más, la feature es muy grande y debe dividirse. Esto previene el scope creep.
+Regla dura: **máximo 3-4 fases** para features medianas. Si necesita más, la feature es demasiado grande y debe dividirse. Esto previene el scope creep.
 </Callout>
 
-## Comando 5: Implementar. Una Fase a la Vez
+## Comando 5: implementar. Una fase a la vez
 
 El comando de implementación solo ejecuta **una fase a la vez**. Después de cada fase, resume qué hizo, qué decisiones tomó, y pide tu revisión antes de continuar.
 
 Esta es la diferencia clave con "generar todo de un golpe". Si la Fase 1 revela un problema, ajustas el plan antes de que arranque la Fase 2. El costo del cambio se mantiene bajo durante todo el proyecto.
 
-## Bonus: Comandos de Review
+## Bonus: comandos de review
 
 | Comando | Qué revisa | Output |
 |---|---|---|
@@ -171,10 +171,10 @@ Pon tus archivos de comandos:
 </div>
 </FileTree>
 
-## Tiempo Ahorrado en Retrabajo
+## Tiempo ahorrado en retrabajo
 
 <InteractiveChart
-  title="Tiempo en Retrabajo"
+  title="Tiempo en retrabajo"
   type="bar"
   data={[
     { label: "Prompts crudos", value: 45, color: "oklch(0.65 0.2 27)" },
@@ -184,13 +184,13 @@ Pon tus archivos de comandos:
 
 *(Porcentaje del tiempo de sesión arreglando código que no encajó)*
 
-## La Regla de Oro
+## La regla de oro
 
-> Nunca saltes pasos bajo presión. El tiempo que "ahorras" saltando el audit o el review lo pagas triple en correcciones después.
+> Nunca te saltes pasos bajo presión. El tiempo que "ahorras" saltándote el audit o el review lo pagas triple en correcciones después.
 
-No se trata de ir más lento. Se trata de **invertir 10 minutos en especificación para ahorrar 2 horas en debugging**. Tu herramienta de IA se vuelve dramáticamente más útil cuando la tratas como un colaborador que necesita contexto, no como una caja mágica que adivina lo que quieres.
+No se trata de ir más lento. Se trata de **invertir 10 minutos en especificación para ahorrar 2 horas en debugging**. Tu herramienta de IA se vuelve drásticamente más útil cuando la tratas como un colaborador que necesita contexto, no como una caja mágica que adivina lo que quieres.
 
-Los flujos estructurados le ganan a los prompts crudos. Siempre.
+Los flujos estructurados les ganan a los prompts crudos. Siempre.
 
 ---
 

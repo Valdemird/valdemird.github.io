@@ -515,7 +515,7 @@ For any new slug, always run once with `--dry-run` first. It prints the estimate
 
 After a successful (non-variation) run, the stdout JSON contains `path` (a public URL like `/images/blog/<slug>/hero.webp`). Wire it in:
 
-- Hero: add `heroImage: "<path>"` to frontmatter of **both** EN and ES versions — images are shared across the pair because filenames are slug-matched.
+- Hero: add `heroImage: "<path>"` to frontmatter of **both** EN and ES versions — images are shared across the pair because filenames are slug-matched. Always add `heroImageAlt: "<descriptive alt in the post's language>"` alongside it (EN alt in the EN file, ES alt in the ES file); without it the layout falls back to the post title.
 - Inline: insert `![descriptive alt](<path>)` at the relevant paragraph.
 
 ## Cost Transparency
