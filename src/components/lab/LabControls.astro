@@ -1,0 +1,156 @@
+---
+/**
+ * LabControls — theme override + animation replay for the /lab gallery.
+ *
+ * Theme: BaseHead always follows the OS preference. Inside /lab we allow a
+ * session-scoped override (auto → light → dark) so components can be checked
+ * in both themes without touching the OS. The override is re-applied after
+ * BaseHead's own handlers on every View Transition, but only on /lab pages —
+ * leaving the lab returns the site to OS-driven theming.
+ *
+ * Replay: kills every ScrollTrigger, strips the `data-*-ready` / `.animate`
+ * init guards all interactive components use, then dispatches a real
+ * `astro:after-swap`. Components that re-init cleanly replay their entrance;
+ * repeated replays double as a manual leak test.
+ */
+---
+
+<div class="lab-controls" data-lab-controls>
+	<button type="button" class="lab-btn" data-lab-theme aria-live="polite">
+		<span class="lab-btn-label">theme</span>
+		<span class="lab-btn-value" data-lab-theme-value>auto</span>
+	</button>
+	<button type="button" class="lab-btn" data-lab-replay>
+		<span class="lab-btn-label">replay</span>
+		<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+			<path d="M3 12a9 9 0 1 0 2.64-6.36M3 3v6h6" />
+		</svg>
+	</button>
+</div>
+
+<script>
+	import { killAllScrollTriggers } from '../../lib/gsap';
+
+	type LabTheme = 'auto' | 'light' | 'dark';
+	const KEY = 'lab-theme';
+
+	function getOverride(): LabTheme {
+		try {
+			const v = sessionStorage.getItem(KEY);
+			return v === 'light' || v === 'dark' ? v : 'auto';
+		} catch {
+			return 'auto';
+		}
+	}
+
+	function osTheme(): 'light' | 'dark' {
+		return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+	}
+
+	function applyTheme(root: HTMLElement, override: LabTheme) {
+		root.setAttribute('data-theme', override === 'auto' ? osTheme() : override);
+	}
+
+	function syncButton() {
+		const value = document.querySelector('[data-lab-theme-value]');
+		if (value) value.textContent = getOverride();
+	}
+
+	function initControls() {
+		const root = document.querySelector<HTMLElement>('[data-lab-controls]');
+		if (!root || root.dataset.labReady === '1') return;
+		root.dataset.labReady = '1';
+
+		root.querySelector('[data-lab-theme]')?.addEventListener('click', () => {
+			const order: LabTheme[] = ['auto', 'light', 'dark'];
+			const next = order[(order.indexOf(getOverride()) + 1) % order.length];
+			try {
+				if (next === 'auto') sessionStorage.removeItem(KEY);
+				else sessionStorage.setItem(KEY, next);
+			} catch {}
+			applyTheme(document.documentElement, next);
+			syncButton();
+		});
+
+		root.querySelector('[data-lab-replay]')?.addEventListener('click', async () => {
+			await killAllScrollTriggers();
+			// Strip the init guards every interactive component sets, so the real
+			// `astro:after-swap` dispatch below re-runs their setup from scratch.
+			const main = document.querySelector('main');
+			if (main) {
+				for (const el of main.querySelectorAll<HTMLElement>('*')) {
+					for (const key of Object.keys(el.dataset)) {
+						if (/Ready$/.test(key)) delete el.dataset[key];
+					}
+					if (el.hasAttribute('data-chart')) el.classList.remove('animate');
+				}
+			}
+			document.dispatchEvent(new Event('astro:after-swap'));
+		});
+
+		applyTheme(document.documentElement, getOverride());
+		syncButton();
+	}
+
+	initControls();
+	document.addEventListener('astro:after-swap', initControls);
+
+	// Re-assert the override AFTER BaseHead's before-swap handler (registered
+	// earlier, so it runs first) — but only when navigating to a /lab page.
+	document.addEventListener('astro:before-swap', (e: any) => {
+		const to: URL | undefined = e.to ?? (e.newDocument && new URL(e.newDocument.URL));
+		if (!to || !/^\/(es\/)?lab(\/|$)/.test(to.pathname)) return;
+		applyTheme(e.newDocument.documentElement, getOverride());
+	});
+</script>
+
+<style>
+	.lab-controls {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.lab-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		padding: 0.4rem 0.7rem;
+		min-height: 32px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		color: var(--color-text-secondary);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		cursor: pointer;
+		transition:
+			border-color var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-spring),
+			box-shadow var(--duration-fast) var(--ease-smooth);
+	}
+
+	.lab-btn:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+		transform: translateY(-1px);
+		box-shadow: var(--shadow-sm);
+	}
+
+	.lab-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.lab-btn-label {
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		font-size: 0.62rem;
+		color: var(--color-text-muted);
+	}
+
+	.lab-btn-value {
+		color: var(--color-accent);
+		font-weight: 600;
+	}
+</style>

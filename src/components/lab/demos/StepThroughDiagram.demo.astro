@@ -1,0 +1,73 @@
+---
+import SDiag from '../../blog/StepThroughDiagram.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'StepThroughDiagram',
+	category: 'narrative',
+	status: 'stable',
+	summary: 'A diagram that builds itself as you scroll its step list — each step reveals the part of the picture it talks about.',
+	summaryEs: 'Un diagrama que se construye solo mientras recorres su lista de pasos — cada paso revela la parte de la imagen de la que habla.',
+	why: 'A static diagram can\'t narrate itself. When a post walks through a pipeline stage by stage, the diagram should light up in sync with the steps, so the picture and the prose tell the story together. It takes more work to build than a plain diagram, which is exactly why it\'s reserved for the ones that carry a sequence.',
+	whyEs: 'Un diagrama estático no puede narrarse a sí mismo. Cuando un post recorre un pipeline etapa por etapa, el diagrama debería iluminarse en sincronía con los pasos, para que la imagen y la prosa cuenten la historia juntas. Cuesta más construirlo que un diagrama normal, y exactamente por eso se reserva para los que llevan una secuencia.',
+	props: [
+		{ name: 'steps', type: '{ id: string, label: string }[]', description: 'Ordered steps. Each id matches data-diagram-step="<id>" elements in the slotted SVG.' },
+		{ name: 'exclusive', type: 'boolean', default: 'false', description: 'If true, only the active step\'s elements are visible instead of accumulating.' },
+		{ name: 'diagram (slot)', type: 'SVG', description: 'Named slot holding the SVG with data-diagram-step markers.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const steps = es
+	? [
+			{ id: 'commit', label: 'Un commit aterriza en el branch.' },
+			{ id: 'unit', label: 'Los tests unitarios corren primero — rápidos, sin red.' },
+			{ id: 'e2e', label: 'Solo una corrida unitaria en verde paga la suite e2e.' },
+		]
+	: [
+			{ id: 'commit', label: 'A commit lands on the branch.' },
+			{ id: 'unit', label: 'Unit tests run first — fast, no network.' },
+			{ id: 'e2e', label: 'Only a green unit run pays for the e2e suite.' },
+		];
+---
+
+<DemoSection
+	label={es ? 'revelado acumulativo / pipeline de tests' : 'cumulative reveal / test pipeline'}
+	description={es ? 'Recorre los pasos numerados — cada uno revela su parte del SVG y las anteriores siguen visibles. Con reduced-motion el diagrama completo se muestra de una vez.' : 'Scroll through the numbered steps — each one reveals its part of the SVG and earlier parts stay visible. Reduced-motion shows the full diagram at once.'}
+	usage={`<StepThroughDiagram
+  steps={[
+    { id: "commit", label: "A commit lands on the branch." },
+    { id: "unit", label: "Unit tests run first — fast, no network." },
+    { id: "e2e", label: "Only a green unit run pays for the e2e suite." },
+  ]}
+>
+  <svg slot="diagram" viewBox="0 0 420 160" xmlns="http://www.w3.org/2000/svg">
+    <g data-diagram-step="commit"><!-- commit node --></g>
+    <g data-diagram-step="unit"><!-- unit node + arrow --></g>
+    <g data-diagram-step="e2e"><!-- e2e node + arrow --></g>
+  </svg>
+</StepThroughDiagram>`}
+>
+	<SDiag steps={steps}>
+		<svg slot="diagram" viewBox="0 0 420 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label={es ? 'Pipeline de tests: commit, tests unitarios, suite e2e' : 'Test pipeline: commit, unit tests, e2e suite'} style="width: 100%; height: auto;">
+			<g data-diagram-step="commit">
+				<rect x="14" y="58" width="104" height="44" rx="8" fill="none" stroke="var(--color-accent)" stroke-width="1.5" />
+				<text x="66" y="84" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--color-text)">commit</text>
+			</g>
+			<g data-diagram-step="unit">
+				<line x1="118" y1="80" x2="156" y2="80" stroke="var(--color-text-muted)" stroke-width="1.5" />
+				<polygon points="156,76 164,80 156,84" fill="var(--color-text-muted)" />
+				<rect x="166" y="58" width="104" height="44" rx="8" fill="none" stroke="var(--color-accent)" stroke-width="1.5" />
+				<text x="218" y="84" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--color-text)">unit · 40s</text>
+			</g>
+			<g data-diagram-step="e2e">
+				<line x1="270" y1="80" x2="308" y2="80" stroke="var(--color-text-muted)" stroke-width="1.5" />
+				<polygon points="308,76 316,80 308,84" fill="var(--color-text-muted)" />
+				<rect x="318" y="58" width="88" height="44" rx="8" fill="none" stroke="var(--color-accent)" stroke-width="1.5" />
+				<text x="362" y="84" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--color-text)">e2e · 9m</text>
+			</g>
+		</svg>
+	</SDiag>
+</DemoSection>

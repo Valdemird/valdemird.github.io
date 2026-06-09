@@ -1,0 +1,84 @@
+---
+import Table from '../../blog/DataTable.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'DataTable',
+	category: 'data',
+	status: 'stable',
+	summary: 'Sortable table with optional per-column heatmap coloring and default sort.',
+	summaryEs: 'Tabla ordenable con coloreado heatmap opcional por columna y orden por defecto.',
+	why: 'A markdown table makes the reader do the work: scan every row, find the outlier, build the ranking in their head. Sorting and heatmap shading move that work into the component. The heatmapDirection option exists because "lower is better" columns (MTTR, flake rate) lie visually if you shade them the same way as "higher is better" ones.',
+	whyEs: 'Una tabla markdown le pasa el trabajo al lector: recorrer cada fila, encontrar el outlier, armar el ranking de cabeza. Ordenar y sombrear con heatmap mueven ese trabajo al componente. La opción heatmapDirection existe porque las columnas donde "menos es mejor" (MTTR, tasa de flakes) mienten visualmente si se sombrean igual que las de "más es mejor".',
+	props: [
+		{ name: 'columns', type: '{ key, label, align?, heatmap?, heatmapDirection?, suffix? }[]', description: 'Column definitions. heatmapDirection "descending" means lower is better.' },
+		{ name: 'rows', type: 'Record<string, string | number>[]', description: 'Row objects keyed by column key.' },
+		{ name: 'defaultSort', type: '{ key, direction: "asc" | "desc" }', description: 'Initial sort applied on load.' },
+		{ name: 'caption', type: 'string', description: 'Accessible table caption.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'heatmap / ordenable' : 'heatmap / sortable'}
+	description={es ? 'Haz clic en un encabezado para ordenar. Las columnas con heatmap se sombrean por valor; MTTR usa descending (menos es mejor).' : 'Click a header to sort. Heatmap columns shade by value; MTTR uses descending (lower is better).'}
+	usage={`<DataTable
+  columns={[
+    { key: "team", label: "Team", align: "left" },
+    { key: "deploys", label: "Deploys/day", align: "right", heatmap: true },
+    { key: "mttr", label: "MTTR (min)", align: "right", heatmap: true, heatmapDirection: "descending" },
+  ]}
+  rows={[
+    { team: "Gateway", deploys: 4.2, mttr: 9 },
+    { team: "Billing", deploys: 1.1, mttr: 42 },
+    { team: "Mobile", deploys: 2.6, mttr: 23 },
+  ]}
+  defaultSort={{ key: "deploys", direction: "desc" }}
+  caption="Sample delivery metrics"
+/>`}
+>
+	<Table
+		columns={[
+			{ key: 'team', label: es ? 'Equipo' : 'Team', align: 'left' },
+			{ key: 'deploys', label: es ? 'Deploys/día' : 'Deploys/day', align: 'right', heatmap: true },
+			{ key: 'mttr', label: 'MTTR (min)', align: 'right', heatmap: true, heatmapDirection: 'descending' },
+		]}
+		rows={[
+			{ team: 'Gateway', deploys: 4.2, mttr: 9 },
+			{ team: 'Billing', deploys: 1.1, mttr: 42 },
+			{ team: 'Mobile', deploys: 2.6, mttr: 23 },
+			{ team: 'Search', deploys: 3.8, mttr: 15 },
+		]}
+		defaultSort={{ key: 'deploys', direction: 'desc' }}
+		caption={es ? 'Métricas de entrega de ejemplo' : 'Sample delivery metrics'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'simple / con sufijo' : 'plain / with suffix'}
+	description={es ? 'Sin heatmap, con sufijo añadido a los valores.' : 'No heatmap, suffix appended to values.'}
+	usage={`<DataTable
+  columns={[
+    { key: "model", label: "Model", align: "left" },
+    { key: "pass", label: "Pass rate", align: "right", suffix: "%" },
+  ]}
+  rows={[
+    { model: "baseline", pass: 71 },
+    { model: "with tests", pass: 94 },
+  ]}
+/>`}
+>
+	<Table
+		columns={[
+			{ key: 'model', label: es ? 'Modelo' : 'Model', align: 'left' },
+			{ key: 'pass', label: es ? 'Tasa de éxito' : 'Pass rate', align: 'right', suffix: '%' },
+		]}
+		rows={[
+			{ model: 'baseline', pass: 71 },
+			{ model: 'with tests', pass: 94 },
+		]}
+	/>
+</DemoSection>

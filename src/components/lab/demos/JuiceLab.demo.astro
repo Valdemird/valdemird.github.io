@@ -1,0 +1,53 @@
+---
+import Juice from '../../blog/JuiceLab.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'JuiceLab',
+	category: 'playful',
+	status: 'stable',
+	summary: 'Self-contained game-feel demos: squash, hitstop, shake, particles, Web Audio synthesis, combo meter.',
+	summaryEs: 'Demos autocontenidas de game feel: squash, hitstop, shake, partículas, síntesis con Web Audio y medidor de combos.',
+	why: 'The game-feel post made a claim that prose cannot back up: that juice is felt, not described. A video would have been someone else feeling it. These demos port the exact motion math and synth parameters from the shipped game, so when the post says "toggle juice off and the pad goes dead", the reader\'s own finger runs the experiment.',
+	whyEs: 'El post de game feel hacía una afirmación que la prosa no puede sostener: que el juice se siente, no se describe. Un video habría sido otra persona sintiéndolo. Estas demos portan la matemática de movimiento y los parámetros del sintetizador exactos del juego publicado, así que cuando el post dice "apaga el juice y el panel se muere", el dedo del lector corre el experimento.',
+	props: [
+		{ name: 'demo', type: '"squash" | "hitstop" | "shake" | "particles" | "sound" | "combo"', description: 'Which demo to render. Each instance is one demo.' },
+		{ name: 'caption', type: 'string', description: 'Mono caption below the demo.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label="squash"
+	description={es ? 'Haz clic en el pad y luego apaga el juice para sentir la versión muerta.' : 'Click the pad, then toggle juice off to feel the dead version.'}
+	usage={`<JuiceLab demo="squash" caption="Same click handler. Only the feedback changes." />`}
+>
+	<Juice demo="squash" caption={es ? 'El mismo handler de clic. Solo cambia el feedback.' : 'Same click handler. Only the feedback changes.'} />
+</DemoSection>
+
+<DemoSection
+	label="shake"
+	description={es ? 'Tres magnitudes de screen shake a partir del mismo impulso.' : 'Three magnitudes of screen shake from the same impulse.'}
+	usage={`<JuiceLab demo="shake" caption="Three magnitudes, same impulse." />`}
+>
+	<Juice demo="shake" caption={es ? 'Tres magnitudes, el mismo impulso.' : 'Three magnitudes, same impulse.'} />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'sonido' : 'sound'}
+	description={es ? 'Sin archivos de audio — cada sonido se sintetiza en vivo con la Web Audio API. El estado de mute persiste.' : 'No audio files — every sound is synthesized live with the Web Audio API. Mute state persists.'}
+	usage={`<JuiceLab demo="sound" caption="Synthesized live with the Web Audio API." />`}
+>
+	<Juice demo="sound" caption={es ? 'Sintetizado en vivo con la Web Audio API.' : 'Synthesized live with the Web Audio API.'} />
+</DemoSection>
+
+<DemoSection
+	label="combo"
+	description={es ? 'Pulsa rápido; los niveles se desbloquean en 10 / 20 / 30 / 50 y decaen cuando paras.' : 'Tap fast; tiers unlock at 10 / 20 / 30 / 50 and decay when you stop.'}
+	usage={`<JuiceLab demo="combo" caption="Escalation and decay." />`}
+>
+	<Juice demo="combo" caption={es ? 'Escalada y decaimiento.' : 'Escalation and decay.'} />
+</DemoSection>

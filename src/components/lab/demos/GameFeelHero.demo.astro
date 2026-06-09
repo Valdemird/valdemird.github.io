@@ -1,0 +1,89 @@
+---
+import Hero from '../../blog/GameFeelHero.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'GameFeelHero',
+	category: 'playful',
+	status: 'stable',
+	summary: 'Always-dark "game screen" hero panel with serif title, muted subtitle, and chip links that double as a table of contents.',
+	summaryEs: 'Panel hero siempre oscuro tipo "pantalla de juego", con título serif, subtítulo apagado y chips de enlace que hacen de tabla de contenidos.',
+	why: 'The game-feel post was the longest on the site, with six demos the reader needed a map for. A generic h1 wasn\'t going to carry a 3,000-word piece about juice — the hero had to demonstrate the thesis before the first paragraph, and the chip nav is the map.',
+	whyEs: 'El post de game feel era el más largo del sitio, con seis demos para las que el lector necesitaba un mapa. Un h1 genérico no iba a cargar una pieza de 3.000 palabras sobre juice: el hero tenía que demostrar la tesis antes del primer párrafo, y la navegación de chips es el mapa.',
+	props: [
+		{ name: 'eyebrow', type: 'string', description: 'Optional mono eyebrow line above the title.' },
+		{ name: 'title', type: 'string', description: 'Serif display title of the panel.' },
+		{ name: 'subtitle', type: 'string', description: 'Muted one-paragraph subtitle under the title.' },
+		{ name: 'chips', type: '{ label: string, href: string }[]', description: 'Anchor-link chips into the post sections — the TOC in disguise.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const heroChips = es
+	? [
+		{ label: 'squash & stretch', href: '#squash-stretch' },
+		{ label: 'hitstop', href: '#hitstop' },
+		{ label: 'screen shake', href: '#screen-shake' },
+		{ label: 'sonido', href: '#sound' },
+	]
+	: [
+		{ label: 'squash & stretch', href: '#squash-stretch' },
+		{ label: 'hitstop', href: '#hitstop' },
+		{ label: 'screen shake', href: '#screen-shake' },
+		{ label: 'sound', href: '#sound' },
+	];
+
+const checklistChips = es
+	? [
+		{ label: 'la checklist', href: '#checklist' },
+		{ label: 'cuándo parar', href: '#restraint' },
+	]
+	: [
+		{ label: 'the checklist', href: '#checklist' },
+		{ label: 'when to stop', href: '#restraint' },
+	];
+---
+
+<DemoSection
+	label={es ? 'hero de post / chips como TOC' : 'post hero / chips as TOC'}
+	description={es ? 'El panel se mantiene oscuro sin importar el tema del sitio, como la pantalla de una consola. Los chips son anchors reales hacia las secciones del post.' : "The panel stays dark regardless of site theme, like a console screen. Chips are real anchor links into the post's sections."}
+	usage={`<GameFeelHero
+  eyebrow="game feel"
+  title="Why clicking this button feels good"
+  subtitle="Same handler, same logic — the only difference is feedback. Six small techniques that turn a dead UI into one you want to touch."
+  chips={[
+    { label: "squash & stretch", href: "#squash-stretch" },
+    { label: "hitstop", href: "#hitstop" },
+    { label: "screen shake", href: "#screen-shake" },
+    { label: "sound", href: "#sound" },
+  ]}
+/>`}
+>
+	<Hero
+		eyebrow="game feel"
+		title={es ? 'Por qué hacer clic en este botón se siente bien' : 'Why clicking this button feels good'}
+		subtitle={es ? 'El mismo handler, la misma lógica — la única diferencia es el feedback. Seis técnicas pequeñas que convierten una UI muerta en una que dan ganas de tocar.' : 'Same handler, same logic — the only difference is feedback. Six small techniques that turn a dead UI into one you want to touch.'}
+		chips={heroChips}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'sin eyebrow' : 'no eyebrow'}
+	description={es ? 'El eyebrow es opcional — sin él, el título serif carga el panel solo.' : 'The eyebrow is optional — without it the serif title carries the panel alone.'}
+	usage={`<GameFeelHero
+  title="Ship the juice"
+  subtitle="A checklist of feedback layers you can bolt onto any web UI in an afternoon."
+  chips={[
+    { label: "the checklist", href: "#checklist" },
+    { label: "when to stop", href: "#restraint" },
+  ]}
+/>`}
+>
+	<Hero
+		title={es ? 'Shippea el juice' : 'Ship the juice'}
+		subtitle={es ? 'Una checklist de capas de feedback que puedes atornillar a cualquier UI web en una tarde.' : 'A checklist of feedback layers you can bolt onto any web UI in an afternoon.'}
+		chips={checklistChips}
+	/>
+</DemoSection>

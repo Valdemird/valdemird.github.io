@@ -1,0 +1,50 @@
+---
+import Diagram from '../../blog/MermaidDiagram.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'MermaidDiagram',
+	category: 'data',
+	status: 'stable',
+	summary: 'Flowcharts and sequence diagrams written as text, rendered to match the site in both light and dark mode.',
+	summaryEs: 'Flowcharts y diagramas de secuencia escritos como texto, renderizados a juego con el sitio tanto en modo claro como oscuro.',
+	why: 'The first diagram component on the blog. It earns its place for flowcharts and sequence diagrams — the shapes where a picture beats three paragraphs of prose — and it only loads when you actually scroll to it, so a diagram halfway down a post never slows down the start of it.',
+	whyEs: 'El primer componente de diagramas del blog. Se gana su lugar en flowcharts y diagramas de secuencia — las formas donde una imagen le gana a tres párrafos de prosa — y solo se carga cuando de verdad llegas a él, así que un diagrama a mitad de post nunca frena el arranque.',
+	props: [
+		{ name: 'title', type: 'string', description: 'Optional mono title above the diagram.' },
+		{ name: 'chart', type: 'string', description: 'Mermaid source. Literal \\n sequences are converted to newlines before rendering.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const worktreeChart = `flowchart LR
+	main[main branch] --> wt1[worktree: feat/auth]
+	main --> wt2[worktree: fix/flaky-test]
+	wt1 --> a1[Agent 1]
+	wt2 --> a2[Agent 2]
+	a1 --> pr1[PR #41]
+	a2 --> pr2[PR #42]
+	pr1 --> main
+	pr2 --> main`;
+---
+
+<DemoSection
+	label={es ? 'flowchart / agentes en paralelo' : 'flowchart / parallel agents'}
+	description={es ? 'El diagrama se renderiza solo cuando entra en pantalla — un spinner guarda el lugar mientras tanto.' : 'The diagram renders only when it scrolls into view — a spinner holds the spot until then.'}
+	usage={`<MermaidDiagram
+  title="Two agents, two worktrees, zero collisions"
+  chart={\`flowchart LR
+  main[main branch] --> wt1[worktree: feat/auth]
+  main --> wt2[worktree: fix/flaky-test]
+  wt1 --> a1[Agent 1]
+  wt2 --> a2[Agent 2]
+  a1 --> pr1[PR #41]
+  a2 --> pr2[PR #42]
+  pr1 --> main
+  pr2 --> main\`}
+/>`}
+>
+	<Diagram title={es ? 'Dos agentes, dos worktrees, cero colisiones' : 'Two agents, two worktrees, zero collisions'} chart={worktreeChart} />
+</DemoSection>

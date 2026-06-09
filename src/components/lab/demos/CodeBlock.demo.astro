@@ -1,0 +1,58 @@
+---
+import Block from '../../blog/CodeBlock.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'CodeBlock',
+	category: 'utility',
+	status: 'stable',
+	summary: 'Code container with an optional filename header — so you know where the code lives — and a one-click copy button.',
+	summaryEs: 'Contenedor de código con encabezado opcional de filename — para saber dónde vive el código — y botón de copiar en un clic.',
+	why: 'Code in the posts is real code from real sessions, and a bare fenced block strips it of the thing that matters: where it lives. The filename header answers that, and the copy button exists because I caught myself triple-clicking code in my own posts.',
+	whyEs: 'El código de los posts es código real de sesiones reales, y un bloque pelado le quita lo que importa: dónde vive. El encabezado con filename responde eso, y el botón de copiar existe porque me descubrí haciendo triple clic en el código de mis propios posts.',
+	props: [
+		{ name: 'filename', type: 'string', description: 'Optional filename shown in a header bar with a file icon. Without it, the copy button floats over the code.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'con encabezado de filename' : 'with filename header'}
+	description={es ? 'El encabezado dice dónde vive el código; el botón copia el bloque en un clic.' : 'The header tells you where the code lives; the button copies the block in one click.'}
+	usage={`<CodeBlock filename="vitest.config.ts">
+\`\`\`ts
+export default defineConfig({
+  test: {
+    pool: "forks",
+    isolate: true,
+  },
+});
+\`\`\`
+</CodeBlock>`}
+>
+	<Block filename="vitest.config.ts">
+		<pre><code>export default defineConfig({'{'}
+  test: {'{'}
+    pool: "forks",
+    isolate: true,
+  {'}'},
+{'}'});</code></pre>
+	</Block>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'sin filename / botón flotante' : 'no filename / floating copy'}
+	description={es ? 'Sin filename, el botón de copiar flota en la esquina superior derecha del bloque.' : 'Without a filename the copy button floats in the top-right corner of the block.'}
+	usage={`<CodeBlock>
+\`\`\`bash
+git worktree add ../fix-auth -b fix/auth
+\`\`\`
+</CodeBlock>`}
+>
+	<Block>
+		<pre><code>git worktree add ../fix-auth -b fix/auth</code></pre>
+	</Block>
+</DemoSection>

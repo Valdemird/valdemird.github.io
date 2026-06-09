@@ -1,0 +1,240 @@
+---
+/**
+ * Lab layout — shell for the /lab component gallery.
+ *
+ * Public and indexed, wearing the site's own chrome (glass Header + Footer)
+ * so the gallery reads as part of the site, plus a lab-only toolbar (theme
+ * override + replay). Components render against the real global.css, fonts,
+ * GSAP singleton and View Transitions, so what you see here is exactly what
+ * a blog post gets.
+ */
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import LabControls from '../components/lab/LabControls.astro';
+import type { DemoEntry } from '../components/lab/registry';
+import { groupByCategory } from '../components/lab/registry';
+
+interface Props {
+	title: string;
+	description: string;
+	entries: DemoEntry[];
+	/** Slug of the active component page; undefined on the index. */
+	active?: string;
+	lang?: 'en' | 'es';
+}
+
+const { title, description, entries, active, lang = 'en' } = Astro.props;
+const groups = groupByCategory(entries, lang);
+
+const STRINGS = {
+	en: { skip: 'Skip to content', nav: 'Components', wordmark: 'component lab' },
+	es: { skip: 'Saltar al contenido', nav: 'Componentes', wordmark: 'lab de componentes' },
+} as const;
+const L = STRINGS[lang];
+const labHome = lang === 'es' ? '/es/lab/' : '/lab/';
+
+// EN/ES mirrors live at /lab/... and /es/lab/... — emit both hreflang links.
+const enPath = Astro.url.pathname.replace(/^\/es\//, '/');
+const alternates = [
+	{ hreflang: 'en', href: new URL(enPath, Astro.site).toString() },
+	{ hreflang: 'es', href: new URL(`/es${enPath}`, Astro.site).toString() },
+];
+---
+
+<!doctype html>
+<html lang={lang}>
+	<head>
+		<BaseHead title={title} description={description} lang={lang} alternates={alternates} />
+	</head>
+	<body>
+		<a class="skip-link" href="#lab-content">{L.skip}</a>
+		<Header />
+
+		<div class="lab-toolbar">
+			<a href={labHome} class="lab-wordmark">
+				<span class="lab-wordmark-lab">{L.wordmark}</span>
+			</a>
+			<LabControls />
+		</div>
+
+		<div class="lab-shell">
+			<aside class="lab-sidebar">
+				<nav aria-label={L.nav}>
+					{groups.map((group) => (
+						<div class="lab-nav-group">
+							<span class="lab-nav-label">{group.label}</span>
+							<ul>
+								{group.items.map((item) => (
+									<li>
+										<a
+											href={`${labHome}${item.slug}/`}
+											class:list={['lab-nav-link', { active: item.slug === active }]}
+											aria-current={item.slug === active ? 'page' : undefined}
+										>
+											{item.meta.title}
+										</a>
+									</li>
+								))}
+							</ul>
+						</div>
+					))}
+				</nav>
+			</aside>
+
+			<main id="lab-content" class="lab-main">
+				<slot />
+			</main>
+		</div>
+
+		<Footer />
+	</body>
+</html>
+
+<style>
+	.skip-link {
+		position: absolute;
+		top: -100%;
+		left: 1rem;
+		z-index: 100;
+		padding: 0.6rem 1rem;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border-strong);
+		border-radius: var(--radius-sm);
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--color-text);
+	}
+
+	.skip-link:focus {
+		top: 0.75rem;
+	}
+
+	.lab-toolbar {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 1.1rem 1.5rem 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.lab-wordmark {
+		text-decoration: none;
+	}
+
+	.lab-wordmark:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		border-radius: var(--radius-sm);
+	}
+
+	.lab-wordmark-lab {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+
+	.lab-shell {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 1.5rem;
+		display: grid;
+		grid-template-columns: 220px minmax(0, 1fr);
+		gap: var(--space-2xl);
+		align-items: start;
+	}
+
+	.lab-sidebar {
+		position: sticky;
+		top: 4.5rem;
+		padding: var(--space-xl) 0;
+		max-height: calc(100vh - 4.5rem);
+		overflow-y: auto;
+	}
+
+	.lab-nav-group + .lab-nav-group {
+		margin-top: var(--space-lg);
+	}
+
+	.lab-nav-label {
+		display: block;
+		margin-bottom: 0.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-text-muted);
+	}
+
+	.lab-nav-group ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.lab-nav-link {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		padding: 0.3rem 0;
+		min-height: 30px;
+		font-size: 0.85rem;
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		transition: color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.lab-nav-link:hover {
+		color: var(--color-text);
+	}
+
+	.lab-nav-link:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		border-radius: var(--radius-sm);
+	}
+
+	.lab-nav-link.active {
+		color: var(--color-accent);
+		font-weight: 600;
+	}
+
+	.lab-main {
+		padding: var(--space-xl) 0 var(--space-2xl);
+		min-height: 70vh;
+	}
+
+	@media (max-width: 880px) {
+		.lab-shell {
+			grid-template-columns: 1fr;
+			gap: 0;
+		}
+
+		.lab-sidebar {
+			position: static;
+			max-height: none;
+			padding: var(--space-lg) 0 0;
+			border-bottom: 1px solid var(--color-border);
+		}
+
+		.lab-nav-group {
+			margin-bottom: var(--space-md);
+		}
+
+		.lab-nav-group ul {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.25rem 1rem;
+		}
+
+		.lab-nav-link {
+			min-height: 44px;
+		}
+	}
+</style>

@@ -1,0 +1,53 @@
+---
+import Line from '../../blog/Timeline.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'Timeline',
+	category: 'narrative',
+	status: 'stable',
+	summary: 'Vertical milestone timeline with mono dates, serif titles, and batch scroll-reveal; one entry can be emphasized.',
+	summaryEs: 'Línea de tiempo vertical de hitos con fechas en mono, títulos en serif y revelado por lotes al hacer scroll; una entrada puede ir enfatizada.',
+	why: 'The worktrees discipline wasn\'t learned in a day and the post needed to show that: first attempt, the breakage, the rule, the Saturday it paid off. A bulleted list flattens chronology into items; the vertical line with scroll-revealed entries keeps time as the spine of the story.',
+	whyEs: 'La disciplina de worktrees no se aprendió en un día y el post necesitaba mostrarlo: el primer intento, la rotura, la regla, el sábado en que rindió. Una lista con viñetas aplana la cronología en ítems; la línea vertical con entradas que se revelan al scroll mantiene el tiempo como columna vertebral de la historia.',
+	props: [
+		{ name: 'items', type: '{ date: string, title: string, body?: string, emphasize?: boolean }[]', description: 'Milestones in order. emphasize visually highlights the landmark entry.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const items = es
+	? [
+			{ date: '2025-Q1', title: 'Un agente, una terminal', body: 'Cuidando una sola sesión de Claude y aprobando cada edición a mano.' },
+			{ date: '2025-Q2', title: 'Primer worktree paralelo', body: 'Segundo agente en un branch de bugfix. Cero conflictos — los directorios nunca se solapan.' },
+			{ date: '2025-Q4', title: 'Los worktrees se vuelven el default', body: 'Cada tarea empieza con git worktree add. Main se mantiene limpio.', emphasize: true },
+			{ date: '2026-Q1', title: 'La merge queue es el cuello de botella', body: 'Los agentes producen más rápido de lo que alcanzo a revisar. Un buen problema, pero un problema real.' },
+		]
+	: [
+			{ date: '2025-Q1', title: 'One agent, one terminal', body: 'Babysitting a single Claude session and approving every edit by hand.' },
+			{ date: '2025-Q2', title: 'First parallel worktree', body: 'Second agent on a bugfix branch. Zero conflicts — the directories never overlap.' },
+			{ date: '2025-Q4', title: 'Worktrees become the default', body: 'Every task starts with git worktree add. Main stays clean.', emphasize: true },
+			{ date: '2026-Q1', title: 'The merge queue is the bottleneck', body: 'Agents produce faster than I can review. A good problem, but a real one.' },
+		];
+---
+
+<DemoSection
+	label={es ? 'arco de adopción / hito enfatizado' : 'adoption arc / emphasized landmark'}
+	description={es ? 'Las entradas aparecen con fade y un leve desplazamiento en x al entrar en el viewport. El ítem enfatizado marca el punto de inflexión.' : 'Entries fade in with a slight x-offset as they scroll into view. The emphasized item marks the turning point.'}
+	usage={`<Timeline
+  items={[
+    { date: "2025-Q1", title: "One agent, one terminal",
+      body: "Babysitting a single Claude session and approving every edit by hand." },
+    { date: "2025-Q2", title: "First parallel worktree",
+      body: "Second agent on a bugfix branch. Zero conflicts — the directories never overlap." },
+    { date: "2025-Q4", title: "Worktrees become the default",
+      body: "Every task starts with git worktree add. Main stays clean.", emphasize: true },
+    { date: "2026-Q1", title: "The merge queue is the bottleneck",
+      body: "Agents produce faster than I can review. A good problem, but a real one." },
+  ]}
+/>`}
+>
+	<Line items={items} />
+</DemoSection>

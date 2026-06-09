@@ -1,0 +1,65 @@
+---
+import TabSet from '../../blog/Tabs.astro';
+import TabPanel from '../../blog/TabPanel.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'Tabs',
+	category: 'utility',
+	status: 'stable',
+	summary: 'Keyboard-navigable tab set with an animated underline indicator. Panels map to labels by order.',
+	summaryEs: 'Set de tabs navegable con teclado y con indicador de subrayado animado. Los paneles se asocian a las etiquetas por orden.',
+	why: 'Comparisons were eating the posts: npm vs pnpm, the plan vs what actually happened, with tests vs without. Writing both versions as consecutive sections doubles the scroll and buries the contrast. Tabs let the reader hold one frame and flip the content inside it, which is how you actually compare two things.',
+	whyEs: 'Las comparaciones se estaban comiendo los posts: npm contra pnpm, el plan contra lo que pasó de verdad, con tests contra sin tests. Escribir ambas versiones como secciones consecutivas duplica el scroll y entierra el contraste. Las tabs dejan que el lector fije un marco y cambie el contenido dentro, y así es como se compara de verdad.',
+	props: [
+		{ name: 'labels', type: 'string[]', description: 'Tab labels, in panel order. Each <TabPanel> child maps to one label.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const storyLabels = es
+	? ['El plan', 'Lo que pasó', 'La lección']
+	: ['The plan', 'What happened', 'The lesson'];
+---
+
+<DemoSection
+	label={es ? 'dos paneles' : 'two panels'}
+	description={es ? 'Haz clic o usa las flechas del teclado. El indicador de subrayado se anima entre tabs.' : 'Click or use arrow keys. The underline indicator animates between tabs.'}
+	usage={`<Tabs labels={["npm", "pnpm"]}>
+  <TabPanel>Install with npm: \`npm install gsap\`</TabPanel>
+  <TabPanel>Install with pnpm: \`pnpm add gsap\`</TabPanel>
+</Tabs>`}
+>
+	<TabSet labels={['npm', 'pnpm']}>
+		<TabPanel>
+			<p>{es ? 'Instala con npm: ' : 'Install with npm: '}<code>npm install gsap</code></p>
+		</TabPanel>
+		<TabPanel>
+			<p>{es ? 'Instala con pnpm: ' : 'Install with pnpm: '}<code>pnpm add gsap</code></p>
+		</TabPanel>
+	</TabSet>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'tres paneles / contenido más largo' : 'three panels / longer content'}
+	description={es ? 'Las tabs admiten cualquier contenido MDX — prosa, bloques de código, otros componentes.' : 'Tabs hold arbitrary MDX content — prose, code blocks, other components.'}
+	usage={`<Tabs labels={["The plan", "What happened", "The lesson"]}>
+  <TabPanel>...</TabPanel>
+  <TabPanel>...</TabPanel>
+  <TabPanel>...</TabPanel>
+</Tabs>`}
+>
+	<TabSet labels={storyLabels}>
+		<TabPanel>
+			<p>{es ? 'Correr tres agentes en paralelo, un bug cada uno, merge antes de la cena.' : 'Run three agents in parallel, one bug each, merge by dinner.'}</p>
+		</TabPanel>
+		<TabPanel>
+			<p>{es ? 'Dos terminaron. El tercero pasó cuarenta minutos editando el mismo archivo que el primero y perdió la carrera.' : 'Two finished. The third spent forty minutes editing the same file as the first and lost the race.'}</p>
+		</TabPanel>
+		<TabPanel>
+			<p>{es ? 'Los agentes en paralelo necesitan aislamiento a nivel de archivo, no solo prompts separados.' : 'Parallel agents need file-level isolation, not just separate prompts.'}</p>
+		</TabPanel>
+	</TabSet>
+</DemoSection>

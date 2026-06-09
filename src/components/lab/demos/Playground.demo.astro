@@ -1,0 +1,129 @@
+---
+import Pg from '../../blog/Playground.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'Playground',
+	category: 'playful',
+	status: 'stable',
+	summary: 'Slider-driven explorer: move the inputs and the demo beside them reacts in real time.',
+	summaryEs: 'Explorador con sliders: mueve los inputs y la demo de al lado reacciona en tiempo real.',
+	why: 'Bret Victor\'s old complaint: an essay about a dynamic system shouldn\'t be static. When a post says "retry backoff grows exponentially", a slider bound to a CSS variable lets the reader move the exponent and watch the bar. The component publishes --pg-* vars and an event; the post decides what they drive.',
+	whyEs: 'La vieja queja de Bret Victor: un ensayo sobre un sistema dinámico no debería ser estático. Cuando un post dice "el backoff de retries crece exponencialmente", un slider atado a una variable CSS deja que el lector mueva el exponente y mire la barra. El componente publica variables --pg-* y un evento; el post decide qué mueven.',
+	props: [
+		{ name: 'inputs', type: '{ id, label, min, max, step?, default, suffix?, prefix? }[]', description: 'Sliders to render. Each becomes a --pg-<id> CSS variable on the root and a [data-pg-bind="<id>"] text binding.' },
+		{ name: 'caption', type: 'string', description: 'Caption below the inputs for context.' },
+		{ name: 'layout', type: '"stack" | "side"', default: '"stack"', description: 'Stack sliders above the stage, or split 50/50 on wide screens.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const squashInputs = [
+	{ id: 'squash', label: es ? 'Cantidad de squash' : 'Squash amount', min: 0, max: 40, default: 18, suffix: '%' },
+];
+
+const backoffInputs = [
+	{ id: 'attempts', label: es ? 'Intentos de retry' : 'Retry attempts', min: 0, max: 8, default: 3 },
+	{ id: 'base', label: es ? 'Delay base' : 'Base delay', min: 100, max: 2000, step: 100, default: 300, suffix: 'ms' },
+];
+---
+
+<DemoSection
+	label={es ? 'squash & stretch / movido por variables CSS' : 'squash & stretch / css-var driven'}
+	description={es ? 'Arrastra el slider y el pad se deforma en tiempo real.' : 'Drag the slider and the pad deforms in real time.'}
+	usage={`<Playground
+  inputs={[
+    { id: "squash", label: "Squash amount", min: 0, max: 40, default: 18, suffix: "%" },
+  ]}
+  caption="Drag the slider — the pad deforms live via calc() on the CSS variable."
+>
+  <div class="pad" style="transform: scale(calc(1 + var(--pg-squash) / 100), calc(1 - var(--pg-squash) / 100))">
+    CLICK ME
+  </div>
+</Playground>`}
+>
+	<Pg
+		inputs={squashInputs}
+		caption={es ? 'Arrastra el slider — el pad se deforma en vivo vía calc() sobre la variable CSS.' : 'Drag the slider — the pad deforms live via calc() on the CSS variable.'}
+	>
+		<div class="pg-pad-wrap">
+			<div class="pg-pad">{es ? 'HAZ CLIC' : 'CLICK ME'}</div>
+		</div>
+	</Pg>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'backoff de retries / salidas enlazadas' : 'retry backoff / bound outputs'}
+	description={es ? 'Los números y la barra siguen el slider en vivo.' : 'The numbers and the bar follow the slider live.'}
+	usage={`<Playground
+  layout="side"
+  inputs={[
+    { id: "attempts", label: "Retry attempts", min: 0, max: 8, default: 3 },
+    { id: "base", label: "Base delay", min: 100, max: 2000, step: 100, default: 300, suffix: "ms" },
+  ]}
+  caption="A flaky test retried with linear backoff."
+>
+  <p>
+    <output data-pg-bind="attempts"></output> retries at
+    <output data-pg-bind="base"></output>ms base delay.
+  </p>
+  <div class="bar" style="width: calc(var(--pg-base) / 20 * 1%)"></div>
+</Playground>`}
+>
+	<Pg
+		layout="side"
+		inputs={backoffInputs}
+		caption={es ? 'Un test flaky reintentado con backoff lineal.' : 'A flaky test retried with linear backoff.'}
+	>
+		<p class="pg-readout">
+			<output data-pg-bind="attempts">3</output> {es ? 'retries con' : 'retries at'} <output data-pg-bind="base">300</output>{es ? 'ms de delay base.' : 'ms base delay.'}
+		</p>
+		<div class="pg-bar" style="width: calc(var(--pg-base) / 20 * 1%)"></div>
+	</Pg>
+</DemoSection>
+
+<style>
+	.pg-pad-wrap {
+		display: flex;
+		justify-content: center;
+		padding: 2rem 0;
+	}
+
+	.pg-pad {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 9rem;
+		height: 4.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		letter-spacing: 0.1em;
+		color: var(--color-bg);
+		background: var(--color-accent);
+		border-radius: var(--radius-md);
+		transform: scale(calc(1 + var(--pg-squash) / 100), calc(1 - var(--pg-squash) / 100));
+		transition: transform 120ms var(--ease-spring);
+	}
+
+	.pg-readout {
+		margin: 0 0 0.75rem;
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		color: var(--color-text-secondary);
+	}
+
+	.pg-readout output {
+		color: var(--color-accent);
+		font-weight: 600;
+	}
+
+	.pg-bar {
+		height: 0.5rem;
+		max-width: 100%;
+		border-radius: 999px;
+		background: oklch(from var(--color-accent) l c h / 0.55);
+		transition: width 160ms var(--ease-smooth);
+	}
+</style>

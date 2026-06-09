@@ -1,0 +1,48 @@
+---
+import Note from '../../blog/Sidenote.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'Sidenote',
+	category: 'typographic',
+	status: 'stable',
+	summary: 'Auto-numbered superscript marker that reveals a short editorial note inline below the paragraph — no box, no border.',
+	summaryEs: 'Marcador superíndice autonumerado que revela una nota editorial corta inline bajo el párrafo — sin caja, sin borde.',
+	why: 'Footnotes send the reader to the basement and most never come back. These notes open inline, right under the sentence that spawned them, numbered like the academic kind but without the round trip. The style is deliberately bare — a note that arrives in a decorated box stops feeling like an aside.',
+	whyEs: 'Las notas al pie mandan al lector al sótano y la mayoría no vuelve. Estas notas se abren inline, justo bajo la frase que las generó, numeradas como las académicas pero sin el viaje de ida y vuelta. El estilo es deliberadamente desnudo: una nota que llega en caja decorada deja de sentirse como un aparte.',
+	props: [
+		{ name: '(slot)', type: 'children', description: 'The note text. Keep it to 1–2 sentences; promote longer asides to a Callout.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'apartes a mitad de frase' : 'mid-sentence asides'}
+	description={es ? 'Haz clic en un marcador numerado para revelar la nota bajo el párrafo. La numeración es automática.' : 'Click a numbered marker to reveal the note below the paragraph. Numbering is automatic.'}
+	usage={`Worktrees share one object store, so a second checkout costs almost
+nothing on disk.<Sidenote>About 50MB of working files versus the 2GB
+the full clone would have duplicated.</Sidenote> The branch is the
+only thing that's truly separate.`}
+>
+	{es ? (
+		<p style="line-height: 1.75;">
+			Los worktrees comparten un solo object store, así que un segundo checkout
+			no cuesta casi nada en disco.<Note>Unos 50MB de archivos de trabajo frente
+			a los 2GB que habría duplicado el clone completo.</Note> El branch es lo
+			único que está separado de verdad — que es exactamente el aislamiento que
+			un agente necesita.<Note>En rigor, el index y HEAD también son por
+			worktree. Ese es todo el truco.</Note>
+		</p>
+	) : (
+		<p style="line-height: 1.75;">
+			Worktrees share one object store, so a second checkout costs almost nothing
+			on disk.<Note>About 50MB of working files versus the 2GB the full clone
+			would have duplicated.</Note> The branch is the only thing that's truly
+			separate — which is exactly the isolation an agent needs.<Note>Strictly,
+			the index and HEAD are also per-worktree. That's the whole trick.</Note>
+		</p>
+	)}
+</DemoSection>

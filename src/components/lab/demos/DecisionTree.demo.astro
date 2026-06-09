@@ -1,0 +1,126 @@
+---
+import Walker from '../../blog/DecisionTree.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'DecisionTree',
+	category: 'narrative',
+	status: 'stable',
+	summary: 'Click-based branching narrative — the author defines question and verdict nodes, the reader walks the tree by picking options.',
+	summaryEs: 'Narrativa ramificada a base de clics — el autor define nodos de pregunta y de veredicto, y el lector recorre el árbol eligiendo opciones.',
+	why: 'The worktrees post ended with "I don\'t know which one you are" — but the honest version of that is a question the reader answers, not a sentence they read. The tree exists for advice that genuinely branches: should YOU use worktrees depends on answers only the reader has.',
+	whyEs: 'El post de worktrees terminaba con "no sé cuál de los dos eres" — pero la versión honesta de eso es una pregunta que el lector responde, no una frase que lee. El árbol existe para el consejo que de verdad se bifurca: si TÚ deberías usar worktrees depende de respuestas que solo el lector tiene.',
+	props: [
+		{ name: 'root', type: 'string', description: 'Key of the starting node.' },
+		{ name: 'nodes', type: 'Record<string, { question?, verdict?, detail?, choices?: { label, next }[] }>', description: 'The node graph. Question nodes prompt, verdict nodes conclude; choices point at the next key.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const nodes = es
+	? {
+			start: {
+				question: '¿Cuántos agentes están tocando el repo ahora mismo?',
+				choices: [
+					{ label: 'Solo uno', next: 'one' },
+					{ label: 'Dos o más', next: 'many' },
+				],
+			},
+			one: {
+				question: '¿Vas a seguir trabajando mientras corre?',
+				choices: [
+					{ label: 'Sí, en los mismos archivos', next: 'worktree' },
+					{ label: 'No, lo voy a mirar', next: 'branch' },
+				],
+			},
+			many: {
+				verdict: 'Worktrees. Sin discusión.',
+				detail: 'Dos agentes escribiendo el mismo directorio de trabajo van a chocar, y el trabajo del que pierde desaparece en silencio.',
+				choices: [{ label: 'Empezar de nuevo', next: 'start' }],
+			},
+			worktree: {
+				verdict: 'Dale su worktree.',
+				detail: 'Tú y el agente se vuelven dos escritores en un mismo directorio en cuanto sigues tecleando. Es la misma carrera, contigo de participante.',
+				choices: [{ label: 'Empezar de nuevo', next: 'start' }],
+			},
+			branch: {
+				verdict: 'Con una rama normal alcanza.',
+				detail: 'Un escritor, un directorio de trabajo — la frontera de aislamiento eres tú sin tocar el teclado.',
+				choices: [{ label: 'Empezar de nuevo', next: 'start' }],
+			},
+		}
+	: {
+			start: {
+				question: 'How many agents are touching the repo right now?',
+				choices: [
+					{ label: 'Just one', next: 'one' },
+					{ label: 'Two or more', next: 'many' },
+				],
+			},
+			one: {
+				question: 'Will you keep working while it runs?',
+				choices: [
+					{ label: 'Yes, in the same files', next: 'worktree' },
+					{ label: "No, I'll watch it", next: 'branch' },
+				],
+			},
+			many: {
+				verdict: 'Worktrees. No discussion.',
+				detail: "Two agents writing the same working directory will race, and the loser's work silently disappears.",
+				choices: [{ label: 'Start over', next: 'start' }],
+			},
+			worktree: {
+				verdict: 'Give it a worktree.',
+				detail: "You and the agent become two writers in one directory the moment you keep typing. That's the same race, with you as a participant.",
+				choices: [{ label: 'Start over', next: 'start' }],
+			},
+			branch: {
+				verdict: 'A plain branch is fine.',
+				detail: 'One writer, one working directory — the isolation boundary is you not touching the keyboard.',
+				choices: [{ label: 'Start over', next: 'start' }],
+			},
+		};
+---
+
+<DemoSection
+	label={es ? '¿este agente merece su propio worktree?' : 'should this agent get its own worktree?'}
+	description={es ? 'Las opciones son botones de verdad en una lista — navegables por teclado. Las migas de pan registran el camino; Reset vuelve al inicio.' : 'Choices are real buttons in a list — fully keyboard-navigable. Breadcrumbs track the path; Reset starts over.'}
+	usage={`<DecisionTree
+  root="start"
+  nodes={{
+    start: {
+      question: "How many agents are touching the repo right now?",
+      choices: [
+        { label: "Just one", next: "one" },
+        { label: "Two or more", next: "many" },
+      ],
+    },
+    one: {
+      question: "Will you keep working while it runs?",
+      choices: [
+        { label: "Yes, in the same files", next: "worktree" },
+        { label: "No, I'll watch it", next: "branch" },
+      ],
+    },
+    many: {
+      verdict: "Worktrees. No discussion.",
+      detail: "Two agents writing the same working directory will race, and the loser's work silently disappears.",
+      choices: [{ label: "Start over", next: "start" }],
+    },
+    worktree: {
+      verdict: "Give it a worktree.",
+      detail: "You and the agent become two writers in one directory the moment you keep typing. That's the same race, with you as a participant.",
+      choices: [{ label: "Start over", next: "start" }],
+    },
+    branch: {
+      verdict: "A plain branch is fine.",
+      detail: "One writer, one working directory — the isolation boundary is you not touching the keyboard.",
+      choices: [{ label: "Start over", next: "start" }],
+    },
+  }}
+/>`}
+>
+	<Walker root="start" nodes={nodes} />
+</DemoSection>

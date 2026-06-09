@@ -1,0 +1,42 @@
+---
+import Note from '../../blog/Callout.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'Callout',
+	category: 'typographic',
+	status: 'stable',
+	summary: 'Semantic aside with four types — tip, warning, note, important — marked by mono eyebrow labels, never accent bars.',
+	summaryEs: 'Aparte semántico con cuatro tipos — tip, warning, note, important — marcados con etiquetas eyebrow en mono, nunca con barras de acento.',
+	why: 'Every post has two or three sentences that carry the whole argument, and bold is too weak to hold them. The Callout marks those sentences with an eyebrow label instead of the colored left bar every AI-generated interface reaches for — that bar is banned in this design system on purpose. Four types because a warning earned by a broken Saturday is not the same register as a tip.',
+	whyEs: 'Cada post tiene dos o tres frases que cargan todo el argumento, y la negrita es demasiado débil para sostenerlas. El Callout las marca con una etiqueta eyebrow en vez de la barra izquierda de color a la que recurre toda interfaz generada por IA — esa barra está prohibida en este design system a propósito. Cuatro tipos porque una advertencia que costó un sábado roto no suena igual que un consejo.',
+	props: [
+		{ name: 'type', type: '"tip" | "warning" | "note" | "important"', default: '"note"', description: 'Category; drives the eyebrow label, icon and tint.' },
+		{ name: 'title', type: 'string', description: 'Optional title after the eyebrow label.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'los cuatro tipos' : 'all four types'}
+	description={es ? 'La etiqueta eyebrow carga la categoría — sin barras de acento a la izquierda, como manda el design system.' : 'The eyebrow label carries the category — no left accent bars, per the design system.'}
+	usage={`<Callout type="tip" title="Cheap insurance">
+  Run the suite before you let the agent touch anything.
+</Callout>`}
+>
+	<Note type="tip" title={es ? 'Seguro barato' : 'Cheap insurance'}>
+		<p>{es ? 'Corre la suite antes de dejar que el agente toque nada.' : 'Run the suite before you let the agent touch anything.'}</p>
+	</Note>
+	<Note type="warning" title={es ? 'Aquí hay dragones' : 'Here be dragons'}>
+		<p>{es ? 'Dos agentes escribiendo el mismo archivo van a chocar, y el trabajo del que pierde desaparece en silencio.' : "Two agents writing the same file will race, and the loser's work silently disappears."}</p>
+	</Note>
+	<Note type="note">
+		<p>{es ? 'Las notas no necesitan título. El eyebrow solo ya marca el bloque.' : "Notes don't need a title. The eyebrow alone marks the block."}</p>
+	</Note>
+	<Note type="important" title={es ? 'La tesis' : 'The thesis'}>
+		<p>{es ? 'Un worktree de git no es un truco de productividad. Es una frontera de aislamiento entre agentes.' : "A git worktree isn't a productivity hack. It's an isolation boundary between agents."}</p>
+	</Note>
+</DemoSection>

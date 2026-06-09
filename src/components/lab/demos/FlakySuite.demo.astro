@@ -1,0 +1,32 @@
+---
+import Suite from '../../blog/FlakySuite.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'FlakySuite',
+	category: 'playful',
+	status: 'experimental',
+	summary: 'Monte Carlo flaky-suite simulator: drag flake rate and suite size, see P(suite green) per retry budget from 2,000 runs.',
+	summaryEs: 'Simulador Monte Carlo de suites flaky: arrastra la tasa de flakes y el tamaño de la suite, y mira P(suite verde) por presupuesto de retries sobre 2.000 corridas.',
+	why: 'The testing post claimed that a 3% flake rate is not a 3% problem, and I could feel readers filing that under exaggeration. The math is a one-liner (0.97^40 ≈ 0.30) but nobody feels an exponent. Dragging the suite-size slider and watching the no-retry bar collapse from 97% to 30% is the exponent, felt. The retry bars then make the uncomfortable second point: retries fix the color of the build, not the suite.',
+	whyEs: 'El post de testing afirmaba que una tasa de flakes del 3% no es un problema del 3%, y se notaba que los lectores lo archivaban como exageración. La matemática es una línea (0.97^40 ≈ 0.30), pero nadie siente un exponente. Arrastrar el slider de tamaño de suite y ver la barra sin retries desplomarse del 97% al 30% es el exponente, sentido. Las barras de retries rematan con el segundo punto incómodo: los retries arreglan el color del build, no la suite.',
+	props: [
+		{ name: 'tests', type: 'number', default: '40', description: 'Initial suite size (4–120).' },
+		{ name: 'flakeRate', type: 'number', default: '0.03', description: 'Initial per-test flake probability (0–0.2).' },
+		{ name: 'caption', type: 'string', description: 'Mono caption below the results.' },
+		{ name: 'lang', type: "'en' | 'es'", default: "'en'", description: 'UI language for labels and the live verdict.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'default / 3% de flakes, 40 tests' : 'default / 3% flake, 40 tests'}
+	description={es ? 'Una tasa de flakes del 3% suena inofensiva hasta que la multiplicas por 40 tests. Arrastra los sliders y mira cómo se desploma la barra sin retries.' : 'A 3% flake rate sounds harmless until you multiply it by 40 tests. Drag the sliders and watch the no-retry bar collapse.'}
+	usage={`<FlakySuite tests={40} flakeRate={0.03}
+  caption="Per-test flakiness compounds with suite size. Retries buy green builds, not trust." />`}
+>
+	<Suite lang={lang} tests={40} flakeRate={0.03} caption={es ? 'El flakiness por test se multiplica con el tamaño de la suite. Los retries compran builds verdes, no confianza.' : 'Per-test flakiness compounds with suite size. Retries buy green builds, not trust.'} />
+</DemoSection>

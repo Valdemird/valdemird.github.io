@@ -1,0 +1,94 @@
+---
+import Graph from '../../blog/GitGraph.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'GitGraph',
+	category: 'data',
+	status: 'experimental',
+	summary: 'Git history as an animated graph: branch lanes, merge edges, and playback you can step through one operation at a time.',
+	summaryEs: 'El historial de git como grafo animado: carriles por rama, aristas de merge y un playback que puedes avanzar operación por operación.',
+	why: 'The worktrees post used to show its branch diagrams as static pictures, which is the wrong shape for the story: git history happens one operation at a time — branch, commit, merge — so the diagram should too. The step-through playback is the point; the reader watches the collision not happen.',
+	whyEs: 'El post de worktrees mostraba sus diagramas de ramas como imágenes estáticas, lo que es la forma equivocada para esta historia: la historia de git ocurre operación por operación — branch, commit, merge — así que el diagrama también debería hacerlo. El playback paso a paso es el punto: el lector ve cómo la colisión no llega a ocurrir.',
+	props: [
+		{ name: 'ops', type: '({ op: "commit", branch, label? } | { op: "branch", name, from, label? } | { op: "merge", from, into, label? })[]', description: 'Ordered git operations; layout and lanes derive from these.' },
+		{ name: 'caption', type: 'string', description: 'Mono caption below the control bar.' },
+		{ name: 'revealed', type: 'boolean', default: 'false', description: 'Start fully drawn instead of at step 0.' },
+		{ name: 'lang', type: "'en' | 'es'", default: "'en'", description: 'UI language for control aria-labels. Git terms stay as-is.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const parallelOps = es
+	? [
+		{ op: 'commit' as const, branch: 'main', label: 'sábado en la mañana' },
+		{ op: 'branch' as const, name: 'fix/auth', from: 'main', label: 'agente 1' },
+		{ op: 'branch' as const, name: 'fix/cart', from: 'main', label: 'agente 2' },
+		{ op: 'commit' as const, branch: 'fix/auth', label: 'refresh del token' },
+		{ op: 'commit' as const, branch: 'fix/cart', label: 'redondeo de cantidades' },
+		{ op: 'commit' as const, branch: 'fix/auth', label: 'tests en verde' },
+		{ op: 'merge' as const, from: 'fix/auth', into: 'main', label: 'PR #1' },
+		{ op: 'merge' as const, from: 'fix/cart', into: 'main', label: 'PR #2' },
+	]
+	: [
+		{ op: 'commit' as const, branch: 'main', label: 'saturday morning' },
+		{ op: 'branch' as const, name: 'fix/auth', from: 'main', label: 'agent 1' },
+		{ op: 'branch' as const, name: 'fix/cart', from: 'main', label: 'agent 2' },
+		{ op: 'commit' as const, branch: 'fix/auth', label: 'token refresh' },
+		{ op: 'commit' as const, branch: 'fix/cart', label: 'qty rounding' },
+		{ op: 'commit' as const, branch: 'fix/auth', label: 'tests pass' },
+		{ op: 'merge' as const, from: 'fix/auth', into: 'main', label: 'PR #1' },
+		{ op: 'merge' as const, from: 'fix/cart', into: 'main', label: 'PR #2' },
+	];
+
+const revealedOps = es
+	? [
+		{ op: 'commit' as const, branch: 'main', label: 'v1' },
+		{ op: 'branch' as const, name: 'experiment', from: 'main' },
+		{ op: 'commit' as const, branch: 'experiment', label: 'idea loca' },
+		{ op: 'commit' as const, branch: 'main', label: 'hotfix' },
+		{ op: 'merge' as const, from: 'experiment', into: 'main', label: 'funcionó' },
+	]
+	: [
+		{ op: 'commit' as const, branch: 'main', label: 'v1' },
+		{ op: 'branch' as const, name: 'experiment', from: 'main' },
+		{ op: 'commit' as const, branch: 'experiment', label: 'wild idea' },
+		{ op: 'commit' as const, branch: 'main', label: 'hotfix' },
+		{ op: 'merge' as const, from: 'experiment', into: 'main', label: 'it worked' },
+	];
+---
+
+<DemoSection
+	label={es ? 'agentes en paralelo / paso a paso' : 'parallel agents / step-through'}
+	description={es ? 'La historia de los worktrees como grafo: dale play, o avanza con las flechas una operación a la vez.' : 'The worktrees story as a graph: press play, or arrow through one operation at a time.'}
+	usage={`<GitGraph ops={[
+  { op: "commit", branch: "main", label: "saturday morning" },
+  { op: "branch", name: "fix/auth", from: "main", label: "agent 1" },
+  { op: "branch", name: "fix/cart", from: "main", label: "agent 2" },
+  { op: "commit", branch: "fix/auth", label: "token refresh" },
+  { op: "commit", branch: "fix/cart", label: "qty rounding" },
+  { op: "commit", branch: "fix/auth", label: "tests pass" },
+  { op: "merge", from: "fix/auth", into: "main", label: "PR #1" },
+  { op: "merge", from: "fix/cart", into: "main", label: "PR #2" },
+]} caption="Three agents, three lanes, zero collisions." />`}
+>
+	<Graph
+		lang={lang}
+		ops={parallelOps}
+		caption={es ? 'Tres agentes, tres carriles, cero colisiones.' : 'Three agents, three lanes, zero collisions.'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'revealed / sin playback' : 'revealed / no playback needed'}
+	description={es ? 'Con revealed, el grafo arranca completamente dibujado — para cuando la forma importa más que la secuencia.' : 'With revealed, the graph starts fully drawn — for when the shape matters more than the sequence.'}
+	usage={`<GitGraph revealed ops={[...]} />`}
+>
+	<Graph
+		lang={lang}
+		revealed
+		ops={revealedOps}
+	/>
+</DemoSection>

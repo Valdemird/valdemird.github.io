@@ -1,0 +1,155 @@
+---
+/**
+ * LabIndexPage — shared gallery home for /lab/ (en) and /es/lab/ (es).
+ * Route files are thin shells that pass `lang`; all markup lives here.
+ */
+import Lab from '../../layouts/Lab.astro';
+import { buildEntries, groupByCategory, summaryFor } from '../lab/registry';
+
+interface Props {
+	lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const es = lang === 'es';
+
+const modules = import.meta.glob('../lab/demos/*.demo.astro', { eager: true });
+const entries = buildEntries(modules);
+const groups = groupByCategory(entries, lang);
+const total = entries.length;
+
+const labHome = es ? '/es/lab/' : '/lab/';
+const title = es ? 'Lab — galería de componentes | valdemird' : 'Lab — component gallery | valdemird';
+const description = es
+	? 'Galería viva de los componentes detrás de valdemird.com — gráficas, diagramas y piezas interactivas corriendo en su entorno real, cada una con la razón por la que existe.'
+	: 'Live gallery of every MDX component behind valdemird.com — charts, diagrams and interactive widgets running in their real environment, each with the reason it was built.';
+---
+
+<Lab title={title} description={description} entries={entries} lang={lang}>
+	<div class="lab-hero animate-fade-in">
+		<span class="lab-hero-eyebrow">{es ? 'lab de componentes' : 'component lab'}</span>
+		<h1>{es ? 'Cada componente, corriendo de verdad.' : 'Every component, running for real.'}</h1>
+		<p class="lab-hero-intro">
+			{es
+				? 'Los posts de este blog se apoyan en piezas interactivas — gráficas que puedes recorrer, diagramas que se reproducen paso a paso, pequeños simuladores — en vez de capturas estáticas. Esta galería las reúne todas, vivas: todo lo que ves aquí se cliquea, se arrastra y se reproduce exactamente igual que dentro de un post. Cada una existe porque un post concreto la necesitó: una afirmación que la prosa no podía sostener, una comparación que se comía el scroll, un número que nadie sentiría como texto. Esa razón vive en la página de cada componente, bajo «por qué existe».'
+				: 'The posts on this blog lean on interactive pieces — charts you can scrub, diagrams that play out step by step, small simulators — instead of static screenshots. This gallery collects all of them, live: everything here clicks, drags and plays exactly as it does inside a post. Each one was built because a specific post needed it — a claim prose couldn\'t carry, a comparison that was eating the scroll, a number nobody would feel as text. That reason lives on every component\'s page, under "why this exists".'}
+		</p>
+		<span class="lab-hero-count">
+			{es
+				? `${total} componente${total === 1 ? '' : 's'} documentado${total === 1 ? '' : 's'}`
+				: `${total} component${total === 1 ? '' : 's'} documented`}
+		</span>
+	</div>
+
+	{groups.map((group, gi) => (
+		<section class:list={['lab-group', 'animate-fade-in', `delay-${Math.min(gi + 1, 3)}`]}>
+			<h2 class="lab-group-label">{group.label}</h2>
+			<div class="lab-grid">
+				{group.items.map((item) => (
+					<a href={`${labHome}${item.slug}/`} class="lab-card">
+						<span class="lab-card-title">{item.meta.title}</span>
+						{summaryFor(item.meta, lang) && <span class="lab-card-summary">{summaryFor(item.meta, lang)}</span>}
+					</a>
+				))}
+			</div>
+		</section>
+	))}
+</Lab>
+
+<style>
+	.lab-hero {
+		padding: var(--space-xl) 0 var(--space-2xl);
+	}
+
+	.lab-hero-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+
+	.lab-hero h1 {
+		margin: 0.6rem 0 0;
+		font-family: var(--font-serif);
+		font-size: clamp(1.8rem, 4vw, 2.6rem);
+		font-weight: 550;
+		letter-spacing: -0.015em;
+		line-height: 1.15;
+	}
+
+	.lab-hero-intro {
+		margin: 1rem 0 0;
+		max-width: 62ch;
+		color: var(--color-text-secondary);
+		line-height: 1.65;
+	}
+
+	.lab-hero-count {
+		display: inline-block;
+		margin-top: 1.25rem;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+
+	.lab-group {
+		margin-bottom: var(--space-2xl);
+	}
+
+	.lab-group-label {
+		margin: 0 0 var(--space-lg);
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-text-muted);
+	}
+
+	.lab-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+		gap: var(--space-md);
+	}
+
+	.lab-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		padding: 1.1rem 1.2rem;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		text-decoration: none;
+		transition:
+			transform var(--duration-normal) var(--ease-spring),
+			box-shadow var(--duration-normal) var(--ease-smooth),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+
+	.lab-card:hover {
+		transform: translateY(-3px);
+		box-shadow: var(--shadow-md);
+		border-color: var(--color-border-strong);
+	}
+
+	.lab-card:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.lab-card-title {
+		font-family: var(--font-mono);
+		font-size: 0.88rem;
+		font-weight: 600;
+		color: var(--color-text);
+	}
+
+	.lab-card-summary {
+		font-size: 0.82rem;
+		line-height: 1.5;
+		color: var(--color-text-secondary);
+	}
+</style>

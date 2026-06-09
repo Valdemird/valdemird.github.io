@@ -1,0 +1,38 @@
+---
+import Meta from '../../blog/ReadingMeta.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'ReadingMeta',
+	category: 'utility',
+	status: 'stable',
+	summary: 'Compact reading-time and word-count line shown at the top of every post.',
+	summaryEs: 'Línea compacta con tiempo de lectura y conteo de palabras que aparece al inicio de cada post.',
+	why: 'The row exists so the reader can budget attention before committing — and the numbers are computed from the actual text of the post, never typed by hand, so they stay honest when a post gets edited. The mono type keeps it as meta, not content.',
+	whyEs: 'La fila existe para que el lector presupueste su atención antes de comprometerse — y los números se calculan a partir del texto real del post, nunca se escriben a mano, así que siguen siendo honestos cuando un post se edita. La tipografía mono lo mantiene como meta, no como contenido.',
+	props: [
+		{ name: 'readingTime', type: 'number', description: 'Minutes of reading. Component renders nothing if missing.' },
+		{ name: 'wordCount', type: 'number', description: 'Word count, formatted per locale. Component renders nothing if missing.' },
+		{ name: 'lang', type: '"en" | "es"', default: '"en"', description: 'Drives labels (min read / min de lectura) and number formatting.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'inglés' : 'english'}
+	description={es ? 'La misma línea que cada post muestra bajo su título — aquí con valores de ejemplo.' : 'The same line every post shows under its title — here with sample values.'}
+	usage={`<ReadingMeta readingTime={9} wordCount={2340} lang="en" />`}
+>
+	<Meta readingTime={9} wordCount={2340} lang="en" />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'español' : 'spanish'}
+	description={es ? 'Las etiquetas y el separador de miles siguen el locale (formato es-CO).' : 'Labels and thousands separator follow the locale (es-CO formatting).'}
+	usage={`<ReadingMeta readingTime={9} wordCount={2340} lang="es" />`}
+>
+	<Meta readingTime={9} wordCount={2340} lang="es" />
+</DemoSection>

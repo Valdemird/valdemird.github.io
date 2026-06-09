@@ -1,0 +1,63 @@
+---
+import Summary from '../../blog/TLDR.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'TLDR',
+	category: 'typographic',
+	status: 'stable',
+	summary: 'The takeaways of a post, up front: two or three bullets for the reader who skims before committing.',
+	summaryEs: 'Las conclusiones de un post, de entrada: dos o tres bullets para el lector que lee en diagonal antes de comprometerse.',
+	why: 'Half the audience skims, and pretending otherwise just means they skim badly. The TLDR gives skimmers three honest bullets at the top — and since the SEO pass, those same bullets ship as the JSON-LD abstract, so search engines and LLMs quote the summary I wrote instead of one they invent.',
+	whyEs: 'La mitad de la audiencia lee en diagonal, y fingir lo contrario solo significa que lo hace mal. El TLDR les da a esos lectores tres bullets honestos arriba — y desde el pase de SEO esos mismos bullets viajan como abstract en el JSON-LD, así que los buscadores y los LLMs citan el resumen que yo escribí y no uno que inventan.',
+	props: [
+		{ name: 'bullets', type: 'string[]', description: 'The takeaways, one per line.' },
+		{ name: 'title', type: 'string', default: '"TL;DR" / "EN RESUMEN"', description: 'Eyebrow label; defaults follow lang.' },
+		{ name: 'lang', type: '"en" | "es"', default: '"en"', description: 'Picks the default label when title is not given.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const defaultBullets = es
+	? [
+			'Un worktree es una frontera de aislamiento, no un truco de productividad.',
+			'Un agente por worktree; main nunca ve una edición a medias.',
+			'La merge queue es el único lugar donde los flujos paralelos se encuentran.',
+		]
+	: [
+			'A worktree is an isolation boundary, not a productivity hack.',
+			'One agent per worktree; main never sees a half-finished edit.',
+			'The merge queue is the only place parallel streams meet.',
+		];
+---
+
+<DemoSection
+	label={es ? 'por defecto / según el idioma' : 'default / english'}
+	description={es ? 'Las hairlines enmarcan el bloque; el eyebrow en mono lleva la categoría. Bullets con raya, según el sistema de diseño.' : 'Hairline rules frame the block; the mono eyebrow carries the category. Em-dash bullets, per the design system.'}
+	usage={`<TLDR bullets={[
+  "A worktree is an isolation boundary, not a productivity hack.",
+  "One agent per worktree; main never sees a half-finished edit.",
+  "The merge queue is the only place parallel streams meet.",
+]} />`}
+>
+	<Summary lang={lang} bullets={defaultBullets} />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'etiqueta en español' : 'spanish label'}
+	description={es ? "Con lang='es' el eyebrow por defecto pasa a ser EN RESUMEN." : "With lang='es' the default eyebrow becomes EN RESUMEN."}
+	usage={`<TLDR lang="es" bullets={[
+  "Un worktree es una frontera de aislamiento, no un truco de productividad.",
+  "Un agente por worktree; main nunca ve una edición a medias.",
+]} />`}
+>
+	<Summary
+		lang="es"
+		bullets={[
+			'Un worktree es una frontera de aislamiento, no un truco de productividad.',
+			'Un agente por worktree; main nunca ve una edición a medias.',
+		]}
+	/>
+</DemoSection>

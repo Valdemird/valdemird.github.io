@@ -1,0 +1,42 @@
+---
+import Cmd from '../../blog/CopyableCommand.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'CopyableCommand',
+	category: 'utility',
+	status: 'stable',
+	summary: 'Inline one-line shell command with a $ prompt and a copy button — for commands the reader should actually run.',
+	summaryEs: 'Comando de shell de una línea, inline, con prompt $ y botón de copiar — para comandos que el lector debería correr de verdad.',
+	why: 'A full CodeBlock for `git worktree add` is furniture around a one-liner. Commands the reader should actually run deserve exactly two affordances: the $ prompt that says "this is your terminal\'s problem now" and a copy button. Nothing else.',
+	whyEs: 'Un CodeBlock completo para `git worktree add` es mueble alrededor de una sola línea. Los comandos que el lector debería correr de verdad merecen exactamente dos cosas: el prompt $ que dice "esto ya es problema de tu terminal" y un botón de copiar. Nada más.',
+	props: [
+		{ name: 'command', type: 'string', description: 'The shell command. Rendered in mono and copied verbatim (without the prompt).' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'comandos sueltos' : 'single commands'}
+	description={es ? 'Cada uno se renderiza como una pill inline-flex; el botón copia el comando sin el prompt $.' : 'Each renders as an inline-flex pill; the copy button writes the command without the $ prompt.'}
+	usage={`<CopyableCommand command="git worktree add ../fix-auth -b fix/auth" />
+<CopyableCommand command="npx vitest run --reporter=dot" />
+<CopyableCommand command="claude --dangerously-skip-permissions" />`}
+>
+	<div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+		<Cmd command="git worktree add ../fix-auth -b fix/auth" />
+		<Cmd command="npx vitest run --reporter=dot" />
+		<Cmd command="claude --dangerously-skip-permissions" />
+	</div>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'comando largo / scroll horizontal' : 'long command / horizontal scroll'}
+	description={es ? 'Los comandos largos se quedan en una línea y hacen scroll horizontal dentro de la pill en vez de partirse.' : 'Long commands stay on one line and scroll horizontally inside the pill instead of wrapping.'}
+	usage={`<CopyableCommand command="git log --oneline --graph --all --decorate --date-order --color=always | head -40" />`}
+>
+	<Cmd command="git log --oneline --graph --all --decorate --date-order --color=always | head -40" />
+</DemoSection>

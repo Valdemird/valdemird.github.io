@@ -1,0 +1,38 @@
+---
+import Explorer from '../../blog/EasingExplorer.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'EasingExplorer',
+	category: 'playful',
+	status: 'experimental',
+	summary: 'Draggable cubic-bezier editor with live preview, presets and a copyable CSS snippet. The interactive companion to JuiceLab.',
+	summaryEs: 'Editor de cubic-bezier con manijas arrastrables, vista previa en vivo, presets y un snippet de CSS listo para copiar. El compañero interactivo de JuiceLab.',
+	why: 'JuiceLab proves that motion has feel, but the easing curve behind it was still four opaque numbers in a code block. This site\'s whole hover language rides on one of them: the 1.56 overshoot in --ease-spring. Dragging that handle past y=1 and watching the ball punch through its target explains overshoot better than any paragraph I ever wrote about it.',
+	whyEs: 'JuiceLab demuestra que el movimiento tiene tacto, pero la curva de easing que hay detrás seguía siendo cuatro números opacos en un bloque de código. Todo el lenguaje de hover de este sitio depende de uno: el overshoot de 1.56 en --ease-spring. Arrastrar esa manija por encima de y=1 y ver la bola atravesar su destino explica el overshoot mejor que cualquier párrafo que haya escrito sobre él.',
+	props: [
+		{ name: 'initial', type: '[x1, y1, x2, y2]', default: '[0.34, 1.56, 0.64, 1]', description: 'Starting control points. Defaults to the site\'s --ease-spring.' },
+		{ name: 'caption', type: 'string', description: 'Mono caption below the explorer.' },
+		{ name: 'lang', type: "'en' | 'es'", default: "'en'", description: 'UI language for buttons and aria labels. Preset names are CSS terms.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'default / el spring del sitio' : "default / the site's spring"}
+	description={es ? 'Arrastra las manijas (o enfócalas y usa las flechas; shift para pasos grandes). La bola se vuelve a animar con cada cambio; el eje y permite overshoot por encima de 1.' : 'Drag the handles (or focus them and use arrow keys, shift for coarse steps). The ball replays with every change; the y axis allows overshoot above 1.'}
+	usage={`<EasingExplorer caption="Overshoot at y=1.56 is what makes it feel springy." />`}
+>
+	<Explorer lang={lang} caption={es ? 'El overshoot en y=1.56 es lo que le da esa sensación de resorte.' : 'Overshoot at y=1.56 is what makes it feel springy.'} />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'curva inicial personalizada' : 'custom initial curve'}
+	description={es ? 'Arranca desde otra forma — aquí un ease-in duro para una salida pesada, que se resiste.' : 'Start from a different shape — here a hard ease-in for a heavy, reluctant exit.'}
+	usage={`<EasingExplorer initial={[0.7, 0, 0.84, 0]} />`}
+>
+	<Explorer lang={lang} initial={[0.7, 0, 0.84, 0]} />
+</DemoSection>

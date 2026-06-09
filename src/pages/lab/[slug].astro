@@ -1,0 +1,15 @@
+---
+import LabComponentPage from '../../components/pages/LabComponentPage.astro';
+
+export async function getStaticPaths() {
+	const { buildEntries } = await import('../../components/lab/registry');
+	const modules = import.meta.glob('../../components/lab/demos/*.demo.astro', { eager: true });
+	return buildEntries(modules).map((entry) => ({
+		params: { slug: entry.slug },
+	}));
+}
+
+const { slug } = Astro.params;
+---
+
+<LabComponentPage lang="en" slug={slug!} />
