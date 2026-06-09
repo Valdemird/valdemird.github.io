@@ -73,8 +73,10 @@ export const UI_STRINGS = {
 			home: 'Home',
 			blog: 'Blog',
 			about: 'About',
+			lab: 'Lab',
 			switchLang: 'Switch to',
 			toggleMenu: 'Toggle menu',
+			skipToContent: 'Skip to content',
 		},
 		home: {
 			greeting: "Hi, I'm",
@@ -87,6 +89,7 @@ export const UI_STRINGS = {
 			gamesTitle: 'Games & Experiments',
 			recentPostsTitle: 'Recent Posts',
 			viewAllPosts: 'View all posts',
+			terminalTitle: '~/projects',
 		},
 		projects: {
 			previewOf: 'Preview of',
@@ -109,21 +112,24 @@ export const UI_STRINGS = {
 		nav: {
 			home: 'Inicio',
 			blog: 'Blog',
-			about: 'Acerca',
+			about: 'Sobre mí',
+			lab: 'Lab',
 			switchLang: 'Cambiar a',
-			toggleMenu: 'Alternar menú',
+			toggleMenu: 'Abrir o cerrar el menú',
+			skipToContent: 'Saltar al contenido',
 		},
 		home: {
 			greeting: 'Hola, soy',
 			name: 'valdemird',
-			subtitle: 'Ingeniero de Software & Maker',
+			subtitle: 'Ingeniero de software y maker',
 			bio: 'Construyo herramientas para desarrolladores y side projects. Ahora mismo estoy buscando cómo hacer que la IA sea realmente útil en el día a día de programar.',
 			statusBadge: 'Hablemos, aprendamos y construyamos',
 			metaDescription: 'Ingeniero de software y maker. Construyo herramientas para desarrolladores y escribo sobre lo que aprendo.',
 			projectsTitle: 'Proyectos',
-			gamesTitle: 'Juegos & Experimentos',
-			recentPostsTitle: 'Posts Recientes',
+			gamesTitle: 'Juegos y experimentos',
+			recentPostsTitle: 'Posts recientes',
 			viewAllPosts: 'Ver todos los posts',
+			terminalTitle: '~/proyectos',
 		},
 		projects: {
 			previewOf: 'Vista previa de',
@@ -135,7 +141,7 @@ export const UI_STRINGS = {
 			minRead: 'min de lectura',
 		},
 		about: {
-			title: 'Sobre Mí',
+			title: 'Sobre mí',
 			description: 'Ingeniero full-stack con 8+ años creando productos con React, Next.js y Node.js. Construyendo herramientas para desarrolladores y experimentando con flujos de trabajo con IA.',
 		},
 		footer: {

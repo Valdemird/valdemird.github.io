@@ -26,12 +26,14 @@ interface Props {
 	tags?: string[];
 	/** Public URL of a markdown alternate for this page — surfaces the .md to AI agents */
 	markdownAlternate?: string;
+	/** Keep this page out of search indexes (e.g. /lab). */
+	noindex?: boolean;
 }
 
 const AUTHOR_NAME = 'Valdemir D.';
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const { title, description, image: imageProp, imageAlt, lang, type = 'website', alternates = [], jsonLd, extraJsonLd = [], publishedTime, modifiedTime, tags, markdownAlternate } = Astro.props;
+const { title, description, image: imageProp, imageAlt, lang, type = 'website', alternates = [], jsonLd, extraJsonLd = [], publishedTime, modifiedTime, tags, markdownAlternate, noindex = false } = Astro.props;
 const image = imageProp || '/og/default.png';
 const ogImageAlt = imageAlt || title;
 
@@ -189,6 +191,8 @@ const structuredData = jsonLd || defaultJsonLd;
 		});
 	})();
 </script>
+
+{noindex && <meta name="robots" content="noindex, nofollow" />}
 
 <!-- Canonical URL -->
 <link rel="canonical" href={canonicalURL} />

@@ -11,7 +11,10 @@ const blog = defineCollection({
 		reviewedDate: z.coerce.date().optional(),
 		status: z.string().optional(),
 		heroImage: z.string().optional(),
+		heroImageAlt: z.string().optional(),
 		tags: z.array(z.string()).optional(),
+		/** Skimmer bullets — also surfaced as the JSON-LD `abstract`. */
+		tldr: z.array(z.string()).optional(),
 		featured: z.boolean().optional(),
 		lang: z.enum(['en', 'es']).default('en'),
 	}),

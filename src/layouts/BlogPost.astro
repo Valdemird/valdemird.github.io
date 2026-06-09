@@ -9,12 +9,12 @@ import HeadingAnchors from '../components/blog/HeadingAnchors.astro';
 import CopyPageButton from '../components/blog/CopyPageButton.astro';
 import FreshnessLine from '../components/blog/FreshnessLine.astro';
 import Comments from '../components/blog/Comments.astro';
-import { cleanMdxBody, countWords } from '../lib/mdx-plaintext';
-import { PERSON, PERSON_REF } from '../consts';
+import { cleanMdxBody, countWords, extractTldr } from '../lib/mdx-plaintext';
+import { PERSON, PERSON_REF, UI_STRINGS } from '../consts';
 
 type Props = CollectionEntry<'blog'>['data'];
 
-const { title, description, pubDate, updatedDate, reviewedDate, status, heroImage, tags, lang = 'en' } = Astro.props;
+const { title, description, pubDate, updatedDate, reviewedDate, status, heroImage, heroImageAlt, tags, tldr, lang = 'en' } = Astro.props;
 
 // Effective last-modified for SEO: reviewedDate beats updatedDate beats publish.
 const effectiveDateModified = reviewedDate ?? updatedDate;
@@ -28,6 +28,10 @@ const slug = currentPath.replace(/^\/blog\//, '').replace(/\/$/, '');
 // Lookup current post entry to count words for JSON-LD
 const currentPost = allPosts.find((p) => p.id === slug);
 const wordCount = currentPost?.body ? countWords(cleanMdxBody(currentPost.body)) : undefined;
+
+// JSON-LD abstract: frontmatter tldr wins, else the post's <TLDR> bullets.
+const tldrBullets = tldr && tldr.length > 0 ? tldr : extractTldr(currentPost?.body ?? '');
+const abstract = tldrBullets?.join('; ');
 
 // OG image: use heroImage if provided, otherwise use generated OG image
 const ogImage = heroImage || `/og/${slug}.png`;
@@ -46,6 +50,7 @@ const blogPostingJsonLd: Record<string, unknown> = {
 	'@type': 'BlogPosting',
 	headline: title,
 	description,
+	...(abstract && { abstract }),
 	datePublished: pubDate.toISOString(),
 	...(effectiveDateModified && { dateModified: effectiveDateModified.toISOString() }),
 	...(isArchivedStatus && { creativeWorkStatus: 'Archived' }),
@@ -104,10 +109,11 @@ if (lang === 'en') {
 	</head>
 
 	<body>
+		<a class="skip-link" href="#main-content">{UI_STRINGS[lang].nav.skipToContent}</a>
 		<ReadingProgress />
 		<HeadingAnchors lang={lang} />
 		<Header />
-		<main>
+		<main id="main-content">
 			<script>
 				import {
 					initPageEntrance,
@@ -168,7 +174,7 @@ if (lang === 'en') {
 			<article>
 				{heroImage && (
 					<div class="hero-image">
-						<img width={1020} height={510} src={heroImage} alt="" />
+						<img width={1020} height={510} src={heroImage} alt={heroImageAlt ?? title} />
 					</div>
 				)}
 				<div class="prose">

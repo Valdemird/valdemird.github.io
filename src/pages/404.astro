@@ -2,7 +2,7 @@
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE_TITLE, getLocale } from '../consts';
+import { SITE_TITLE, getLocale, UI_STRINGS } from '../consts';
 
 const locale = getLocale(Astro.url);
 const isEs = locale === 'es';
@@ -23,8 +23,9 @@ const homePath = isEs ? '/es/' : '/';
 		<BaseHead title={`${title} — ${SITE_TITLE}`} description={title} />
 	</head>
 	<body>
+		<a id="nf-skip" class="skip-link" href="#main-content">{UI_STRINGS[locale].nav.skipToContent}</a>
 		<Header />
-		<main>
+		<main id="main-content">
 			<script>
 				import { initPageEntrance, cleanupAll, isReducedMotion } from '../lib/animations';
 
@@ -65,6 +66,8 @@ const homePath = isEs ? '/es/' : '/';
 					var sub = document.getElementById('nf-submessage');
 					var btn = document.getElementById('nf-button');
 					var home = document.getElementById('nf-home');
+					var skip = document.getElementById('nf-skip');
+					if (skip) skip.textContent = 'Saltar al contenido';
 					if (msg) msg.textContent = 'Esta página no existe.';
 					if (sub) sub.textContent = 'Puede que haya sido movida o el enlace esté incorrecto.';
 					if (btn) btn.textContent = 'Ir al inicio';
