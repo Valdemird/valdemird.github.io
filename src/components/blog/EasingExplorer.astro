@@ -1,0 +1,491 @@
+---
+/**
+ * EasingExplorer — drag a cubic-bezier curve, feel the result, copy the code.
+ *
+ * The natural companion to JuiceLab for game-feel and animation posts: two
+ * draggable control handles on an SVG plot, preset chips (including this
+ * site's own --ease-spring), a live preview pad that replays a translate
+ * animation with the current curve, and a copyable CSS/GSAP snippet.
+ *
+ *   <EasingExplorer caption="The site's spring: overshoot at 1.56." />
+ *
+ * Accessibility: handles are keyboard-draggable (focus + arrows, shift for
+ * coarse steps), the preview only auto-plays on change when motion is
+ * allowed, and prefers-reduced-motion keeps the curve editable while the
+ * preview plays only on explicit demand.
+ */
+interface Props {
+	/** Initial control points [x1, y1, x2, y2]. Defaults to the site spring. */
+	initial?: [number, number, number, number];
+	caption?: string;
+	/** UI language for buttons and aria labels. Preset names are CSS terms and stay as-is. */
+	lang?: 'en' | 'es';
+}
+
+const { initial = [0.34, 1.56, 0.64, 1], caption, lang = 'en' } = Astro.props;
+
+const STRINGS = {
+	en: {
+		editorAria: 'Cubic bezier curve editor. Focus a handle and use arrow keys to adjust.',
+		handle1Aria: 'First control point',
+		handle2Aria: 'Second control point',
+		presetsAria: 'Easing presets',
+		replay: 'replay',
+		copy: 'copy',
+		copied: 'copied',
+		copyAria: 'Copy CSS easing',
+	},
+	es: {
+		editorAria: 'Editor de curva cubic-bezier. Enfoca un punto de control y ajusta con las flechas.',
+		handle1Aria: 'Primer punto de control',
+		handle2Aria: 'Segundo punto de control',
+		presetsAria: 'Presets de easing',
+		replay: 'repetir',
+		copy: 'copiar',
+		copied: 'copiado',
+		copyAria: 'Copiar el easing CSS',
+	},
+} as const;
+const L = STRINGS[lang];
+
+const PRESETS: { name: string; pts: [number, number, number, number] }[] = [
+	{ name: 'spring', pts: [0.34, 1.56, 0.64, 1] },
+	{ name: 'smooth', pts: [0.25, 0.1, 0.25, 1] },
+	{ name: 'ease-in', pts: [0.42, 0, 1, 1] },
+	{ name: 'ease-out', pts: [0, 0, 0.58, 1] },
+	{ name: 'linear', pts: [0, 0, 1, 1] },
+];
+
+// SVG plot space: x 0..1 maps to PAD..PAD+PLOT, y 0..1 maps bottom-up.
+// Drag clamps y to [-0.3, 1.6]; the canvas must fit that whole range so the
+// spring preset's 1.56 overshoot handle stays visible and grabbable.
+const PLOT = 240;
+const PAD = 40;
+const Y_MAX = 1.6;
+const Y_MIN = -0.3;
+const SVG_W = PLOT + PAD * 2;
+const Y0 = 12 + Y_MAX * PLOT; // y of progress 0, leaving 12px above the top of the range
+const SVG_H = Y0 + Math.ceil(-Y_MIN * PLOT) + 12;
+const toX = (t: number) => PAD + t * PLOT;
+const toY = (v: number) => Y0 - v * PLOT;
+---
+
+<figure
+	class="easing"
+	data-easing
+	data-initial={initial.join(',')}
+	data-presets={JSON.stringify(PRESETS)}
+	style={`--easing-svg-w:${SVG_W}; --easing-svg-h:${SVG_H};`}
+>
+	<div class="easing-grid">
+		<div class="easing-plot">
+			<svg
+				viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+				role="application"
+				aria-label={L.editorAria}
+				data-ez-svg
+				data-pad={PAD}
+				data-plot={PLOT}
+				data-y0={Y0}
+			>
+				<rect class="easing-unit" x={toX(0)} y={toY(1)} width={PLOT} height={PLOT} />
+				<line class="easing-diag" x1={toX(0)} y1={toY(0)} x2={toX(1)} y2={toY(1)} />
+				<line class="easing-arm" data-ez-arm1 x1={toX(0)} y1={toY(0)} x2={toX(initial[0])} y2={toY(initial[1])} />
+				<line class="easing-arm" data-ez-arm2 x1={toX(1)} y1={toY(1)} x2={toX(initial[2])} y2={toY(initial[3])} />
+				<path class="easing-curve" data-ez-curve d="" fill="none" />
+				<circle class="easing-anchor" cx={toX(0)} cy={toY(0)} r="5" />
+				<circle class="easing-anchor" cx={toX(1)} cy={toY(1)} r="5" />
+				<circle class="easing-handle" data-ez-h1 cx={toX(initial[0])} cy={toY(initial[1])} r="9" tabindex="0" role="slider" aria-label={L.handle1Aria} />
+				<circle class="easing-handle" data-ez-h2 cx={toX(initial[2])} cy={toY(initial[3])} r="9" tabindex="0" role="slider" aria-label={L.handle2Aria} />
+			</svg>
+		</div>
+
+		<div class="easing-side">
+			<div class="easing-presets" role="group" aria-label={L.presetsAria}>
+				{PRESETS.map((p) => (
+					<button type="button" class="easing-chip" data-ez-preset={p.pts.join(',')}>
+						{p.name}
+					</button>
+				))}
+			</div>
+
+			<div class="easing-preview">
+				<div class="easing-track">
+					<div class="easing-ball" data-ez-ball></div>
+				</div>
+				<button type="button" class="easing-play" data-ez-play>{L.replay}</button>
+			</div>
+
+			<div class="easing-code">
+				<code data-ez-css>cubic-bezier(0.34, 1.56, 0.64, 1)</code>
+				<button
+					type="button"
+					class="easing-copy"
+					data-ez-copy
+					data-ez-copy-label={L.copy}
+					data-ez-copied-label={L.copied}
+					aria-label={L.copyAria}
+				>{L.copy}</button>
+			</div>
+			<span class="easing-gsap" data-ez-gsap>gsap: ease: "back.out(1.7)" ≈</span>
+		</div>
+	</div>
+
+	{caption && <figcaption class="easing-caption">{caption}</figcaption>}
+</figure>
+
+<script>
+	import { onReducedMotion } from '../../lib/gsap';
+
+	function setup(root: HTMLElement) {
+		const svg = root.querySelector<SVGSVGElement>('[data-ez-svg]');
+		if (!svg) return;
+		const PAD = Number(svg.dataset.pad);
+		const PLOT = Number(svg.dataset.plot);
+		const Y0 = Number(svg.dataset.y0);
+		const toX = (t: number) => PAD + t * PLOT;
+		const toY = (v: number) => Y0 - v * PLOT;
+		const fromX = (x: number) => (x - PAD) / PLOT;
+		const fromY = (y: number) => (Y0 - y) / PLOT;
+
+		const h1 = svg.querySelector<SVGCircleElement>('[data-ez-h1]')!;
+		const h2 = svg.querySelector<SVGCircleElement>('[data-ez-h2]')!;
+		const arm1 = svg.querySelector<SVGLineElement>('[data-ez-arm1]')!;
+		const arm2 = svg.querySelector<SVGLineElement>('[data-ez-arm2]')!;
+		const curve = svg.querySelector<SVGPathElement>('[data-ez-curve]')!;
+		const cssOut = root.querySelector<HTMLElement>('[data-ez-css]')!;
+		const gsapOut = root.querySelector<HTMLElement>('[data-ez-gsap]')!;
+		const ball = root.querySelector<HTMLElement>('[data-ez-ball]')!;
+
+		let pts = (root.dataset.initial ?? '0.34,1.56,0.64,1').split(',').map(Number) as [number, number, number, number];
+
+		const fmt = (n: number) => `${Math.round(n * 100) / 100}`;
+
+		function render() {
+			const [x1, y1, x2, y2] = pts;
+			h1.setAttribute('cx', String(toX(x1)));
+			h1.setAttribute('cy', String(toY(y1)));
+			h2.setAttribute('cx', String(toX(x2)));
+			h2.setAttribute('cy', String(toY(y2)));
+			arm1.setAttribute('x2', String(toX(x1)));
+			arm1.setAttribute('y2', String(toY(y1)));
+			arm2.setAttribute('x2', String(toX(x2)));
+			arm2.setAttribute('y2', String(toY(y2)));
+			curve.setAttribute(
+				'd',
+				`M${toX(0)},${toY(0)} C${toX(x1)},${toY(y1)} ${toX(x2)},${toY(y2)} ${toX(1)},${toY(1)}`,
+			);
+			const css = `cubic-bezier(${fmt(x1)}, ${fmt(y1)}, ${fmt(x2)}, ${fmt(y2)})`;
+			cssOut.textContent = css;
+			gsapOut.textContent = `gsap: ease: CustomEase.create("custom", "M0,0 C${fmt(x1)},${fmt(y1)} ${fmt(x2)},${fmt(y2)} 1,1")`;
+			h1.setAttribute('aria-valuetext', `x ${fmt(x1)}, y ${fmt(y1)}`);
+			h2.setAttribute('aria-valuetext', `x ${fmt(x2)}, y ${fmt(y2)}`);
+			ball.style.transitionTimingFunction = css;
+		}
+
+		function play() {
+			const track = ball.parentElement!;
+			const run = Math.max(0, track.clientWidth - ball.offsetWidth - 12);
+			ball.style.transitionDuration = '0s';
+			ball.style.transform = 'translateX(0)';
+			// force reflow so the transition restarts from 0
+			void ball.offsetWidth;
+			ball.style.transitionDuration = '0.9s';
+			ball.style.transform = `translateX(${run}px)`;
+		}
+
+		function maybeAutoPlay() {
+			if (!onReducedMotion()) play();
+		}
+
+		// --- Dragging ---
+		function attachDrag(handle: SVGCircleElement, idx: 0 | 2) {
+			handle.addEventListener('pointerdown', (e) => {
+				handle.setPointerCapture(e.pointerId);
+				const move = (ev: PointerEvent) => {
+					const rect = svg!.getBoundingClientRect();
+					const vb = svg!.viewBox.baseVal;
+					const sx = ((ev.clientX - rect.left) / rect.width) * vb.width;
+					const sy = ((ev.clientY - rect.top) / rect.height) * vb.height;
+					pts[idx] = Math.min(1, Math.max(0, fromX(sx)));
+					pts[idx + 1] = Math.min(1.6, Math.max(-0.3, fromY(sy)));
+					render();
+				};
+				const up = () => {
+					handle.removeEventListener('pointermove', move);
+					handle.removeEventListener('pointerup', up);
+					maybeAutoPlay();
+				};
+				handle.addEventListener('pointermove', move);
+				handle.addEventListener('pointerup', up);
+			});
+
+			handle.addEventListener('keydown', (e) => {
+				const step = e.shiftKey ? 0.1 : 0.02;
+				let dx = 0;
+				let dy = 0;
+				if (e.key === 'ArrowLeft') dx = -step;
+				else if (e.key === 'ArrowRight') dx = step;
+				else if (e.key === 'ArrowUp') dy = step;
+				else if (e.key === 'ArrowDown') dy = -step;
+				else return;
+				e.preventDefault();
+				pts[idx] = Math.min(1, Math.max(0, pts[idx] + dx));
+				pts[idx + 1] = Math.min(1.6, Math.max(-0.3, pts[idx + 1] + dy));
+				render();
+				maybeAutoPlay();
+			});
+		}
+		attachDrag(h1, 0);
+		attachDrag(h2, 2);
+
+		// --- Presets / play / copy ---
+		root.querySelectorAll<HTMLButtonElement>('[data-ez-preset]').forEach((btn) => {
+			btn.addEventListener('click', () => {
+				pts = btn.dataset.ezPreset!.split(',').map(Number) as typeof pts;
+				render();
+				maybeAutoPlay();
+			});
+		});
+		root.querySelector('[data-ez-play]')?.addEventListener('click', play);
+		root.querySelector<HTMLButtonElement>('[data-ez-copy]')?.addEventListener('click', async (e) => {
+			const btn = e.currentTarget as HTMLButtonElement;
+			try {
+				await navigator.clipboard.writeText(cssOut.textContent ?? '');
+				btn.textContent = btn.dataset.ezCopiedLabel ?? 'copied';
+				setTimeout(() => (btn.textContent = btn.dataset.ezCopyLabel ?? 'copy'), 1200);
+			} catch {}
+		});
+
+		render();
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-easing]:not([data-ez-ready])').forEach((root) => {
+			root.dataset.ezReady = '1';
+			setup(root);
+		});
+	}
+
+	init();
+	document.addEventListener('astro:after-swap', init);
+</script>
+
+<style>
+	.easing {
+		margin: 2em 0;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: var(--color-surface);
+	}
+
+	.easing-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+		gap: 1.25rem;
+		padding: 1.25rem;
+	}
+
+	@media (max-width: 640px) {
+		.easing-grid {
+			grid-template-columns: 1fr;
+		}
+	}
+
+	.easing-plot svg {
+		width: 100%;
+		height: auto;
+		display: block;
+	}
+
+	.easing-unit {
+		fill: oklch(from var(--color-accent) l c h / 0.045);
+		stroke: var(--color-border);
+		stroke-width: 1;
+	}
+
+	.easing-diag {
+		stroke: var(--color-border-strong);
+		stroke-width: 1;
+		stroke-dasharray: 3 4;
+	}
+
+	.easing-arm {
+		stroke: var(--color-text-muted);
+		stroke-width: 1.25;
+	}
+
+	.easing-curve {
+		stroke: var(--color-accent);
+		stroke-width: 2.5;
+		stroke-linecap: round;
+	}
+
+	.easing-anchor {
+		fill: var(--color-text);
+	}
+
+	.easing-handle {
+		fill: var(--color-surface);
+		stroke: var(--color-accent);
+		stroke-width: 2.5;
+		cursor: grab;
+		touch-action: none;
+	}
+
+	.easing-handle:active {
+		cursor: grabbing;
+	}
+
+	.easing-handle:focus-visible {
+		outline: none;
+		stroke-width: 4;
+		stroke: var(--color-accent);
+	}
+
+	.easing-side {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		min-width: 0;
+	}
+
+	.easing-presets {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+
+	.easing-chip {
+		padding: 0.3em 0.75em;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: var(--color-surface);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition:
+			border-color var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-spring);
+	}
+
+	.easing-chip:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+		transform: translateY(-1px);
+	}
+
+	.easing-chip:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.easing-preview {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+	}
+
+	.easing-track {
+		--easing-run: calc(100% + 0px);
+		flex: 1;
+		position: relative;
+		height: 40px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-bg-secondary);
+		overflow: hidden;
+	}
+
+	.easing-ball {
+		--easing-run: 0px;
+		position: absolute;
+		top: 50%;
+		left: 6px;
+		width: 22px;
+		height: 22px;
+		margin-top: -11px;
+		border-radius: 50%;
+		background: var(--color-accent);
+		transform: translateX(0);
+		transition: transform 0.9s;
+	}
+
+	.easing-play {
+		padding: 0.45em 0.9em;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition:
+			border-color var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.easing-play:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+	}
+
+	.easing-play:focus-visible,
+	.easing-copy:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.easing-code {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 0.65rem 0.85rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-bg-secondary);
+	}
+
+	.easing-code code {
+		flex: 1;
+		min-width: 0;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: var(--color-text);
+		background: none;
+		padding: 0;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.easing-copy {
+		border: none;
+		background: none;
+		font-family: var(--font-mono);
+		font-size: 0.65rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-accent);
+		cursor: pointer;
+	}
+
+	.easing-gsap {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		color: var(--color-text-muted);
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+
+	.easing-caption {
+		padding: 0 1.25rem 0.85rem;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+</style>

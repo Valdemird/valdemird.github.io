@@ -1,0 +1,441 @@
+---
+/**
+ * AgentLoop — step-through visualizer of an AI coding agent's
+ * plan → act → observe cycle, with a context-window gauge.
+ *
+ * For AI dev-workflow posts: each step names its phase, an optional tool
+ * call, and a token cost; the gauge fills as the conversation grows, which
+ * is usually the point the post is making (context is the budget).
+ *
+ *   <AgentLoop
+ *     contextWindow={200}
+ *     steps={[
+ *       { phase: "plan", title: "Read the issue, draft a plan", tokens: 12 },
+ *       { phase: "act", title: "Edit auth.ts", tool: "Edit", tokens: 18 },
+ *       { phase: "observe", title: "Tests fail: token refresh", tool: "Bash", tokens: 22 },
+ *       { phase: "act", title: "Fix the refresh path", tool: "Edit", tokens: 15 },
+ *       { phase: "observe", title: "Suite green", tool: "Bash", tokens: 9 },
+ *     ]}
+ *     caption="Tokens are in thousands."
+ *   />
+ *
+ * Accessibility: real buttons, aria-live step card, gauge exposed as a
+ * progressbar. prefers-reduced-motion drops transitions, stepper still works.
+ */
+type Phase = 'plan' | 'act' | 'observe';
+interface Step {
+	phase: Phase;
+	title: string;
+	detail?: string;
+	tool?: string;
+	/** Token cost of this step (any unit — see caption). */
+	tokens?: number;
+}
+interface Props {
+	steps: Step[];
+	/** Total context budget in the same unit as step tokens. */
+	contextWindow?: number;
+	caption?: string;
+	/** UI language for phase chips, buttons and the gauge. Defaults to English. */
+	lang?: 'en' | 'es';
+}
+
+const { steps, contextWindow, caption, lang = 'en' } = Astro.props;
+
+const STRINGS = {
+	en: {
+		phases: { plan: 'plan', act: 'act', observe: 'observe' },
+		idle: 'Press play to walk the loop.',
+		tool: 'tool',
+		gaugeLabel: 'context',
+		gaugeAria: 'Context window usage',
+		prevAria: 'Previous step',
+		playAria: 'Play all steps',
+		nextAria: 'Next step',
+	},
+	es: {
+		phases: { plan: 'planear', act: 'actuar', observe: 'observar' },
+		idle: 'Dale play para recorrer el ciclo.',
+		tool: 'herramienta',
+		gaugeLabel: 'contexto',
+		gaugeAria: 'Uso de la ventana de contexto',
+		prevAria: 'Paso anterior',
+		playAria: 'Reproducir todos los pasos',
+		nextAria: 'Paso siguiente',
+	},
+} as const;
+const L = STRINGS[lang];
+
+const PHASES: { key: Phase; label: string }[] = [
+	{ key: 'plan', label: L.phases.plan },
+	{ key: 'act', label: L.phases.act },
+	{ key: 'observe', label: L.phases.observe },
+];
+
+const totalTokens = steps.reduce((s, st) => s + (st.tokens ?? 0), 0);
+const budget = contextWindow ?? Math.max(totalTokens, 1);
+
+// Cumulative token usage per step, for the gauge.
+let acc = 0;
+const cumulative = steps.map((s) => (acc += s.tokens ?? 0));
+---
+
+<figure class="agentloop" data-agentloop data-total={steps.length} data-budget={budget}>
+	<div class="agentloop-cycle" aria-hidden="true">
+		{PHASES.map((p, i) => (
+			<>
+				<span class="agentloop-phase" data-al-phase={p.key}>{p.label}</span>
+				{i < PHASES.length - 1 && <span class="agentloop-arrow">→</span>}
+			</>
+		))}
+		<span class="agentloop-arrow agentloop-arrow-loop">↺</span>
+	</div>
+
+	<div class="agentloop-card" data-al-card aria-live="polite">
+		<span class="agentloop-card-phase" data-al-card-phase></span>
+		<span class="agentloop-card-title" data-al-card-title>{L.idle}</span>
+		<span class="agentloop-card-detail" data-al-card-detail></span>
+		<span class="agentloop-card-tool" data-al-card-tool></span>
+	</div>
+
+	<div class="agentloop-gauge">
+		<span class="agentloop-gauge-label">{L.gaugeLabel}</span>
+		<div
+			class="agentloop-gauge-track"
+			role="progressbar"
+			aria-label={L.gaugeAria}
+			aria-valuemin="0"
+			aria-valuemax={budget}
+			aria-valuenow="0"
+			data-al-gauge
+		>
+			<div class="agentloop-gauge-fill" data-al-fill></div>
+		</div>
+		<span class="agentloop-gauge-value" data-al-gauge-value>0 / {budget}</span>
+	</div>
+
+	<div class="agentloop-bar">
+		<button type="button" class="agentloop-btn" data-al-prev aria-label={L.prevAria}>←</button>
+		<button type="button" class="agentloop-btn" data-al-play aria-label={L.playAria}>▶</button>
+		<button type="button" class="agentloop-btn" data-al-next aria-label={L.nextAria}>→</button>
+		<span class="agentloop-count" data-al-count></span>
+	</div>
+
+	{caption && <figcaption class="agentloop-caption">{caption}</figcaption>}
+
+	<script
+		type="application/json"
+		data-al-steps
+		set:html={JSON.stringify({ steps, cumulative, i18n: { idle: L.idle, tool: L.tool, phases: L.phases } })}
+	/>
+</figure>
+
+<script>
+	import { onReducedMotion } from '../../lib/gsap';
+
+	interface AlStep {
+		phase: string;
+		title: string;
+		detail?: string;
+		tool?: string;
+		tokens?: number;
+	}
+
+	function setup(root: HTMLElement) {
+		const payload = JSON.parse(root.querySelector('[data-al-steps]')?.textContent ?? '{}') as {
+			steps: AlStep[];
+			cumulative: number[];
+			i18n?: { idle: string; tool: string; phases: Record<string, string> };
+		};
+		const steps = payload.steps ?? [];
+		const cumulative = payload.cumulative ?? [];
+		const i18n = payload.i18n ?? { idle: 'Press play to walk the loop.', tool: 'tool', phases: {} };
+		const total = steps.length;
+		const budget = Number(root.dataset.budget ?? 1);
+
+		const phaseEls = root.querySelectorAll<HTMLElement>('[data-al-phase]');
+		const cardPhase = root.querySelector<HTMLElement>('[data-al-card-phase]')!;
+		const cardTitle = root.querySelector<HTMLElement>('[data-al-card-title]')!;
+		const cardDetail = root.querySelector<HTMLElement>('[data-al-card-detail]')!;
+		const cardTool = root.querySelector<HTMLElement>('[data-al-card-tool]')!;
+		const gauge = root.querySelector<HTMLElement>('[data-al-gauge]')!;
+		const fill = root.querySelector<HTMLElement>('[data-al-fill]')!;
+		const gaugeValue = root.querySelector<HTMLElement>('[data-al-gauge-value]')!;
+		const count = root.querySelector<HTMLElement>('[data-al-count]')!;
+		const playBtn = root.querySelector<HTMLButtonElement>('[data-al-play]')!;
+
+		let current = 0; // 0 = before first step
+		let timer: ReturnType<typeof setInterval> | null = null;
+
+		const apply = () => {
+			const step = current > 0 ? steps[current - 1] : null;
+			phaseEls.forEach((el) => el.classList.toggle('al-active', !!step && el.dataset.alPhase === step.phase));
+			cardPhase.textContent = step ? (i18n.phases[step.phase] ?? step.phase) : '';
+			cardTitle.textContent = step ? step.title : i18n.idle;
+			cardDetail.textContent = step?.detail ?? '';
+			cardTool.textContent = step?.tool ? `${i18n.tool}: ${step.tool}` : '';
+			const used = current > 0 ? cumulative[current - 1] : 0;
+			const pct = Math.min(100, (used / budget) * 100);
+			fill.style.width = `${pct}%`;
+			fill.classList.toggle('al-hot', pct > 80);
+			gauge.setAttribute('aria-valuenow', String(used));
+			gaugeValue.textContent = `${used} / ${budget}`;
+			count.textContent = `${current}/${total}`;
+		};
+
+		const stop = () => {
+			if (timer) clearInterval(timer);
+			timer = null;
+			playBtn.textContent = '▶';
+		};
+
+		const go = (n: number) => {
+			current = Math.max(0, Math.min(total, n));
+			apply();
+		};
+
+		root.querySelector('[data-al-prev]')?.addEventListener('click', () => {
+			stop();
+			go(current - 1);
+		});
+		root.querySelector('[data-al-next]')?.addEventListener('click', () => {
+			stop();
+			go(current + 1);
+		});
+		playBtn.addEventListener('click', () => {
+			if (timer) {
+				stop();
+				return;
+			}
+			if (current >= total) current = 0;
+			playBtn.textContent = '⏸';
+			timer = setInterval(
+				() => {
+					go(current + 1);
+					if (current >= total) stop();
+				},
+				onReducedMotion() ? 60 : 1400,
+			);
+		});
+
+		apply();
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-agentloop]:not([data-al-ready])').forEach((root) => {
+			root.dataset.alReady = '1';
+			setup(root);
+		});
+	}
+
+	init();
+	document.addEventListener('astro:after-swap', init);
+</script>
+
+<style>
+	.agentloop {
+		margin: 2em 0;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: var(--color-surface);
+	}
+
+	.agentloop-cycle {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		padding: 1rem 1.25rem 0;
+	}
+
+	.agentloop-phase {
+		padding: 0.3em 0.8em;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-muted);
+		transition:
+			color var(--duration-normal) var(--ease-smooth),
+			border-color var(--duration-normal) var(--ease-smooth),
+			background var(--duration-normal) var(--ease-smooth);
+	}
+
+	.agentloop-phase.al-active {
+		color: var(--color-accent);
+		border-color: var(--color-accent);
+		background: oklch(from var(--color-accent) l c h / 0.06);
+	}
+
+	.agentloop-arrow {
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--color-text-muted);
+	}
+
+	.agentloop-arrow-loop {
+		margin-left: auto;
+		font-size: 0.95rem;
+	}
+
+	.agentloop-card {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		margin: 1rem 1.25rem;
+		padding: 0.9rem 1.1rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-bg-secondary);
+		min-height: 5.4rem;
+	}
+
+	.agentloop-card-phase {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		min-height: 1em;
+	}
+
+	.agentloop-card-title {
+		font-family: var(--font-serif);
+		font-size: 1.02rem;
+		font-weight: 500;
+		color: var(--color-text);
+		line-height: 1.35;
+	}
+
+	.agentloop-card-detail {
+		font-size: 0.85rem;
+		color: var(--color-text-secondary);
+	}
+
+	.agentloop-card-detail:empty,
+	.agentloop-card-tool:empty {
+		display: none;
+	}
+
+	.agentloop-card-tool {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+
+	.agentloop-gauge {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0 1.25rem 0.9rem;
+	}
+
+	.agentloop-gauge-label {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-text-muted);
+	}
+
+	.agentloop-gauge-track {
+		flex: 1;
+		height: 8px;
+		border-radius: 999px;
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+	}
+
+	.agentloop-gauge-fill {
+		height: 100%;
+		width: 0;
+		border-radius: 999px;
+		background: var(--color-accent);
+		transition: width 0.5s var(--ease-smooth), background var(--duration-normal) var(--ease-smooth);
+	}
+
+	.agentloop-gauge-fill.al-hot {
+		background: var(--color-destructive);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.agentloop-gauge-fill,
+		.agentloop-phase {
+			transition: none;
+		}
+	}
+
+	.agentloop-gauge-value {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+		min-width: 7ch;
+		text-align: right;
+	}
+
+	.agentloop-bar {
+		display: flex;
+		align-items: center;
+		gap: 0.35rem;
+		padding: 0.6rem 1.25rem;
+		border-top: 1px solid var(--color-border);
+		background: var(--color-bg-secondary);
+	}
+
+	.agentloop-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		color: var(--color-text-secondary);
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition:
+			border-color var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-spring);
+	}
+
+	.agentloop-btn:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+		transform: translateY(-1px);
+	}
+
+	.agentloop-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.agentloop-count {
+		margin-left: auto;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+
+	.agentloop-caption {
+		padding: 0.6rem 1.25rem 0.85rem;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+
+	[data-al-steps] {
+		display: none;
+	}
+
+	@media (max-width: 560px) {
+		.agentloop-cycle {
+			flex-wrap: wrap;
+		}
+	}
+</style>

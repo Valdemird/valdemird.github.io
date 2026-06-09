@@ -1,0 +1,426 @@
+---
+/**
+ * GitGraph — declarative commit DAG with step-through playback.
+ *
+ * Feed it an ordered list of git operations; it lays out branches as lanes,
+ * commits as dots, merges as curved edges, and lets the reader step through
+ * the history one operation at a time with prev/next/play controls. Built
+ * for posts about branching workflows (worktrees, parallel agents, rebases)
+ * where Mermaid's gitGraph is off-brand and CDN-loaded.
+ *
+ *   <GitGraph ops={[
+ *     { op: "commit", branch: "main", label: "init" },
+ *     { op: "branch", name: "fix/auth", from: "main" },
+ *     { op: "commit", branch: "fix/auth", label: "agent 1 starts" },
+ *     { op: "commit", branch: "main", label: "meanwhile on main" },
+ *     { op: "merge", from: "fix/auth", into: "main", label: "PR #1 merged" },
+ *   ]} caption="Two agents, two lanes, no collisions." />
+ *
+ * Accessibility: controls are real buttons, the step caption is aria-live,
+ * and prefers-reduced-motion swaps transitions for instant reveals (the
+ * stepper still works).
+ */
+interface CommitOp {
+	op: 'commit';
+	branch: string;
+	label?: string;
+}
+interface BranchOp {
+	op: 'branch';
+	name: string;
+	from: string;
+	label?: string;
+}
+interface MergeOp {
+	op: 'merge';
+	from: string;
+	into: string;
+	label?: string;
+}
+export type GitOp = CommitOp | BranchOp | MergeOp;
+
+interface Props {
+	ops: GitOp[];
+	caption?: string;
+	/** Start fully revealed instead of at step 0. */
+	revealed?: boolean;
+	/** UI language for control labels. Git terms in step labels stay as-is. */
+	lang?: 'en' | 'es';
+}
+
+const { ops, caption, revealed = false, lang = 'en' } = Astro.props;
+
+const STRINGS = {
+	en: {
+		svgAria: 'git commit graph',
+		prevAria: 'Previous step',
+		playAria: 'Play all steps',
+		nextAria: 'Next step',
+	},
+	es: {
+		svgAria: 'grafo de commits de git',
+		prevAria: 'Paso anterior',
+		playAria: 'Reproducir todos los pasos',
+		nextAria: 'Paso siguiente',
+	},
+} as const;
+const L = STRINGS[lang];
+
+/** Lane palette — design tokens, main always gets the accent. */
+const LANE_COLORS = [
+	'var(--color-accent)',
+	'var(--color-success)',
+	'var(--color-warning)',
+	'var(--color-destructive)',
+];
+
+// --- Layout: ops → nodes/edges in SVG user space ---
+const COL_W = 64;
+const LANE_H = 52;
+const PAD_Y = 30;
+const PAD_R = 28;
+
+// Left padding grows with the longest branch name so lane labels never clip
+// (~6.6px per character at the 11px mono label size).
+const branchNames = ops.flatMap((o) =>
+	o.op === 'commit' ? [o.branch] : o.op === 'branch' ? [o.name, o.from] : [o.from, o.into],
+);
+const maxNameLen = Math.max(0, ...branchNames.map((n) => n.length));
+const PAD_L = 16 + Math.ceil(maxNameLen * 6.6);
+
+interface Node {
+	id: number;
+	step: number;
+	x: number;
+	y: number;
+	color: string;
+	label?: string;
+	branch: string;
+}
+interface Edge {
+	step: number;
+	path: string;
+	color: string;
+	merge?: boolean;
+}
+
+const lanes: string[] = [];
+function laneOf(branch: string): number {
+	let i = lanes.indexOf(branch);
+	if (i === -1) {
+		lanes.push(branch);
+		i = lanes.length - 1;
+	}
+	return i;
+}
+const laneColor = (branch: string) => LANE_COLORS[laneOf(branch) % LANE_COLORS.length];
+
+const nodes: Node[] = [];
+const edges: Edge[] = [];
+const tip = new Map<string, Node>(); // branch → last node
+let col = 0;
+
+function addNode(branch: string, step: number, label?: string): Node {
+	col += 1;
+	const node: Node = {
+		id: nodes.length,
+		step,
+		x: PAD_L + col * COL_W,
+		y: PAD_Y + laneOf(branch) * LANE_H,
+		color: laneColor(branch),
+		label,
+		branch,
+	};
+	nodes.push(node);
+	return node;
+}
+
+function link(a: Node, b: Node, step: number, merge = false) {
+	const path =
+		a.y === b.y
+			? `M${a.x},${a.y} L${b.x},${b.y}`
+			: `M${a.x},${a.y} C${a.x + COL_W * 0.55},${a.y} ${b.x - COL_W * 0.55},${b.y} ${b.x},${b.y}`;
+	edges.push({ step, path, color: b.color, merge });
+}
+
+ops.forEach((o, step) => {
+	if (o.op === 'commit') {
+		const node = addNode(o.branch, step, o.label);
+		const prev = tip.get(o.branch);
+		if (prev) link(prev, node, step);
+		tip.set(o.branch, node);
+	} else if (o.op === 'branch') {
+		laneOf(o.name);
+		const base = tip.get(o.from);
+		const node = addNode(o.name, step, o.label ?? o.name);
+		if (base) link(base, node, step);
+		tip.set(o.name, node);
+	} else if (o.op === 'merge') {
+		const node = addNode(o.into, step, o.label ?? `merge ${o.from}`);
+		const intoPrev = tip.get(o.into);
+		const fromTip = tip.get(o.from);
+		if (intoPrev) link(intoPrev, node, step);
+		if (fromTip) link(fromTip, node, step, true);
+		tip.set(o.into, node);
+	}
+});
+
+const SVG_W = PAD_L + (col + 1) * COL_W + PAD_R;
+const SVG_H = PAD_Y * 2 + Math.max(lanes.length - 1, 0) * LANE_H;
+const totalSteps = ops.length;
+const stepLabels = ops.map((o) => o.label ?? (o.op === 'branch' ? `branch ${o.name}` : o.op === 'merge' ? `merge ${o.from} → ${o.into}` : 'commit'));
+---
+
+<figure class="gitgraph" data-gitgraph data-total={totalSteps} data-revealed={revealed ? '1' : undefined}>
+	<div class="gitgraph-stage">
+		<svg
+			style={`min-width: ${Math.round(SVG_W * 0.72)}px`}
+			viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+			role="img"
+			aria-label={caption ?? L.svgAria}
+			preserveAspectRatio="xMidYMid meet"
+		>
+			{lanes.map((branch, i) => (
+				<g class="gitgraph-lane">
+					<line x1={PAD_L} y1={PAD_Y + i * LANE_H} x2={SVG_W - PAD_R} y2={PAD_Y + i * LANE_H} />
+					<text x={PAD_L - 10} y={PAD_Y + i * LANE_H + 4} text-anchor="end" fill={LANE_COLORS[i % LANE_COLORS.length]}>
+						{branch}
+					</text>
+				</g>
+			))}
+			{edges.map((e) => (
+				<path
+					class="gitgraph-edge"
+					data-step={e.step}
+					d={e.path}
+					fill="none"
+					stroke={e.color}
+					stroke-width={e.merge ? 1.75 : 2.25}
+					stroke-dasharray={e.merge ? '5 4' : undefined}
+					stroke-linecap="round"
+				/>
+			))}
+			{nodes.map((n) => (
+				<g class="gitgraph-node" data-step={n.step}>
+					<circle cx={n.x} cy={n.y} r="6.5" fill={n.color} stroke="var(--color-surface)" stroke-width="2.5" />
+					{n.label && (
+						<text x={n.x} y={n.y - 14} text-anchor="middle">
+							{n.label}
+						</text>
+					)}
+				</g>
+			))}
+		</svg>
+	</div>
+
+	<div class="gitgraph-bar">
+		<div class="gitgraph-controls">
+			<button type="button" class="gitgraph-btn" data-gg-prev aria-label={L.prevAria}>←</button>
+			<button type="button" class="gitgraph-btn" data-gg-play aria-label={L.playAria}>▶</button>
+			<button type="button" class="gitgraph-btn" data-gg-next aria-label={L.nextAria}>→</button>
+		</div>
+		<span class="gitgraph-step" data-gg-caption aria-live="polite"></span>
+		<span class="gitgraph-count" data-gg-count></span>
+	</div>
+
+	{caption && <figcaption class="gitgraph-caption">{caption}</figcaption>}
+
+	<script type="application/json" data-gg-labels set:html={JSON.stringify(stepLabels)} />
+</figure>
+
+<script>
+	import { onReducedMotion } from '../../lib/gsap';
+
+	function setupGraph(root: HTMLElement) {
+		const total = Number(root.dataset.total ?? 0);
+		const labels: string[] = JSON.parse(root.querySelector('[data-gg-labels]')?.textContent ?? '[]');
+		const caption = root.querySelector<HTMLElement>('[data-gg-caption]');
+		const count = root.querySelector<HTMLElement>('[data-gg-count]');
+		const playBtn = root.querySelector<HTMLButtonElement>('[data-gg-play]');
+		let current = root.dataset.revealed === '1' ? total : 0;
+		let timer: ReturnType<typeof setInterval> | null = null;
+
+		const apply = () => {
+			root.querySelectorAll<SVGElement>('[data-step]').forEach((el) => {
+				el.classList.toggle('gg-shown', Number(el.dataset.step) < current);
+			});
+			if (caption) caption.textContent = current === 0 ? '—' : labels[current - 1] ?? '';
+			if (count) count.textContent = `${current}/${total}`;
+		};
+
+		const stop = () => {
+			if (timer) clearInterval(timer);
+			timer = null;
+			if (playBtn) playBtn.textContent = '▶';
+		};
+
+		const go = (n: number) => {
+			current = Math.max(0, Math.min(total, n));
+			apply();
+		};
+
+		root.querySelector('[data-gg-prev]')?.addEventListener('click', () => {
+			stop();
+			go(current - 1);
+		});
+		root.querySelector('[data-gg-next]')?.addEventListener('click', () => {
+			stop();
+			go(current + 1);
+		});
+		playBtn?.addEventListener('click', () => {
+			if (timer) {
+				stop();
+				return;
+			}
+			if (current >= total) current = 0;
+			playBtn.textContent = '⏸';
+			const interval = onReducedMotion() ? 50 : 900;
+			timer = setInterval(() => {
+				go(current + 1);
+				if (current >= total) stop();
+			}, interval);
+		});
+
+		apply();
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-gitgraph]:not([data-gg-ready])').forEach((root) => {
+			root.dataset.ggReady = '1';
+			setupGraph(root);
+		});
+	}
+
+	init();
+	document.addEventListener('astro:after-swap', init);
+</script>
+
+<style>
+	.gitgraph {
+		margin: 2em 0;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: var(--color-surface);
+	}
+
+	/* Wide graphs scroll horizontally on small screens instead of scaling
+	   the labels below legibility (the svg carries a min-width inline). */
+	.gitgraph-stage {
+		padding: 1.25rem 1.25rem 0.5rem;
+		overflow-x: auto;
+	}
+
+	.gitgraph svg {
+		width: 100%;
+		height: auto;
+		display: block;
+	}
+
+	.gitgraph-lane line {
+		stroke: var(--color-border);
+		stroke-width: 0.75;
+		stroke-dasharray: 2 4;
+	}
+
+	.gitgraph-lane text {
+		font-family: var(--font-mono);
+		font-size: 11px;
+		font-weight: 600;
+	}
+
+	.gitgraph-edge,
+	.gitgraph-node {
+		opacity: 0;
+		transition: opacity 0.45s var(--ease-smooth);
+	}
+
+	.gitgraph-edge.gg-shown,
+	.gitgraph-node.gg-shown {
+		opacity: 1;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.gitgraph-edge,
+		.gitgraph-node {
+			transition: none;
+		}
+	}
+
+	.gitgraph-node text {
+		fill: var(--color-text-secondary);
+		font-family: var(--font-mono);
+		font-size: 10.5px;
+	}
+
+	.gitgraph-bar {
+		display: flex;
+		align-items: center;
+		gap: 1rem;
+		padding: 0.6rem 1.25rem;
+		border-top: 1px solid var(--color-border);
+		background: var(--color-bg-secondary);
+	}
+
+	.gitgraph-controls {
+		display: flex;
+		gap: 0.35rem;
+	}
+
+	.gitgraph-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 32px;
+		height: 32px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		color: var(--color-text-secondary);
+		font-size: 0.8rem;
+		cursor: pointer;
+		transition:
+			border-color var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-spring);
+	}
+
+	.gitgraph-btn:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+		transform: translateY(-1px);
+	}
+
+	.gitgraph-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.gitgraph-step {
+		flex: 1;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		color: var(--color-text);
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.gitgraph-count {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+
+	.gitgraph-caption {
+		padding: 0.6rem 1.25rem 0.85rem;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+
+	[data-gg-labels] {
+		display: none;
+	}
+</style>

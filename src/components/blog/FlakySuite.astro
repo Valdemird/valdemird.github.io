@@ -1,0 +1,396 @@
+---
+/**
+ * FlakySuite — Monte Carlo simulator for flaky test suites.
+ *
+ * Drag the flake rate and suite size, pick a retry policy, and watch the
+ * probability that a full suite run comes back green. The grid shows one
+ * sampled run (each dot a test); the bars show P(suite green) for retry
+ * budgets 0–3, recomputed live from 2,000 simulated runs. The point the
+ * component makes: per-test flakiness compounds brutally with suite size,
+ * and retries paper over it at the cost of trust.
+ *
+ *   <FlakySuite tests={40} flakeRate={0.02} caption="2% flaky × 40 tests." />
+ *
+ * Accessibility: native range inputs, verdict in an aria-live region;
+ * prefers-reduced-motion skips the dot pop-in and shows the sampled
+ * outcome instantly.
+ */
+interface Props {
+	/** Number of tests in the suite. 4–120. */
+	tests?: number;
+	/** Per-test probability of a spurious failure. 0–0.2. */
+	flakeRate?: number;
+	caption?: string;
+	/** UI language for labels and the live verdict. Defaults to English. */
+	lang?: 'en' | 'es';
+}
+
+const { tests = 40, flakeRate = 0.03, caption, lang = 'en' } = Astro.props;
+const clampedTests = Math.max(4, Math.min(120, tests));
+const ratePct = Math.round(Math.max(0, Math.min(0.2, flakeRate)) * 100);
+
+const STRINGS = {
+	en: {
+		flakeRate: 'flake rate',
+		suiteSize: 'suite size',
+		runSuite: 'run suite',
+		rateAria: 'Per-test flake rate, percent',
+		testsAria: 'Number of tests in the suite',
+		resultsLabel: 'P(suite green) by retry budget — 2,000 simulated runs',
+		noRetry: 'no retry',
+		retry: 'retry',
+		verdictGreen: 'Suite green — all {total} passed this run.',
+		verdictRed: 'Suite red — {n} of {total} flaked this run.',
+	},
+	es: {
+		flakeRate: 'tasa de flakes',
+		suiteSize: 'tamaño de suite',
+		runSuite: 'correr suite',
+		rateAria: 'Tasa de flakes por test, en porcentaje',
+		testsAria: 'Cantidad de tests en la suite',
+		resultsLabel: 'P(suite verde) por presupuesto de retries — 2.000 corridas simuladas',
+		noRetry: 'sin retries',
+		retry: 'retry',
+		verdictGreen: 'Suite verde — pasaron los {total} en esta corrida.',
+		verdictRed: 'Suite roja — {n} de {total} flaquearon en esta corrida.',
+	},
+} as const;
+const L = STRINGS[lang];
+---
+
+<figure
+	class="flaky"
+	data-flaky
+	data-tests={clampedTests}
+	data-rate={ratePct}
+	data-fk-msg-green={L.verdictGreen}
+	data-fk-msg-red={L.verdictRed}
+>
+	<div class="flaky-controls">
+		<label class="flaky-field">
+			<span class="flaky-label">{L.flakeRate} <strong data-fk-rate-out>{ratePct}%</strong></span>
+			<input type="range" min="0" max="20" step="1" value={ratePct} data-fk-rate aria-label={L.rateAria} />
+		</label>
+		<label class="flaky-field">
+			<span class="flaky-label">{L.suiteSize} <strong data-fk-tests-out>{clampedTests}</strong></span>
+			<input type="range" min="4" max="120" step="4" value={clampedTests} data-fk-tests aria-label={L.testsAria} />
+		</label>
+		<button type="button" class="flaky-run" data-fk-run>{L.runSuite}</button>
+	</div>
+
+	<div class="flaky-grid" data-fk-grid aria-hidden="true"></div>
+	<p class="flaky-verdict" data-fk-verdict aria-live="polite"></p>
+
+	<div class="flaky-results">
+		<span class="flaky-results-label">{L.resultsLabel}</span>
+		<div class="flaky-bars" data-fk-bars>
+			{[0, 1, 2, 3].map((r) => (
+				<div class="flaky-bar-row">
+					<span class="flaky-bar-name">{r === 0 ? L.noRetry : `${L.retry} ×${r}`}</span>
+					<div class="flaky-bar-track">
+						<div class="flaky-bar-fill" data-fk-bar={r}></div>
+					</div>
+					<span class="flaky-bar-value" data-fk-bar-value={r}>—</span>
+				</div>
+			))}
+		</div>
+	</div>
+
+	{caption && <figcaption class="flaky-caption">{caption}</figcaption>}
+</figure>
+
+<script>
+	import { onReducedMotion } from '../../lib/gsap';
+
+	const RUNS = 2000;
+
+	function pSuiteGreen(tests: number, rate: number, retries: number): number {
+		// Analytic per-test: green if any of (1 + retries) attempts passes.
+		// Sampled anyway to keep the number honest with the grid — and because
+		// Monte Carlo is the point of the demo.
+		let green = 0;
+		for (let run = 0; run < RUNS; run++) {
+			let ok = true;
+			for (let t = 0; t < tests; t++) {
+				let passed = false;
+				for (let a = 0; a <= retries; a++) {
+					if (Math.random() >= rate) {
+						passed = true;
+						break;
+					}
+				}
+				if (!passed) {
+					ok = false;
+					break;
+				}
+			}
+			if (ok) green++;
+		}
+		return green / RUNS;
+	}
+
+	function setup(root: HTMLElement) {
+		const rateInput = root.querySelector<HTMLInputElement>('[data-fk-rate]')!;
+		const testsInput = root.querySelector<HTMLInputElement>('[data-fk-tests]')!;
+		const rateOut = root.querySelector<HTMLElement>('[data-fk-rate-out]')!;
+		const testsOut = root.querySelector<HTMLElement>('[data-fk-tests-out]')!;
+		const grid = root.querySelector<HTMLElement>('[data-fk-grid]')!;
+		const verdict = root.querySelector<HTMLElement>('[data-fk-verdict]')!;
+
+		const readState = () => ({
+			rate: Number(rateInput.value) / 100,
+			tests: Number(testsInput.value),
+		});
+
+		function recompute() {
+			const { rate, tests } = readState();
+			rateOut.textContent = `${rateInput.value}%`;
+			testsOut.textContent = String(tests);
+			for (let r = 0; r <= 3; r++) {
+				const p = pSuiteGreen(tests, rate, r);
+				const fill = root.querySelector<HTMLElement>(`[data-fk-bar="${r}"]`)!;
+				const val = root.querySelector<HTMLElement>(`[data-fk-bar-value="${r}"]`)!;
+				fill.style.width = `${(p * 100).toFixed(1)}%`;
+				fill.classList.toggle('fk-bad', p < 0.5);
+				val.textContent = `${(p * 100).toFixed(1)}%`;
+			}
+		}
+
+		function runOnce() {
+			const { rate, tests } = readState();
+			grid.innerHTML = '';
+			const outcomes: boolean[] = Array.from({ length: tests }, () => Math.random() >= rate);
+			const failures = outcomes.filter((o) => !o).length;
+			const reduced = onReducedMotion();
+			outcomes.forEach((pass, i) => {
+				const dot = document.createElement('span');
+				dot.className = `flaky-dot ${pass ? 'fk-pass' : 'fk-fail'}`;
+				if (!reduced) dot.style.animationDelay = `${i * 18}ms`;
+				else dot.classList.add('fk-instant');
+				grid.appendChild(dot);
+			});
+			const template = failures === 0 ? root.dataset.fkMsgGreen : root.dataset.fkMsgRed;
+			verdict.textContent = (template ?? '')
+				.replace('{total}', String(tests))
+				.replace('{n}', String(failures));
+		}
+
+		rateInput.addEventListener('input', recompute);
+		testsInput.addEventListener('input', recompute);
+		root.querySelector('[data-fk-run]')?.addEventListener('click', runOnce);
+
+		recompute();
+		runOnce();
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-flaky]:not([data-fk-ready])').forEach((root) => {
+			root.dataset.fkReady = '1';
+			setup(root);
+		});
+	}
+
+	init();
+	document.addEventListener('astro:after-swap', init);
+</script>
+
+<style>
+	.flaky {
+		margin: 2em 0;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: var(--color-surface);
+	}
+
+	.flaky-controls {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		gap: 1.25rem;
+		padding: 1.1rem 1.25rem 0.75rem;
+	}
+
+	.flaky-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+		min-width: 150px;
+		flex: 1;
+	}
+
+	.flaky-label {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-muted);
+	}
+
+	.flaky-label strong {
+		color: var(--color-accent);
+	}
+
+	.flaky input[type='range'] {
+		accent-color: var(--color-accent);
+		width: 100%;
+		min-height: 24px;
+	}
+
+	.flaky input[type='range']:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		border-radius: var(--radius-sm);
+	}
+
+	.flaky-run {
+		padding: 0.5em 1em;
+		min-height: 36px;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition:
+			border-color var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-spring);
+	}
+
+	.flaky-run:hover {
+		border-color: var(--color-border-strong);
+		color: var(--color-text);
+		transform: translateY(-1px);
+	}
+
+	.flaky-run:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.flaky-grid {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+		padding: 0.75rem 1.25rem;
+	}
+
+	/* Dots are created from the client script, so they don't carry Astro's
+	   scope attribute — style them through :global under the scoped grid. */
+	.flaky-grid :global(.flaky-dot) {
+		width: 12px;
+		height: 12px;
+		border-radius: 3px;
+		opacity: 0;
+		animation: fkPop 0.25s var(--ease-spring) forwards;
+	}
+
+	.flaky-grid :global(.flaky-dot.fk-instant) {
+		animation: none;
+		opacity: 1;
+	}
+
+	@keyframes fkPop {
+		from {
+			opacity: 0;
+			transform: scale(0.4);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1);
+		}
+	}
+
+	.flaky-grid :global(.fk-pass) {
+		background: oklch(from var(--color-success) l c h / 0.75);
+	}
+
+	.flaky-grid :global(.fk-fail) {
+		background: var(--color-destructive);
+	}
+
+	.flaky-verdict {
+		margin: 0;
+		padding: 0 1.25rem 0.75rem;
+		font-family: var(--font-serif);
+		font-size: 1rem;
+		font-weight: 500;
+		color: var(--color-text);
+	}
+
+	.flaky-results {
+		padding: 0.85rem 1.25rem;
+		border-top: 1px solid var(--color-border);
+		background: var(--color-bg-secondary);
+	}
+
+	.flaky-results-label {
+		display: block;
+		margin-bottom: 0.6rem;
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-muted);
+	}
+
+	.flaky-bar-row {
+		display: grid;
+		grid-template-columns: 80px 1fr 56px;
+		align-items: center;
+		gap: 0.75rem;
+		margin-bottom: 0.45rem;
+	}
+
+	.flaky-bar-name {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-text-secondary);
+		text-align: right;
+	}
+
+	.flaky-bar-track {
+		height: 16px;
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+	}
+
+	.flaky-bar-fill {
+		height: 100%;
+		width: 0;
+		background: var(--color-success);
+		border-radius: var(--radius-sm);
+		transition: width 0.45s var(--ease-spring), background var(--duration-normal) var(--ease-smooth);
+	}
+
+	.flaky-bar-fill.fk-bad {
+		background: var(--color-destructive);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.flaky-bar-fill {
+			transition: none;
+		}
+	}
+
+	.flaky-bar-value {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--color-text);
+		text-align: right;
+	}
+
+	.flaky-caption {
+		padding: 0.6rem 1.25rem 0.85rem;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+</style>

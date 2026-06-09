@@ -1,10 +1,14 @@
 ---
+import { getLocale } from '../../consts';
+
 interface Props {
 	type?: 'tip' | 'warning' | 'note' | 'important';
 	title?: string;
+	/** Eyebrow language. Defaults to the page locale, so ES posts localize for free. */
+	lang?: 'en' | 'es';
 }
 
-const { type = 'note', title } = Astro.props;
+const { type = 'note', title, lang = getLocale(Astro.url) } = Astro.props;
 
 const icons: Record<string, string> = {
 	tip: '💡',
@@ -13,12 +17,11 @@ const icons: Record<string, string> = {
 	important: '🔑',
 };
 
-const labels: Record<string, string> = {
-	tip: 'Tip',
-	warning: 'Warning',
-	note: 'Note',
-	important: 'Important',
+const LABELS: Record<'en' | 'es', Record<string, string>> = {
+	en: { tip: 'Tip', warning: 'Warning', note: 'Note', important: 'Important' },
+	es: { tip: 'Consejo', warning: 'Cuidado', note: 'Nota', important: 'Importante' },
 };
+const labels = LABELS[lang];
 ---
 
 <aside class:list={['callout', `callout-${type}`]} role="note">

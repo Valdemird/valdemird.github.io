@@ -31,7 +31,7 @@ const labels = {
 	es: { published: 'Publicado', reviewed: 'Revisado', status: 'Estado' },
 }[lang];
 
-const isWarning = !!status && /outdated|deprecated|archived/i.test(status);
+const isWarning = !!status && /outdated|deprecated|archived|desactualizado|obsoleto|archivado/i.test(status);
 ---
 
 <p class="freshness">
