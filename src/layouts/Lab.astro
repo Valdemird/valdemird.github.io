@@ -1,0 +1,224 @@
+---
+/**
+ * Lab layout — shell for the /lab component gallery.
+ *
+ * Public and indexed, wearing the site's own chrome (glass Header + Footer)
+ * so the gallery reads as part of the site, plus a lab-only toolbar (theme
+ * override + replay). Components render against the real global.css, fonts,
+ * GSAP singleton and View Transitions, so what you see here is exactly what
+ * a blog post gets.
+ */
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import LabControls from '../components/lab/LabControls.astro';
+import LabNav from '../components/lab/LabNav.astro';
+import type { DemoEntry } from '../components/lab/registry';
+import { groupByCategory } from '../components/lab/registry';
+
+interface Props {
+	title: string;
+	description: string;
+	entries: DemoEntry[];
+	/** Slug of the active component page; undefined on the index. */
+	active?: string;
+	lang?: 'en' | 'es';
+}
+
+const { title, description, entries, active, lang = 'en' } = Astro.props;
+const groups = groupByCategory(entries, lang);
+
+const STRINGS = {
+	en: { skip: 'Skip to content', nav: 'Components', wordmark: 'component lab' },
+	es: { skip: 'Saltar al contenido', nav: 'Componentes', wordmark: 'lab de componentes' },
+} as const;
+const L = STRINGS[lang];
+const labHome = lang === 'es' ? '/es/lab/' : '/lab/';
+
+// EN/ES mirrors live at /lab/... and /es/lab/... — emit both hreflang links.
+const enPath = Astro.url.pathname.replace(/^\/es\//, '/');
+const alternates = [
+	{ hreflang: 'en', href: new URL(enPath, Astro.site).toString() },
+	{ hreflang: 'es', href: new URL(`/es${enPath}`, Astro.site).toString() },
+];
+---
+
+<!doctype html>
+<html lang={lang}>
+	<head>
+		<BaseHead title={title} description={description} lang={lang} alternates={alternates} />
+	</head>
+	<body>
+		<a class="skip-link" href="#lab-content">{L.skip}</a>
+		<Header />
+
+		<div class="lab-toolbar">
+			<a href={labHome} class="lab-wordmark">
+				<span class="lab-wordmark-lab">{L.wordmark}</span>
+			</a>
+			<LabControls />
+		</div>
+
+		<div class="lab-shell">
+			<aside class="lab-sidebar">
+				<nav aria-label={L.nav}>
+					<LabNav groups={groups} labHome={labHome} active={active} />
+				</nav>
+			</aside>
+
+			{active && (
+				<details class="lab-nav-mobile">
+					<summary>{L.nav}</summary>
+					<nav aria-label={L.nav}>
+						<LabNav groups={groups} labHome={labHome} active={active} />
+					</nav>
+				</details>
+			)}
+
+			<main id="lab-content" class="lab-main">
+				<slot />
+			</main>
+		</div>
+
+		<Footer />
+	</body>
+</html>
+
+<style>
+	.skip-link {
+		position: absolute;
+		top: -100%;
+		left: 1rem;
+		z-index: 100;
+		padding: 0.6rem 1rem;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border-strong);
+		border-radius: var(--radius-sm);
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--color-text);
+	}
+
+	.skip-link:focus {
+		top: 0.75rem;
+	}
+
+	.lab-toolbar {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 1.1rem 1.5rem 0;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.lab-wordmark {
+		text-decoration: none;
+	}
+
+	.lab-wordmark:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		border-radius: var(--radius-sm);
+	}
+
+	.lab-wordmark-lab {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+
+	.lab-shell {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 1.5rem;
+		display: grid;
+		grid-template-columns: 220px minmax(0, 1fr);
+		gap: var(--space-2xl);
+		align-items: start;
+	}
+
+	.lab-sidebar {
+		position: sticky;
+		top: 4.5rem;
+		padding: var(--space-xl) 0;
+		max-height: calc(100vh - 4.5rem);
+		overflow-y: auto;
+	}
+
+	/* Mobile-only disclosure (component pages): the full link list collapses
+	   behind a tap instead of pushing the demo below 30+ links. */
+	.lab-nav-mobile {
+		display: none;
+	}
+
+	.lab-main {
+		padding: var(--space-xl) 0 var(--space-2xl);
+		min-height: 70vh;
+	}
+
+	@media (max-width: 880px) {
+		.lab-shell {
+			grid-template-columns: 1fr;
+			gap: 0;
+		}
+
+		/* The index browses everything itself and component pages get the
+		   disclosure — the full sidebar never stacks above the content. */
+		.lab-sidebar {
+			display: none;
+		}
+
+		.lab-nav-mobile {
+			display: block;
+			margin-top: var(--space-lg);
+			border-bottom: 1px solid var(--color-border);
+		}
+
+		.lab-nav-mobile summary {
+			display: flex;
+			align-items: center;
+			gap: 0.5em;
+			min-height: 44px;
+			font-family: var(--font-mono);
+			font-size: 0.68rem;
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.14em;
+			color: var(--color-text-muted);
+			cursor: pointer;
+			list-style: none;
+			transition: color var(--duration-fast) var(--ease-smooth);
+		}
+
+		.lab-nav-mobile summary::-webkit-details-marker {
+			display: none;
+		}
+
+		.lab-nav-mobile summary::after {
+			content: '';
+			width: 0.45em;
+			height: 0.45em;
+			border-right: 1.5px solid currentColor;
+			border-bottom: 1.5px solid currentColor;
+			transform: rotate(45deg) translateY(-25%);
+			transition: transform var(--duration-fast) var(--ease-smooth);
+		}
+
+		.lab-nav-mobile[open] summary::after {
+			transform: rotate(225deg) translateY(-25%);
+		}
+
+		.lab-nav-mobile summary:hover {
+			color: var(--color-text);
+		}
+
+		.lab-nav-mobile nav {
+			padding-bottom: var(--space-md);
+		}
+	}
+</style>

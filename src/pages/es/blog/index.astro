@@ -11,7 +11,7 @@ const strings = t(Astro.url);
 const posts = (await getCollection('blog'))
 	.filter((p) => p.data.lang === 'es')
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
-const featuredPost = posts.find((p) => p.data.featured) || posts[0];
+const featuredPost = posts[0];
 const otherPosts = posts.filter((p) => p !== featuredPost);
 
 const blogJsonLd = {
@@ -49,8 +49,9 @@ const blogJsonLd = {
 		]} />
 	</head>
 	<body>
+		<a class="skip-link" href="#main-content">{strings.nav.skipToContent}</a>
 		<Header />
-		<main>
+		<main id="main-content">
 			<div class="blog-hero">
 				<div class="blog-hero-bg" aria-hidden="true"><div class="hero-grid"></div></div>
 				<div class="blog-hero-content animate-fade-in">
@@ -63,7 +64,7 @@ const blogJsonLd = {
 					<a href={`/blog/${featuredPost.id}/`} class="featured-post animate-fade-in delay-1">
 						<div class="featured-inner">
 							<div class="featured-meta">
-								<span class="featured-badge">Destacado</span>
+								<span class="featured-badge">Último</span>
 								<FormattedDate date={featuredPost.data.pubDate} locale="es" />
 							</div>
 							<h2 transition:name={`post-title-${featuredPost.id.replace(/\//g, '-')}`}>{featuredPost.data.title}</h2>

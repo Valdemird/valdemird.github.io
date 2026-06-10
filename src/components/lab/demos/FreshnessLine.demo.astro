@@ -1,0 +1,73 @@
+---
+import Freshness from '../../blog/FreshnessLine.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'FreshnessLine',
+	category: 'utility',
+	status: 'stable',
+	summary: 'Mono eyebrow row for post headers — published date, optional review date, and an author-voiced status segment.',
+	summaryEs: 'Fila eyebrow en mono para encabezados de post — fecha de publicación, fecha de revisión opcional y un segmento de estado con la voz del autor.',
+	why: 'Posts about AI tooling rot in months, not years, and pretending otherwise costs the reader\'s trust. This line exists to say "reviewed May 2026" or "this is outdated, here\'s why" in the author\'s voice, right under the title, before anyone invests ten minutes in stale advice.',
+	whyEs: 'Los posts sobre tooling de IA se pudren en meses, no en años, y fingir lo contrario cuesta la confianza del lector. Esta línea existe para decir "revisado en mayo de 2026" o "esto quedó viejo, te cuento por qué" con la voz del autor, justo bajo el título, antes de que alguien invierta diez minutos en un consejo rancio.',
+	props: [
+		{ name: 'pubDate', type: 'Date', description: 'Publication date; always shown.' },
+		{ name: 'reviewedDate', type: 'Date', description: 'Last-reviewed date; segment hides when absent.' },
+		{ name: 'status', type: 'string', description: 'Author-curated status line. Containing "outdated", "deprecated" or "archived" switches it to the warning color.' },
+		{ name: 'lang', type: '"en" | "es"', default: '"en"', description: 'Locale for labels and date formatting.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'fresco / revisado y vigente' : 'fresh / reviewed and current'}
+	description={es ? 'Los tres segmentos. El status habla con la voz del autor — nunca "revisado con un LLM".' : "All three segments. Status speaks in the author's voice — never 'reviewed with an LLM'."}
+	usage={`<FreshnessLine
+  pubDate={new Date("2026-04-26")}
+  reviewedDate={new Date("2026-05-30")}
+  status="Still reflects my workflow"
+/>`}
+>
+	<Freshness
+		lang={lang}
+		pubDate={new Date('2026-04-26')}
+		reviewedDate={new Date('2026-05-30')}
+		status={es ? 'Sigue reflejando mi workflow' : 'Still reflects my workflow'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'rancio / estado de advertencia' : 'stale / warning state'}
+	description={es ? 'Palabras como "desactualizado", "obsoleto" u "outdated" (sin distinguir mayúsculas) cambian el segmento de status al color de advertencia.' : "Words like 'outdated', 'deprecated' or 'desactualizado' (case-insensitive) flip the status segment to the warning color."}
+	usage={`<FreshnessLine
+  pubDate={new Date("2025-08-12")}
+  status="Outdated — see the worktrees post instead"
+/>`}
+>
+	<Freshness
+		lang={lang}
+		pubDate={new Date('2025-08-12')}
+		status={es ? 'Desactualizado — mejor lee el post de worktrees' : 'Outdated — see the worktrees post instead'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'locale en español' : 'spanish locale'}
+	description={es ? 'Con lang=\'es\' las etiquetas y el formato de fecha se localizan; los segmentos sin datos siguen ocultos.' : "With lang='es' the labels and date formatting localize; segments without data still hide."}
+	usage={`<FreshnessLine
+  pubDate={new Date("2026-03-14")}
+  reviewedDate={new Date("2026-06-01")}
+  status="Sigue vigente"
+  lang="es"
+/>`}
+>
+	<Freshness
+		pubDate={new Date('2026-03-14')}
+		reviewedDate={new Date('2026-06-01')}
+		status="Sigue vigente"
+		lang="es"
+	/>
+</DemoSection>

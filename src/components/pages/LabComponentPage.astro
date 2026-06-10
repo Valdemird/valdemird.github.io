@@ -1,0 +1,104 @@
+---
+/**
+ * LabComponentPage — shared component page for /lab/[slug] (en) and
+ * /es/lab/[slug] (es). Each locale shows its own language: chrome, summary
+ * and the "why this exists" editorial, plus the demo rendered with `lang`.
+ */
+import Lab from '../../layouts/Lab.astro';
+import { buildEntries, summaryFor, whyFor, CATEGORY_LABELS, CATEGORY_LABELS_ES } from '../lab/registry';
+
+interface Props {
+	slug: string;
+	lang: 'en' | 'es';
+}
+
+const { slug, lang } = Astro.props;
+const es = lang === 'es';
+
+const modules = import.meta.glob('../lab/demos/*.demo.astro', { eager: true });
+const entries = buildEntries(modules);
+const entry = entries.find((e) => e.slug === slug);
+if (!entry) throw new Error(`No lab demo found for slug "${slug}"`);
+
+const { meta, Component } = entry;
+const summary = summaryFor(meta, lang);
+const why = whyFor(meta, lang);
+const categoryLabel = (es ? CATEGORY_LABELS_ES : CATEGORY_LABELS)[meta.category];
+const title = es ? `${meta.title} — lab | valdemird` : `${meta.title} — lab | valdemird`;
+const description = summary ?? (es ? `Demos en vivo del componente ${meta.title}.` : `Live demos of the ${meta.title} component.`);
+---
+
+<Lab title={title} description={description} entries={entries} active={slug} lang={lang}>
+	<header class="comp-header animate-fade-in">
+		<span class="comp-category">{categoryLabel}</span>
+		<h1>{meta.title}</h1>
+		{summary && <p class="comp-summary">{summary}</p>}
+	</header>
+
+	{why && (
+		<aside class="comp-why animate-fade-in delay-1">
+			<span class="comp-why-eyebrow">{es ? 'por qué existe' : 'why this exists'}</span>
+			<p>{why}</p>
+		</aside>
+	)}
+
+	<div class="comp-demos animate-fade-in delay-2">
+		<Component lang={lang} />
+	</div>
+</Lab>
+
+<style>
+	.comp-header {
+		padding-bottom: var(--space-lg);
+	}
+
+	.comp-category {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-text-muted);
+	}
+
+	.comp-header h1 {
+		margin: 0.5rem 0 0;
+		font-family: var(--font-serif);
+		font-size: clamp(1.7rem, 3.5vw, 2.4rem);
+		font-weight: 550;
+		letter-spacing: -0.015em;
+	}
+
+	.comp-summary {
+		margin: 0.75rem 0 0;
+		max-width: 62ch;
+		color: var(--color-text-secondary);
+		line-height: 1.6;
+	}
+
+	.comp-why {
+		margin: var(--space-lg) 0;
+		padding: var(--space-lg) 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.comp-why-eyebrow {
+		display: block;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+
+	.comp-why p {
+		margin: 0.6rem 0 0;
+		max-width: 68ch;
+		font-family: var(--font-serif);
+		font-size: 1.02rem;
+		line-height: 1.7;
+		color: var(--color-text);
+	}
+</style>

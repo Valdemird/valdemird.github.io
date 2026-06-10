@@ -1,0 +1,68 @@
+---
+import Loop from '../../blog/AgentLoop.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'AgentLoop',
+	category: 'narrative',
+	status: 'experimental',
+	summary: 'Step-through visualizer of an AI agent\'s plan → act → observe cycle with a live context-window gauge.',
+	summaryEs: 'Visualizador paso a paso del ciclo planear → actuar → observar de un agente de IA, con un gauge de ventana de contexto en vivo.',
+	why: 'I kept describing the agent loop in prose — it plans, it edits, the tests fail, it re-plans — and readers nodded without seeing the cost. The gauge is the missing character: every observation step eats context, and the moment it turns red is the moment a session starts forgetting. That moment was always the real story in the AI workflow posts; now it has a picture.',
+	whyEs: 'Seguía describiendo el ciclo del agente en prosa — planea, edita, fallan los tests, replanea — y los lectores asentían sin ver el costo. El gauge es el personaje que faltaba: cada paso de observación consume contexto, y el momento en que se pone rojo es el momento en que una sesión empieza a olvidar. Ese momento siempre fue la verdadera historia en los posts de workflows con IA; ahora tiene imagen.',
+	props: [
+		{ name: 'steps', type: '{ phase: "plan" | "act" | "observe", title, detail?, tool?, tokens? }[]', description: 'The agent\'s trajectory, one entry per step.' },
+		{ name: 'contextWindow', type: 'number', description: 'Context budget in the same unit as step tokens; the gauge turns red past 80%.' },
+		{ name: 'caption', type: 'string', description: 'Mono caption — say what unit tokens are in.' },
+		{ name: 'lang', type: "'en' | 'es'", default: "'en'", description: 'UI language for phase chips, buttons and the gauge.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const steps: { phase: 'plan' | 'act' | 'observe'; title: string; tool?: string; tokens?: number }[] = es
+	? [
+			{ phase: 'plan', title: 'Leer el issue, armar un plan', tokens: 12 },
+			{ phase: 'act', title: 'Editar auth.ts', tool: 'Edit', tokens: 18 },
+			{ phase: 'observe', title: 'Fallan los tests: el refresh del token expiró', tool: 'Bash', tokens: 42 },
+			{ phase: 'plan', title: 'Replanear: el bug está en el reloj, no en el token', tokens: 10 },
+			{ phase: 'act', title: 'Arreglar la ruta de refresh', tool: 'Edit', tokens: 15 },
+			{ phase: 'observe', title: 'Suite en verde, 84 tests', tool: 'Bash', tokens: 38 },
+			{ phase: 'observe', title: 'Releer el diff antes del PR', tool: 'Read', tokens: 30 },
+		]
+	: [
+			{ phase: 'plan', title: 'Read the issue, draft a plan', tokens: 12 },
+			{ phase: 'act', title: 'Edit auth.ts', tool: 'Edit', tokens: 18 },
+			{ phase: 'observe', title: 'Tests fail: token refresh expired', tool: 'Bash', tokens: 42 },
+			{ phase: 'plan', title: 'Re-plan: the bug is in the clock, not the token', tokens: 10 },
+			{ phase: 'act', title: 'Fix the refresh path', tool: 'Edit', tokens: 15 },
+			{ phase: 'observe', title: 'Suite green, 84 tests', tool: 'Bash', tokens: 38 },
+			{ phase: 'observe', title: 'Re-read the diff before PR', tool: 'Read', tokens: 30 },
+		];
+---
+
+<DemoSection
+	label={es ? 'sesión de debug / el contexto se llena' : 'debug session / context fills up'}
+	description={es ? 'Dale play al loop y mira el gauge de contexto — la historia es que observar (la salida de los tests) cuesta más que actuar.' : 'Play the loop and watch the context gauge — the story is that observation (test output) costs more than action.'}
+	usage={`<AgentLoop
+  contextWindow={200}
+  steps={[
+    { phase: "plan", title: "Read the issue, draft a plan", tokens: 12 },
+    { phase: "act", title: "Edit auth.ts", tool: "Edit", tokens: 18 },
+    { phase: "observe", title: "Tests fail: token refresh expired", tool: "Bash", tokens: 42 },
+    { phase: "plan", title: "Re-plan: the bug is in the clock, not the token", tokens: 10 },
+    { phase: "act", title: "Fix the refresh path", tool: "Edit", tokens: 15 },
+    { phase: "observe", title: "Suite green, 84 tests", tool: "Bash", tokens: 38 },
+    { phase: "observe", title: "Re-read the diff before PR", tool: "Read", tokens: 30 },
+  ]}
+  caption="Tokens in thousands. Observation is the budget hog."
+/>`}
+>
+	<Loop
+		contextWindow={200}
+		steps={steps}
+		caption={es ? 'Tokens en miles. Observar es lo que se come el presupuesto.' : 'Tokens in thousands. Observation is the budget hog.'}
+		lang={lang}
+	/>
+</DemoSection>

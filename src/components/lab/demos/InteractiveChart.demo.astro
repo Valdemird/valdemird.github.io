@@ -1,0 +1,306 @@
+---
+// Aliased import: Astro names this module's component after the filename,
+// so the demo can't import the real component under its own name.
+import Chart from '../../blog/InteractiveChart.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'InteractiveChart',
+	category: 'data',
+	status: 'stable',
+	summary: 'Multi-type chart (bar, horizontal, line, area, donut, scatter) with multi-series, thresholds, hover scrub and keyboard navigation.',
+	summaryEs: 'Gráfica multitipo (barras, horizontal, línea, área, dona, dispersión) con multiserie, umbrales, scrub con hover y navegación por teclado.',
+	why: 'The posts kept making numeric claims in prose — "ten rounds of feedback", "three PRs by dinner" — and a markdown table flattens that into furniture. This chart exists so the number can argue: the story prop forces me to write the finding, not the topic, and annotations point at the exact data point that carries it. No chart library because every fill is a CSS variable; dark mode and the OKLch palette come free.',
+	whyEs: 'Los posts hacían afirmaciones numéricas en prosa ("diez rondas de feedback", "tres PRs antes de cenar") y una tabla markdown convierte eso en mueble. Esta gráfica existe para que el número argumente: la prop story me obliga a escribir el hallazgo y no el tema, y las anotaciones señalan el punto exacto que lo sostiene. Sin librería de charts porque cada relleno es una variable CSS; el dark mode y la paleta OKLch salen gratis.',
+	props: [
+		{ name: 'type', type: '"bar" | "horizontal" | "line" | "area" | "donut" | "scatter"', default: '"bar"', description: 'Chart shape. Bars animate via CSS, SVG types via GSAP + ScrollTrigger.' },
+		{ name: 'data', type: '{ label, value, color? }[]', description: 'Data points. color accepts any CSS color, defaults to the accent token.' },
+		{ name: 'series', type: '{ name, color?, data }[]', description: 'Multi-series lines with legend toggling. Line type only; x labels from the first series.' },
+		{ name: 'points', type: '{ x, y, label?, color? }[]', description: 'Scatter points (type="scatter").' },
+		{ name: 'thresholds', type: '{ value, label? }[]', default: '[]', description: 'Dashed reference lines on line/area/scatter.' },
+		{ name: 'curve', type: '"linear" | "monotone"', default: '"linear"', description: 'Path interpolation for line/area.' },
+		{ name: 'interactive', type: 'boolean', default: 'true', description: 'Hover crosshair + readout and arrow-key navigation on SVG types.' },
+		{ name: 'story', type: 'string', description: 'Finding-first headline above the chart. State the point, not the topic.' },
+		{ name: 'title', type: 'string', description: 'Small mono meta label in the chart header bar.' },
+		{ name: 'annotations', type: '{ targetIndex, text, emphasize? }[]', default: '[]', description: 'Per-point callouts; emphasize outlines the point as the focus.' },
+		{ name: 'source', type: 'string', description: 'Muted mono attribution below the chart.' },
+		{ name: 'yLabel / xLabel', type: 'string', description: 'Axis labels, SVG types only.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const barData = es
+	? [
+		{ label: 'llegó a prod', value: 31 },
+		{ label: 'atrapado en review', value: 14 },
+		{ label: 'atrapado por tests', value: 9 },
+	]
+	: [
+		{ label: 'shipped', value: 31 },
+		{ label: 'caught in review', value: 14 },
+		{ label: 'caught by tests', value: 9 },
+	];
+
+const horizontalData = es
+	? [
+		{ label: 'scaffold', value: 12 },
+		{ label: 'primera pasada', value: 34 },
+		{ label: 'loop de review', value: 58 },
+		{ label: 'pulido', value: 21 },
+	]
+	: [
+		{ label: 'scaffold', value: 12 },
+		{ label: 'first pass', value: 34 },
+		{ label: 'review loop', value: 58 },
+		{ label: 'polish', value: 21 },
+	];
+
+const lineData = es
+	? [
+		{ label: 'Ene', value: 41 },
+		{ label: 'Feb', value: 47 },
+		{ label: 'Mar', value: 60 },
+		{ label: 'Abr', value: 38 },
+		{ label: 'May', value: 33 },
+	]
+	: [
+		{ label: 'Jan', value: 41 },
+		{ label: 'Feb', value: 47 },
+		{ label: 'Mar', value: 60 },
+		{ label: 'Apr', value: 38 },
+		{ label: 'May', value: 33 },
+	];
+
+const multiSeries = es
+	? [
+		{ name: 'con tests', data: [
+			{ label: 'sem1', value: 2 }, { label: 'sem2', value: 3 },
+			{ label: 'sem3', value: 2 }, { label: 'sem4', value: 4 },
+		] },
+		{ name: 'sin tests', data: [
+			{ label: 'sem1', value: 3 }, { label: 'sem2', value: 6 },
+			{ label: 'sem3', value: 9 }, { label: 'sem4', value: 14 },
+		] },
+	]
+	: [
+		{ name: 'with tests', data: [
+			{ label: 'wk1', value: 2 }, { label: 'wk2', value: 3 },
+			{ label: 'wk3', value: 2 }, { label: 'wk4', value: 4 },
+		] },
+		{ name: 'no tests', data: [
+			{ label: 'wk1', value: 3 }, { label: 'wk2', value: 6 },
+			{ label: 'wk3', value: 9 }, { label: 'wk4', value: 14 },
+		] },
+	];
+
+const scatterPoints = es
+	? [
+		{ x: 12, y: 4, label: 'corregir typo' },
+		{ x: 38, y: 11, label: 'rename' },
+		{ x: 80, y: 18, label: 'feat pequeño' },
+		{ x: 150, y: 42, label: 'feat mediano' },
+		{ x: 240, y: 95, label: 'refactor' },
+		{ x: 320, y: 150, label: 'migración' },
+		{ x: 520, y: 260, label: 'el grandote', color: 'var(--color-destructive)' },
+	]
+	: [
+		{ x: 12, y: 4, label: 'fix typo' },
+		{ x: 38, y: 11, label: 'rename' },
+		{ x: 80, y: 18, label: 'small feat' },
+		{ x: 150, y: 42, label: 'mid feat' },
+		{ x: 240, y: 95, label: 'refactor' },
+		{ x: 320, y: 150, label: 'migration' },
+		{ x: 520, y: 260, label: 'the big one', color: 'var(--color-destructive)' },
+	];
+
+const donutData = es
+	? [
+		{ label: 'loop de review', value: 19 },
+		{ label: 'escribir código', value: 11 },
+		{ label: 'escribir tests', value: 8 },
+		{ label: 'pensar', value: 4, color: 'var(--color-warning)' },
+	]
+	: [
+		{ label: 'review loop', value: 19 },
+		{ label: 'writing code', value: 11 },
+		{ label: 'writing tests', value: 8 },
+		{ label: 'thinking', value: 4, color: 'var(--color-warning)' },
+	];
+---
+
+<DemoSection
+	label={es ? 'barras / con anotaciones' : 'bar / annotated'}
+	description={es ? 'Columnas animadas con CSS; la anotación con emphasize delinea el punto de datos de la historia.' : "CSS-animated columns; annotation with emphasize outlines the story's data point."}
+	usage={`<InteractiveChart
+  type="bar"
+  story="Review picks up half of what slips past the agent."
+  data={[
+    { label: "shipped", value: 31 },
+    { label: "caught in review", value: 14 },
+    { label: "caught by tests", value: 9 },
+  ]}
+  annotations={[{ targetIndex: 1, text: "the review gap", emphasize: true }]}
+  source="Sample data"
+/>`}
+>
+	<Chart
+		type="bar"
+		story={es ? 'El review atrapa la mitad de lo que se le escapa al agente.' : 'Review picks up half of what slips past the agent.'}
+		data={barData}
+		annotations={[{ targetIndex: 1, text: es ? 'la brecha del review' : 'the review gap', emphasize: true }]}
+		source={es ? 'Datos de ejemplo' : 'Sample data'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label="horizontal"
+	description={es ? 'Filas con columna de valores — mejor cuando las etiquetas son largas.' : 'Rows with value column — better when labels are long.'}
+	usage={`<InteractiveChart
+  type="horizontal"
+  title="time per task (min)"
+  data={[
+    { label: "scaffold", value: 12 },
+    { label: "first pass", value: 34 },
+    { label: "review loop", value: 58 },
+    { label: "polish", value: 21 },
+  ]}
+  annotations={[{ targetIndex: 2, text: "where the day goes", emphasize: true }]}
+/>`}
+>
+	<Chart
+		type="horizontal"
+		title={es ? 'tiempo por tarea (min)' : 'time per task (min)'}
+		data={horizontalData}
+		annotations={[{ targetIndex: 2, text: es ? 'donde se va el día' : 'where the day goes', emphasize: true }]}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'línea / con anotaciones' : 'line / annotated'}
+	description={es ? 'La línea se dibuja sola al entrar en pantalla. Dale replay para verla de nuevo.' : 'The line draws itself in as it enters the view. Replay to watch it again.'}
+	usage={`<InteractiveChart
+  type="line"
+  story="The suite got slower until the fixture rewrite landed."
+  data={[
+    { label: "Jan", value: 41 },
+    { label: "Feb", value: 47 },
+    { label: "Mar", value: 60 },
+    { label: "Apr", value: 38 },
+    { label: "May", value: 33 },
+  ]}
+  annotations={[{ targetIndex: 3, text: "fixture rewrite", emphasize: true }]}
+  yLabel="suite time (s)"
+/>`}
+>
+	<Chart
+		type="line"
+		story={es ? 'La suite se fue poniendo lenta hasta que aterrizó la reescritura de fixtures.' : 'The suite got slower until the fixture rewrite landed.'}
+		data={lineData}
+		annotations={[{ targetIndex: 3, text: es ? 'reescritura de fixtures' : 'fixture rewrite', emphasize: true }]}
+		yLabel={es ? 'tiempo de suite (s)' : 'suite time (s)'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'área' : 'area'}
+	description={es ? 'Línea más un relleno translúcido — para historias acumulativas o con forma de volumen.' : 'Line plus a translucent fill — for cumulative or volume-shaped stories.'}
+	usage={`<InteractiveChart
+  type="area"
+  title="posts published, cumulative"
+  data={[
+    { label: "2025 Q4", value: 1 },
+    { label: "2026 Q1", value: 3 },
+    { label: "2026 Q2", value: 5 },
+  ]}
+/>`}
+>
+	<Chart
+		type="area"
+		title={es ? 'posts publicados, acumulado' : 'posts published, cumulative'}
+		data={[
+			{ label: '2025 Q4', value: 1 },
+			{ label: '2026 Q1', value: 3 },
+			{ label: '2026 Q2', value: 5 },
+		]}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'multiserie / toggle de leyenda / umbrales' : 'multi-series / legend toggle / thresholds'}
+	description={es ? 'Haz hover para mover el crosshair, haz clic en los chips de la leyenda para ocultar una serie, enfoca el SVG y usa las flechas. El umbral se dibuja como una línea de referencia punteada.' : 'Hover to scrub the crosshair, click legend chips to hide a series, focus the SVG and use arrow keys. Threshold renders as a dashed reference line.'}
+	usage={`<InteractiveChart
+  type="line"
+  curve="monotone"
+  story="The agent ships faster, but only the tested branch stays under the error budget."
+  series={[
+    { name: "with tests", data: [
+      { label: "wk1", value: 2 }, { label: "wk2", value: 3 },
+      { label: "wk3", value: 2 }, { label: "wk4", value: 4 },
+    ]},
+    { name: "no tests", data: [
+      { label: "wk1", value: 3 }, { label: "wk2", value: 6 },
+      { label: "wk3", value: 9 }, { label: "wk4", value: 14 },
+    ]},
+  ]}
+  thresholds={[{ value: 8, label: "error budget" }]}
+  yLabel="regressions"
+/>`}
+>
+	<Chart
+		type="line"
+		curve="monotone"
+		story={es ? 'El agente entrega más rápido, pero solo la rama con tests se mantiene bajo el presupuesto de errores.' : 'The agent ships faster, but only the tested branch stays under the error budget.'}
+		series={multiSeries}
+		thresholds={[{ value: 8, label: es ? 'presupuesto de errores' : 'error budget' }]}
+		yLabel={es ? 'regresiones' : 'regressions'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'dispersión' : 'scatter'}
+	description={es ? 'Puntos numéricos x/y con ticks limpios en ambos ejes. Recorre los puntos con hover o con las flechas.' : 'Numeric x/y points with nice ticks on both axes. Hover or arrow through points.'}
+	usage={`<InteractiveChart
+  type="scatter"
+  title="PR size vs review time"
+  points={[
+    { x: 12, y: 4, label: "fix typo" },
+    { x: 80, y: 18, label: "small feat" },
+    { x: 240, y: 95, label: "refactor" },
+    { x: 520, y: 260, label: "the big one", color: "var(--color-destructive)" },
+  ]}
+  thresholds={[{ value: 120, label: "review SLA" }]}
+  xLabel="lines changed" yLabel="review minutes"
+/>`}
+>
+	<Chart
+		type="scatter"
+		title={es ? 'tamaño de PR vs tiempo de review' : 'PR size vs review time'}
+		points={scatterPoints}
+		thresholds={[{ value: 120, label: es ? 'SLA de review' : 'review SLA' }]}
+		xLabel={es ? 'líneas cambiadas' : 'lines changed'}
+		yLabel={es ? 'minutos de review' : 'review minutes'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'dona' : 'donut'}
+	description={es ? 'Partes de un todo con leyenda; el total va en serif al centro.' : 'Part-of-whole with legend; total set in serif in the center.'}
+	usage={`<InteractiveChart
+  type="donut"
+  story="Most of the month went to the review loop."
+  data={[
+    { label: "review loop", value: 19 },
+    { label: "writing code", value: 11 },
+    { label: "writing tests", value: 8 },
+    { label: "thinking", value: 4, color: "var(--color-warning)" },
+  ]}
+/>`}
+>
+	<Chart
+		type="donut"
+		story={es ? 'La mayor parte del mes se fue en el loop de review.' : 'Most of the month went to the review loop.'}
+		data={donutData}
+	/>
+</DemoSection>

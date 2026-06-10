@@ -17,6 +17,7 @@ import Timeline from '../../components/blog/Timeline.astro';
 import PullQuote from '../../components/blog/PullQuote.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import Sidenote from '../../components/blog/Sidenote.astro';
+import EasingExplorer from '../../components/blog/EasingExplorer.astro';
 
 <GameFeelHero
   eyebrow="Interactive"
@@ -77,6 +78,15 @@ The trap is using a single `scale()`. That's a balloon inflating, not an object 
 </CodeBlock>
 
 `transform-origin: 50% 100%` is doing quiet work there. Anchoring to the bottom edge makes the squash read as the object pressing into the ground, not floating in place. Move the origin to center and the same keyframes feel like a heartbeat instead of a landing.
+
+The other quiet worker is the timing curve. `cubic-bezier(0.22, 1, 0.36, 1)` is why the settle reads as a plant instead of a slide: most of the travel happens in the first third, then a long brake. Push either right-hand handle above the top edge and the element overshoots its target and snaps back, which is the entire "spring" personality this site's hover states run on. Grab the handles and watch the ball:
+
+<EasingExplorer
+  initial={[0.22, 1, 0.36, 1]}
+  caption="The settleIn curve from the game. Try the spring preset, then linear, to feel what those four numbers buy."
+/>
+
+Every demo on this page that moves is downstream of a curve like that one. The keyframes decide what deforms. The bezier decides whether it feels like rubber, butter, or a spreadsheet.
 
 <h2 id="hitstop">Hitstop</h2>
 

@@ -1,0 +1,125 @@
+---
+title: "Interactive Blog Posts: Why I Built 30 Components Instead of Pasting Screenshots"
+description: "Why this blog renders live simulators, draggable easing curves and step-through diagrams instead of static screenshots: the idea behind its 30 MDX components, what they cost to build, and the research — from Bret Victor's explorable explanations to Distill — on why a claim you can drag beats a claim you can only read."
+pubDate: 2026-06-09
+tags: ["interaction-design", "writing", "frontend"]
+featured: false
+lang: en
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeDiff from '../../components/blog/CodeDiff.astro';
+import FlakySuite from '../../components/blog/FlakySuite.astro';
+import PullQuote from '../../components/blog/PullQuote.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Timeline from '../../components/blog/Timeline.astro';
+import TLDR from '../../components/blog/TLDR.astro';
+
+<TLDR bullets={[
+  "This blog runs 30 interactive components — simulators, draggable charts, step-through diagrams — because some claims can't be carried by prose. A reader can dismiss a sentence; they can't dismiss a slider they just dragged.",
+  "The idea isn't mine. Bret Victor named it in 2011, Distill measured it, The Pudding made a publication out of it. Blogs mostly skipped it because components are expensive. This post is about when they're worth it.",
+]} />
+
+This week I went back into a two-month-old post about testing and added a Monte Carlo simulator next to one sentence. One sentence. The post had been live since April, people had read it, and the line I kept thinking about was this one: a 3% flake rate is not a 3% problem.
+
+I believed it when I wrote it. I had watched my own CI turn red on changes that touched nothing. But I could feel how a reader files that sentence: under exaggeration, next to every other blogger rounding up for effect. The math behind it is a one-liner, 0.97^40 ≈ 0.30, and that's exactly the problem. Nobody feels an exponent. You can print the formula in bold, you can graph it, and the reader's eyes slide over it at reading speed, which is the one speed where compounding never looks scary.
+
+So instead of defending the sentence with two more paragraphs, I built it a machine.
+
+<Callout type="important" title="The thesis">
+A reader can dismiss a sentence. They can't dismiss a slider they just dragged. Interactive components exist to move a claim from "read" to "felt". That's the only job that justifies their cost.
+</Callout>
+
+## The sentence nobody believed
+
+Here's the machine. Each dot is a test; each test independently flakes at the rate on the left. Set the suite to 40 tests and watch the no-retry bar. Then drag the suite bigger, the way real suites only ever get.
+
+<FlakySuite
+  tests={40}
+  flakeRate={0.03}
+  caption="2,000 simulated runs per configuration. The same 3% that looked harmless at 4 tests."
+/>
+
+That collapse from 97% green to roughly 30% is the exponent, felt. No paragraph I write gets you there, because reading is a spectator activity and the claim only lands when you're the one who made the bar fall. The retry bars then sneak in the second, more uncomfortable point: retries pull the build back to green without making a single test less flaky. The reader discovers that by dragging, before I've said it. An argument you arrive at yourself needs no defending.
+
+This is the entire idea behind the component library on this site. Not decoration. Not "engagement". A specific tool for a specific failure mode: the claim that is true, that matters, and that prose physically cannot carry.
+
+## Twenty years of prior art
+
+None of this is my idea, and pretending otherwise would be silly when the lineage is this easy to trace.
+
+<Timeline items={[
+  { date: "2011", title: "Explorable Explanations + Ladder of Abstraction", body: "Bret Victor names the genre in one essay and performs it in a second." },
+  { date: "2016", title: "Distill launches", body: "Machine-learning research published as interactive articles." },
+  { date: "2017", title: "The Pudding", body: "A publication built on the premise that some essays are played, not read." },
+  { date: "2020", title: "Communicating with Interactive Articles", body: "Distill surveys the evidence: interaction measurably improves engagement and understanding.", emphasize: true },
+  { date: "2021", title: "Distill goes on hiatus", body: "Producing at that standard was exhausting for everyone involved. The cost is real." },
+  { date: "2026", title: "This post", body: "An ordinary engineering blog tries to close the gap." },
+]} />
+
+The clearest statement is Bret Victor's [*Explorable Explanations*](https://worrydream.com/ExplorableExplanations/) from 2011: a reactive document, he wrote, lets the reader "play with the author's assumptions and analyses, and see the consequences". His [*Up and Down the Ladder of Abstraction*](https://worrydream.com/LadderOfAbstraction/) is the same argument performed instead of stated — you learn the design of a steering algorithm by scrubbing through every level of it. Fifteen years later both essays still read like a to-do list the web mostly ignored.
+
+Mostly, not entirely. [Distill](https://distill.pub/) spent five years publishing machine-learning research as interactive articles, and its 2020 piece [*Communicating with Interactive Articles*](https://distill.pub/2020/communicating-with-interactive-articles/) is the best survey of why this works that I know of. It walks through the evidence that interaction improves engagement and understanding, connects it to active learning research, and is itself interactive, so the argument demonstrates itself while you read it.<Sidenote>Distill went on hiatus in 2021, partly because producing articles at that standard was exhausting for everyone involved. That detail belongs in this post, not in a footnote at the end: the cost is real and I'll get to it.</Sidenote> Nicky Case collects the whole genre at [explorabl.es](https://explorabl.es/), and [The Pudding](https://pudding.cool/) built a publication on the premise that some essays need to be played, not read.
+
+What strikes me about that list is what's missing from it: ordinary engineering blogs. The genre lives in journalism, in ML research, in standalone art projects. Personal technical blogs — the place where someone explains worktrees or flaky tests to a colleague — still mostly paste screenshots. I don't think that's because bloggers disagree with Victor. I think it's because a screenshot costs nothing and a simulator doesn't.
+
+<PullQuote>
+A screenshot shows the reader what you saw. A component lets them check whether you're right.
+</PullQuote>
+
+## What a component actually costs
+
+I'll put numbers on the cost, because the honest version of this post admits it's the whole reason the genre is thin.
+
+<StatGrid columns={3} stats={[
+  { value: 30, label: "components live", context: "every one demoed at /lab" },
+  { value: 4, label: "built in one session", context: "the cheap part" },
+  { value: "×5", label: "hidden costs each", context: "keyboard · reduced-motion · dark mode · ES labels · re-init" },
+]} />
+
+This site currently runs 30 components. The four newest — the flaky-suite simulator above, a step-through git graph, an agent-loop player, a draggable easing-curve editor — took a full working session to build, and that was the cheap part. The expensive part came after: every one of them needs keyboard navigation, reduced-motion behavior, dark mode, a Spanish version of every label including the ones generated client-side, and re-initialization when the site's page transitions swap the DOM out from under them. None of that is visible in a demo GIF, and all of it is the difference between a component and a toy.
+
+And then there's the part I'd skip if this post were marketing. The dot grid in that simulator — the one part whose entire purpose is being seen — shipped invisible. Astro scopes component styles with an attribute selector, the dots are created from a client script, client-created nodes don't carry the attribute, so every dot rendered at height zero. The bars worked, the verdict text worked, the math was right, and the centerpiece was a hole. I only caught it days later when a Playwright screenshot came back with an empty band in the middle of the figure.<Sidenote>The fix was one `:global()` wrapper, two minutes. Finding it required actually looking at the rendered page instead of the code, which I had been confidently not doing.</Sidenote> I won't pretend that was elegant. I built a machine for making things visible and didn't notice it was invisible.
+
+Here is the entire fix:
+
+<CodeDiff
+  filename="src/components/blog/FlakySuite.astro"
+  language="css"
+  before={[
+    { line: 1, text: ".flaky-dot {" },
+    { line: 2, text: "  width: 12px;" },
+    { line: 3, text: "  height: 12px;" },
+    { line: 4, text: "  border-radius: 3px;" },
+    { line: 5, text: "  opacity: 0;" },
+    { line: 6, text: "  animation: fkPop 0.25s var(--ease-spring) forwards;" },
+    { line: 7, text: "}" },
+  ]}
+  after={[
+    { line: 1, text: "/* Dots are created from the client script, so they don't carry" },
+    { line: 2, text: "   Astro's scope attribute — style them through :global. */" },
+    { line: 3, text: ".flaky-grid :global(.flaky-dot) {" },
+    { line: 4, text: "  width: 12px;" },
+    { line: 5, text: "  height: 12px;" },
+    { line: 6, text: "  border-radius: 3px;" },
+    { line: 7, text: "  opacity: 0;" },
+    { line: 8, text: "  animation: fkPop 0.25s var(--ease-spring) forwards;" },
+    { line: 9, text: "}" },
+  ]}
+  removed={[1]}
+  added={[1, 2, 3]}
+  note="Astro compiles .flaky-dot to .flaky-dot[data-astro-cid-…] at build time. The dots are created by a client script and never receive that attribute, so the selector matched zero nodes and every dot rendered at height zero."
+/>
+
+That bug earns its place here because it's the strongest argument for the whole approach that I have. I had read that component's code several times and believed it worked. Reading was not enough — for me, the author, on my own code. That is exactly the reader's position on every claim you publish, and it's why "just describe it well" keeps losing to "let them run it".
+
+## The rule that keeps it honest
+
+Thirty components is also how you end up with a blog that looks like a component vendor's demo reel, so there's one rule that decides whether something gets built: a component exists only when a specific post needs it for a claim prose couldn't carry. The git graph exists because the worktrees post tells a story about three branches not colliding, and "not colliding" is a sequence, not a picture. The easing editor exists because a post about game feel was asking readers to take four bezier numbers on faith.
+
+Every component documents that reason on its own page, in a section called "why this exists", in both languages. The whole library runs live at [/lab](/lab/) — same styles, same dark mode, same transitions a post gets, nothing mocked. If a component's "why" paragraph ever reads as "it looked cool", it shouldn't have been built.
+
+The corollary cuts the other way too, and it's the part I have to keep relearning: most claims don't need a component. The majority of every post on this site is still paragraphs, because most sentences are doing fine on their own. The simulator above exists for the one sentence per post that readers file under exaggeration. Spending a working session on that sentence only makes sense if you actually want to be believed — which is, I suspect, the real filter, and a less comfortable one than build cost.
+
+I know which side of it I'm on. The dots were invisible for three days, and reading my own code had me convinced they weren't. You're in that exact position with this post right now. Scroll back up and drag the slider.

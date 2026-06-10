@@ -1,0 +1,84 @@
+---
+import Tree from '../../blog/FileTree.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'FileTree',
+	category: 'data',
+	status: 'stable',
+	summary: 'Directory listing with collapsible folders and optional file highlighting, for showing where things live in a project.',
+	summaryEs: 'Listado de directorios con carpetas colapsables y resaltado opcional de archivos, para mostrar dónde vive cada cosa en un proyecto.',
+	why: 'ASCII trees in code blocks were doing this job, badly: no hierarchy you can collapse, no way to point at the one file the post is about. The highlight prop is the whole feature — "this is the file the agent and I fought over" — and clickable folders keep big trees scannable.',
+	whyEs: 'Los árboles ASCII en bloques de código hacían este trabajo, mal: sin jerarquía que puedas colapsar, sin forma de señalar el único archivo del que habla el post. La prop highlight es la funcionalidad entera — "este es el archivo por el que el agente y yo peleamos" — y las carpetas clicables mantienen escaneables los árboles grandes.',
+	props: [
+		{ name: 'highlight', type: 'string', description: 'Substring matched against file lines; matching files get the accent highlight.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'carpetas anidadas / clic para colapsar' : 'nested folders / click to collapse'}
+	description={es ? 'Las etiquetas de carpeta abren y cierran sus hijos; el archivo resaltado es del que trata la historia.' : 'Folder labels toggle their children open and closed; the highlighted file is the one the story is about.'}
+	usage={`<FileTree highlight="fix-db-pool/">
+<div class="folder">
+<div class="folder-label">project/</div>
+<div class="folder-children">
+<div class="file">src/ (main, untouched)</div>
+<div class="folder">
+<div class="folder-label">.claude/worktrees/</div>
+<div class="folder-children">
+<div class="file">fix-oauth-reconnect/</div>
+<div class="file">fix-db-pool/</div>
+<div class="file">fix-banner-redirect/</div>
+</div>
+</div>
+</div>
+</div>
+</FileTree>`}
+>
+	<Tree highlight="fix-db-pool/">
+		<div class="folder">
+			<div class="folder-label">project/</div>
+			<div class="folder-children">
+				<div class="file">{es ? 'src/ (main, sin tocar)' : 'src/ (main, untouched)'}</div>
+				<div class="folder">
+					<div class="folder-label">.claude/worktrees/</div>
+					<div class="folder-children">
+						<div class="file">fix-oauth-reconnect/</div>
+						<div class="file">fix-db-pool/</div>
+						<div class="file">fix-banner-redirect/</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</Tree>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'plano / sin highlight' : 'flat / no highlight'}
+	description={es ? 'Sin highlight es solo un listado mono ordenado — útil para mostrar dónde vive cada cosa.' : "Without highlight it's just a tidy mono listing — good for showing where things live."}
+	usage={`<FileTree>
+<div class="folder">
+<div class="folder-label">.claude/commands</div>
+<div class="folder-children">
+<div class="file">spec-create.md</div>
+<div class="file">spec-plan.md</div>
+<div class="file">spec-implement.md</div>
+</div>
+</div>
+</FileTree>`}
+>
+	<Tree>
+		<div class="folder">
+			<div class="folder-label">.claude/commands</div>
+			<div class="folder-children">
+				<div class="file">spec-create.md</div>
+				<div class="file">spec-plan.md</div>
+				<div class="file">spec-implement.md</div>
+			</div>
+		</div>
+	</Tree>
+</DemoSection>

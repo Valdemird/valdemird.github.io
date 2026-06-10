@@ -1,7 +1,8 @@
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { SplitText } from 'gsap/SplitText';
 
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger, SplitText);
 
 // --- Constants ---
 export const DURATION = {
@@ -26,6 +27,9 @@ export function isReducedMotion(): boolean {
 // --- Cleanup ---
 let _timelines: gsap.core.Timeline[] = [];
 let _triggers: ScrollTrigger[] = [];
+// SplitText leaves wrapper spans in the DOM; View Transitions would snapshot
+// them on swap, so every split registers a revert that runs before navigation.
+let _reverts: (() => void)[] = [];
 
 export function trackTimeline(tl: gsap.core.Timeline): gsap.core.Timeline {
   _timelines.push(tl);
@@ -38,6 +42,8 @@ export function cleanupAll(): void {
   _triggers.forEach((st) => st.kill());
   _triggers = [];
   ScrollTrigger.getAll().forEach((st) => st.kill());
+  _reverts.forEach((revert) => revert());
+  _reverts = [];
   ScrollTrigger.refresh();
 }
 
@@ -60,6 +66,59 @@ export function initPageEntrance(selector: string, container?: string): gsap.cor
   );
 
   return tl;
+}
+
+// --- Headline Reveal ---
+// Splits a headline into chars and staggers them in so the title "performs"
+// on load. The split is reverted in cleanupAll so navigation snapshots see
+// the original markup.
+export function initHeadlineReveal(selector: string): gsap.core.Timeline | null {
+  if (isReducedMotion()) return null;
+
+  const el = document.querySelector(selector);
+  if (!el) return null;
+
+  const split = SplitText.create(el, { type: 'chars,words', aria: 'auto' });
+  _reverts.push(() => split.revert());
+
+  const tl = trackTimeline(gsap.timeline());
+  tl.from(split.chars, {
+    yPercent: 60,
+    opacity: 0,
+    duration: 0.7,
+    ease: EASE.enter,
+    stagger: { each: 0.025, from: 'start' },
+  });
+  return tl;
+}
+
+// --- Focal Wave Entrance ---
+// One directed reveal: each item's delay grows with its distance to the focal
+// element, so the entrance reads as a single wave radiating from the headline
+// instead of identical fade-ups.
+export function initFocalWave(focalSelector: string, itemsSelector: string): void {
+  if (isReducedMotion()) return;
+
+  const focal = document.querySelector(focalSelector);
+  const items = document.querySelectorAll<HTMLElement>(itemsSelector);
+  if (!focal || !items.length) return;
+
+  const fRect = focal.getBoundingClientRect();
+  const fx = fRect.left + fRect.width / 2;
+  const fy = fRect.top + fRect.height / 2;
+
+  const tl = trackTimeline(gsap.timeline());
+  items.forEach((item) => {
+    const r = item.getBoundingClientRect();
+    const dist = Math.hypot(r.left + r.width / 2 - fx, r.top + r.height / 2 - fy);
+    const delay = Math.min(0.45, 0.12 + (dist / 1000) * 0.4);
+    tl.fromTo(
+      item,
+      { opacity: 0, y: 18 },
+      { opacity: 1, y: 0, duration: DURATION.normal, ease: EASE.enter },
+      delay
+    );
+  });
 }
 
 // --- Scroll Reveals ---
@@ -186,4 +245,4 @@ export function initMouseParallax(
 }
 
 // Re-export for convenience
-export { gsap, ScrollTrigger };
+export { gsap, ScrollTrigger, SplitText };

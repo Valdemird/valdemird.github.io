@@ -1,0 +1,52 @@
+---
+import Fold from '../../blog/Collapsible.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'Collapsible',
+	category: 'typographic',
+	status: 'stable',
+	summary: 'Native details/summary disclosure with an animated chevron — for tangents and long dumps that would break reading flow.',
+	summaryEs: 'Disclosure nativo con details/summary y chevron animado — para tangentes y volcados largos que romperían el ritmo de lectura.',
+	why: 'The git stash story in the tests post — eight of ten files eaten — was real and worth telling, but it wasn\'t load-bearing for the thesis. The choice was cut it or let it derail the argument. The Collapsible is the third option: pain behind a click, available to whoever wants it, invisible to whoever doesn\'t.',
+	whyEs: 'La historia del git stash en el post de tests — ocho de diez archivos devorados — era real y valía la pena contarla, pero no sostenía la tesis. La opción era cortarla o dejar que descarrilara el argumento. El Collapsible es la tercera vía: el dolor detrás de un clic, disponible para quien lo quiera, invisible para quien no.',
+	props: [
+		{ name: 'title', type: 'string', description: 'Summary line shown next to the chevron.' },
+		{ name: 'open', type: 'boolean', default: 'false', description: 'Start expanded instead of collapsed.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'cerrado por defecto' : 'closed by default'}
+	description={es ? 'El desvío se mantiene fuera del camino hasta que el lector decide entrar.' : 'The detour stays out of the way until the reader opts in.'}
+	usage={`<Collapsible title="Why not just use git stash?">
+  Stash is a stack, and agents don't pop their own stack. With three
+  agents running, whoever stashes last wins and the other two diffs
+  evaporate. Worktrees give each agent its own working directory instead.
+</Collapsible>`}
+>
+	<Fold title={es ? '¿Por qué no usar git stash y ya?' : 'Why not just use git stash?'}>
+		<p>{es ? 'El stash es una pila, y los agentes no hacen pop de su propia pila. Con tres agentes corriendo, el último en hacer stash gana y los otros dos diffs se evaporan. Los worktrees, en cambio, le dan a cada agente su propio directorio de trabajo.' : "Stash is a stack, and agents don't pop their own stack. With three agents running, whoever stashes last wins and the other two diffs evaporate. Worktrees give each agent its own working directory instead."}</p>
+	</Fold>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'abierto por defecto' : 'open by default'}
+	description={es ? 'Con open, el contenido aparece expandido al cargar — el pliegue se vuelve un marco con etiqueta, no un escondite.' : 'With open, the content is expanded on load — the fold becomes a labeled frame rather than a hiding spot.'}
+	usage={`<Collapsible title="The full flake list" open>
+  Three tests failed only on CI: two raced a shared SQLite file,
+  one asserted on Date.now() with a 50ms tolerance.
+</Collapsible>`}
+>
+	<Fold title={es ? 'La lista completa de flakes' : 'The full flake list'} open>
+		{es ? (
+			<p>Tres tests fallaban solo en CI: dos competían por un archivo SQLite compartido, uno hacía assert sobre <code>Date.now()</code> con 50ms de tolerancia. Ninguno probaba lo que decía probar.</p>
+		) : (
+			<p>Three tests failed only on CI: two raced a shared SQLite file, one asserted on <code>Date.now()</code> with a 50ms tolerance. None of them were testing what they claimed to test.</p>
+		)}
+	</Fold>
+</DemoSection>

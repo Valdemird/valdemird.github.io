@@ -7,7 +7,7 @@ export async function GET(context) {
 		.filter((post) => post.data.lang === 'es')
 		.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 	return rss({
-		title: SITE_TITLE,
+		title: `${SITE_TITLE} — en español`,
 		description: SITE_DESCRIPTION_ES,
 		site: context.site,
 		customData: '<language>es</language>',

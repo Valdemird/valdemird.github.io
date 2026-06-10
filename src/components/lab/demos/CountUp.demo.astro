@@ -1,0 +1,69 @@
+---
+import Counter from '../../blog/CountUp.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'CountUp',
+	category: 'data',
+	status: 'stable',
+	summary: 'Viewport-triggered animated number in Fraunces display type, with mono caption lines. Respects prefers-reduced-motion.',
+	summaryEs: 'Número animado que se dispara al entrar en el viewport, en Fraunces tamaño display, con líneas de caption en mono. Respeta prefers-reduced-motion.',
+	why: 'Some numbers are the post. "84 tests" buried mid-sentence is data; 84 in display-size Fraunces, counting up as you reach it, is a claim you have to look at. Built for the /insights post-mortem, where three numbers carried more argument than any section.',
+	whyEs: 'Algunos números son el post. "84 tests" enterrado a mitad de frase es un dato; 84 en Fraunces tamaño display, contando hacia arriba cuando llegas, es una afirmación que no puedes esquivar. Nació para el post-mortem de /insights, donde tres números cargaban más argumento que cualquier sección.',
+	props: [
+		{ name: 'to', type: 'number', description: 'Final value to animate to.' },
+		{ name: 'from', type: 'number', default: '0', description: 'Starting value.' },
+		{ name: 'duration', type: 'number', default: '1200', description: 'Animation duration in ms.' },
+		{ name: 'decimals', type: 'number', default: '0', description: 'Decimal places shown throughout the animation.' },
+		{ name: 'prefix', type: 'string', description: 'Text before the number, e.g. "$".' },
+		{ name: 'suffix', type: 'string', description: 'Text after the number, e.g. "%" or "ms".' },
+		{ name: 'label', type: 'string', description: 'Editorial caption below the number.' },
+		{ name: 'context', type: 'string', description: 'Smaller context line under the label.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'cifra única / el número titular' : 'single stat / the headline number'}
+	description={es ? 'Haz scroll hasta que entre en pantalla para disparar el conteo. Con reduced motion, el valor final aparece de inmediato.' : 'Scroll it into view to trigger the count. With reduced motion, the final value shows immediately.'}
+	usage={`<CountUp
+  to={847}
+  suffix=" tests"
+  label="Suite size after three weekends"
+  context="Started at 12. The agent wrote most of them; I deleted the lies."
+/>`}
+>
+	<Counter
+		to={847}
+		suffix=" tests"
+		label={es ? 'Tamaño de la suite tras tres fines de semana' : 'Suite size after three weekends'}
+		context={es ? 'Empezó en 12. El agente escribió la mayoría; yo borré las mentiras.' : 'Started at 12. The agent wrote most of them; I deleted the lies.'}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'decimales + prefijo' : 'decimals + prefix'}
+	description={es ? 'Los decimales se mantienen fijos durante la animación para que el layout nunca salte.' : 'Decimals stay fixed during the animation so the layout never jitters.'}
+	usage={`<CountUp
+  to={3.4}
+  decimals={1}
+  prefix="~"
+  suffix="x"
+  duration={1600}
+  label="Throughput with three worktrees"
+  context="Versus one agent on one branch, same Saturday."
+/>`}
+>
+	<Counter
+		to={3.4}
+		decimals={1}
+		prefix="~"
+		suffix="x"
+		duration={1600}
+		label={es ? 'Throughput con tres worktrees' : 'Throughput with three worktrees'}
+		context={es ? 'Contra un agente en una rama, el mismo sábado.' : 'Versus one agent on one branch, same Saturday.'}
+	/>
+</DemoSection>

@@ -1,5 +1,5 @@
 ---
-title: "Aprender Construyendo: Por Qué los Makers Aprenden Más Rápido Que los Estudiantes"
+title: "Aprender construyendo: por qué los makers aprenden más rápido que los estudiantes"
 description: "La forma más efectiva de dominar una tecnología no es leer docs ni ver tutoriales — es construir algo real. Por qué aprender haciendo funciona mejor."
 pubDate: 2026-03-14
 tags: ["aprendizaje", "maker", "productividad", "carrera"]
@@ -8,18 +8,18 @@ lang: es
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import Tabs from '../../../components/blog/Tabs.astro';
 import TabPanel from '../../../components/blog/TabPanel.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
-import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import StatGrid from '../../../components/blog/StatGrid.astro';
+import Timeline from '../../../components/blog/Timeline.astro';
 
-He visto desarrolladores pasar meses con cursos, tutoriales y documentación, y seguir sin sentirse listos para construir algo real. También he visto desarrolladores con la mitad del "tiempo de estudio" lanzar apps a producción que realmente funcionan. La diferencia no es talento. Es método.
+He visto a desarrolladores pasar meses con cursos, tutoriales y documentación, y seguir sin sentirse listos para construir algo real. También he visto a desarrolladores con la mitad del "tiempo de estudio" lanzar apps a producción que realmente funcionan. La diferencia no es talento. Es método.
 
 **Los que construyen aprenden más rápido que los que estudian.** No porque construir sea más difícil, sino porque fuerza una relación fundamentalmente diferente con el conocimiento.
 
-## La Trampa del Tutorial
+## La trampa del tutorial
 
 Los tutoriales se sienten productivos. Sigues los pasos, todo funciona, entiendes cada paso. Pero hay un costo oculto: estás aprendiendo las decisiones del *instructor*, no tomando las tuyas.
 
@@ -44,42 +44,35 @@ Los tutoriales se sienten productivos. Sigues los pasos, todo funciona, entiende
 </TabPanel>
 </Tabs>
 
-La diferencia crítica: cuando construyes, te metes en la *zona pantanosa* — esa parte entre "entiendo el concepto" y "funciona en producción." Ahí es donde ocurre el aprendizaje real.
+La diferencia crítica: cuando construyes, te metes en la *zona pantanosa* — esa parte entre "entiendo el concepto" y "funciona en producción". Ahí es donde ocurre el aprendizaje real.
 
 <Callout type="important" title="La ventaja del builder">
 Los tutoriales te enseñan qué funciona. Construir te enseña qué falla y dónde — y ese es el conocimiento que realmente importa en producción.
 </Callout>
 
-## La Investigación Es Clara: Activo Le Gana a Pasivo
+## La investigación es clara: activo le gana a pasivo
 
-Esto no es solo intuición. Hay ciencia rigurosa detrás. Un [meta-análisis de 225 estudios publicado en PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) por Freeman et al. encontró que los estudiantes en entornos de aprendizaje activo obtuvieron 6% más en exámenes y fueron **1.5x menos propensos a reprobar** comparados con clases pasivas tradicionales.
+Esto no es solo intuición. Hay ciencia rigurosa detrás. Un [metaanálisis de 225 estudios publicado en PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) por Freeman et al. encontró que los estudiantes en entornos de aprendizaje activo obtuvieron un 6% más en exámenes y fueron **1.5x menos propensos a reprobar** en comparación con las clases pasivas tradicionales.
 
-<InteractiveChart
-  title="Aprendizaje Activo vs Pasivo"
-  type="horizontal"
-  data={[
-    { label: "Tasa reprobación pasiva", value: 34, color: "oklch(0.65 0.2 27)" },
-    { label: "Tasa reprobación activa", value: 22, color: "oklch(0.6 0.18 145)" },
-    { label: "Retención activa", value: 93, color: "oklch(0.55 0.15 260)" },
-    { label: "Retención pasiva", value: 79, color: "oklch(0.7 0.15 55)" },
-  ]}
-/>
+<StatGrid columns={3} stats={[
+  { value: "1.5×", label: "menos probabilidad de reprobar", context: "activo vs pasivo — Freeman et al., 225 estudios" },
+  { value: "+6%", label: "en las notas de examen", context: "el mismo metaanálisis de PNAS" },
+  { value: "0.27 SD", label: "más alto en el post-test", context: "ensayo aleatorizado de 2024, estudiantes de medicina" },
+]} />
 
-*(Fuentes: [Freeman et al., PNAS 2014](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111); [Engageli Active Learning Statistics 2026](https://www.engageli.com/blog/active-learning-statistics-2025))*
+La confirmación más reciente es un [ensayo aleatorizado de 2024 con estudiantes de medicina](https://link.springer.com/article/10.1007/s40670-024-02219-1). La evidencia sigue acumulándose — la participación práctica le gana a la absorción pasiva, y los tutoriales *se sienten* productivos sin *serlo*.
 
-Más recientemente, un [ensayo aleatorizado de 2024 con estudiantes de medicina](https://link.springer.com/article/10.1007/s40670-024-02219-1) confirmó el patrón: los estudiantes obtuvieron **0.27 desviaciones estándar más** después de sesiones activas. La evidencia sigue acumulándose — la participación práctica le gana a la absorción pasiva, y los tutoriales *se sienten* productivos sin *serlo*.
-
-El premio Nobel Richard Feynman formalizó este insight en lo que hoy se conoce como la [Técnica Feynman](https://fs.blog/feynman-technique/): si no puedes explicar algo de forma simple, no lo entiendes realmente. Enseñar te fuerza a cerrar la brecha entre "lo entiendo" y "puedo explicarlo."
+El premio Nobel Richard Feynman formalizó este insight en lo que hoy se conoce como la [Técnica Feynman](https://fs.blog/feynman-technique/): si no puedes explicar algo de forma simple, no lo entiendes realmente. Enseñar te fuerza a cerrar la brecha entre "lo entiendo" y "puedo explicarlo".
 
 <Callout type="tip" title="El loop del maker">
-Construir algo → escribir sobre ello → enseñarle a alguien → construir lo siguiente. Cada paso refuerza el anterior. Es la Técnica Feynman aplicada a la ingeniería: constrúyelo, luego explícalo hasta que sea simple.
+Construir algo → escribir sobre ello → enseñárselo a alguien → construir lo siguiente. Cada paso refuerza el anterior. Es la Técnica Feynman aplicada a la ingeniería: constrúyelo, luego explícalo hasta que sea simple.
 </Callout>
 
-## Por Qué los Side Projects Aceleran Tu Carrera
+## Por qué los side projects aceleran tu carrera
 
 Los side projects no son solo para aprender. Crean un **portafolio visible de buen criterio** — prueba de que sabes tomar decisiones, no solo seguir instrucciones.
 
-<MermaidDiagram title="El Flywheel del Maker" chart="graph TD\n    A[Construir algo] --> B[Encontrar problemas reales]\n    B --> C[Resolverlos]\n    C --> D[Ganar conocimiento profundo]\n    D --> E[Compartir lo aprendido]\n    E --> F[Atraer oportunidades]\n    F --> A" />
+<MermaidDiagram title="El flywheel del maker" chart="graph TD\n    A[Construir algo] --> B[Encontrar problemas reales]\n    B --> C[Resolverlos]\n    C --> D[Ganar conocimiento profundo]\n    D --> E[Compartir lo aprendido]\n    E --> F[Atraer oportunidades]\n    F --> A" />
 
 Cuando publicas un proyecto, demuestras:
 - **Decisiones de arquitectura**: escogiste una base de datos, un framework, una estrategia de deploy
@@ -88,15 +81,15 @@ Cuando publicas un proyecto, demuestras:
 
 <Collapsible title="Lo que los hiring managers realmente buscan">
 
-Después de entrevistar 100+ ingenieros, el patrón es claro: los candidatos más fuertes no son los que tienen más certificaciones. Son los que pueden explicar *por qué* tomaron decisiones técnicas específicas en sus proyectos.
+Después de entrevistar a más de 100 ingenieros, el patrón es claro: los candidatos más fuertes no son los que tienen más certificaciones. Son los que pueden explicar *por qué* tomaron decisiones técnicas específicas en sus proyectos.
 
-"Usé Prisma en vez de SQL crudo porque el equipo era pequeño y moverse rápido importaba más que optimizar queries" me dice más que "tengo 5 años de experiencia en bases de datos."
+"Usé Prisma en vez de SQL crudo porque el equipo era pequeño y moverse rápido importaba más que optimizar queries" me dice más que "tengo 5 años de experiencia en bases de datos".
 
-Un proyecto enviado con decisiones reales le gana a un CV con tecnologías listadas.
+Un proyecto lanzado con decisiones reales le gana a un CV con tecnologías listadas.
 
 </Collapsible>
 
-## El Efecto Compuesto de Construir en Público
+## El efecto compuesto de construir en público
 
 Hay un efecto compuesto que la mayoría no ve. Cuando construyes y compartes públicamente:
 
@@ -112,30 +105,28 @@ Cada proyecto hace mejor al siguiente. No solo técnicamente. Tu capacidad de *p
 No necesitas inventar un nuevo framework. Construye una app de tareas, pero hazla *tuya*. Escoge el tech stack, diseña la UI, toma las decisiones difíciles. Una idea familiar bien ejecutada enseña más que una idea ambiciosa abandonada.
 </Callout>
 
-## Cómo Empezar
+## Cómo empezar
 
 La barrera más grande no es la habilidad — es el perfeccionismo. El antídoto:
 
-1. **Escoge un problema que realmente tengas.** No construyas un "proyecto de práctica." Construye algo que vayas a usar. La motivación para terminar es 10x mayor cuando eres tu propio usuario.
+1. **Escoge un problema que realmente tengas.** No construyas un "proyecto de práctica". Construye algo que vayas a usar. La motivación para terminar es 10x mayor cuando eres tu propio usuario.
 
-2. **Restringe el scope sin piedad.** La primera versión debería tomar un fin de semana, no un mes. Envía el MVP vergonzoso. Siempre puedes iterar.
+2. **Restringe el scope sin piedad.** La primera versión debería tomar un fin de semana, no un mes. Lanza el MVP vergonzoso. Siempre puedes iterar.
 
 3. **Escribe una cosa sobre ello.** Un blog post, un hilo de tweets, un README con explicaciones de decisiones reales. Enseñar es el multiplicador.
 
 4. **Ponlo en línea.** Despliégalo en algún lugar real. Un proyecto en localhost es un borrador. Un proyecto con URL es un producto.
 
-<CodeBlock filename="El proceso mínimo viable del maker">
-```
-Fin de semana 1: Construye la feature core. Hazle deploy.
-Fin de semana 2: Arregla las 3 cosas que más te molestan.
-Fin de semana 3: Escribe sobre lo que aprendiste.
-Repite con la siguiente idea.
-```
-</CodeBlock>
+<Timeline items={[
+  { date: "Fin de semana 1", title: "Construye la feature core. Hazle deploy.", body: "Un proyecto en localhost es un borrador; una URL lo vuelve real." },
+  { date: "Fin de semana 2", title: "Arregla las tres cosas que más te molestan.", body: "Ahora eres tu propio usuario: la lista se escribe sola." },
+  { date: "Fin de semana 3", title: "Escribe sobre lo que aprendiste.", body: "Enseñar es el multiplicador.", emphasize: true },
+  { date: "Después", title: "Repite con la siguiente idea." },
+]} />
 
-## El Conocimiento Que No Se Googlea
+## El conocimiento que no se googlea
 
-Hay un tipo de conocimiento de ingeniería que no existe en ninguna documentación. Vive en la brecha entre "sé cómo funciona X" y "sé qué pasa cuando X se encuentra con Y en producción."
+Hay un tipo de conocimiento de ingeniería que no existe en ninguna documentación. Vive en la brecha entre "sé cómo funciona X" y "sé qué pasa cuando X se encuentra con Y en producción".
 
 No puedes llegar a ese conocimiento leyendo. Solo puedes construirlo. Michael Polanyi lo llamó [conocimiento tácito](https://en.wikipedia.org/wiki/Tacit_knowledge) — el tipo de saber que solo se adquiere a través de la experiencia, no de la instrucción.
 

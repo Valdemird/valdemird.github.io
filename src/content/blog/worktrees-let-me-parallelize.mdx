@@ -13,6 +13,10 @@ import Collapsible from '../../components/blog/Collapsible.astro';
 import FileTree from '../../components/blog/FileTree.astro';
 import PullQuote from '../../components/blog/PullQuote.astro';
 import TLDR from '../../components/blog/TLDR.astro';
+import GitGraph from '../../components/blog/GitGraph.astro';
+import AgentLoop from '../../components/blog/AgentLoop.astro';
+import StepThroughDiagram from '../../components/blog/StepThroughDiagram.astro';
+import DecisionTree from '../../components/blog/DecisionTree.astro';
 
 <TLDR bullets={[
   "I ran three Claude agents in parallel this Saturday on a small side project. Three bugs, three branches, three PRs merged in one afternoon.",
@@ -44,6 +48,39 @@ The first time I asked Claude to create a worktree, it created the worktree *ins
 I didn't notice immediately. What I noticed was that `next dev` started compiling and never stopped. The spinner would tick, finish, restart. Tick, finish, restart. I couldn't load the app. I couldn't tell if my code was broken or if the dev server was broken or if my computer was on fire.
 
 What was happening, once I figured it out, was almost comically simple. Next.js was watching the entire repo for changes. The worktree Claude had created contained a literal copy of the repo's source files, sitting *inside* the directory being watched. Every time Next.js finished a compile, the file watchers saw "new" files in the worktree (same content, different paths), kicked off another compile, finished it, saw the worktree files *again*, and the loop never ended. The repo was watching itself.
+
+<StepThroughDiagram steps={[
+  { id: "watch", label: "next dev watches every file under the repo root for changes." },
+  { id: "worktree", label: "The agent creates the worktree inside the repo — a full copy of the source files, inside the watched tree." },
+  { id: "detect", label: "A compile finishes. The watcher sees the worktree's files as new and kicks off another compile." },
+  { id: "loop", label: "That compile finishes, the watcher looks again, sees the same files again. The repo is watching itself." },
+]}>
+  <svg slot="diagram" viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The infinite compile loop: the watcher sees the worktree's copied files as new, recompiles, and looks again forever">
+    <defs>
+      <marker id="wt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-accent)" />
+      </marker>
+    </defs>
+    <g data-diagram-step="watch">
+      <rect x="8" y="30" width="344" height="262" rx="12" fill="var(--color-surface)" stroke="var(--color-border-strong)" />
+      <text x="24" y="58" font-family="var(--font-mono)" font-size="15" fill="var(--color-text)">repo/</text>
+      <text x="24" y="77" font-family="var(--font-mono)" font-size="12" fill="var(--color-text-muted)">watched by next dev</text>
+    </g>
+    <g data-diagram-step="worktree">
+      <rect x="140" y="160" width="200" height="110" rx="10" fill="oklch(from var(--color-accent) l c h / 0.08)" stroke="var(--color-accent)" />
+      <text x="240" y="208" text-anchor="middle" font-family="var(--font-mono)" font-size="14" fill="var(--color-text)">worktree/</text>
+      <text x="240" y="230" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--color-text-muted)">full copy of src/</text>
+    </g>
+    <g data-diagram-step="detect">
+      <path d="M 64 92 C 84 145, 98 175, 134 198" fill="none" stroke="var(--color-accent)" stroke-width="2" marker-end="url(#wt-arrow)" />
+      <text x="22" y="150" font-family="var(--font-mono)" font-size="12" fill="var(--color-accent)">sees "new" files</text>
+    </g>
+    <g data-diagram-step="loop">
+      <path d="M 240 156 C 240 104, 192 94, 118 92" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#wt-arrow)" />
+      <text x="128" y="118" font-family="var(--font-mono)" font-size="12" fill="var(--color-accent)">recompiles, looks again</text>
+    </g>
+  </svg>
+</StepThroughDiagram>
 
 I copied the error stream into a fresh Claude session and Claude figured it out. The same tool that had put me in the hole helped me climb out. That part I won't pretend was elegant.
 
@@ -86,6 +123,24 @@ By the end of the afternoon I had merged three PRs. Roughly:
 - A pooled DB connection was getting exhausted under realistic load and throwing `P2037`. The fix capped the per-instance pool size.
 - A stale UI banner was triggering a navigation into an empty view. The fix bootstrapped the right state before the redirect.
 
+Here's the same afternoon as git history. Press play, or arrow through it one operation at a time. The thing to watch is what doesn't happen: no lane touches another lane until the merges at the end.
+
+<GitGraph
+  ops={[
+    { op: 'commit', branch: 'main', label: 'saturday morning' },
+    { op: 'branch', name: 'fix/oauth-reconnect', from: 'main', label: 'agent 1' },
+    { op: 'branch', name: 'fix/db-pool', from: 'main', label: 'agent 2' },
+    { op: 'branch', name: 'fix/banner-redirect', from: 'main', label: 'agent 3' },
+    { op: 'commit', branch: 'fix/oauth-reconnect', label: 'move the await' },
+    { op: 'commit', branch: 'fix/db-pool', label: 'cap pool size' },
+    { op: 'commit', branch: 'fix/banner-redirect', label: 'bootstrap state' },
+    { op: 'merge', from: 'fix/oauth-reconnect', into: 'main', label: 'PR #1' },
+    { op: 'merge', from: 'fix/db-pool', into: 'main', label: 'PR #2' },
+    { op: 'merge', from: 'fix/banner-redirect', into: 'main', label: 'PR #3' },
+  ]}
+  caption="The real branches had more commits than this — the shape is what's exact. Three lanes, three merges, zero collisions."
+/>
+
 I'm being short on product detail on purpose. The bugs themselves are not the interesting part. The interesting part is that three agents could work on three of them in the same afternoon without colliding once.
 
 ## When the First Pass Isn't Enough
@@ -103,6 +158,24 @@ fb7b925 docs(storybook): note why @/lib/analytics is mocked
 </CodeBlock>
 
 Three commits for one fix. The pattern is the same one I wrote about last month with CSS — the agent patches the visible surface and stops. The adjacent surfaces (other imports, other themes, other breakpoints) only surface when you actually run the thing in the environment that fails. Worktrees gave me parallelism. They did not give me a smarter first pass.
+
+Played back as a loop, the expensive part of that session is obvious. The edits took minutes each. The observe steps — push, wait for CI, read the new failure — were the afternoon:
+
+<AgentLoop
+  contextWindow={180}
+  steps={[
+    { phase: 'plan', title: 'Read the CI failure: the story breaks on push', tokens: 14 },
+    { phase: 'act', title: 'Mock @/lib/analytics in the vitest setup', tool: 'Edit', tokens: 12 },
+    { phase: 'observe', title: 'CI fails again — the component also pulls in next/server', tool: 'CI', tokens: 52 },
+    { phase: 'plan', title: 'Stop patching the visible error, walk the import chain', tokens: 10 },
+    { phase: 'act', title: 'Mock taskActions to break the next/server chain', tool: 'Edit', tokens: 13 },
+    { phase: 'observe', title: 'CI green', tool: 'CI', tokens: 48 },
+    { phase: 'act', title: 'Document why analytics is mocked', tool: 'Edit', tokens: 8 },
+  ]}
+  caption="A reconstruction of the session, not a transcript — token figures are illustrative, in thousands. The proportions are not."
+/>
+
+Acting is cheap. Observing is what fills the context window, and a session that burns it on two CI round-trips is a session that starts forgetting why it made the first edit. That's the real price of a first pass that doesn't walk the dependency tree.
 
 <Callout type="tip" title="The cheap rule that prevents this">
 Before declaring a Storybook fix done, ask the agent to enumerate every import the changed story's component touches and confirm each is either real-or-mocked. Same idea for any test setup. The "what else does this thing transitively need" question costs five seconds; the alternative is two CI cycles per fix.
@@ -132,6 +205,55 @@ Worktrees in `.claude/worktrees/` work for me because that path is gitignored on
 I picked Saturday's three bugs because they sat in three different layers of the stack. That wasn't strategy. It was the queue. If I'd had three bugs that all touched the same hook, or three changes that each modified a shared type, the worktrees would have kept the diffs apart and the merge would have been a war. Physical isolation doesn't buy semantic isolation.
 
 This shows up everywhere once you start looking. Three agents bumping the same package to three different versions. Three migrations against the same table. Three refactors of a shared internal API. Each PR individually correct, together a broken build. Worktrees give you the *ability* to parallelize. They don't give you the *judgment* to know which work can safely parallelize.
+
+That judgment fits in four questions. Here's the version I now run in my head before opening a second terminal:
+
+<DecisionTree
+  root="start"
+  nodes={{
+    start: {
+      question: "Two tasks are queued. Can two agents take them in parallel?",
+      choices: [
+        { label: "They edit the same files", next: "samefiles" },
+        { label: "Different files entirely", next: "types" },
+      ],
+    },
+    samefiles: {
+      verdict: "Serialize.",
+      detail: "Worktrees will keep the diffs apart, but the merge will be a war anyway.",
+      choices: [{ label: "Start over", next: "start" }],
+    },
+    types: {
+      question: "Do they touch a shared type, schema, or internal API?",
+      choices: [
+        { label: "Yes", next: "shared" },
+        { label: "No", next: "runtime" },
+      ],
+    },
+    shared: {
+      verdict: "Serialize, or make it one PR.",
+      detail: "Physical isolation doesn't buy semantic isolation. Each PR individually correct, together a broken build.",
+      choices: [{ label: "Start over", next: "start" }],
+    },
+    runtime: {
+      question: "Do they need the same runtime resource — port 3000, the database, the generated Prisma client?",
+      choices: [
+        { label: "Yes", next: "careful" },
+        { label: "No", next: "go" },
+      ],
+    },
+    careful: {
+      verdict: "Parallelize with care.",
+      detail: "Per-agent ports and databases, or only one agent gets to run the dev server.",
+      choices: [{ label: "Start over", next: "start" }],
+    },
+    go: {
+      verdict: "Parallelize.",
+      detail: "This was Saturday's case: three layers, zero overlap.",
+      choices: [{ label: "Start over", next: "start" }],
+    },
+  }}
+/>
 
 The other thing worktrees don't isolate: shared runtime resources. Three dev servers want port 3000. Three Prisma clients regenerate the same generated files. Three sets of migrations want to run against the same database. Three `npm install` calls fight over the same `node_modules`. Worktrees give each agent its own files. They don't give each agent its own port or its own database. For anything beyond filesystem state (sockets, processes, caches, shared services), you still need to think about it explicitly.
 

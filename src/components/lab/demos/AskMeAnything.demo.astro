@@ -1,0 +1,31 @@
+---
+import Ama from '../../blog/AskMeAnything.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'AskMeAnything',
+	category: 'playful',
+	status: 'experimental',
+	summary: 'The floating chat that lives on every page: an AI that runs in your browser, answers about me and can summarize the post you are reading, plus a tab that emails me directly.',
+	summaryEs: 'El chat flotante que vive en todas las páginas: una IA que corre en tu navegador, responde sobre mí y resume el post que estás leyendo, más una pestaña para escribirme directo.',
+	why: "Browsers started shipping a small language model you can talk to without any server, and I wanted to know if \"an AI that answers for me, on the visitor's hardware\" was a gimmick or a feature. The honest answer is both, and it still earned a promotion: it started as a section buried in my About page and now floats in the corner of every page, where it also reads the post you're on and can summarize it. It only exists for visitors whose browser carries the model, and the part I actually needed — a way for someone to reach me — is still a plain form one tab away, working in every browser. The chat is the experiment; the form is the product.",
+	whyEs: 'Los navegadores empezaron a traer un modelo de lenguaje pequeño con el que puedes hablar sin ningún servidor, y quería saber si "una IA que responde por mí, en el hardware del visitante" era un truco o una funcionalidad. La respuesta honesta es que es las dos cosas, y aun así se ganó un ascenso: empezó como una sección perdida en mi página About y ahora flota en la esquina de todas las páginas, donde además lee el post en el que estás y puede resumirlo. Solo existe para visitantes cuyo navegador trae el modelo, y la parte que de verdad necesitaba — que alguien pueda escribirme — sigue siendo un formulario simple a una pestaña de distancia, que funciona en cualquier navegador. El chat es el experimento; el formulario es el producto.',
+	props: [
+		{ name: 'lang', type: "'en' | 'es'", default: "'en'", description: 'UI language and the language the assistant answers in.' },
+		{ name: 'floating', type: 'boolean', default: 'true', description: 'true mounts the fixed corner button + popover (site-wide, via Footer); false renders the panel inline, as in this demo.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'panel en vivo / depende del navegador' : 'live panel / browser-gated'}
+	description={es
+		? 'Es el mismo widget del botón flotante de la esquina, renderizado inline. Si tu navegador expone IA integrada verás el chat, y el formulario de correo gana un botón para mejorar la redacción con el mismo modelo local; si no, el widget se queda en un formulario de contacto normal, sin rastro de IA. Todo lo que escribas se queda en tu máquina.'
+		: "This is the same widget behind the floating corner button, rendered inline. If your browser exposes built-in AI you'll see the chat, and the email form gains an on-device pass that polishes your draft; otherwise the widget stays a plain contact form, with no AI in sight. Everything you type stays on your machine."}
+	usage={`<AskMeAnything lang="en" />\n<AskMeAnything lang="en" floating={false} />`}
+>
+	<Ama lang={lang} floating={false} />
+</DemoSection>

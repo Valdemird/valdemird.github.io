@@ -1,0 +1,67 @@
+---
+/**
+ * DemoSection — one variant of a component inside a /lab page.
+ *
+ * Renders a mono eyebrow label, an optional one-line description, and the
+ * live component (default slot). The live area is intentionally unstyled
+ * inside: components bring their own margins and must look right against
+ * the page background, exactly as in a post.
+ *
+ * The lab is reader-facing: `usage` is still accepted (it documents the
+ * variant for maintainers, in the demo source) but is NOT rendered.
+ */
+interface Props {
+	/** Variant label, e.g. "bar / annotated". Rendered as a mono eyebrow. */
+	label: string;
+	/** One-liner about what this variant shows. */
+	description?: string;
+	/** MDX usage snippet — kept in the demo source for maintainers, never rendered. */
+	usage?: string;
+	/** Constrain the live area (e.g. "420px") for components meant for narrow columns. */
+	maxWidth?: string;
+}
+
+const { label, description, maxWidth } = Astro.props;
+---
+
+<section class="demo-section">
+	<header class="demo-head">
+		<span class="demo-eyebrow">{label}</span>
+		{description && <p class="demo-desc">{description}</p>}
+	</header>
+
+	<div class="demo-stage" style={maxWidth ? `max-width: ${maxWidth}` : undefined}>
+		<slot />
+	</div>
+</section>
+
+<style>
+	.demo-section {
+		padding: var(--space-xl) 0;
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.demo-section:last-child {
+		border-bottom: none;
+	}
+
+	.demo-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+
+	.demo-desc {
+		margin: 0.5rem 0 0;
+		font-size: 0.92rem;
+		color: var(--color-text-secondary);
+		max-width: 60ch;
+	}
+
+	.demo-stage {
+		margin-top: var(--space-lg);
+	}
+</style>

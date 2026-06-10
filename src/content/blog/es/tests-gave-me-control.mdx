@@ -18,6 +18,8 @@ import TabPanel from '../../../components/blog/TabPanel.astro';
 import FileTree from '../../../components/blog/FileTree.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
 import Sidenote from '../../../components/blog/Sidenote.astro';
+import FlakySuite from '../../../components/blog/FlakySuite.astro';
+import CodeDiff from '../../../components/blog/CodeDiff.astro';
 
 <TLDR lang="es" bullets={[
   "Trabajé un mes con Claude Code en un side project. /insights me mostró dos cosas: la IA parcha síntomas antes de entender causas, y los tests son lo único que me deja confiar en sus cambios.",
@@ -26,7 +28,7 @@ import Sidenote from '../../../components/blog/Sidenote.astro';
 
 Construí un side project este último mes. Un calendario/PWA pequeño, un sandbox personal para aprender patrones de Next.js que no uso en mi trabajo en la consultora. Fuera de horas laborales, sin mezcla con clientes, solo un lugar donde romper cosas a propósito.
 
-Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando.<Sidenote>`/insights` inspecciona el transcript de la sesión y saca patrones sobre cómo prompteé, dónde iteré y dónde me quedé pegado. Es el tipo de post-mortem que rara vez le hacés a tu propio trabajo.</Sidenote> Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
+Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando.<Sidenote>`/insights` inspecciona el transcript de la sesión y saca patrones sobre cómo prompteé, dónde iteré y dónde me quedé pegado. Es el tipo de post-mortem que rara vez le haces a tu propio trabajo.</Sidenote> Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
 
 Este post es lo que `/insights` me mostró y el cambio que hice por culpa de eso.
 
@@ -44,28 +46,56 @@ La parte cómoda era la que ya conocía:
 
 Esa era la mitad aburrida. La que no esperaba ver pegó más fuerte.
 
-Un comportamiento de scroll en una landing page tomó cerca de diez rondas de feedback antes de converger.<Sidenote>Para contexto: diez rondas de "no, lo otro" es el tipo de sesión donde a un ingeniero junior le habrían dicho que se levante un rato. Con la IA seguí empujando porque el costo se sentía bajo. El costo de *tiempo*, no tanto.</Sidenote> Un overflow de kanban se "arregló" dos veces con la propiedad de CSS equivocada antes de que parara y preguntara qué estaba haciendo el contenedor padre. Un layout de escritorio se "corrigió" dos veces sin que cambiara nada visible, hasta que escribí algo parecido a "no resolviste el problema, analiza profundamente." `/insights` marcó esa frase exacta como un patrón recurrente.
+Un comportamiento de scroll en una landing page tomó cerca de diez rondas de feedback antes de converger.<Sidenote>Para contexto: diez rondas de "no, lo otro" es el tipo de sesión donde a un ingeniero junior le habrían dicho que se levantara un rato. Con la IA seguí empujando porque el costo se sentía bajo. El costo de *tiempo*, no tanto.</Sidenote> Un overflow de kanban se "arregló" dos veces con la propiedad de CSS equivocada antes de que parara y preguntara qué estaba haciendo el contenedor padre. Un layout de escritorio se "corrigió" dos veces sin que cambiara nada visible, hasta que escribí algo parecido a "no resolviste el problema, analiza profundamente". `/insights` marcó esa frase exacta como un patrón recurrente.
 
-Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los que estaba trabajando. No voy a fingir que fue elegante. Eso fue antes de que apretara la disciplina de tests y commits frecuentes. La recuperación fue desde memoria.
+Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los que estaba trabajando. No voy a fingir que fue elegante. Eso fue antes de que apretara la disciplina de tests y commits frecuentes. La recuperación fue de memoria.
 
 <Collapsible title="La historia del git stash (puedes saltarla)">
-A mitad de sesión pedí un stash para pausar trabajo en una rama medio rota. El pop no restauró todo porque había tocado archivos en directorios que el stash no rastreó limpiamente. Perdí toda una tarde de código en progreso que aún no había commiteado. La solución fue aburrida: commit temprano, commit seguido, incluso en ramas WIP basura. La lección fue menos aburrida: había asumido que la IA iba a tratar las operaciones de git con la misma cautela que yo. No lo hace. Git es uno de esos lugares donde "delegar completo" es el default equivocado.
+A mitad de sesión pedí un stash para pausar trabajo en una rama medio rota. El pop no restauró todo porque había tocado archivos en directorios que el stash no rastreó limpiamente. Perdí toda una tarde de código en progreso que aún no había commiteado. La solución fue aburrida: commit temprano, commit seguido, incluso en ramas WIP basura. La lección fue menos aburrida: había dado por sentado que la IA iba a tratar las operaciones de git con la misma cautela que yo. No lo hace. Git es uno de esos lugares donde "delegar completo" es el default equivocado.
 </Collapsible>
 
 Esta es la parte de trabajar con IA que nadie postea en Twitter. Los demos perfectos son reales. Lo que los rodea se parece mucho a ingeniería normal. Estás confundido un rato, hasta que cae la ficha.
 
 ## El patrón que sí encontré
 
-El modo de falla interesante no era "la IA se equivocó." Era más sutil. La IA saltaba a una solución antes de tener un diagnóstico.
+El modo de falla interesante no era "la IA se equivocó". Era más sutil. La IA saltaba a una solución antes de tener un diagnóstico.
 
 El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible* antes de subir por la cascada. Ahí se fueron las diez rondas en scroll-snap.
 
-El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA se enfocó en "el comando que falló" en vez de "qué entorno se cargó."
+Esta es la forma del problema, reconstruida de la sesión del overflow del kanban, no copiada de un commit:
+
+<CodeDiff
+  filename="components/Board.tsx"
+  language="jsx"
+  before={[
+    { line: 1, text: '<div className="board flex gap-4">' },
+    { line: 2, text: '  <section className="column">' },
+    { line: 3, text: '    <ul className="items-start max-h-full overflow-hidden">' },
+    { line: 4, text: '      {cards.map(renderCard)}' },
+    { line: 5, text: '    </ul>' },
+    { line: 6, text: '  </section>' },
+    { line: 7, text: '</div>' },
+  ]}
+  after={[
+    { line: 1, text: '<div className="board flex gap-4 min-h-0">' },
+    { line: 2, text: '  <section className="column flex flex-col min-h-0">' },
+    { line: 3, text: '    <ul className="overflow-y-auto">' },
+    { line: 4, text: '      {cards.map(renderCard)}' },
+    { line: 5, text: '    </ul>' },
+    { line: 6, text: '  </section>' },
+    { line: 7, text: '</div>' },
+  ]}
+  removed={[3]}
+  added={[1, 2, 3]}
+  note="Los dos parches de la IA cayeron en la línea 3, el elemento visible. La restricción estaba dos padres más arriba: un hijo de flex no se encoge por debajo de su contenido a menos que min-h-0 se lo permita."
+/>
+
+El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA se enfocó en "el comando que falló" en vez de "qué entorno se cargó".
 
 No es un mal hábito que se cura con mejor prompt. El modelo predice tokens que estadísticamente rodean al síntoma. Hasta que no muevas el diagnóstico río arriba, a un spec o a un test que falla, no tiene a dónde mirar.
 
 <Callout type="warning" title="La pista del CSS">
-Si la IA cambia una propiedad sobre el elemento roto y el bug no se mueve, para. La restricción está río arriba. Hazla caminar la cadena de padres antes de tocar otra propiedad.
+Si la IA cambia una propiedad sobre el elemento roto y el bug no se mueve, para. La restricción está río arriba. Hazla recorrer la cadena de padres antes de tocar otra propiedad.
 </Callout>
 
 ## El cinturón de seguridad: los tests
@@ -119,7 +149,7 @@ coverage: {
 ```
 </CodeBlock>
 
-Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?" sino "¿puede el número bajar sin que te enteres?". Como piso, no puede. Con números así de bajos solo atrapa regresiones gruesas. Las sutiles necesitan más cobertura para aparecer. Ahora me importa si el número está subiendo, no dónde está.
+Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?", sino "¿puede el número bajar sin que te enteres?". Como piso, no puede. Con números así de bajos solo atrapa regresiones gruesas. Las sutiles necesitan más cobertura para aparecer. Ahora me importa si el número está subiendo, no dónde está.
 
 La segunda es el setup de E2E corriendo contra un Postgres real, no contra un mock:
 
@@ -147,6 +177,17 @@ export default defineConfig({
 
 Los tests E2E insertan una sesión real en la DB para saltarse NextAuth, y después manejan el server real. Nada de mocks. Los dos `@smoke` no hacen nada raro. Uno navega cada página principal, otro crea una tarea. Existen para que si la IA recablea el routing o rompe la auth de una forma que igual compila, me entere en segundos.
 
+Hay una línea de ese config que merece más atención de la que le di cuando la escribí: `retries: process.env.CI ? 2 : 0`. Dos retries en CI son una confesión. Dicen que espero algún fallo de E2E que no tiene nada que ver con mi código, y que prefiero relanzar antes que investigar cada uno. Lo que justifica esa confesión es que la flakiness se multiplica. Un test que flaquea el 3% de las veces pasa el 97% de las corridas. Una suite con cuarenta tests así sale verde en unas tres corridas de cada diez. El mismo 3%, el mismo código, y el build amanece rojo casi todas las mañanas. Haz la cuenta tú mismo:
+
+<FlakySuite
+  lang="es"
+  tests={40}
+  flakeRate={0.03}
+  caption="2.000 corridas simuladas por configuración. Mira cómo se desploma la barra sin retries cuando crece la suite."
+/>
+
+Los retries levantan la barra verde de nuevo, y por eso esa línea está en mi config. Pero fíjate en qué arreglan de verdad: el color del build, no la suite. Cada fallo reintentado es un fallo real que te entrenaste a ignorar. Con dos tests de smoke puedo permitirme ese intercambio. El día que la suite de E2E pase de la docena, ese `2` se convierte en el lugar donde las regresiones van a esconderse.
+
 Compara el mismo cambio con y sin ese andamiaje. Son bocetos compuestos de lo que viví todo el mes, no transcripciones de una sola sesión:
 
 <Tabs labels={["Sin tests", "Con tests"]}>
@@ -170,7 +211,7 @@ El diagrama que ahora tengo en la cabeza:
 
 <MermaidDiagram title="El loop de confianza" chart={`graph LR
   A[IA propone cambio] --> B[Corren los tests]
-  B --> C{Verde?}
+  B --> C{¿Verde?}
   C -->|Sí| D[Confío y subo]
   C -->|No| E[Falla real expuesta]
   E --> F[Fix dirigido]
@@ -182,7 +223,7 @@ Sin el loop, le estás preguntando a tu intuición si la IA acertó. En un cambi
 
 La otra cosa que `/insights` dejó obvia: las features que arranqué con un spec escrito terminaron más limpias que las que improvisé en chat.
 
-Un spec no necesita ser largo. Objetivos, no-objetivos, casos borde, plan de tests, checklist de aceptación. Quizá un párrafo cada uno. El punto no es el documento. El punto es que ya tomaste las decisiones antes de que el modelo tenga que adivinarlas.
+Un spec no necesita ser largo. Objetivos, no objetivos, casos borde, plan de tests, checklist de aceptación. Quizá un párrafo cada uno. El punto no es el documento. El punto es que ya tomaste las decisiones antes de que el modelo tenga que adivinarlas.
 
 Cuando improvisé, la IA adivinó. A veces bien, a veces mal. Las adivinanzas malas aparecieron como las iteraciones de diez rondas.
 
@@ -190,8 +231,8 @@ Cuando especifiqué, la IA ejecutó. El primer borrador solía estar al 80%. El 
 
 Así se ve uno de mis specs, corto a propósito. Este era para eventos recurrentes de calendario:
 
-- **Objetivo:** crear eventos recurrentes (diaria, semanal, mensual) editables individualmente sin romper la serie.
-- **No-objetivos:** soporte completo de RRULE de iCal, excepciones por zona horaria.
+- **Objetivo:** crear eventos recurrentes (diarios, semanales, mensuales) editables individualmente sin romper la serie.
+- **No objetivos:** soporte completo de RRULE de iCal, excepciones por zona horaria.
 - **Casos borde:** evento que cae en cambio de DST, instancia eliminada vs. serie eliminada, semántica de "este y los siguientes".
 - **Plan de tests:** unit para la generación de instancias, E2E para edición de una sola ocurrencia.
 - **Aceptación:** crear serie semanal, editar la del jueves, confirmar que las otras quedan intactas.

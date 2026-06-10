@@ -13,6 +13,10 @@ import Collapsible from '../../../components/blog/Collapsible.astro';
 import FileTree from '../../../components/blog/FileTree.astro';
 import PullQuote from '../../../components/blog/PullQuote.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
+import GitGraph from '../../../components/blog/GitGraph.astro';
+import AgentLoop from '../../../components/blog/AgentLoop.astro';
+import StepThroughDiagram from '../../../components/blog/StepThroughDiagram.astro';
+import DecisionTree from '../../../components/blog/DecisionTree.astro';
 
 <TLDR lang="es" bullets={[
   "Este sábado corrí tres agentes de Claude en paralelo sobre un side project. Tres bugs, tres ramas, tres PRs mergeados en una tarde.",
@@ -43,7 +47,40 @@ La primera vez que le pedí a Claude que creara un worktree, lo creó adentro de
 
 No me di cuenta enseguida. Lo que noté fue que `next dev` empezó a compilar y no paraba. El spinner avanzaba, terminaba, arrancaba de nuevo. Avanzaba, terminaba, arrancaba. No podía cargar la app. No sabía si mi código estaba roto, si el dev server estaba roto, o si mi computadora estaba en llamas.
 
-Lo que estaba pasando, una vez que caí, era casi cómicamente simple. Next.js vigilaba el repo completo para detectar cambios. El worktree que Claude había creado contenía una copia literal de los archivos fuente del repo, sentado adentro del directorio vigilado. Cada vez que Next.js terminaba una compilación, los file watchers veían archivos "nuevos" en el worktree (mismo contenido, paths distintos), arrancaban otra compilación, la terminaban, volvían a ver los archivos del worktree, y el loop no terminaba nunca. El repo se estaba vigilando a sí mismo.
+Lo que estaba pasando, una vez que caí, era casi cómicamente simple. Next.js vigilaba el repo completo para detectar cambios. El worktree que Claude había creado contenía una copia literal de los archivos fuente del repo, metida adentro del directorio vigilado. Cada vez que Next.js terminaba una compilación, los file watchers veían archivos "nuevos" en el worktree (mismo contenido, paths distintos), arrancaban otra compilación, la terminaban, volvían a ver los archivos del worktree, y el loop no terminaba nunca. El repo se estaba vigilando a sí mismo.
+
+<StepThroughDiagram steps={[
+  { id: "watch", label: "next dev vigila cada archivo bajo la raíz del repo para detectar cambios." },
+  { id: "worktree", label: "El agente crea el worktree adentro del repo: una copia completa de los archivos fuente, dentro del árbol vigilado." },
+  { id: "detect", label: "Una compilación termina. El watcher ve los archivos del worktree como nuevos y arranca otra compilación." },
+  { id: "loop", label: "Esa compilación termina, el watcher vuelve a mirar, ve los mismos archivos otra vez. El repo se vigila a sí mismo." },
+]}>
+  <svg slot="diagram" viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="El loop infinito de compilación: el watcher ve los archivos copiados del worktree como nuevos, recompila y vuelve a mirar para siempre">
+    <defs>
+      <marker id="wt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-accent)" />
+      </marker>
+    </defs>
+    <g data-diagram-step="watch">
+      <rect x="8" y="30" width="344" height="262" rx="12" fill="var(--color-surface)" stroke="var(--color-border-strong)" />
+      <text x="24" y="58" font-family="var(--font-mono)" font-size="15" fill="var(--color-text)">repo/</text>
+      <text x="24" y="77" font-family="var(--font-mono)" font-size="12" fill="var(--color-text-muted)">vigilado por next dev</text>
+    </g>
+    <g data-diagram-step="worktree">
+      <rect x="140" y="160" width="200" height="110" rx="10" fill="oklch(from var(--color-accent) l c h / 0.08)" stroke="var(--color-accent)" />
+      <text x="240" y="208" text-anchor="middle" font-family="var(--font-mono)" font-size="14" fill="var(--color-text)">worktree/</text>
+      <text x="240" y="230" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--color-text-muted)">copia completa de src/</text>
+    </g>
+    <g data-diagram-step="detect">
+      <path d="M 64 92 C 84 145, 98 175, 134 198" fill="none" stroke="var(--color-accent)" stroke-width="2" marker-end="url(#wt-arrow)" />
+      <text x="22" y="150" font-family="var(--font-mono)" font-size="12" fill="var(--color-accent)">ve archivos "nuevos"</text>
+    </g>
+    <g data-diagram-step="loop">
+      <path d="M 240 156 C 240 104, 192 94, 118 92" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#wt-arrow)" />
+      <text x="120" y="118" font-family="var(--font-mono)" font-size="12" fill="var(--color-accent)">recompila, vuelve a mirar</text>
+    </g>
+  </svg>
+</StepThroughDiagram>
 
 Copié el stream de errores a una sesión nueva de Claude y Claude lo diagnosticó. La misma herramienta que me había metido en el pozo me ayudó a salir. Esa parte no voy a fingir que fue elegante.
 
@@ -57,7 +94,7 @@ Ese fue el costo de la lección. Todo lo que sigue pasó por eso.
 
 ## El sábado
 
-Este sábado tenía tres bugs abiertos en el side project. Ninguno era urgente. Cada bug vivía en una capa distinta del stack: uno en un reconnect de OAuth, otro en el pool de base de datos, otro en un pedazo de navegación de UI. Genuinamente independientes. Pero cada uno me molestaba lo suficiente como para querer sacármelos de encima.
+Este sábado tenía tres bugs abiertos en el side project. Ninguno era urgente. Cada bug vivía en una capa distinta del stack: uno en un reconnect de OAuth, otro en el pool de base de datos, otro en un pedazo de navegación de UI. Genuinamente independientes. Pero cada uno me molestaba lo suficiente como para querer sacármelo de encima.
 
 Abrí tres worktrees y arranqué tres sesiones de Claude, una por bug. Las sesiones corrieron en paralelo durante casi toda la tarde.
 
@@ -78,7 +115,7 @@ Abrí tres worktrees y arranqué tres sesiones de Claude, una por bug. Las sesio
 </div>
 </FileTree>
 
-Tres árboles. Tres ramas. Tres agentes, cada uno editando solo su propio checkout. Ninguno podía hacer stash encima del otro. Ninguno podía cambiar la rama del repo principal por debajo. Ninguno podía hacer `cd` a algún lugar al que no debía.
+Tres árboles. Tres ramas. Tres agentes, cada uno editando solo su propio checkout. Ninguno podía hacer stash encima del otro. Ninguno podía cambiar la rama del repo principal por debajo. Ninguno podía hacer `cd` a un lugar al que no debía.
 
 Al final de la tarde tenía tres PRs mergeados. A grandes rasgos:
 
@@ -86,13 +123,32 @@ Al final de la tarde tenía tres PRs mergeados. A grandes rasgos:
 - Una conexión de DB con pool se agotaba bajo carga realista y tiraba `P2037`. El fix puso un tope al tamaño del pool por instancia.
 - Un banner de UI obsoleto estaba disparando una navegación a una vista vacía. El fix hizo el bootstrap del estado correcto antes del redirect.
 
+Esta es la misma tarde contada como historia de git. Dale play, o avanza con las flechas operación por operación. Lo que hay que mirar es lo que no pasa: ningún carril toca a otro hasta los merges del final.
+
+<GitGraph
+  lang="es"
+  ops={[
+    { op: 'commit', branch: 'main', label: 'sábado en la mañana' },
+    { op: 'branch', name: 'fix/oauth-reconnect', from: 'main', label: 'agente 1' },
+    { op: 'branch', name: 'fix/db-pool', from: 'main', label: 'agente 2' },
+    { op: 'branch', name: 'fix/banner-redirect', from: 'main', label: 'agente 3' },
+    { op: 'commit', branch: 'fix/oauth-reconnect', label: 'mover el await' },
+    { op: 'commit', branch: 'fix/db-pool', label: 'tope al pool' },
+    { op: 'commit', branch: 'fix/banner-redirect', label: 'bootstrap del estado' },
+    { op: 'merge', from: 'fix/oauth-reconnect', into: 'main', label: 'PR #1' },
+    { op: 'merge', from: 'fix/db-pool', into: 'main', label: 'PR #2' },
+    { op: 'merge', from: 'fix/banner-redirect', into: 'main', label: 'PR #3' },
+  ]}
+  caption="Las ramas reales tenían más commits que esto. Lo exacto es la forma: tres carriles, tres merges, cero colisiones."
+/>
+
 Estoy siendo breve con los detalles del producto a propósito. Los bugs en sí no son la parte interesante. La parte interesante es que tres agentes pudieron trabajar en tres de ellos en la misma tarde sin colisionar ni una sola vez.
 
 ## Cuando la primera pasada no alcanza
 
 Los worktrees resuelven las colisiones entre agentes. No resuelven los fixes incompletos de cualquiera de ellos por separado.
 
-Uno de los tres worktrees tenía una story de Storybook que se rompía al push porque el setup de tests no mockeaba todo lo que el componente importaba. El primer intento mockeó `@/lib/analytics` y dio la cosa por terminada. La story seguía fallando en CI. El agente había mockeado solo el import que veía; no había caminado el árbol de dependencias para encontrar que el mismo componente también traía un server action que importaba `next/server`. Así la suite siguió fallando con un import distinto cada vez, y el fix vino en tres commits separados:
+Uno de los tres worktrees tenía una story de Storybook que se rompía al push porque el setup de tests no mockeaba todo lo que el componente importaba. El primer intento mockeó `@/lib/analytics` y dio la cosa por terminada. La story seguía fallando en CI. El agente había mockeado solo el import que veía; no había recorrido el árbol de dependencias para encontrar que el mismo componente también traía un server action que importaba `next/server`. Así la suite siguió fallando con un import distinto cada vez, y el fix vino en tres commits separados:
 
 <CodeBlock filename="git log --oneline">
 ```
@@ -103,6 +159,25 @@ fb7b925 docs(storybook): note why @/lib/analytics is mocked
 </CodeBlock>
 
 Tres commits para un solo fix. El patrón es el mismo que escribí el mes pasado con CSS: el agente parchea la superficie visible y se detiene. Las superficies adyacentes (otros imports, otros temas, otros breakpoints) aparecen recién cuando corres la cosa en el ambiente donde falla. Los worktrees me dieron paralelismo. No me dieron una primera pasada más inteligente.
+
+Reproducida como un ciclo, la parte cara de esa sesión salta a la vista. Cada edición tomó minutos. Los pasos de observación — pushear, esperar el CI, leer el fallo nuevo — fueron la tarde entera:
+
+<AgentLoop
+  lang="es"
+  contextWindow={180}
+  steps={[
+    { phase: 'plan', title: 'Leer el fallo de CI: la story se rompe al push', tokens: 14 },
+    { phase: 'act', title: 'Mockear @/lib/analytics en el setup de vitest', tool: 'Edit', tokens: 12 },
+    { phase: 'observe', title: 'CI falla de nuevo: el componente también trae next/server', tool: 'CI', tokens: 52 },
+    { phase: 'plan', title: 'Dejar de parchear el error visible, recorrer la cadena de imports', tokens: 10 },
+    { phase: 'act', title: 'Mockear taskActions para cortar la cadena de next/server', tool: 'Edit', tokens: 13 },
+    { phase: 'observe', title: 'CI en verde', tool: 'CI', tokens: 48 },
+    { phase: 'act', title: 'Documentar por qué analytics está mockeado', tool: 'Edit', tokens: 8 },
+  ]}
+  caption="Una reconstrucción de la sesión, no una transcripción. Los tokens son ilustrativos, en miles. Las proporciones no."
+/>
+
+Actuar es barato. Observar es lo que llena la ventana de contexto, y una sesión que se la quema en dos vueltas de CI es una sesión que empieza a olvidar por qué hizo la primera edición. Ese es el precio real de una primera pasada que no camina el árbol de dependencias.
 
 <Callout type="tip" title="La regla barata que previene esto">
 Antes de declarar un fix de Storybook terminado, pídele al agente que enumere cada import que toca el componente de la story que cambió y confirme que cada uno está real-o-mockeado. La misma idea para cualquier setup de tests. La pregunta "qué otra cosa necesita transitivamente esto" cuesta cinco segundos; la alternativa son dos ciclos de CI por fix.
@@ -129,13 +204,62 @@ Los worktrees en `.claude/worktrees/` me funcionan porque esa ruta está en el `
 
 ## Lo que los worktrees no resuelven
 
-Elegí los tres bugs del sábado porque cada uno vivía en una capa distinta del stack. Eso no fue estrategia. Fue la cola. Si hubiera tenido tres bugs que tocaban el mismo hook, o tres cambios que modificaban un tipo compartido, los worktrees habrían mantenido los diffs separados pero el merge habría sido una guerra. El aislamiento físico no compra el aislamiento semántico.
+Elegí los tres bugs del sábado porque cada uno vivía en una capa distinta del stack. Eso no fue estrategia. Fue la cola. Si hubiera tenido tres bugs que tocaban el mismo hook, o tres cambios que modificaban un tipo compartido, los worktrees habrían mantenido los diffs separados, pero el merge habría sido una guerra. El aislamiento físico no compra el aislamiento semántico.
 
 Esto aparece por todos lados una vez que empiezas a buscarlo. Tres agentes subiendo el mismo paquete a tres versiones distintas. Tres migrations contra la misma tabla. Tres refactors de la misma API interna. Cada PR correcto por separado, todos juntos un build roto. Los worktrees te dan la *capacidad* de paralelizar. No te dan el *criterio* para saber cuál trabajo se puede paralelizar de forma segura.
 
+Ese criterio cabe en cuatro preguntas. Esta es la versión que ahora corro en mi cabeza antes de abrir una segunda terminal:
+
+<DecisionTree
+  root="start"
+  nodes={{
+    start: {
+      question: "Dos tareas en cola. ¿Pueden tomarlas dos agentes en paralelo?",
+      choices: [
+        { label: "Editan los mismos archivos", next: "samefiles" },
+        { label: "Archivos completamente distintos", next: "types" },
+      ],
+    },
+    samefiles: {
+      verdict: "Serialízalas.",
+      detail: "Los worktrees van a mantener los diffs separados, pero la fusión va a ser una guerra igual.",
+      choices: [{ label: "Volver a empezar", next: "start" }],
+    },
+    types: {
+      question: "¿Tocan un tipo, un esquema o una API interna compartida?",
+      choices: [
+        { label: "Sí", next: "shared" },
+        { label: "No", next: "runtime" },
+      ],
+    },
+    shared: {
+      verdict: "Serialízalas, o hazlas un solo PR.",
+      detail: "El aislamiento físico no compra aislamiento semántico. Cada PR correcto por separado, todos juntos un build roto.",
+      choices: [{ label: "Volver a empezar", next: "start" }],
+    },
+    runtime: {
+      question: "¿Necesitan el mismo recurso de runtime: el puerto 3000, la base de datos, el cliente de Prisma generado?",
+      choices: [
+        { label: "Sí", next: "careful" },
+        { label: "No", next: "go" },
+      ],
+    },
+    careful: {
+      verdict: "Paraleliza con cuidado.",
+      detail: "Puertos y bases de datos por agente, o un solo agente corre el dev server.",
+      choices: [{ label: "Volver a empezar", next: "start" }],
+    },
+    go: {
+      verdict: "Paraleliza.",
+      detail: "Era el caso del sábado: tres capas, cero solapamiento.",
+      choices: [{ label: "Volver a empezar", next: "start" }],
+    },
+  }}
+/>
+
 La otra cosa que los worktrees no aíslan: los recursos compartidos en runtime. Tres dev servers quieren el puerto 3000. Tres clientes de Prisma regenerando los mismos archivos. Tres sets de migrations corriendo contra la misma base. Tres `npm install` peleándose por el mismo `node_modules`. Los worktrees le dan a cada agente sus propios archivos. No le dan a cada uno su propio puerto o su propia base. Para todo lo que excede el estado del filesystem (sockets, procesos, caches, servicios compartidos), todavía tienes que pensarlo explícitamente.
 
-La otra cosa que casi nadie dice en voz alta: el paralelismo mueve a dónde va tu tiempo. Esa tarde del sábado no estaba escribiendo código. Estaba leyendo tres diffs, integrando tres ramas, y buscando acoplamiento invisible entre ellas. Los agentes trabajaban en paralelo. El reviewer no. Si antes el cuello de botella era escribir código, ahora es leerlo.
+La otra cosa que casi nadie dice en voz alta: el paralelismo cambia adónde va tu tiempo. Esa tarde del sábado no estaba escribiendo código. Estaba leyendo tres diffs, integrando tres ramas, y buscando acoplamiento invisible entre ellas. Los agentes trabajaban en paralelo. El reviewer no. Si antes el cuello de botella era escribir código, ahora es leerlo.
 
 Eso no hace a los worktrees menos útiles. Los hace más honestos. La historia no es "tres agentes hacen el trabajo de tres ingenieros". Es "tres agentes hacen el trabajo de tres mecanógrafos, y un ingeniero todavía tiene que integrarlos".
 

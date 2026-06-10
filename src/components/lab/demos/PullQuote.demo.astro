@@ -1,0 +1,51 @@
+---
+import Quote from '../../blog/PullQuote.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'PullQuote',
+	category: 'typographic',
+	status: 'stable',
+	summary: 'Editorial pull quote in italic Fraunces with hairline rules and mono attribution; fades in on scroll via GSAP.',
+	summaryEs: 'Cita destacada editorial en Fraunces itálica con hairlines y atribución en mono; aparece con fade al hacer scroll vía GSAP.',
+	why: 'Every post has one sentence I\'d want quoted back at me. Blockquotes with colored left bars are banned here, so this is the classical alternative: italic Fraunces between two short hairlines, like a magazine would set it. If the reader only remembers one line, this component decides which.',
+	whyEs: 'Cada post tiene una frase que querría que me citaran. Las blockquotes con barra izquierda de color están prohibidas aquí, así que esta es la alternativa clásica: Fraunces en itálica entre dos hairlines cortas, como lo compondría una revista. Si el lector solo recuerda una línea, este componente decide cuál.',
+	props: [
+		{ name: 'cite', type: 'string', description: 'Attribution — person, source, or title. Rendered with an em dash in mono.' },
+		{ name: 'variant', type: '"bar" | "block"', default: '"bar"', description: 'bar is left-aligned and wider; block is centered and compact.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'bar / alineada a la izquierda con atribución' : 'bar / left-aligned with attribution'}
+	description={es ? 'La variante por defecto. La tipografía carga el énfasis — sin barra lateral de color, según el sistema de diseño.' : 'The default variant. Typography carries the emphasis — no colored side bar, per the design system.'}
+	usage={`<PullQuote cite="me, three worktrees deep on a Saturday">
+  The bottleneck was never the model. It was me, serializing
+  three independent fixes through one working directory.
+</PullQuote>`}
+>
+	<Quote cite={es ? 'yo, a tres worktrees de profundidad un sábado' : 'me, three worktrees deep on a Saturday'}>
+		{es
+			? 'El cuello de botella nunca fue el modelo. Era yo, serializando tres fixes independientes a través de un solo directorio de trabajo.'
+			: 'The bottleneck was never the model. It was me, serializing three independent fixes through one working directory.'}
+	</Quote>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'block / centrada, sin cite' : 'block / centered, no cite'}
+	description={es ? 'Centrada y compacta — para una línea sin atribución en la que quieres que el lector se detenga.' : 'Centered and compact — for an unattributed line you want the reader to slow down on.'}
+	usage={`<PullQuote variant="block">
+  A test suite isn't bureaucracy. It's the only leash
+  an agent actually respects.
+</PullQuote>`}
+>
+	<Quote variant="block">
+		{es
+			? 'Una suite de tests no es burocracia. Es la única correa que un agente respeta de verdad.'
+			: "A test suite isn't bureaucracy. It's the only leash an agent actually respects."}
+	</Quote>
+</DemoSection>

@@ -1,0 +1,154 @@
+---
+import Scrolly from '../../blog/Scrollytelling.astro';
+import Step from '../../blog/ScrollStep.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'Scrollytelling',
+	category: 'narrative',
+	status: 'stable',
+	summary: 'NYT-style scrollytelling: a pinned graphic that changes state as you scroll through the steps beside it.',
+	summaryEs: 'Scrollytelling al estilo NYT: un gráfico fijado que cambia de estado a medida que recorres los pasos a su lado.',
+	why: 'Stolen, with respect, from the NYT graphics desk. When a story has states — before, during, after — paragraphs force the reader to hold the picture in their head while reading. Pinning the graphic and letting scroll drive its state means the picture updates exactly when the prose does. Reduced motion unpins everything and the story still reads top to bottom.',
+	whyEs: 'Robado, con respeto, del equipo de gráficos del NYT. Cuando una historia tiene estados — antes, durante, después — los párrafos obligan al lector a sostener la imagen en la cabeza mientras lee. Fijar el gráfico y dejar que el scroll mueva su estado hace que la imagen cambie exactamente cuando cambia la prosa. Con reduced motion todo se desfija y la historia sigue leyéndose de arriba abajo.',
+	props: [
+		{ name: 'graphic', type: '"left" | "right"', default: '"right"', description: 'Which side the pinned graphic column sits on.' },
+		{ name: 'ScrollStep: state', type: 'string', description: 'State name a step publishes when active — style the graphic off [data-scrolly-state="..."].' },
+		{ name: 'ScrollStep: heading', type: 'string', description: 'Optional serif heading for the step.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'git worktrees / tres estados' : 'git worktrees / three states'}
+	description={es ? 'Haz scroll — la columna del gráfico queda fijada mientras los pasos que cruzas cambian lo que muestra. Con reduced motion activado, todo se revela de entrada.' : 'Scroll through — the graphic column stays pinned while the steps you pass change what it shows. With reduced motion on, everything is revealed up front instead.'}
+	usage={`<Scrollytelling graphic="right">
+  <div slot="graphic">
+    <div class="repo-box" data-gfx="clone">one checkout</div>
+    <div class="repo-box" data-gfx="worktrees">three worktrees</div>
+    <div class="repo-box" data-gfx="merge">merged back</div>
+  </div>
+  <ScrollStep state="clone" heading="One checkout, one agent">
+    A single working directory means a single writer. The second agent
+    you launch starts stepping on the first one's files.
+  </ScrollStep>
+  <ScrollStep state="worktrees" heading="Worktrees split the filesystem">
+    git worktree add gives each agent its own directory and branch,
+    backed by the same object store. Isolation without cloning.
+  </ScrollStep>
+  <ScrollStep state="merge" heading="Everything converges in review">
+    Each worktree produces a normal branch and a normal PR. The merge
+    queue is the only place the streams meet.
+  </ScrollStep>
+</Scrollytelling>
+
+/* in your CSS */
+[data-scrolly-state="worktrees"] [data-gfx="worktrees"] { opacity: 1; }`}
+>
+	<Scrolly graphic="right">
+		<div slot="graphic" class="gfx">
+			<div class="gfx-box" data-gfx="clone">
+				<span class="gfx-label">main/</span>
+				<span class="gfx-note">{es ? 'un checkout, un escritor' : 'one checkout, one writer'}</span>
+			</div>
+			<div class="gfx-box" data-gfx="worktrees">
+				<span class="gfx-label">wt-auth/ &nbsp;wt-tests/ &nbsp;wt-docs/</span>
+				<span class="gfx-note">{es ? 'tres directorios, un object store' : 'three dirs, one object store'}</span>
+			</div>
+			<div class="gfx-box" data-gfx="merge">
+				<span class="gfx-label">main ← PR #41, #42, #43</span>
+				<span class="gfx-note">{es ? 'los flujos convergen en la revisión' : 'streams converge in review'}</span>
+			</div>
+		</div>
+		<Step state="clone" heading={es ? 'Un checkout, un agente' : 'One checkout, one agent'}>
+			{es ? (
+				<p>
+					Un solo directorio de trabajo significa un solo escritor. El segundo
+					agente que lanzas empieza a pisar los archivos del primero — y las
+					ediciones del que pierde desaparecen en silencio.
+				</p>
+			) : (
+				<p>
+					A single working directory means a single writer. The second agent you
+					launch starts stepping on the first one's files — and the loser's edits
+					silently disappear.
+				</p>
+			)}
+		</Step>
+		<Step state="worktrees" heading={es ? 'Los worktrees dividen el filesystem' : 'Worktrees split the filesystem'}>
+			{es ? (
+				<p>
+					<code>git worktree add</code> le da a cada agente su propio directorio
+					y su propio branch, respaldados por el mismo object store. Aislamiento
+					sin el costo de un clone completo.
+				</p>
+			) : (
+				<p>
+					<code>git worktree add</code> gives each agent its own directory and its
+					own branch, backed by the same object store. Isolation without the cost
+					of a full clone.
+				</p>
+			)}
+		</Step>
+		<Step state="merge" heading={es ? 'Todo converge en la revisión' : 'Everything converges in review'}>
+			{es ? (
+				<p>
+					Cada worktree produce un branch normal y un PR normal. La merge queue
+					es el único lugar donde los flujos paralelos llegan a encontrarse.
+				</p>
+			) : (
+				<p>
+					Each worktree produces a normal branch and a normal PR. The merge queue
+					is the only place the parallel streams ever meet.
+				</p>
+			)}
+		</Step>
+	</Scrolly>
+</DemoSection>
+
+<style>
+	.gfx {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 1.5rem;
+	}
+
+	.gfx-box {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		padding: 1rem 1.15rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-bg-secondary);
+		opacity: 0.3;
+		transform: scale(0.985);
+		transition:
+			opacity 0.4s var(--ease-smooth),
+			transform 0.4s var(--ease-spring),
+			border-color 0.4s var(--ease-smooth);
+	}
+
+	.gfx-label {
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		color: var(--color-text);
+	}
+
+	.gfx-note {
+		font-size: 0.8rem;
+		color: var(--color-text-muted);
+	}
+
+	:global(.scrolly[data-scrolly-state='clone']) .gfx-box[data-gfx='clone'],
+	:global(.scrolly[data-scrolly-state='worktrees']) .gfx-box[data-gfx='worktrees'],
+	:global(.scrolly[data-scrolly-state='merge']) .gfx-box[data-gfx='merge'] {
+		opacity: 1;
+		transform: scale(1);
+		border-color: oklch(from var(--color-accent) l c h / 0.5);
+	}
+</style>

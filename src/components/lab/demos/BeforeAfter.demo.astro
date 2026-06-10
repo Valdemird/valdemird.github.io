@@ -1,0 +1,46 @@
+---
+import Slider from '../../blog/BeforeAfter.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'BeforeAfter',
+	category: 'playful',
+	status: 'stable',
+	summary: 'Drag-slider comparison between two slots — images, text blocks, or arbitrary HTML, clipped by a draggable divider.',
+	summaryEs: 'Comparación con slider arrastrable entre dos slots — imágenes, bloques de texto o HTML arbitrario, recortados por un divisor que se arrastra.',
+	why: 'The game-feel and refactor posts kept saying "compare these two" and then showing them stacked, forty lines apart. By the time the reader scrolls to the second one, the first is gone from working memory. The slider holds both under one frame and gives the reader the diff as a physical motion.',
+	whyEs: 'Los posts de game feel y de refactors decían "compara estas dos" y las mostraban apiladas, a cuarenta líneas de distancia. Para cuando el lector llega a la segunda, la primera ya se le fue de la memoria de trabajo. El slider sostiene ambas bajo un mismo marco y le da el diff como gesto físico.',
+	props: [
+		{ name: 'labelBefore', type: 'string', default: '"Before"', description: 'Label badge on the left (before) side.' },
+		{ name: 'labelAfter', type: 'string', default: '"After"', description: 'Label badge on the right (after) side.' },
+		{ name: 'initial', type: 'number', default: '50', description: 'Initial split in percent, 0–100.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'bloques de texto / mensaje de commit con glow-up' : 'text blocks / commit message glow-up'}
+	description={es ? 'Arrastra el divisor, o dale foco y usa las flechas del teclado (±5%).' : 'Drag the divider, or focus it and use arrow keys (±5%).'}
+	usage={`<BeforeAfter labelBefore="Vibing" labelAfter="With tests" initial={45}>
+  <div slot="before">
+    <p>"fix stuff" — 14 files changed, no idea which ones matter.</p>
+  </div>
+  <div slot="after">
+    <p>"fix(auth): strip Bearer prefix before verify" — 1 file, suite green.</p>
+  </div>
+</BeforeAfter>`}
+>
+	<Slider labelBefore="Vibing" labelAfter={es ? 'Con tests' : 'With tests'} initial={45}>
+		<div slot="before" style="padding: 2.5rem 1.5rem; background: var(--color-bg-secondary); border-radius: var(--radius-md); min-height: 9rem;">
+			<p style="margin: 0; font-family: var(--font-mono); font-size: 0.85rem;">git commit -m "fix stuff"</p>
+			<p style="margin: 0.75rem 0 0; color: var(--color-text-secondary); font-size: 0.9rem;">{es ? '14 archivos cambiados. El agente tocó el middleware de auth, dos mocks de tests y un README. Ni idea de cuál cambio lo arregló.' : '14 files changed. The agent touched the auth middleware, two test mocks, and a README. No idea which change fixed it.'}</p>
+		</div>
+		<div slot="after" style="padding: 2.5rem 1.5rem; background: var(--color-bg-secondary); border-radius: var(--radius-md); min-height: 9rem;">
+			<p style="margin: 0; font-family: var(--font-mono); font-size: 0.85rem;">git commit -m "fix(auth): strip Bearer prefix before verify"</p>
+			<p style="margin: 0.75rem 0 0; color: var(--color-text-secondary); font-size: 0.9rem;">{es ? '1 archivo cambiado. Suite en verde. El diff se lee como una frase.' : '1 file changed. Suite green. The diff reads like a sentence.'}</p>
+		</div>
+	</Slider>
+</DemoSection>

@@ -1,0 +1,71 @@
+---
+import Grid from '../../blog/StatGrid.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'StatGrid',
+	category: 'data',
+	status: 'stable',
+	summary: 'KPI card grid — big serif value, mono uppercase label, optional context line — with staggered fade-in on scroll.',
+	summaryEs: 'Grilla de tarjetas KPI — valor grande en serif, etiqueta mono en mayúsculas, línea de contexto opcional — con fade-in escalonado al hacer scroll.',
+	why: 'The /insights post-mortem produced a handful of numbers that belonged together — sessions, PRs, regressions. One CountUp is a headline; three related numbers need a grid so the reader compares them at a glance instead of collecting them across paragraphs.',
+	whyEs: 'El post-mortem de /insights produjo un puñado de números que iban juntos: sesiones, PRs, regresiones. Un CountUp es un titular; tres números relacionados necesitan una grilla para que el lector los compare de un vistazo en vez de ir recogiéndolos a lo largo de varios párrafos.',
+	props: [
+		{ name: 'stats', type: '{ value: string | number, label: string, context?: string }[]', description: 'One card per entry.' },
+		{ name: 'columns', type: '2 | 3 | 4', default: '3', description: 'Desktop column count.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+
+const ciStats = es
+	? [
+			{ value: '3m 12s', label: 'CI de main', context: 'bajó desde 14m' },
+			{ value: '0', label: 'Tests flaky', context: 'tras la política de cuarentena' },
+			{ value: '4.2×', label: 'Deploys/semana', context: 'vs la era del monolito' },
+		]
+	: [
+			{ value: '3m 12s', label: 'Main CI', context: 'down from 14m' },
+			{ value: '0', label: 'Flaky tests', context: 'after quarantine policy' },
+			{ value: '4.2×', label: 'Deploys/week', context: 'vs the monolith era' },
+		];
+
+const agentStats = es
+	? [
+			{ value: '2', label: 'Agentes en paralelo', context: 'un worktree cada uno' },
+			{ value: '0', label: 'Conflictos de merge', context: 'en tres semanas' },
+		]
+	: [
+			{ value: '2', label: 'Agents in parallel', context: 'one worktree each' },
+			{ value: '0', label: 'Merge conflicts', context: 'in three weeks' },
+		];
+---
+
+<DemoSection
+	label={es ? 'tres columnas / ci antes-después' : 'three columns / ci before-after'}
+	description={es ? 'Las tarjetas se revelan con fade escalonado y desplazamiento en y cuando la grilla entra con el scroll. Con reduced-motion aparecen de inmediato.' : 'Cards reveal with a staggered fade + y-offset when the grid scrolls in. Reduced-motion shows them immediately.'}
+	usage={`<StatGrid
+  stats={[
+    { value: "3m 12s", label: "Main CI", context: "down from 14m" },
+    { value: "0", label: "Flaky tests", context: "after quarantine policy" },
+    { value: "4.2×", label: "Deploys/week", context: "vs the monolith era" },
+  ]}
+/>`}
+>
+	<Grid stats={ciStats} />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'dos columnas' : 'two columns'}
+	description={es ? 'Menos tarjetas y más grandes, para un par de números de titular.' : 'Fewer, bigger cards for a pair of headline numbers.'}
+	usage={`<StatGrid
+  columns={2}
+  stats={[
+    { value: "2", label: "Agents in parallel", context: "one worktree each" },
+    { value: "0", label: "Merge conflicts", context: "in three weeks" },
+  ]}
+/>`}
+>
+	<Grid columns={2} stats={agentStats} />
+</DemoSection>

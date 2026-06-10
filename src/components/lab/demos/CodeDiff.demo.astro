@@ -1,0 +1,90 @@
+---
+import Diff from '../../blog/CodeDiff.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'CodeDiff',
+	category: 'utility',
+	status: 'stable',
+	summary: 'Side-by-side before/after diff with marked lines and a narrator note per hunk. Two columns at ≥ 900px, stacked below.',
+	summaryEs: 'Diff antes/después lado a lado con líneas marcadas y una nota del narrador por hunk. Dos columnas a ≥ 900px, apiladas por debajo.',
+	why: 'The tests post needed to show what the agent changed, not just the final state. A unified git diff in a code block reads like log output; what the argument needed was before and after side by side with a narrator note saying why the hunk matters. That note column is the whole reason this exists.',
+	whyEs: 'El post de tests necesitaba mostrar qué cambió el agente, no solo el estado final. Un diff unificado de git en un bloque de código se lee como salida de log; lo que el argumento pedía era antes y después lado a lado con una nota del narrador diciendo por qué importa el hunk. Esa columna de notas es toda la razón de que esto exista.',
+	props: [
+		{ name: 'filename', type: 'string', description: 'Optional filename header above the diff.' },
+		{ name: 'before', type: '{ line: number, text: string }[]', description: 'Lines of the before column.' },
+		{ name: 'after', type: '{ line: number, text: string }[]', description: 'Lines of the after column.' },
+		{ name: 'removed', type: 'number[]', default: '[]', description: '1-indexed line numbers in before to mark as removed.' },
+		{ name: 'added', type: 'number[]', default: '[]', description: '1-indexed line numbers in after to mark as added.' },
+		{ name: 'note', type: 'string', description: 'Narrator text explaining the change, rendered as a figcaption.' },
+		{ name: 'language', type: 'string', description: 'Language tag shown next to the filename.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'hunk anotado / el bug que encontró el agente' : 'annotated hunk / the bug the agent found'}
+	description={es ? 'Las líneas eliminadas se marcan sobre el antes, las añadidas sobre el después. La nota narra el porqué.' : 'Removed lines are marked against before, added lines against after. The note narrates the why.'}
+	usage={`<CodeDiff
+  filename="src/middleware/auth.ts"
+  language="ts"
+  before={[
+    { line: 1, text: "function auth(req) {" },
+    { line: 2, text: "  const token = req.headers.get('Authorization');" },
+    { line: 3, text: "  return verify(token);" },
+    { line: 4, text: "}" },
+  ]}
+  after={[
+    { line: 1, text: "function auth(req) {" },
+    { line: 2, text: "  const token = req.headers.get('Authorization')?.slice(7);" },
+    { line: 3, text: "  if (!token) throw new UnauthorizedError();" },
+    { line: 4, text: "  return verify(token);" },
+    { line: 5, text: "}" },
+  ]}
+  removed={[2]}
+  added={[2, 3]}
+  note="We were passing 'Bearer <token>' straight into verify() — the scheme prefix was never stripped."
+/>`}
+>
+	<Diff
+		filename="src/middleware/auth.ts"
+		language="ts"
+		before={[
+			{ line: 1, text: 'function auth(req) {' },
+			{ line: 2, text: "  const token = req.headers.get('Authorization');" },
+			{ line: 3, text: '  return verify(token);' },
+			{ line: 4, text: '}' },
+		]}
+		after={[
+			{ line: 1, text: 'function auth(req) {' },
+			{ line: 2, text: "  const token = req.headers.get('Authorization')?.slice(7);" },
+			{ line: 3, text: '  if (!token) throw new UnauthorizedError();' },
+			{ line: 4, text: '  return verify(token);' },
+			{ line: 5, text: '}' },
+		]}
+		removed={[2]}
+		added={[2, 3]}
+		note={es ? "Estábamos pasando 'Bearer <token>' directo a verify() — el prefijo del esquema nunca se quitaba." : "We were passing 'Bearer <token>' straight into verify() — the scheme prefix was never stripped."}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'mínimo / sin filename, sin nota' : 'minimal / no filename, no note'}
+	description={es ? 'Solo las dos columnas. Bueno para ajustes mínimos de config que no necesitan narración.' : 'Just the two columns. Good for tiny config tweaks that need no narration.'}
+	usage={`<CodeDiff
+  before={[{ line: 1, text: "retries: 0," }]}
+  after={[{ line: 1, text: "retries: 2," }]}
+  removed={[1]}
+  added={[1]}
+/>`}
+>
+	<Diff
+		before={[{ line: 1, text: 'retries: 0,' }]}
+		after={[{ line: 1, text: 'retries: 2,' }]}
+		removed={[1]}
+		added={[1]}
+	/>
+</DemoSection>

@@ -1,0 +1,48 @@
+---
+import Gate from '../../blog/ProgressGate.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'ProgressGate',
+	category: 'narrative',
+	status: 'stable',
+	summary: 'Content hidden behind a scroll threshold — the hint wall fades out and the payoff fades in when the reader arrives.',
+	summaryEs: 'Contenido oculto tras un umbral de scroll — el muro con la pista se desvanece y el remate aparece cuando el lector llega.',
+	why: 'Some payoffs only land if the reader did the work above them — the twist in a post-mortem, the verdict after the evidence. The gate holds content until the reader scrolls past it, which is a soft promise: you\'ve read what makes this matter. Used once per post at most; twice and it becomes a gimmick.',
+	whyEs: 'Algunos remates solo funcionan si el lector hizo el trabajo de arriba — el giro en un post-mortem, el veredicto después de la evidencia. La compuerta retiene contenido hasta que el lector la cruza con el scroll, lo que es una promesa suave: ya leíste lo que hace que esto importe. Se usa una vez por post como máximo; dos veces y ya es un truco.',
+	props: [
+		{ name: 'hint', type: 'string', default: '"Keep scrolling."', description: 'Placeholder text shown on the wall before the gate opens.' },
+		{ name: 'minHeight', type: 'string', default: '"10rem"', description: 'Minimum height so the layout does not jump when content reveals.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'el momento del remate' : 'the payoff moment'}
+	description={es ? 'Lleva esta sección con el scroll a la parte alta del viewport para abrir la compuerta. Con prefers-reduced-motion el contenido simplemente está visible siempre.' : 'Scroll this section into the upper viewport to open the gate. Under prefers-reduced-motion the content is simply always visible.'}
+	usage={`<ProgressGate hint="Keep scrolling — the actual numbers are next." minHeight="12rem">
+  After three weeks of running two agents in parallel worktrees, the merge
+  conflict count was exactly zero. Not because the agents got smarter —
+  because they physically could not touch the same checkout.
+</ProgressGate>`}
+>
+	<Gate hint={es ? 'Sigue bajando — los números de verdad vienen ahora.' : 'Keep scrolling — the actual numbers are next.'} minHeight="12rem">
+		{es ? (
+			<p>
+				Después de tres semanas con dos agentes corriendo en worktrees paralelos,
+				el conteo de conflictos de merge fue exactamente cero. No porque los
+				agentes se volvieran más listos — sino porque físicamente no podían tocar
+				el mismo checkout.
+			</p>
+		) : (
+			<p>
+				After three weeks of running two agents in parallel worktrees, the merge
+				conflict count was exactly zero. Not because the agents got smarter —
+				because they physically could not touch the same checkout.
+			</p>
+		)}
+	</Gate>
+</DemoSection>

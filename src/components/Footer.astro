@@ -1,5 +1,6 @@
 ---
-import { SITE_TITLE, SOCIAL_LINKS, t } from '../consts';
+import { SITE_TITLE, SOCIAL_LINKS, getLocale, t } from '../consts';
+import AskMeAnything from './blog/AskMeAnything.astro';
 
 const strings = t(Astro.url);
 const year = new Date().getFullYear();
@@ -36,6 +37,8 @@ const year = new Date().getFullYear();
 		</div>
 	</div>
 </footer>
+
+<AskMeAnything lang={getLocale(Astro.url)} />
 
 <style>
 	footer {
