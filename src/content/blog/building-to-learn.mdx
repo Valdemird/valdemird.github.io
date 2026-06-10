@@ -8,12 +8,12 @@ lang: en
 ---
 
 import Callout from '../../components/blog/Callout.astro';
-import CodeBlock from '../../components/blog/CodeBlock.astro';
 import Tabs from '../../components/blog/Tabs.astro';
 import TabPanel from '../../components/blog/TabPanel.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
-import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Timeline from '../../components/blog/Timeline.astro';
 
 I've watched developers spend months on courses, tutorials, and documentation and still feel unprepared to build something real. I've also watched developers with half the "study time" ship production apps that actually work. The difference isn't talent. It's method.
 
@@ -54,20 +54,13 @@ Tutorials teach you what works. Building teaches you what breaks, and that's the
 
 This isn't just intuition. There's rigorous science behind it. A [meta-analysis of 225 studies published in PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) by Freeman et al. found that students in active learning environments scored 6% higher on exams and were **1.5x less likely to fail** compared to traditional passive lectures.
 
-<InteractiveChart
-  title="Active vs Passive Learning Outcomes"
-  type="horizontal"
-  data={[
-    { label: "Passive fail rate", value: 34, color: "oklch(0.65 0.2 27)" },
-    { label: "Active fail rate", value: 22, color: "oklch(0.6 0.18 145)" },
-    { label: "Active retention", value: 93, color: "oklch(0.55 0.15 260)" },
-    { label: "Passive retention", value: 79, color: "oklch(0.7 0.15 55)" },
-  ]}
-/>
+<StatGrid columns={3} stats={[
+  { value: "1.5×", label: "less likely to fail", context: "active vs passive — Freeman et al., 225 studies" },
+  { value: "+6%", label: "on exam scores", context: "same PNAS meta-analysis" },
+  { value: "0.27 SD", label: "higher post-test scores", context: "2024 randomized trial, medical students" },
+]} />
 
-*(Sources: [Freeman et al., PNAS 2014](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111); [Engageli Active Learning Statistics 2026](https://www.engageli.com/blog/active-learning-statistics-2025))*
-
-More recently, a [2024 randomized trial with medical students](https://link.springer.com/article/10.1007/s40670-024-02219-1) confirmed the pattern: students scored **0.27 standard deviations higher** after active learning sessions. The evidence keeps piling up — hands-on engagement beats passive absorption, and tutorials *feel* productive without *being* productive.
+The most recent confirmation is a [2024 randomized trial with medical students](https://link.springer.com/article/10.1007/s40670-024-02219-1). The evidence keeps piling up — hands-on engagement beats passive absorption, and tutorials *feel* productive without *being* productive.
 
 Nobel laureate Richard Feynman formalized this insight into what's now known as the [Feynman Technique](https://fs.blog/feynman-technique/): if you can't explain something simply, you don't truly understand it. Teaching forces you to close the gap between "I get it" and "I can explain it."
 
@@ -124,14 +117,12 @@ The biggest barrier isn't skill — it's perfectionism. Here's the antidote:
 
 4. **Ship it.** Deploy it somewhere real. A project on localhost is a draft. A project with a URL is a product.
 
-<CodeBlock filename="The maker's minimum viable process">
-```
-Weekend 1: Build the core feature. Deploy it.
-Weekend 2: Fix the top 3 things that bother you.
-Weekend 3: Write about what you learned.
-Repeat with the next idea.
-```
-</CodeBlock>
+<Timeline items={[
+  { date: "Weekend 1", title: "Build the core feature. Deploy it.", body: "A project on localhost is a draft; a URL makes it real." },
+  { date: "Weekend 2", title: "Fix the top three things that bother you.", body: "You're your own user now — the list writes itself." },
+  { date: "Weekend 3", title: "Write about what you learned.", body: "Teaching is the multiplier.", emphasize: true },
+  { date: "Then", title: "Repeat with the next idea." },
+]} />
 
 ## The Knowledge You Can't Google
 

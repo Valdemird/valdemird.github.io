@@ -15,6 +15,8 @@ import PullQuote from '../../../components/blog/PullQuote.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
 import GitGraph from '../../../components/blog/GitGraph.astro';
 import AgentLoop from '../../../components/blog/AgentLoop.astro';
+import StepThroughDiagram from '../../../components/blog/StepThroughDiagram.astro';
+import DecisionTree from '../../../components/blog/DecisionTree.astro';
 
 <TLDR lang="es" bullets={[
   "Este sábado corrí tres agentes de Claude en paralelo sobre un side project. Tres bugs, tres ramas, tres PRs mergeados en una tarde.",
@@ -46,6 +48,39 @@ La primera vez que le pedí a Claude que creara un worktree, lo creó adentro de
 No me di cuenta enseguida. Lo que noté fue que `next dev` empezó a compilar y no paraba. El spinner avanzaba, terminaba, arrancaba de nuevo. Avanzaba, terminaba, arrancaba. No podía cargar la app. No sabía si mi código estaba roto, si el dev server estaba roto, o si mi computadora estaba en llamas.
 
 Lo que estaba pasando, una vez que caí, era casi cómicamente simple. Next.js vigilaba el repo completo para detectar cambios. El worktree que Claude había creado contenía una copia literal de los archivos fuente del repo, metida adentro del directorio vigilado. Cada vez que Next.js terminaba una compilación, los file watchers veían archivos "nuevos" en el worktree (mismo contenido, paths distintos), arrancaban otra compilación, la terminaban, volvían a ver los archivos del worktree, y el loop no terminaba nunca. El repo se estaba vigilando a sí mismo.
+
+<StepThroughDiagram steps={[
+  { id: "watch", label: "next dev vigila cada archivo bajo la raíz del repo para detectar cambios." },
+  { id: "worktree", label: "El agente crea el worktree adentro del repo: una copia completa de los archivos fuente, dentro del árbol vigilado." },
+  { id: "detect", label: "Una compilación termina. El watcher ve los archivos del worktree como nuevos y arranca otra compilación." },
+  { id: "loop", label: "Esa compilación termina, el watcher vuelve a mirar, ve los mismos archivos otra vez. El repo se vigila a sí mismo." },
+]}>
+  <svg slot="diagram" viewBox="0 0 360 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="El loop infinito de compilación: el watcher ve los archivos copiados del worktree como nuevos, recompila y vuelve a mirar para siempre">
+    <defs>
+      <marker id="wt-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--color-accent)" />
+      </marker>
+    </defs>
+    <g data-diagram-step="watch">
+      <rect x="8" y="30" width="344" height="262" rx="12" fill="var(--color-surface)" stroke="var(--color-border-strong)" />
+      <text x="24" y="58" font-family="var(--font-mono)" font-size="15" fill="var(--color-text)">repo/</text>
+      <text x="24" y="77" font-family="var(--font-mono)" font-size="12" fill="var(--color-text-muted)">vigilado por next dev</text>
+    </g>
+    <g data-diagram-step="worktree">
+      <rect x="140" y="160" width="200" height="110" rx="10" fill="oklch(from var(--color-accent) l c h / 0.08)" stroke="var(--color-accent)" />
+      <text x="240" y="208" text-anchor="middle" font-family="var(--font-mono)" font-size="14" fill="var(--color-text)">worktree/</text>
+      <text x="240" y="230" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--color-text-muted)">copia completa de src/</text>
+    </g>
+    <g data-diagram-step="detect">
+      <path d="M 64 92 C 84 145, 98 175, 134 198" fill="none" stroke="var(--color-accent)" stroke-width="2" marker-end="url(#wt-arrow)" />
+      <text x="22" y="150" font-family="var(--font-mono)" font-size="12" fill="var(--color-accent)">ve archivos "nuevos"</text>
+    </g>
+    <g data-diagram-step="loop">
+      <path d="M 240 156 C 240 104, 192 94, 118 92" fill="none" stroke="var(--color-accent)" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#wt-arrow)" />
+      <text x="120" y="118" font-family="var(--font-mono)" font-size="12" fill="var(--color-accent)">recompila, vuelve a mirar</text>
+    </g>
+  </svg>
+</StepThroughDiagram>
 
 Copié el stream de errores a una sesión nueva de Claude y Claude lo diagnosticó. La misma herramienta que me había metido en el pozo me ayudó a salir. Esa parte no voy a fingir que fue elegante.
 
@@ -172,6 +207,55 @@ Los worktrees en `.claude/worktrees/` me funcionan porque esa ruta está en el `
 Elegí los tres bugs del sábado porque cada uno vivía en una capa distinta del stack. Eso no fue estrategia. Fue la cola. Si hubiera tenido tres bugs que tocaban el mismo hook, o tres cambios que modificaban un tipo compartido, los worktrees habrían mantenido los diffs separados, pero el merge habría sido una guerra. El aislamiento físico no compra el aislamiento semántico.
 
 Esto aparece por todos lados una vez que empiezas a buscarlo. Tres agentes subiendo el mismo paquete a tres versiones distintas. Tres migrations contra la misma tabla. Tres refactors de la misma API interna. Cada PR correcto por separado, todos juntos un build roto. Los worktrees te dan la *capacidad* de paralelizar. No te dan el *criterio* para saber cuál trabajo se puede paralelizar de forma segura.
+
+Ese criterio cabe en cuatro preguntas. Esta es la versión que ahora corro en mi cabeza antes de abrir una segunda terminal:
+
+<DecisionTree
+  root="start"
+  nodes={{
+    start: {
+      question: "Dos tareas en cola. ¿Pueden tomarlas dos agentes en paralelo?",
+      choices: [
+        { label: "Editan los mismos archivos", next: "samefiles" },
+        { label: "Archivos completamente distintos", next: "types" },
+      ],
+    },
+    samefiles: {
+      verdict: "Serialízalas.",
+      detail: "Los worktrees van a mantener los diffs separados, pero la fusión va a ser una guerra igual.",
+      choices: [{ label: "Volver a empezar", next: "start" }],
+    },
+    types: {
+      question: "¿Tocan un tipo, un esquema o una API interna compartida?",
+      choices: [
+        { label: "Sí", next: "shared" },
+        { label: "No", next: "runtime" },
+      ],
+    },
+    shared: {
+      verdict: "Serialízalas, o hazlas un solo PR.",
+      detail: "El aislamiento físico no compra aislamiento semántico. Cada PR correcto por separado, todos juntos un build roto.",
+      choices: [{ label: "Volver a empezar", next: "start" }],
+    },
+    runtime: {
+      question: "¿Necesitan el mismo recurso de runtime: el puerto 3000, la base de datos, el cliente de Prisma generado?",
+      choices: [
+        { label: "Sí", next: "careful" },
+        { label: "No", next: "go" },
+      ],
+    },
+    careful: {
+      verdict: "Paraleliza con cuidado.",
+      detail: "Puertos y bases de datos por agente, o un solo agente corre el dev server.",
+      choices: [{ label: "Volver a empezar", next: "start" }],
+    },
+    go: {
+      verdict: "Paraleliza.",
+      detail: "Era el caso del sábado: tres capas, cero solapamiento.",
+      choices: [{ label: "Volver a empezar", next: "start" }],
+    },
+  }}
+/>
 
 La otra cosa que los worktrees no aíslan: los recursos compartidos en runtime. Tres dev servers quieren el puerto 3000. Tres clientes de Prisma regenerando los mismos archivos. Tres sets de migrations corriendo contra la misma base. Tres `npm install` peleándose por el mismo `node_modules`. Los worktrees le dan a cada agente sus propios archivos. No le dan a cada uno su propio puerto o su propia base. Para todo lo que excede el estado del filesystem (sockets, procesos, caches, servicios compartidos), todavía tienes que pensarlo explícitamente.
 

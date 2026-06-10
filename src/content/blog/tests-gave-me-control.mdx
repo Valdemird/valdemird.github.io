@@ -19,6 +19,7 @@ import FileTree from '../../components/blog/FileTree.astro';
 import TLDR from '../../components/blog/TLDR.astro';
 import Sidenote from '../../components/blog/Sidenote.astro';
 import FlakySuite from '../../components/blog/FlakySuite.astro';
+import CodeDiff from '../../components/blog/CodeDiff.astro';
 
 <TLDR bullets={[
   "I worked a month with Claude Code on a side project. /insights showed me two things: AI patches symptoms before understanding causes, and tests are the only thing that lets me trust its changes.",
@@ -60,6 +61,34 @@ This is the part of working with AI that nobody posts on Twitter. The hero shots
 The interesting failure mode wasn't "AI got it wrong." It was subtler. AI reached for a fix before it had a diagnosis.
 
 CSS layout was the clearest example. A child element overflowing isn't usually a child problem. It's usually a parent that forgot to constrain height, or a flex axis that nobody set explicitly. AI tends to reach for `items-start`, `max-h-full`, `overflow-hidden`. Properties on the *visible* element. It almost never walks up the cascade first. That's what burned the ten rounds on scroll-snap.
+
+Here's the shape of it, reconstructed from the kanban overflow session rather than copied from one commit:
+
+<CodeDiff
+  filename="components/Board.tsx"
+  language="jsx"
+  before={[
+    { line: 1, text: '<div className="board flex gap-4">' },
+    { line: 2, text: '  <section className="column">' },
+    { line: 3, text: '    <ul className="items-start max-h-full overflow-hidden">' },
+    { line: 4, text: '      {cards.map(renderCard)}' },
+    { line: 5, text: '    </ul>' },
+    { line: 6, text: '  </section>' },
+    { line: 7, text: '</div>' },
+  ]}
+  after={[
+    { line: 1, text: '<div className="board flex gap-4 min-h-0">' },
+    { line: 2, text: '  <section className="column flex flex-col min-h-0">' },
+    { line: 3, text: '    <ul className="overflow-y-auto">' },
+    { line: 4, text: '      {cards.map(renderCard)}' },
+    { line: 5, text: '    </ul>' },
+    { line: 6, text: '  </section>' },
+    { line: 7, text: '</div>' },
+  ]}
+  removed={[3]}
+  added={[1, 2, 3]}
+  note="Both AI patches landed on line 3 — the visible element. The constraint was two parents up: a flex child won't shrink below its content unless min-h-0 says it can."
+/>
 
 Same pattern in Postgres migrations. I asked AI to apply a migration. It failed. AI retried the same `prisma migrate deploy` three times, swapping flags. When I stopped and looked, the problem was that `.env.local` and `.env` pointed at different databases, and `dotenv` was loading the wrong one. The migration was never the problem. AI optimized for "the command that failed" instead of "which environment got loaded."
 

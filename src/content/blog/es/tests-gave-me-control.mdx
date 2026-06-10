@@ -19,6 +19,7 @@ import FileTree from '../../../components/blog/FileTree.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
 import Sidenote from '../../../components/blog/Sidenote.astro';
 import FlakySuite from '../../../components/blog/FlakySuite.astro';
+import CodeDiff from '../../../components/blog/CodeDiff.astro';
 
 <TLDR lang="es" bullets={[
   "Trabajé un mes con Claude Code en un side project. /insights me mostró dos cosas: la IA parcha síntomas antes de entender causas, y los tests son lo único que me deja confiar en sus cambios.",
@@ -60,6 +61,34 @@ Esta es la parte de trabajar con IA que nadie postea en Twitter. Los demos perfe
 El modo de falla interesante no era "la IA se equivocó". Era más sutil. La IA saltaba a una solución antes de tener un diagnóstico.
 
 El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible* antes de subir por la cascada. Ahí se fueron las diez rondas en scroll-snap.
+
+Esta es la forma del problema, reconstruida de la sesión del overflow del kanban, no copiada de un commit:
+
+<CodeDiff
+  filename="components/Board.tsx"
+  language="jsx"
+  before={[
+    { line: 1, text: '<div className="board flex gap-4">' },
+    { line: 2, text: '  <section className="column">' },
+    { line: 3, text: '    <ul className="items-start max-h-full overflow-hidden">' },
+    { line: 4, text: '      {cards.map(renderCard)}' },
+    { line: 5, text: '    </ul>' },
+    { line: 6, text: '  </section>' },
+    { line: 7, text: '</div>' },
+  ]}
+  after={[
+    { line: 1, text: '<div className="board flex gap-4 min-h-0">' },
+    { line: 2, text: '  <section className="column flex flex-col min-h-0">' },
+    { line: 3, text: '    <ul className="overflow-y-auto">' },
+    { line: 4, text: '      {cards.map(renderCard)}' },
+    { line: 5, text: '    </ul>' },
+    { line: 6, text: '  </section>' },
+    { line: 7, text: '</div>' },
+  ]}
+  removed={[3]}
+  added={[1, 2, 3]}
+  note="Los dos parches de la IA cayeron en la línea 3, el elemento visible. La restricción estaba dos padres más arriba: un hijo de flex no se encoge por debajo de su contenido a menos que min-h-0 se lo permita."
+/>
 
 El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA se enfocó en "el comando que falló" en vez de "qué entorno se cargó".
 

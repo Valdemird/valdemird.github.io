@@ -5,6 +5,8 @@ export interface TerminalCommand {
 
 export interface TerminalAnimation {
   stop: () => void;
+  /** Skips the current waits so the loop jumps ahead to the next command. */
+  poke: () => void;
 }
 
 export function initTerminalAnimation(commands: TerminalCommand[]): TerminalAnimation {
@@ -14,9 +16,22 @@ export function initTerminalAnimation(commands: TerminalCommand[]): TerminalAnim
 
   let stopped = false;
   let cmdIndex = 0;
+  let pokeRequested = false;
+  let pokeWaiters: (() => void)[] = [];
 
   function sleep(ms: number): Promise<void> {
-    return new Promise((r) => setTimeout(r, ms));
+    if (pokeRequested) return Promise.resolve();
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        pokeWaiters = pokeWaiters.filter((w) => w !== waiter);
+        resolve();
+      }, ms);
+      const waiter = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      pokeWaiters.push(waiter);
+    });
   }
 
   function waitForVisible(): Promise<void> {
@@ -37,6 +52,10 @@ export function initTerminalAnimation(commands: TerminalCommand[]): TerminalAnim
     cmdEl.textContent = '';
     for (let i = 0; i < text.length; i++) {
       if (stopped) return;
+      if (pokeRequested) {
+        cmdEl.textContent = text;
+        return;
+      }
       await waitForVisible();
       cmdEl.textContent += text[i];
       await sleep(45 + Math.random() * 35);
@@ -61,6 +80,7 @@ export function initTerminalAnimation(commands: TerminalCommand[]): TerminalAnim
   async function run() {
     while (!stopped) {
       await waitForVisible();
+      pokeRequested = false;
       const { cmd, output } = commands[cmdIndex % commands.length];
       if (cmdEl) cmdEl.textContent = '';
       if (outputEl) outputEl.innerHTML = '';
@@ -78,6 +98,13 @@ export function initTerminalAnimation(commands: TerminalCommand[]): TerminalAnim
   return {
     stop() {
       stopped = true;
+      pokeWaiters.forEach((w) => w());
+      pokeWaiters = [];
+    },
+    poke() {
+      pokeRequested = true;
+      pokeWaiters.forEach((w) => w());
+      pokeWaiters = [];
     },
   };
 }

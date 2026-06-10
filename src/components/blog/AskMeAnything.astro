@@ -1,0 +1,1197 @@
+---
+/**
+ * AskMeAnything — site-wide floating chat button (bottom-right) that opens a
+ * compact frosted-glass panel with two tabs: an on-device AI chat (Chrome
+ * Prompt API / Gemini Nano) and a contact form that emails Sebastian
+ * (Web3Forms) from every browser.
+ *
+ * Progressive enhancement: every AI affordance only appears after runtime
+ * feature detection succeeds. Firefox/Safari/mobile visitors get a plain
+ * contact widget — no tabs, no chat, no AI mention. On blog posts the chat
+ * reads the rendered article and can summarize it; the same on-device model
+ * powers an "improve writing" pass on the email draft (only offered once the
+ * model is already on disk). Nothing the visitor types leaves the browser
+ * unless they explicitly submit the form.
+ *
+ *   <AskMeAnything lang="en" />            site-wide widget (mounted in Footer)
+ *   <AskMeAnything lang="en" floating={false} />   panel rendered inline (lab demo)
+ */
+import { AMA_STRINGS, ARTICLE_PROMPT, IMPROVE_PROMPT, INTENT_KEYWORDS, WEB3FORMS_ACCESS_KEY, buildSystemPrompt } from '../../data/ask-me-anything';
+import type { AboutLocale } from '../../data/about';
+
+interface Props {
+	lang?: AboutLocale;
+	/** true (default) mounts the fixed button + popover; false renders the panel inline. */
+	floating?: boolean;
+}
+
+const { lang = 'en', floating = true } = Astro.props;
+const L = AMA_STRINGS[lang];
+// One floating + one inline instance can share a page (the lab demo), so ids
+// need more than the lang to stay unique.
+const uid = `${lang}-${floating ? 'float' : 'inline'}`;
+
+const config = {
+	lang,
+	systemPrompt: buildSystemPrompt(lang),
+	articlePrompt: ARTICLE_PROMPT[lang],
+	improvePrompt: IMPROVE_PROMPT[lang],
+	keywords: INTENT_KEYWORDS[lang],
+	accessKey: WEB3FORMS_ACCESS_KEY,
+	i18n: {
+		downloading: L.downloading,
+		thinking: L.thinking,
+		you: L.you,
+		assistant: L.assistant,
+		fabContact: L.fabContact,
+		titleContact: L.titleContact,
+		quotaNote: L.quotaNote,
+		quotaFull: L.quotaFull,
+		chatError: L.chatError,
+		intentNudge: L.intentNudge,
+		formSending: L.formSending,
+		formSent: L.formSent,
+		formError: L.formError,
+		formCooldown: L.formCooldown,
+		formImproving: L.formImproving,
+		formImproveError: L.formImproveError,
+	},
+};
+---
+
+<div class:list={['ama', floating ? 'ama-floating' : 'ama-inline']} data-ama data-state="boot">
+	{floating && (
+		<button type="button" class="ama-fab" data-ama-toggle aria-expanded="false" aria-controls={`ama-panel-${uid}`}>
+			<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+				<path d="M12 7.5l.94 2.06L15 10.5l-2.06.94L12 13.5l-.94-2.06L9 10.5l2.06-.94L12 7.5z" fill="currentColor" stroke="none" />
+			</svg>
+			<span class="ama-fab-label" data-ama-fab-label>{L.fabLabel}</span>
+		</button>
+	)}
+
+	<div
+		class="ama-panel"
+		id={`ama-panel-${uid}`}
+		role={floating ? 'dialog' : undefined}
+		aria-label={L.panelTitle}
+		tabindex="-1"
+		data-ama-panel
+		hidden={floating}
+	>
+		<header class="ama-head">
+			<span class="ama-head-title" data-ama-title>{L.panelTitle}</span>
+			{floating && (
+				<button type="button" class="ama-close" data-ama-close aria-label={L.close}>
+					<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+						<path d="M18 6 6 18M6 6l12 12" />
+					</svg>
+				</button>
+			)}
+		</header>
+
+		<div class="ama-tabs" role="tablist" aria-label={L.panelTitle}>
+			<button type="button" class="ama-tab" role="tab" id={`ama-tab-chat-${uid}`} aria-selected="true" aria-controls={`ama-pane-chat-${uid}`} data-ama-tab="chat">{L.tabChat}</button>
+			<button type="button" class="ama-tab" role="tab" id={`ama-tab-form-${uid}`} aria-selected="false" aria-controls={`ama-pane-form-${uid}`} data-ama-tab="form">{L.tabMessage}</button>
+		</div>
+
+		<section class="ama-pane" id={`ama-pane-chat-${uid}`} role="tabpanel" aria-labelledby={`ama-tab-chat-${uid}`} data-ama-pane="chat">
+			<div class="ama-gate" data-ama-gate>
+				<p class="ama-gate-title">{L.gateTitle}</p>
+				<p class="ama-gate-body">{L.gateBody}</p>
+				<button type="button" class="ama-btn ama-btn-primary" data-ama-enable>{L.gateButton}</button>
+				<div class="ama-progress-row" data-ama-progress-row hidden>
+					<div class="ama-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-ama-progress>
+						<div class="ama-progress-fill" data-ama-progress-fill></div>
+					</div>
+					<span class="ama-progress-label" data-ama-progress-label>{L.downloading}</span>
+				</div>
+			</div>
+
+			<div class="ama-conv">
+				<div class="ama-log" data-ama-log role="log" aria-live="polite"></div>
+				<div class="ama-suggested" data-ama-suggested>
+					<button type="button" class="ama-chip" data-ama-chip data-ama-article-chip hidden>{L.chipArticle}</button>
+					{L.suggested.map((q) => (
+						<button type="button" class="ama-chip" data-ama-chip>{q}</button>
+					))}
+				</div>
+				<form class="ama-input" data-ama-input>
+					<label class="ama-sr" for={`ama-q-${uid}`}>{L.inputLabel}</label>
+					<input id={`ama-q-${uid}`} type="text" name="q" autocomplete="off" maxlength="400" placeholder={L.inputPlaceholder} data-ama-field />
+					<button type="submit" class="ama-send" data-ama-send aria-label={L.send}>
+						<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<path d="M12 19V5M5 12l7-7 7 7" />
+						</svg>
+					</button>
+				</form>
+				<p class="ama-quota" data-ama-quota hidden></p>
+				<p class="ama-reset-row" data-ama-reset-row hidden>
+					<button type="button" class="ama-btn" data-ama-reset>{L.resetButton}</button>
+				</p>
+				<p class="ama-privacy">{L.privacyChat}</p>
+			</div>
+
+			<div class="ama-error">
+				<p>{L.chatError}</p>
+				<button type="button" class="ama-btn" data-ama-retry>{L.retry}</button>
+			</div>
+		</section>
+
+		<section class="ama-pane" id={`ama-pane-form-${uid}`} role="tabpanel" aria-labelledby={`ama-tab-form-${uid}`} data-ama-pane="form" hidden>
+			<form class="ama-form" data-ama-form>
+				<input type="checkbox" name="botcheck" class="ama-hp" tabindex="-1" aria-hidden="true" data-ama-botcheck />
+				<div class="ama-form-row">
+					<label class="ama-sr" for={`ama-email-${uid}`}>{L.formEmailLabel}</label>
+					<input id={`ama-email-${uid}`} type="email" name="email" required placeholder={L.formEmailPlaceholder} data-ama-email />
+				</div>
+				<div class="ama-form-row">
+					<label class="ama-sr" for={`ama-msg-${uid}`}>{L.formMessageLabel}</label>
+					<textarea id={`ama-msg-${uid}`} name="message" required rows="4" maxlength="4000" placeholder={L.formMessagePlaceholder} data-ama-message></textarea>
+				</div>
+				<div class="ama-improve-row" data-ama-improve-row hidden>
+					<button type="button" class="ama-btn" data-ama-improve disabled>{L.formImprove}</button>
+					<button type="button" class="ama-btn" data-ama-improve-undo hidden>{L.formImproveUndo}</button>
+				</div>
+				<label class="ama-attach" data-ama-attach-row hidden>
+					<input type="checkbox" data-ama-attach checked />
+					<span data-ama-attach-label>{L.formAttach}</span>
+				</label>
+				<div class="ama-form-actions">
+					<button type="submit" class="ama-btn ama-btn-primary" data-ama-submit>{L.formSubmit}</button>
+					<span class="ama-form-status" role="status" aria-live="polite" data-ama-form-status></span>
+				</div>
+				<p class="ama-privacy">{L.formPrivacy}</p>
+			</form>
+		</section>
+	</div>
+
+	<script type="application/json" data-ama-config set:html={JSON.stringify(config)} />
+</div>
+
+<script>
+	interface AmaConfig {
+		lang: 'en' | 'es';
+		systemPrompt: string;
+		articlePrompt: string;
+		improvePrompt: string;
+		keywords: string[];
+		accessKey: string;
+		i18n: Record<string, string>;
+	}
+
+	type AmaState = 'boot' | 'unsupported' | 'gate' | 'downloading' | 'ready' | 'streaming' | 'error';
+
+	// Sessions and in-flight streams are module-scoped so a single pair of
+	// listeners can tear everything down before a View Transition swap.
+	const sessions = new Set<LanguageModelSession>();
+	const aborters = new Set<AbortController>();
+
+	function destroyAllSessions() {
+		aborters.forEach((a) => a.abort());
+		aborters.clear();
+		sessions.forEach((s) => {
+			try {
+				s.destroy();
+			} catch {
+				/* already gone */
+			}
+		});
+		sessions.clear();
+	}
+	document.addEventListener('astro:before-swap', destroyAllSessions);
+	window.addEventListener('pagehide', destroyAllSessions);
+
+	/** Title + trimmed text of the blog post being read, if any. */
+	function articleContext(): { title: string; text: string } | null {
+		const prose = document.querySelector('article .prose');
+		if (!prose?.textContent) return null;
+		const title = (document.querySelector('article h1')?.textContent ?? document.title).trim();
+		const text = prose.textContent.replace(/\s+/g, ' ').trim().slice(0, 7000);
+		return text ? { title, text } : null;
+	}
+
+	function setup(root: HTMLElement) {
+		const config = JSON.parse(root.querySelector('[data-ama-config]')?.textContent ?? '{}') as AmaConfig;
+		const i18n = config.i18n ?? {};
+		const floating = root.classList.contains('ama-floating');
+		const article = articleContext();
+
+		const panel = root.querySelector<HTMLElement>('[data-ama-panel]')!;
+		const log = root.querySelector<HTMLElement>('[data-ama-log]')!;
+		const field = root.querySelector<HTMLInputElement>('[data-ama-field]')!;
+		const sendBtn = root.querySelector<HTMLButtonElement>('[data-ama-send]')!;
+		const quotaEl = root.querySelector<HTMLElement>('[data-ama-quota]')!;
+		const resetRow = root.querySelector<HTMLElement>('[data-ama-reset-row]')!;
+		const progressRow = root.querySelector<HTMLElement>('[data-ama-progress-row]')!;
+		const progressBar = root.querySelector<HTMLElement>('[data-ama-progress]')!;
+		const progressFill = root.querySelector<HTMLElement>('[data-ama-progress-fill]')!;
+		const enableBtn = root.querySelector<HTMLButtonElement>('[data-ama-enable]')!;
+		const attachRow = root.querySelector<HTMLElement>('[data-ama-attach-row]')!;
+		const improveRow = root.querySelector<HTMLElement>('[data-ama-improve-row]')!;
+
+		let session: LanguageModelSession | null = null;
+		let transcript: { role: string; text: string }[] = [];
+		let nudged = false;
+
+		const setState = (s: AmaState) => {
+			root.dataset.state = s;
+		};
+
+		// --- floating open/close ---
+		const fab = root.querySelector<HTMLButtonElement>('[data-ama-toggle]');
+		let isOpen = false;
+		let closeTimer = 0;
+
+		function setOpen(next: boolean) {
+			if (!fab || next === isOpen) return;
+			isOpen = next;
+			fab.setAttribute('aria-expanded', String(next));
+			window.clearTimeout(closeTimer);
+			if (next) {
+				panel.hidden = false;
+				requestAnimationFrame(() => panel.classList.add('ama-open'));
+				panel.focus({ preventScroll: true });
+			} else {
+				panel.classList.remove('ama-open');
+				closeTimer = window.setTimeout(() => {
+					panel.hidden = true;
+				}, 250);
+				fab.focus({ preventScroll: true });
+			}
+		}
+
+		fab?.addEventListener('click', () => setOpen(!isOpen));
+		root.querySelector('[data-ama-close]')?.addEventListener('click', () => setOpen(false));
+		if (floating) {
+			panel.addEventListener('keydown', (e) => {
+				if (e.key === 'Escape') setOpen(false);
+			});
+		}
+
+		// --- tabs ---
+		const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-ama-tab]'));
+		const panes = Array.from(root.querySelectorAll<HTMLElement>('[data-ama-pane]'));
+		const formTab = tabs.find((t) => t.dataset.amaTab === 'form');
+
+		function selectTab(name: string) {
+			tabs.forEach((t) => t.setAttribute('aria-selected', String(t.dataset.amaTab === name)));
+			panes.forEach((p) => {
+				p.hidden = p.dataset.amaPane !== name;
+			});
+			if (name === 'form') formTab?.classList.remove('ama-tab-pulse');
+		}
+		tabs.forEach((t) => t.addEventListener('click', () => selectTab(t.dataset.amaTab!)));
+
+		const articleChip = root.querySelector<HTMLButtonElement>('[data-ama-article-chip]');
+		if (articleChip && article) articleChip.hidden = false;
+
+		const bubble = (kind: 'user' | 'ai' | 'system', text: string): HTMLElement => {
+			const el = document.createElement('div');
+			el.className = `ama-msg ama-msg-${kind}`;
+			if (kind !== 'system') {
+				// Visually the bubble shape carries the sender; keep a label for screen readers.
+				const who = document.createElement('span');
+				who.className = 'ama-sr';
+				who.textContent = `${kind === 'user' ? (i18n.you ?? 'You') : (i18n.assistant ?? 'AI')}: `;
+				el.appendChild(who);
+			}
+			const body = document.createElement('p');
+			body.className = 'ama-msg-body';
+			body.textContent = text;
+			el.appendChild(body);
+			log.appendChild(el);
+			log.scrollTop = log.scrollHeight;
+			return body;
+		};
+
+		// No local model → no AI anywhere: the widget collapses into a plain
+		// contact form (no tabs, no chat, no AI mention) and relabels itself.
+		function enterContactOnly() {
+			setState('unsupported');
+			selectTab('form');
+			const fabLabel = root.querySelector<HTMLElement>('[data-ama-fab-label]');
+			if (fabLabel && i18n.fabContact) fabLabel.textContent = i18n.fabContact;
+			const title = root.querySelector<HTMLElement>('[data-ama-title]');
+			if (title && i18n.titleContact) {
+				title.textContent = i18n.titleContact;
+				panel.setAttribute('aria-label', i18n.titleContact);
+			}
+		}
+
+		async function boot() {
+			if (typeof LanguageModel === 'undefined') {
+				enterContactOnly();
+				return;
+			}
+			try {
+				const availability = await LanguageModel.availability();
+				if (availability === 'unavailable') enterContactOnly();
+				else if (availability === 'available') {
+					setState('ready');
+					improveRow.hidden = false;
+				} else setState('gate');
+			} catch {
+				enterContactOnly();
+			}
+		}
+
+		async function ensureSession(): Promise<LanguageModelSession> {
+			if (session) return session;
+			const controller = new AbortController();
+			aborters.add(controller);
+			const systemPrompt =
+				config.systemPrompt +
+				(article ? (config.articlePrompt ?? '').replace('{title}', article.title).replace('{text}', article.text) : '');
+			try {
+				session = await LanguageModel!.create({
+					initialPrompts: [{ role: 'system', content: systemPrompt }],
+					signal: controller.signal,
+					monitor(m) {
+						m.addEventListener('downloadprogress', (e) => {
+							const pct = Math.round((e.loaded ?? 0) * 100);
+							progressRow.hidden = false;
+							progressBar.setAttribute('aria-valuenow', String(pct));
+							progressFill.style.width = `${pct}%`;
+						});
+					},
+				});
+				sessions.add(session);
+				// The model just proved it is on disk, so the email tab can
+				// offer the rewrite pass too.
+				improveRow.hidden = false;
+				return session;
+			} finally {
+				aborters.delete(controller);
+			}
+		}
+
+		function updateQuota() {
+			if (!session || typeof session.inputUsage !== 'number' || typeof session.inputQuota !== 'number' || !session.inputQuota) {
+				return;
+			}
+			const pct = Math.round((session.inputUsage / session.inputQuota) * 100);
+			if (pct >= 90) {
+				quotaEl.hidden = false;
+				quotaEl.textContent = i18n.quotaFull ?? '';
+				resetRow.hidden = false;
+				field.disabled = true;
+				sendBtn.disabled = true;
+			} else if (pct >= 60) {
+				quotaEl.hidden = false;
+				quotaEl.textContent = (i18n.quotaNote ?? '{pct}%').replace('{pct}', String(pct));
+			} else {
+				quotaEl.hidden = true;
+			}
+		}
+
+		function updateAttachRow() {
+			attachRow.hidden = transcript.length === 0;
+		}
+
+		async function send(text: string) {
+			const q = text.trim();
+			if (!q || root.dataset.state === 'streaming') return;
+			field.value = '';
+			bubble('user', q);
+			transcript.push({ role: config.lang === 'es' ? 'Visitante' : 'Visitor', text: q });
+			const wantsContact = config.keywords.some((k) => q.toLowerCase().includes(k));
+			setState('streaming');
+			sendBtn.disabled = true;
+			const body = bubble('ai', i18n.thinking ?? '…');
+			const controller = new AbortController();
+			aborters.add(controller);
+			try {
+				const s = await ensureSession();
+				let acc = '';
+				for await (const chunk of s.promptStreaming(q, { signal: controller.signal })) {
+					// Older builds stream the cumulative text, newer ones stream deltas.
+					if (chunk.length >= acc.length && chunk.startsWith(acc)) acc = chunk;
+					else acc += chunk;
+					body.textContent = acc;
+					log.scrollTop = log.scrollHeight;
+				}
+				transcript.push({ role: 'AI', text: acc });
+				updateQuota();
+				if (wantsContact && !nudged) {
+					nudged = true;
+					bubble('system', i18n.intentNudge ?? '');
+					formTab?.classList.add('ama-tab-pulse');
+				}
+				setState('ready');
+			} catch (err) {
+				if (!controller.signal.aborted) {
+					body.textContent = i18n.chatError ?? 'Error.';
+					setState('ready');
+				}
+			} finally {
+				aborters.delete(controller);
+				sendBtn.disabled = field.disabled;
+				updateAttachRow();
+			}
+		}
+
+		enableBtn.addEventListener('click', async () => {
+			enableBtn.disabled = true;
+			setState('downloading');
+			try {
+				await ensureSession();
+				setState('ready');
+			} catch {
+				setState('error');
+			} finally {
+				enableBtn.disabled = false;
+			}
+		});
+
+		root.querySelector('[data-ama-retry]')?.addEventListener('click', () => {
+			setState('boot');
+			boot();
+		});
+
+		root.querySelector('[data-ama-reset]')?.addEventListener('click', () => {
+			if (session) {
+				sessions.delete(session);
+				try {
+					session.destroy();
+				} catch {
+					/* noop */
+				}
+				session = null;
+			}
+			quotaEl.hidden = true;
+			resetRow.hidden = true;
+			field.disabled = false;
+			sendBtn.disabled = false;
+		});
+
+		root.querySelector('[data-ama-input]')?.addEventListener('submit', (e) => {
+			e.preventDefault();
+			send(field.value);
+		});
+
+		root.querySelectorAll<HTMLButtonElement>('[data-ama-chip]').forEach((chip) => {
+			chip.addEventListener('click', () => send(chip.textContent ?? ''));
+		});
+
+		// --- Contact form (works regardless of AI support) ---
+		const form = root.querySelector<HTMLFormElement>('[data-ama-form]')!;
+		const status = root.querySelector<HTMLElement>('[data-ama-form-status]')!;
+		const submitBtn = root.querySelector<HTMLButtonElement>('[data-ama-submit]')!;
+		const COOLDOWN_MS = 60_000;
+
+		form.addEventListener('submit', async (e) => {
+			e.preventDefault();
+			const last = Number(localStorage.getItem('ama-last-send') ?? 0);
+			const elapsed = Date.now() - last;
+			if (elapsed < COOLDOWN_MS) {
+				status.textContent = (i18n.formCooldown ?? '{s}s').replace('{s}', String(Math.ceil((COOLDOWN_MS - elapsed) / 1000)));
+				return;
+			}
+			if (!config.accessKey || config.accessKey.startsWith('REPLACE_')) {
+				status.textContent = i18n.formError ?? 'Error.';
+				return;
+			}
+			const email = root.querySelector<HTMLInputElement>('[data-ama-email]')!.value;
+			const message = root.querySelector<HTMLTextAreaElement>('[data-ama-message]')!.value;
+			const attach = root.querySelector<HTMLInputElement>('[data-ama-attach]')!.checked && !attachRow.hidden;
+			const payload: Record<string, unknown> = {
+				access_key: config.accessKey,
+				subject: `valdemird.com — message from ${email}`,
+				from_name: 'valdemird.com AMA',
+				email,
+				message,
+				lang: config.lang,
+				page: location.pathname,
+				botcheck: root.querySelector<HTMLInputElement>('[data-ama-botcheck]')!.checked,
+			};
+			if (attach) {
+				payload.transcript = transcript
+					.map((m) => `${m.role}: ${m.text}`)
+					.join('\n')
+					.slice(0, 4000);
+			}
+			submitBtn.disabled = true;
+			status.textContent = i18n.formSending ?? '…';
+			try {
+				const res = await fetch('https://api.web3forms.com/submit', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+					body: JSON.stringify(payload),
+				});
+				if (!res.ok) throw new Error(String(res.status));
+				status.textContent = i18n.formSent ?? 'Sent.';
+				localStorage.setItem('ama-last-send', String(Date.now()));
+				form.reset();
+			} catch {
+				status.textContent = i18n.formError ?? 'Error.';
+			} finally {
+				submitBtn.disabled = false;
+			}
+		});
+
+		// --- "Improve writing" (same on-device model; the row is only revealed
+		// once the model is known to be on disk, so this never triggers the
+		// multi-GB download from the email tab) ---
+		const msgField = root.querySelector<HTMLTextAreaElement>('[data-ama-message]')!;
+		const improveBtn = root.querySelector<HTMLButtonElement>('[data-ama-improve]')!;
+		const undoBtn = root.querySelector<HTMLButtonElement>('[data-ama-improve-undo]')!;
+		let improving = false;
+		let lastDraft = '';
+
+		// Programmatic .value changes don't fire 'input', so this only reacts
+		// to the visitor's own edits — which also invalidate the undo snapshot.
+		msgField.addEventListener('input', () => {
+			improveBtn.disabled = improving || !msgField.value.trim();
+			undoBtn.hidden = true;
+		});
+
+		undoBtn.addEventListener('click', () => {
+			msgField.value = lastDraft;
+			undoBtn.hidden = true;
+			improveBtn.disabled = !msgField.value.trim();
+		});
+
+		improveBtn.addEventListener('click', async () => {
+			const draft = msgField.value.trim();
+			if (!draft || improving || typeof LanguageModel === 'undefined') return;
+			improving = true;
+			lastDraft = msgField.value;
+			improveBtn.disabled = true;
+			undoBtn.hidden = true;
+			submitBtn.disabled = true;
+			msgField.readOnly = true;
+			status.textContent = i18n.formImproving ?? '…';
+			const controller = new AbortController();
+			aborters.add(controller);
+			let improver: LanguageModelSession | null = null;
+			try {
+				// Fresh session per pass: the model is already on disk so it is
+				// cheap, and the chat's conversation quota stays untouched.
+				improver = await LanguageModel.create({
+					initialPrompts: [{ role: 'system', content: config.improvePrompt }],
+					signal: controller.signal,
+				});
+				sessions.add(improver);
+				let acc = '';
+				for await (const chunk of improver.promptStreaming(draft, { signal: controller.signal })) {
+					// Older builds stream the cumulative text, newer ones stream deltas.
+					if (chunk.length >= acc.length && chunk.startsWith(acc)) acc = chunk;
+					else acc += chunk;
+					msgField.value = acc;
+				}
+				status.textContent = '';
+				undoBtn.hidden = false;
+			} catch {
+				if (!controller.signal.aborted) {
+					msgField.value = lastDraft;
+					status.textContent = i18n.formImproveError ?? 'Error.';
+				}
+			} finally {
+				aborters.delete(controller);
+				if (improver) {
+					sessions.delete(improver);
+					try {
+						improver.destroy();
+					} catch {
+						/* already gone */
+					}
+				}
+				improving = false;
+				msgField.readOnly = false;
+				submitBtn.disabled = false;
+				improveBtn.disabled = !msgField.value.trim();
+			}
+		});
+
+		boot();
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-ama]:not([data-ama-ready])').forEach((root) => {
+			root.dataset.amaReady = '1';
+			setup(root);
+		});
+	}
+
+	init();
+	document.addEventListener('astro:after-swap', init);
+</script>
+
+<style>
+	[data-ama-config] {
+		display: none;
+	}
+
+	/* --- screen-reader-only text --- */
+	.ama :global(.ama-sr) {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip: rect(0 0 0 0);
+		white-space: nowrap;
+	}
+
+	/* --- floating button: quiet glass pill --- */
+	.ama-fab {
+		position: fixed;
+		right: 1.25rem;
+		bottom: 1.25rem;
+		z-index: 90;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.6rem 1rem;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		font-weight: 500;
+		color: var(--color-text);
+		background: oklch(from var(--color-bg) l c h / 0.78);
+		-webkit-backdrop-filter: blur(14px) saturate(1.4);
+		backdrop-filter: blur(14px) saturate(1.4);
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		cursor: pointer;
+		box-shadow: var(--shadow-md);
+		transition:
+			transform var(--duration-fast) var(--ease-spring),
+			box-shadow var(--duration-fast) var(--ease-smooth),
+			border-color var(--duration-fast) var(--ease-smooth);
+	}
+	.ama-fab svg {
+		flex-shrink: 0;
+		color: var(--color-accent);
+	}
+	.ama-fab:hover {
+		border-color: var(--color-accent);
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-lg);
+	}
+	.ama-fab:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 3px;
+	}
+
+	/* --- panel chrome: frosted sheet --- */
+	.ama-floating .ama-panel {
+		position: fixed;
+		right: 1.25rem;
+		bottom: 4.4rem;
+		z-index: 90;
+		width: min(352px, calc(100vw - 1.75rem));
+		/* Fixed height: both tabs render at the same size, so switching never jumps. */
+		height: min(68dvh, 500px);
+		display: flex;
+		flex-direction: column;
+		background: oklch(from var(--color-bg) l c h / 0.82);
+		-webkit-backdrop-filter: blur(22px) saturate(1.5);
+		backdrop-filter: blur(22px) saturate(1.5);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-xl);
+		box-shadow: var(--shadow-lg);
+		opacity: 0;
+		transform: translateY(10px) scale(0.97);
+		transform-origin: bottom right;
+		transition:
+			opacity var(--duration-normal) var(--ease-smooth),
+			transform var(--duration-normal) var(--ease-spring);
+	}
+	.ama-floating .ama-panel.ama-open {
+		opacity: 1;
+		transform: none;
+	}
+	.ama-floating .ama-panel[hidden] {
+		display: none;
+	}
+	.ama-panel:focus {
+		outline: none;
+	}
+
+	.ama-inline .ama-panel {
+		display: flex;
+		flex-direction: column;
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		max-width: 420px;
+		height: 460px;
+	}
+
+	.ama-head {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.8rem 2.4rem 0.15rem;
+	}
+	.ama-head-title {
+		font-family: var(--font-serif);
+		font-size: 0.95rem;
+		font-weight: 550;
+		color: var(--color-text);
+	}
+	.ama-close {
+		position: absolute;
+		top: 0.6rem;
+		right: 0.6rem;
+		display: grid;
+		place-items: center;
+		width: 24px;
+		height: 24px;
+		padding: 0;
+		color: var(--color-text-muted);
+		background: var(--color-bg-secondary);
+		border: none;
+		border-radius: 50%;
+		cursor: pointer;
+		transition:
+			color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth);
+	}
+	.ama-close:hover {
+		color: var(--color-text);
+		background: var(--color-border);
+	}
+
+	/* --- segmented control --- */
+	.ama-tabs {
+		display: flex;
+		gap: 2px;
+		margin: 0.55rem 0.9rem 0.15rem;
+		padding: 3px;
+		background: oklch(from var(--color-text) l c h / 0.06);
+		border-radius: 999px;
+	}
+	.ama-tab {
+		flex: 1;
+		padding: 0.32rem 0.6rem;
+		font-family: var(--font-sans);
+		font-size: 0.78rem;
+		font-weight: 500;
+		color: var(--color-text-muted);
+		background: none;
+		border: none;
+		border-radius: 999px;
+		cursor: pointer;
+		transition:
+			color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth),
+			box-shadow var(--duration-fast) var(--ease-smooth);
+	}
+	.ama-tab:hover {
+		color: var(--color-text);
+	}
+	.ama-tab[aria-selected='true'] {
+		color: var(--color-text);
+		background: var(--color-bg);
+		box-shadow: var(--shadow-sm);
+	}
+	.ama-tab-pulse {
+		color: var(--color-accent);
+	}
+
+	/* --- panes --- */
+	.ama-pane {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		padding: 0.8rem 0.9rem 0.9rem;
+		overflow-y: auto;
+	}
+	/* display:flex above beats the UA's [hidden] rule — restate it. */
+	.ama-pane[hidden] {
+		display: none;
+	}
+	/* In the chat tab only the message log scrolls — never the pane itself,
+	   so there is a single scrollbar. */
+	.ama-pane[data-ama-pane='chat'] {
+		overflow: hidden;
+	}
+
+	/* --- state gating (CSS only, DOM stays stable) --- */
+	.ama-gate,
+	.ama-conv,
+	.ama-error {
+		display: none;
+	}
+	.ama[data-state='gate'] .ama-gate,
+	.ama[data-state='downloading'] .ama-gate {
+		display: flex;
+	}
+	.ama[data-state='ready'] .ama-conv,
+	.ama[data-state='streaming'] .ama-conv {
+		display: flex;
+	}
+	.ama[data-state='error'] .ama-error {
+		display: flex;
+	}
+	/* No local AI → no AI: the tab row disappears and only the email form
+	   remains. Also hidden during boot so unsupported browsers (most mobile)
+	   never flash the Chat tab. */
+	.ama[data-state='boot'] .ama-tabs,
+	.ama[data-state='unsupported'] .ama-tabs {
+		display: none;
+	}
+
+	/* --- gate --- */
+	.ama-gate {
+		flex-direction: column;
+		gap: 0.6rem;
+		align-items: flex-start;
+		padding: 0.25rem 0.15rem;
+	}
+	.ama-gate-title {
+		font-family: var(--font-serif);
+		font-size: 1rem;
+		font-weight: 500;
+		margin: 0;
+		color: var(--color-text);
+	}
+	.ama-gate-body {
+		font-size: 0.82rem;
+		line-height: 1.55;
+		color: var(--color-text-secondary);
+		margin: 0;
+		max-width: 40ch;
+	}
+	.ama-progress-row {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		width: 100%;
+	}
+	.ama-progress {
+		flex: 1;
+		height: 6px;
+		border-radius: 999px;
+		background: var(--color-bg-secondary);
+		overflow: hidden;
+	}
+	.ama-progress-fill {
+		height: 100%;
+		width: 0;
+		border-radius: 999px;
+		background: var(--color-accent);
+		transition: width 0.4s var(--ease-smooth);
+	}
+	.ama-progress-label {
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		color: var(--color-text-muted);
+	}
+
+	/* --- conversation: message bubbles --- */
+	.ama-conv {
+		flex: 1;
+		min-height: 0;
+		flex-direction: column;
+		justify-content: flex-end;
+		gap: 0.7rem;
+	}
+	.ama-log {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+	}
+	.ama-log:empty {
+		display: none;
+	}
+	/* Bubbles are created at runtime, so they carry no Astro scope attribute —
+	   style them via :global() anchored on the scoped .ama-log container. */
+	.ama-log :global(.ama-msg) {
+		max-width: 86%;
+		padding: 0.45rem 0.75rem;
+		border-radius: 16px;
+	}
+	.ama-log :global(.ama-msg-user) {
+		align-self: flex-end;
+		background: var(--color-accent);
+		border-bottom-right-radius: 5px;
+	}
+	.ama-log :global(.ama-msg-user .ama-msg-body) {
+		color: var(--color-bg);
+	}
+	.ama-log :global(.ama-msg-ai) {
+		align-self: flex-start;
+		background: var(--color-bg-secondary);
+		border-bottom-left-radius: 5px;
+	}
+	.ama-log :global(.ama-msg-system) {
+		align-self: center;
+		max-width: 95%;
+		padding: 0.1rem 0;
+		background: none;
+		text-align: center;
+	}
+	.ama-log :global(.ama-msg-system .ama-msg-body) {
+		font-size: 0.72rem;
+		color: var(--color-text-muted);
+	}
+	.ama-log :global(.ama-msg-body) {
+		margin: 0;
+		font-size: 0.88rem;
+		line-height: 1.5;
+		color: var(--color-text);
+		white-space: pre-wrap;
+		overflow-wrap: anywhere;
+	}
+
+	.ama-suggested {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem;
+	}
+	.ama-chip {
+		font-family: var(--font-sans);
+		font-size: 0.74rem;
+		padding: 0.32em 0.85em;
+		border: 1px solid var(--color-border);
+		border-radius: 999px;
+		background: transparent;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition:
+			border-color var(--duration-fast) var(--ease-smooth),
+			color var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-spring);
+	}
+	.ama-chip:hover {
+		border-color: var(--color-accent);
+		color: var(--color-text);
+		transform: translateY(-1px);
+	}
+	[data-ama-article-chip]:not([hidden]) {
+		border-color: oklch(from var(--color-accent) l c h / 0.5);
+		color: var(--color-accent);
+	}
+
+	/* --- input row: pill + round send --- */
+	.ama-input {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+	}
+	.ama-input input {
+		flex: 1;
+		min-width: 0;
+		padding: 0.5rem 1rem;
+		font-family: var(--font-sans);
+		font-size: 0.88rem;
+		color: var(--color-text);
+		background: var(--color-bg-secondary);
+		border: 1px solid transparent;
+		border-radius: 999px;
+		transition: border-color var(--duration-fast) var(--ease-smooth);
+	}
+	.ama-input input::placeholder {
+		color: var(--color-text-muted);
+	}
+	.ama-input input:focus {
+		outline: none;
+		border-color: var(--color-accent);
+	}
+	.ama-input input:disabled {
+		opacity: 0.5;
+	}
+	.ama-send {
+		display: grid;
+		place-items: center;
+		width: 32px;
+		height: 32px;
+		padding: 0;
+		flex-shrink: 0;
+		color: var(--color-bg);
+		background: var(--color-accent);
+		border: none;
+		border-radius: 50%;
+		cursor: pointer;
+		transition:
+			background var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-spring);
+	}
+	.ama-send:hover:not(:disabled) {
+		background: var(--color-accent-hover);
+		transform: translateY(-1px);
+	}
+	.ama-send:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
+	.ama-send:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.ama-quota {
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		color: var(--color-warning);
+		margin: 0;
+	}
+	.ama-reset-row {
+		margin: 0;
+	}
+
+	.ama-privacy {
+		font-size: 0.66rem;
+		line-height: 1.45;
+		color: var(--color-text-muted);
+		text-align: center;
+		margin: 0;
+	}
+
+	.ama-error {
+		flex-direction: column;
+		gap: 0.6rem;
+		align-items: flex-start;
+	}
+	.ama-error p {
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--color-text-secondary);
+	}
+
+	/* --- buttons --- */
+	.ama-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.45rem 1rem;
+		font-family: var(--font-sans);
+		font-size: 0.82rem;
+		font-weight: 500;
+		color: var(--color-text-secondary);
+		background: var(--color-bg-secondary);
+		border: none;
+		border-radius: 999px;
+		cursor: pointer;
+		transition:
+			color var(--duration-fast) var(--ease-smooth),
+			background var(--duration-fast) var(--ease-smooth),
+			transform var(--duration-fast) var(--ease-spring);
+	}
+	.ama-btn:hover:not(:disabled) {
+		color: var(--color-text);
+		transform: translateY(-1px);
+	}
+	.ama-btn:disabled {
+		opacity: 0.55;
+		cursor: default;
+	}
+	.ama-btn-primary {
+		color: var(--color-bg);
+		background: var(--color-accent);
+	}
+	.ama-btn-primary:hover:not(:disabled) {
+		color: var(--color-bg);
+		background: var(--color-accent-hover);
+	}
+	.ama-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	/* --- contact form --- */
+	.ama-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+	.ama-form-row {
+		display: flex;
+		flex-direction: column;
+	}
+	.ama-form-row input,
+	.ama-form-row textarea {
+		padding: 0.5rem 0.9rem;
+		font-family: var(--font-sans);
+		font-size: 0.88rem;
+		color: var(--color-text);
+		background: var(--color-bg-secondary);
+		border: 1px solid transparent;
+		border-radius: 14px;
+		transition: border-color var(--duration-fast) var(--ease-smooth);
+		resize: vertical;
+	}
+	.ama-form-row input::placeholder,
+	.ama-form-row textarea::placeholder {
+		color: var(--color-text-muted);
+	}
+	.ama-form-row input:focus,
+	.ama-form-row textarea:focus {
+		outline: none;
+		border-color: var(--color-accent);
+	}
+	.ama-improve-row {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+	.ama-improve-row[hidden] {
+		display: none;
+	}
+	.ama-attach {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		font-size: 0.78rem;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+	}
+	.ama-form-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.8rem;
+		flex-wrap: wrap;
+	}
+	.ama-form-status {
+		font-size: 0.72rem;
+		color: var(--color-text-muted);
+	}
+	.ama-form-status:empty {
+		display: none;
+	}
+
+	/* Honeypot: off-screen but not display:none (some bots skip hidden fields). */
+	.ama-hp {
+		position: absolute;
+		left: -9999px;
+		opacity: 0;
+	}
+
+	@media (max-width: 480px) {
+		.ama-floating .ama-panel {
+			right: 0.75rem;
+			left: 0.75rem;
+			bottom: 4.2rem;
+			width: auto;
+		}
+		.ama-fab {
+			right: 1rem;
+			bottom: 1rem;
+		}
+	}
+
+	@media print {
+		.ama-floating {
+			display: none;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.ama-fab,
+		.ama-floating .ama-panel,
+		.ama-progress-fill,
+		.ama-btn,
+		.ama-send,
+		.ama-chip {
+			transition: none;
+		}
+	}
+</style>

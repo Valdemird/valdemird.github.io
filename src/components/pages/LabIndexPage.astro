@@ -43,7 +43,10 @@ const description = es
 
 	{groups.map((group, gi) => (
 		<section class:list={['lab-group', 'animate-fade-in', `delay-${Math.min(gi + 1, 3)}`]}>
-			<h2 class="lab-group-label">{group.label}</h2>
+			<h2 class="lab-group-label">
+				{group.label}
+				<span class="lab-group-count">{group.items.length}</span>
+			</h2>
 			<div class="lab-grid">
 				{group.items.map((item) => (
 					<a href={`${labHome}${item.slug}/`} class="lab-card">
@@ -99,6 +102,9 @@ const description = es
 	}
 
 	.lab-group-label {
+		display: flex;
+		align-items: baseline;
+		gap: 0.55em;
 		margin: 0 0 var(--space-lg);
 		font-family: var(--font-mono);
 		font-size: 0.68rem;
@@ -106,6 +112,11 @@ const description = es
 		text-transform: uppercase;
 		letter-spacing: 0.14em;
 		color: var(--color-text-muted);
+	}
+
+	.lab-group-count {
+		font-weight: 400;
+		color: var(--color-accent);
 	}
 
 	.lab-grid {
@@ -151,5 +162,38 @@ const description = es
 		font-size: 0.82rem;
 		line-height: 1.5;
 		color: var(--color-text-secondary);
+	}
+
+	/* On phones the grid would stack 30+ cards into one endless column.
+	   Each category becomes a horizontal snap rail instead — the page is five
+	   swipeable rows, and the next card peeking in from the right is the
+	   affordance. Full-bleed margins match .lab-shell's 1.5rem padding so
+	   cards scroll to the screen edge. */
+	@media (max-width: 640px) {
+		.lab-group {
+			margin-bottom: var(--space-xl);
+		}
+
+		.lab-grid {
+			grid-auto-flow: column;
+			grid-auto-columns: min(74vw, 290px);
+			grid-template-columns: none;
+			overflow-x: auto;
+			margin-inline: -1.5rem;
+			padding-inline: 1.5rem;
+			padding-bottom: 0.6rem;
+			scroll-snap-type: x mandatory;
+			scroll-padding-inline: 1.5rem;
+			overscroll-behavior-x: contain;
+			scrollbar-width: none;
+		}
+
+		.lab-grid::-webkit-scrollbar {
+			display: none;
+		}
+
+		.lab-card {
+			scroll-snap-align: start;
+		}
 	}
 </style>

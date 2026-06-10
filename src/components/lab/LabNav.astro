@@ -1,0 +1,103 @@
+---
+/**
+ * LabNav — the grouped component-link list used twice by Lab.astro: inside
+ * the desktop sidebar and inside the mobile <details> disclosure. Markup and
+ * link styles live here so both render identically.
+ */
+import type { groupByCategory } from './registry';
+
+interface Props {
+	groups: ReturnType<typeof groupByCategory>;
+	labHome: string;
+	active?: string;
+}
+
+const { groups, labHome, active } = Astro.props;
+---
+
+{
+	groups.map((group) => (
+		<div class="lab-nav-group">
+			<span class="lab-nav-label">{group.label}</span>
+			<ul>
+				{group.items.map((item) => (
+					<li>
+						<a
+							href={`${labHome}${item.slug}/`}
+							class:list={['lab-nav-link', { active: item.slug === active }]}
+							aria-current={item.slug === active ? 'page' : undefined}
+						>
+							{item.meta.title}
+						</a>
+					</li>
+				))}
+			</ul>
+		</div>
+	))
+}
+
+<style>
+	.lab-nav-group + .lab-nav-group {
+		margin-top: var(--space-lg);
+	}
+
+	.lab-nav-label {
+		display: block;
+		margin-bottom: 0.5rem;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-text-muted);
+	}
+
+	.lab-nav-group ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+
+	.lab-nav-link {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		padding: 0.3rem 0;
+		min-height: 30px;
+		font-size: 0.85rem;
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		transition: color var(--duration-fast) var(--ease-smooth);
+	}
+
+	.lab-nav-link:hover {
+		color: var(--color-text);
+	}
+
+	.lab-nav-link:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		border-radius: var(--radius-sm);
+	}
+
+	.lab-nav-link.active {
+		color: var(--color-accent);
+		font-weight: 600;
+	}
+
+	@media (max-width: 880px) {
+		.lab-nav-group {
+			margin-bottom: var(--space-md);
+		}
+
+		.lab-nav-group ul {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.25rem 1rem;
+		}
+
+		.lab-nav-link {
+			min-height: 44px;
+		}
+	}
+</style>

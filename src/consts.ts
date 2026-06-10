@@ -6,6 +6,7 @@ export const SOCIAL_LINKS = {
 	github: 'https://github.com/valdemird',
 	twitter: '',
 	linkedin: 'https://www.linkedin.com/in/sebastiancaja',
+	devto: 'https://dev.to/valdemird',
 } as const;
 
 // --- Canonical author entity (Entity SEO / E-E-A-T) ---
@@ -23,7 +24,7 @@ export const PERSON = {
 	url: 'https://valdemird.com/about/',
 	jobTitle: 'Senior Software Engineer & Consultant',
 	knowsAbout: ['Software Engineering', 'Developer Tools', 'AI-assisted development', 'Astro', 'React', 'Web Performance'],
-	sameAs: [SOCIAL_LINKS.github, SOCIAL_LINKS.linkedin],
+	sameAs: [SOCIAL_LINKS.github, SOCIAL_LINKS.linkedin, SOCIAL_LINKS.devto],
 } as const;
 
 // Lightweight reference: link to the canonical Person by @id without re-inlining.
@@ -82,7 +83,7 @@ export const UI_STRINGS = {
 			greeting: "Hi, I'm",
 			name: 'valdemird',
 			subtitle: 'Software Engineer & Builder',
-			bio: 'I build developer tools and side projects. Right now I\'m figuring out how to make AI actually useful in day-to-day coding.',
+			bio: 'I ship products for companies across the Americas. After hours I build my own tools and write down what breaks. This site is me showing my work.',
 			statusBadge: "Let's talk, learn, and build",
 			metaDescription: 'Software engineer and builder. I make developer tools and write about what I learn.',
 			projectsTitle: 'Projects',
@@ -90,6 +91,9 @@ export const UI_STRINGS = {
 			recentPostsTitle: 'Recent Posts',
 			viewAllPosts: 'View all posts',
 			terminalTitle: '~/projects',
+			fromLabTitle: 'From the lab',
+			fromLabBlurb: 'Every diagram on this blog is a live component, not a screenshot. This one steps through the branching workflow from the worktrees post.',
+			fromLabLink: 'Browse all components →',
 		},
 		projects: {
 			previewOf: 'Preview of',
@@ -102,7 +106,7 @@ export const UI_STRINGS = {
 		},
 		about: {
 			title: 'About Me',
-			description: 'Full-stack engineer with 8+ years shipping products with React, Next.js, and Node.js. Currently building developer tools and experimenting with AI workflows.',
+			description: 'Sebastian Castano, full-stack engineer in Cali, Colombia. 8+ years shipping products, a spec-driven AI workflow, and a site built from its own live components.',
 		},
 		footer: {
 			copyright: 'All rights reserved.',
@@ -122,7 +126,7 @@ export const UI_STRINGS = {
 			greeting: 'Hola, soy',
 			name: 'valdemird',
 			subtitle: 'Ingeniero de software y maker',
-			bio: 'Construyo herramientas para desarrolladores y side projects. Ahora mismo estoy buscando cómo hacer que la IA sea realmente útil en el día a día de programar.',
+			bio: 'Lanzo productos para empresas en las Américas. Fuera del horario construyo mis propias herramientas y anoto lo que se rompe en el camino. Este sitio es mi manera de mostrar mi trabajo.',
 			statusBadge: 'Hablemos, aprendamos y construyamos',
 			metaDescription: 'Ingeniero de software y maker. Construyo herramientas para desarrolladores y escribo sobre lo que aprendo.',
 			projectsTitle: 'Proyectos',
@@ -130,6 +134,9 @@ export const UI_STRINGS = {
 			recentPostsTitle: 'Posts recientes',
 			viewAllPosts: 'Ver todos los posts',
 			terminalTitle: '~/proyectos',
+			fromLabTitle: 'Del lab',
+			fromLabBlurb: 'Cada diagrama de este blog es un componente vivo, no una captura. Este recorre el flujo de ramas del post sobre worktrees.',
+			fromLabLink: 'Ver todos los componentes →',
 		},
 		projects: {
 			previewOf: 'Vista previa de',
@@ -142,7 +149,7 @@ export const UI_STRINGS = {
 		},
 		about: {
 			title: 'Sobre mí',
-			description: 'Ingeniero full-stack con 8+ años creando productos con React, Next.js y Node.js. Construyendo herramientas para desarrolladores y experimentando con flujos de trabajo con IA.',
+			description: 'Sebastian Castano, ingeniero full-stack en Cali, Colombia. Más de 8 años lanzando productos, un flujo de IA spec-driven y un sitio construido con sus propios componentes vivos.',
 		},
 		footer: {
 			copyright: 'Todos los derechos reservados.',

@@ -8,9 +8,12 @@ lang: es
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
+import CodeDiff from '../../../components/blog/CodeDiff.astro';
 import FlakySuite from '../../../components/blog/FlakySuite.astro';
 import PullQuote from '../../../components/blog/PullQuote.astro';
 import Sidenote from '../../../components/blog/Sidenote.astro';
+import StatGrid from '../../../components/blog/StatGrid.astro';
+import Timeline from '../../../components/blog/Timeline.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
 
 <TLDR lang="es" bullets={[
@@ -47,6 +50,15 @@ Esa es la idea completa detrás de la librería de componentes de este sitio. No
 
 Nada de esto es idea mía, y fingir lo contrario sería ridículo cuando el linaje se rastrea tan fácil.
 
+<Timeline items={[
+  { date: "2011", title: "Explorable Explanations + Ladder of Abstraction", body: "Bret Victor le pone nombre al género en un ensayo y lo actúa en un segundo." },
+  { date: "2016", title: "Nace Distill", body: "Investigación de machine learning publicada como artículos interactivos." },
+  { date: "2017", title: "The Pudding", body: "Una publicación entera sobre la premisa de que hay ensayos que se juegan, no se leen." },
+  { date: "2020", title: "Communicating with Interactive Articles", body: "Distill repasa la evidencia: la interacción mejora de forma medible la comprensión y el involucramiento.", emphasize: true },
+  { date: "2021", title: "Distill entra en pausa", body: "Producir a ese estándar agotaba a todos los involucrados. El costo es real." },
+  { date: "2026", title: "Este post", body: "Un blog de ingeniería común intenta cerrar la brecha." },
+]} />
+
 La formulación más clara es [*Explorable Explanations*](https://worrydream.com/ExplorableExplanations/) de Bret Victor, de 2011: un documento reactivo, escribió, le permite al lector "jugar con los supuestos y análisis del autor, y ver las consecuencias". Su [*Up and Down the Ladder of Abstraction*](https://worrydream.com/LadderOfAbstraction/) es el mismo argumento actuado en vez de enunciado: aprendes el diseño de un algoritmo de dirección recorriendo con el dedo cada nivel de abstracción. Quince años después, los dos ensayos todavía se leen como una lista de pendientes que la web en general ignoró.
 
 En general, no del todo. [Distill](https://distill.pub/) pasó cinco años publicando investigación de machine learning como artículos interactivos, y su pieza de 2020, [*Communicating with Interactive Articles*](https://distill.pub/2020/communicating-with-interactive-articles/), es el mejor repaso que conozco de por qué esto funciona. Recorre la evidencia de que la interacción mejora la comprensión y el involucramiento, la conecta con la investigación sobre aprendizaje activo, y es ella misma interactiva, así que el argumento se demuestra solo mientras lo lees.<Sidenote>Distill entró en pausa en 2021, en parte porque producir artículos a ese estándar agotaba a todos los involucrados. Ese detalle va aquí y no en una nota al final: el costo es real y ahora llego a él.</Sidenote> Nicky Case junta el género completo en [explorabl.es](https://explorabl.es/), y [The Pudding](https://pudding.cool/) construyó una publicación entera sobre la premisa de que hay ensayos que se juegan, no se leen.
@@ -61,9 +73,45 @@ Una captura le muestra al lector lo que tú viste. Un componente le deja comprob
 
 Le voy a poner números al costo, porque la versión honesta de este post admite que el costo es la razón entera de que el género sea tan flaco.
 
+<StatGrid columns={3} stats={[
+  { value: 30, label: "componentes en producción", context: "cada uno con demo en /es/lab/" },
+  { value: 4, label: "construidos en una sesión", context: "la parte barata" },
+  { value: "×5", label: "costos ocultos cada uno", context: "teclado · movimiento reducido · dark mode · etiquetas ES · re-init" },
+]} />
+
 Este sitio corre hoy 30 componentes. Los cuatro más nuevos (el simulador de suites flaky de arriba, un grafo de git paso a paso, un reproductor del ciclo de un agente, un editor de curvas de easing arrastrable) tomaron una sesión completa de trabajo, y esa fue la parte barata. La cara vino después: cada uno necesita navegación por teclado, comportamiento con movimiento reducido, dark mode, versión en español de cada etiqueta incluyendo las que se generan en el cliente, y reinicialización cuando las transiciones de página del sitio le cambian el DOM por debajo. Nada de eso se ve en un GIF de demo, y todo eso es la diferencia entre un componente y un juguete.
 
 Y después está la parte que me saltaría si este post fuera marketing. La cuadrícula de puntos de ese simulador, la única parte cuyo propósito entero es ser vista, salió a producción invisible. Astro acota los estilos de un componente con un selector de atributo, los puntos se crean desde un script del cliente, los nodos creados en el cliente no llevan ese atributo, y cada punto se renderizaba con altura cero. Las barras funcionaban, el veredicto funcionaba, la matemática estaba bien, y la pieza central era un hueco. Lo descubrí días después, cuando un screenshot de Playwright volvió con una franja vacía en mitad de la figura.<Sidenote>El arreglo fue un `:global()`, dos minutos. Encontrarlo exigió mirar la página renderizada en vez del código, que era justo lo que yo venía no haciendo con toda confianza.</Sidenote> No voy a fingir que fue elegante. Construí una máquina para hacer cosas visibles y no noté que era invisible.
+
+Este es el arreglo completo:
+
+<CodeDiff
+  filename="src/components/blog/FlakySuite.astro"
+  language="css"
+  before={[
+    { line: 1, text: ".flaky-dot {" },
+    { line: 2, text: "  width: 12px;" },
+    { line: 3, text: "  height: 12px;" },
+    { line: 4, text: "  border-radius: 3px;" },
+    { line: 5, text: "  opacity: 0;" },
+    { line: 6, text: "  animation: fkPop 0.25s var(--ease-spring) forwards;" },
+    { line: 7, text: "}" },
+  ]}
+  after={[
+    { line: 1, text: "/* Dots are created from the client script, so they don't carry" },
+    { line: 2, text: "   Astro's scope attribute — style them through :global. */" },
+    { line: 3, text: ".flaky-grid :global(.flaky-dot) {" },
+    { line: 4, text: "  width: 12px;" },
+    { line: 5, text: "  height: 12px;" },
+    { line: 6, text: "  border-radius: 3px;" },
+    { line: 7, text: "  opacity: 0;" },
+    { line: 8, text: "  animation: fkPop 0.25s var(--ease-spring) forwards;" },
+    { line: 9, text: "}" },
+  ]}
+  removed={[1]}
+  added={[1, 2, 3]}
+  note="Astro compila .flaky-dot a .flaky-dot[data-astro-cid-…] al construir el sitio. Los puntos los crea un script del cliente y nunca reciben ese atributo, así que el selector no coincidía con ningún nodo y cada punto se renderizaba con altura cero."
+/>
 
 Ese bug se gana su lugar aquí porque es el argumento más fuerte que tengo a favor de todo este enfoque. Yo había leído el código de ese componente varias veces y estaba convencido de que funcionaba. Leer no alcanzó. A mí, el autor, con mi propio código. Esa es exactamente la posición del lector frente a cada afirmación que publicas, y por eso "descríbelo mejor" sigue perdiendo contra "deja que lo corra".
 
