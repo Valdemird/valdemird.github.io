@@ -1,9 +1,10 @@
 ---
 /**
- * AskMeAnything — site-wide floating chat button (bottom-right) that opens a
- * compact frosted-glass panel with two tabs: an on-device AI chat (Chrome
- * Prompt API / Gemini Nano) and a contact form that emails Sebastian
- * (Web3Forms) from every browser.
+ * AskMeAnything — site-wide floating button (bottom-right) that opens a
+ * compact frosted-glass panel. The default tab everywhere is the contact form
+ * that emails Sebastian (Web3Forms, works in every browser); a second tab
+ * hosts an on-device AI chat (Chrome Prompt API / Gemini Nano) that only
+ * becomes reachable once feature detection confirms the local model.
  *
  * Progressive enhancement: every AI affordance only appears after runtime
  * feature detection succeeds. Firefox/Safari/mobile visitors get a plain
@@ -90,12 +91,14 @@ const config = {
 			)}
 		</header>
 
+		<!-- Email is the product and the default everywhere; the chat tab is only
+		     reachable once feature detection has confirmed the local model. -->
 		<div class="ama-tabs" role="tablist" aria-label={L.panelTitle}>
-			<button type="button" class="ama-tab" role="tab" id={`ama-tab-chat-${uid}`} aria-selected="true" aria-controls={`ama-pane-chat-${uid}`} data-ama-tab="chat">{L.tabChat}</button>
-			<button type="button" class="ama-tab" role="tab" id={`ama-tab-form-${uid}`} aria-selected="false" aria-controls={`ama-pane-form-${uid}`} data-ama-tab="form">{L.tabMessage}</button>
+			<button type="button" class="ama-tab" role="tab" id={`ama-tab-form-${uid}`} aria-selected="true" aria-controls={`ama-pane-form-${uid}`} data-ama-tab="form">{L.tabMessage}</button>
+			<button type="button" class="ama-tab" role="tab" id={`ama-tab-chat-${uid}`} aria-selected="false" aria-controls={`ama-pane-chat-${uid}`} data-ama-tab="chat">{L.tabChat}</button>
 		</div>
 
-		<section class="ama-pane" id={`ama-pane-chat-${uid}`} role="tabpanel" aria-labelledby={`ama-tab-chat-${uid}`} data-ama-pane="chat">
+		<section class="ama-pane" id={`ama-pane-chat-${uid}`} role="tabpanel" aria-labelledby={`ama-tab-chat-${uid}`} data-ama-pane="chat" hidden>
 			<div class="ama-gate" data-ama-gate>
 				<p class="ama-gate-title">{L.gateTitle}</p>
 				<p class="ama-gate-body">{L.gateBody}</p>
@@ -138,7 +141,7 @@ const config = {
 			</div>
 		</section>
 
-		<section class="ama-pane" id={`ama-pane-form-${uid}`} role="tabpanel" aria-labelledby={`ama-tab-form-${uid}`} data-ama-pane="form" hidden>
+		<section class="ama-pane" id={`ama-pane-form-${uid}`} role="tabpanel" aria-labelledby={`ama-tab-form-${uid}`} data-ama-pane="form">
 			<form class="ama-form" data-ama-form>
 				<input type="checkbox" name="botcheck" class="ama-hp" tabindex="-1" aria-hidden="true" data-ama-botcheck />
 				<div class="ama-form-row">
