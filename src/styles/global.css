@@ -263,9 +263,20 @@ hr {
 }
 
 /* --- Tables --- */
+.table-scroll {
+	overflow-x: auto;
+	max-width: 100%;
+	-webkit-overflow-scrolling: touch;
+}
+
 table {
 	width: 100%;
 	border-collapse: collapse;
+}
+
+/* In a scroll container, keep columns readable instead of crushing them. */
+.table-scroll table {
+	min-width: 34rem;
 }
 
 th, td {

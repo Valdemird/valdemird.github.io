@@ -1,15 +1,24 @@
 ---
 import { getLearnModules, groupByPhase, moduleHref, baseSlug, type Lang } from '../../lib/learn';
 
+interface Heading {
+	depth: number;
+	slug: string;
+	text: string;
+}
+
 interface Props {
 	lang: Lang;
 	currentSlug?: string;
+	currentHeadings?: Heading[];
 }
 
-const { lang, currentSlug } = Astro.props;
+const { lang, currentSlug, currentHeadings } = Astro.props;
 const modules = await getLearnModules(lang);
 const phases = groupByPhase(modules);
 const es = lang === 'es';
+// Sections of the current module (h2 only) for the in-rail page index.
+const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 ---
 
 <nav class="learn-sidebar" aria-label={es ? 'Índice del curso' : 'Course index'}>
@@ -32,6 +41,15 @@ const es = lang === 'es';
 								<a href={moduleHref(slug, lang)} class:list={[{ active }]} aria-current={active ? 'page' : undefined}>
 									{m.data.title}
 								</a>
+								{active && sections.length > 1 && (
+									<ul class="section-list" data-toc>
+										{sections.map((s) => (
+											<li>
+												<a href={`#${s.slug}`} data-toc-link={s.slug}>{s.text}</a>
+											</li>
+										))}
+									</ul>
+								)}
 							</li>
 						);
 					})}
@@ -40,6 +58,39 @@ const es = lang === 'es';
 		))}
 	</ol>
 </nav>
+
+<script>
+	// Scroll-spy: highlight the current module section in the rail.
+	function initLearnToc() {
+		const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'));
+		if (!links.length) return () => {};
+		const byId = new Map(links.map((l) => [l.dataset.tocLink!, l]));
+		const heads = Array.from(document.querySelectorAll<HTMLElement>('.article-body h2[id]')).filter((h) => byId.has(h.id));
+		if (!heads.length) return () => {};
+		let current: HTMLAnchorElement | null = null;
+		const setActive = (id: string) => {
+			const link = byId.get(id);
+			if (!link || link === current) return;
+			current?.classList.remove('toc-active');
+			link.classList.add('toc-active');
+			current = link;
+		};
+		const obs = new IntersectionObserver(
+			(entries) => {
+				const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+				if (visible[0]) setActive((visible[0].target as HTMLElement).id);
+			},
+			{ rootMargin: '-15% 0px -70% 0px', threshold: 0 },
+		);
+		heads.forEach((h) => obs.observe(h));
+		return () => obs.disconnect();
+	}
+	let cleanupToc = initLearnToc();
+	document.addEventListener('astro:before-swap', () => cleanupToc?.());
+	document.addEventListener('astro:after-swap', () => {
+		cleanupToc = initLearnToc();
+	});
+</script>
 
 <style>
 	.learn-sidebar {
@@ -95,6 +146,31 @@ const es = lang === 'es';
 	}
 	.module-list a:hover { color: var(--color-text); background: var(--color-accent-subtle); }
 	.module-list a.active {
+		color: var(--color-accent);
+		background: var(--color-accent-subtle);
+		font-weight: 500;
+	}
+
+	/* In-rail page index: the active module's sections (h2). Active state uses
+	   the same tinted-wash + accent-text mechanism as the module links — no
+	   left accent bar (design-system hard rule). */
+	.section-list {
+		list-style: none;
+		margin: 0.15em 0 0.5em;
+		padding: 0 0 0 1.5em;
+		font-size: 0.82rem;
+	}
+	.section-list a {
+		display: block;
+		padding: 0.24em 0.6em;
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		line-height: 1.3;
+		transition: color 0.18s var(--ease-spring), background 0.18s var(--ease-spring);
+	}
+	.section-list a:hover { color: var(--color-text); background: var(--color-accent-subtle); }
+	.section-list a.toc-active {
 		color: var(--color-accent);
 		background: var(--color-accent-subtle);
 		font-weight: 500;
