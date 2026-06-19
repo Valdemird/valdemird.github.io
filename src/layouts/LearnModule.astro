@@ -13,7 +13,6 @@ import {
 	moduleHref,
 	learnHomeHref,
 	baseSlug,
-	PHASES,
 	TIER_LABEL,
 	DURABILITY_LABEL,
 	type Lang,
@@ -45,7 +44,6 @@ const es = lang === 'es';
 
 const modules = await getLearnModules(lang);
 const { prev, next } = getPrevNext(modules, slug);
-const phaseMeta = PHASES.find((p) => p.phase === phase);
 
 const currentPath = Astro.url.pathname;
 const homePath = es ? '/es/' : '/';
@@ -107,13 +105,21 @@ const breadcrumbJsonLd = {
 		<main id="main-content">
 			<div class="learn-layout">
 				<aside class="sidebar-col">
-					<LearnSidebar lang={lang} currentSlug={slug} />
+					<details class="sidebar-details">
+						<summary class="sidebar-summary">
+							<svg class="chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+							{es ? 'Índice del curso' : 'Course map'}
+						</summary>
+						<div class="sidebar-inner">
+							<LearnSidebar lang={lang} currentSlug={slug} />
+						</div>
+					</details>
 				</aside>
 				<article class="content-col">
 					<nav class="crumbs" aria-label={es ? 'Migas de pan' : 'Breadcrumb'}>
 						<a href={learnHome}>Learn</a>
 						<span aria-hidden="true">/</span>
-						<span class="crumb-phase">{phaseMeta?.title[lang]}</span>
+						<span class="crumb-phase">{es ? 'Fase' : 'Phase'} {String(phase).padStart(2, '0')} · {TIER_LABEL[tier][lang]}</span>
 					</nav>
 
 					<header class="module-header">
@@ -188,6 +194,36 @@ const breadcrumbJsonLd = {
 		max-height: calc(100vh - 7rem);
 		overflow-y: auto;
 		padding-right: var(--space-sm);
+	}
+
+	/* The course map is a collapsed <details> on mobile (so the article is
+	   reachable without scrolling past 16 modules) and a forced-open rail on
+	   desktop (the summary toggle is hidden). */
+	.sidebar-summary {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		padding: 0.7em 0;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		list-style: none;
+	}
+	.sidebar-summary::-webkit-details-marker { display: none; }
+	.sidebar-summary .chev {
+		transition: transform 0.2s var(--ease-spring);
+	}
+	.sidebar-details[open] .sidebar-summary .chev { transform: rotate(90deg); }
+
+	@media (min-width: 901px) {
+		.sidebar-summary { display: none; }
+		.sidebar-details > .sidebar-inner {
+			display: block !important;
+			content-visibility: visible !important;
+		}
 	}
 
 	.content-col { max-width: var(--content-width); }

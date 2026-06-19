@@ -88,13 +88,15 @@ const es = lang === 'es';
 		border-radius: var(--radius-sm);
 		font-family: var(--font-mono);
 		font-size: 0.72rem;
-		font-weight: 600;
-		color: var(--color-bg);
+		font-weight: 700;
+		/* Fixed near-black text reads on every fill in both themes (light
+		   text on the yellow/grey chips failed AA). */
+		color: oklch(0.21 0.03 265);
 	}
-	.grade-a { background: oklch(0.62 0.17 150); }
-	.grade-b { background: oklch(0.65 0.15 230); }
-	.grade-c { background: oklch(0.72 0.15 70); }
-	.grade-d { background: var(--color-text-secondary); }
+	.grade-a { background: oklch(0.74 0.13 150); }
+	.grade-b { background: oklch(0.74 0.12 235); }
+	.grade-c { background: oklch(0.80 0.13 75); }
+	.grade-d { background: oklch(0.74 0.02 265); }
 
 	.src-body { display: flex; flex-direction: column; }
 	.src-body a { color: var(--color-text); text-decoration-color: var(--color-accent); }

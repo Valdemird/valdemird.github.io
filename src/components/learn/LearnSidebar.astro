@@ -58,6 +58,13 @@ const es = lang === 'es';
 	}
 	.sidebar-home:hover { color: var(--color-accent); }
 
+	/* On mobile the course map lives behind a <details> toggle in the layout,
+	   so this in-rail "back to map" link would duplicate it. Hide it there;
+	   the breadcrumb's "Learn" link still returns to the hub. */
+	@media (max-width: 900px) {
+		.sidebar-home { display: none; }
+	}
+
 	.phase-list { list-style: none; margin: 0; padding: 0; }
 	.phase { margin-bottom: var(--space-lg); }
 

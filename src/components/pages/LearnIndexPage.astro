@@ -198,14 +198,14 @@ const courseJsonLd = {
 		display: inline-grid; place-items: center;
 		width: 1.5em; height: 1.5em;
 		border-radius: var(--radius-sm);
-		font-family: var(--font-mono); font-size: 0.72rem; font-weight: 600;
-		color: var(--color-bg);
+		font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+		color: oklch(0.21 0.03 265);
 	}
 	.gl { margin-right: 0.7em; }
-	.g-a { background: oklch(0.62 0.17 150); }
-	.g-b { background: oklch(0.65 0.15 230); }
-	.g-c { background: oklch(0.72 0.15 70); }
-	.g-d { background: var(--color-text-secondary); }
+	.g-a { background: oklch(0.74 0.13 150); }
+	.g-b { background: oklch(0.74 0.12 235); }
+	.g-c { background: oklch(0.80 0.13 75); }
+	.g-d { background: oklch(0.74 0.02 265); }
 
 	.path { display: grid; gap: var(--space-xl); }
 	.phase-block { }
@@ -247,8 +247,8 @@ const courseJsonLd = {
 	.insights-intro { color: var(--color-text-secondary); font-size: 1.05rem; line-height: 1.7; margin: 0 0 var(--space-lg); }
 	.insight-list { list-style: none; margin: 0; padding: 0; counter-reset: none; }
 	.insight-list li {
-		display: grid; grid-template-columns: 2.2rem 1fr; gap: 0.8em;
-		padding: var(--space-md) 0;
+		display: grid; grid-template-columns: 2.2rem 1fr; gap: 1em;
+		padding: var(--space-lg) 0;
 	}
 	.insight-list li + li { border-top: 1px solid var(--color-border); }
 	.i-num { font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-accent); padding-top: 0.2em; }
