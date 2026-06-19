@@ -1,0 +1,155 @@
+---
+title: "Multi-agent is a context-engineering decision, not a smarter architecture"
+description: "Sub-agents buy you clean, isolated context windows and parallel read-heavy exploration. The price is coordination overhead, and a single agent often wins. Orchestrator-worker and the read/write asymmetry decide when fan-out helps."
+phase: 8
+order: 14
+tier: produccion
+durability: duradero
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "A sub-agent is a context-window trick, not a colleague on an org chart. Use it to isolate noisy exploration and hand back only the distillate."
+  - "Parallelize reads, serialize writes. Read-only fan-out is safe; agents that write shared state can't see each other's implicit decisions and produce incoherent output."
+  - "Most multi-agent failures are system-design and coordination problems, not model limits. A better model won't fix a badly decomposed system, and multi-agent costs ~15x the tokens."
+sources:
+  - { grade: "A", title: "Building Effective Agents", author: "Schluntz & Zhang, Anthropic", year: 2024, url: "https://www.anthropic.com/engineering/building-effective-agents" }
+  - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/built-multi-agent-research-system" }
+  - { grade: "B", title: "Don't Build Multi-Agents", author: "Walden Yan, Cognition", year: 2025, url: "https://cognition.ai/blog/dont-build-multi-agents" }
+  - { grade: "A", title: "Why Do Multi-Agent LLM Systems Fail? (MAST)", author: "Cemri, Pan et al., UC Berkeley — NeurIPS 2025", year: 2025, url: "https://arxiv.org/abs/2503.13657" }
+  - { grade: "B", title: "Revisiting Multi-Agent Debate as Test-Time Scaling", author: "arXiv 2505.22960", year: 2025, url: "https://arxiv.org/pdf/2505.22960" }
+  - { grade: "B", title: "Improving Factuality and Reasoning through Multiagent Debate", author: "Du, Li, Torralba, Tenenbaum, Mordatch (MIT/Google), ICML 2024", year: 2023, url: "https://arxiv.org/pdf/2305.14325" }
+  - { grade: "C", title: "Security Threat Modeling for AI-Agent Protocols (MCP, A2A, ANP)", author: "arXiv 2602.11327", year: 2026, url: "https://arxiv.org/pdf/2602.11327" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+
+The whole "should I go multi-agent?" debate is framed wrong. The question isn't how many agents. It's how context flows between LLM calls. Once you stop anthropomorphizing ("a CEO agent, an analyst agent") and start reasoning about what context each generation actually needs, two positions that look like a contradiction stop being one. Anthropic builds a multi-agent research system and reports a big win. Cognition publishes a post titled "Don't Build Multi-Agents." Same axis, different points on it.
+
+<Callout type="important" title="The one reframe">
+A sub-agent is not a coworker in an org chart. It's a context-window management trick. It isolates noisy exploration and returns only the distillate to the main thread. The right question is "what context does each LLM call need, and what contamination do I want to keep out of the main thread?", not "how many agents."
+</Callout>
+
+The analogy I keep: a read-only sub-agent is an intern you send to the library with one instruction: "bring me a three-paragraph summary, not the whole cart of books." You, the main thread, never see the 400 books it skimmed. You get the digest. The cost is that the intern spent hours (tokens) you don't count at your desk. The win is your desk stays clear. The rookie move is handing the intern a pen to edit the final document while a second intern edits the same document without seeing the first. That's where the contradictions are born.
+
+## Multi-agent is mostly buying compute
+
+Here's the most counterintuitive number in the field. Anthropic's multi-agent research system spends roughly 15x the tokens of a normal chat, and token usage alone explains about 80% of the performance variance between configurations. Read that twice. A lot of the "magic" of multi-agent is just spending more compute in parallel. If cost explains most of the variance, then cost isn't only a finance metric. Cost is a performance metric.
+
+So before you add agents, ask the honest question: would one agent with more tool calls or extended thinking give the same lift, cheaper?
+
+<Tabs labels={["Cost vs. when it wins", "The scaling myth"]}>
+<TabPanel label="Cost vs. when it wins">
+| Configuration | Relative cost | Wins when |
+| --- | --- | --- |
+| Single-turn chat | 1x | Trivial task, no tools |
+| Single agent + tools | a few x | Most production tasks |
+| Multi-agent fan-out | ~15x | Breadth-first, read-only research that overflows the window |
+
+The 1x and ~15x figures are Anthropic's. The middle row is an order-of-magnitude gut estimate, not a measured number: treat it as a shape, not a fact.
+</TabPanel>
+<TabPanel label="The scaling myth">
+"More agents = more intelligence" is false. The gains come largely from spending 15x the tokens, and much of that is compute, not structure. Deploying a 15x fan-out for a low-value task where one agent was enough is one of the most expensive and common mistakes there is.
+</TabPanel>
+</Tabs>
+
+## The read/write asymmetry reconciles the debate
+
+This is the line almost nobody states out loud, and it unifies both camps: parallelize reads, serialize writes.
+
+Parallelizing read-only agents (search, read files, answer questions) is safe because they produce no conflicting decisions. There's no shared mutable state. Parallelizing writes shares mutable state and creates a race of decisions. That's why the exact exception Cognition admits (read-only sub-agents) lines up perfectly with the pattern Claude Code uses and with the cases where Anthropic says multi-agent helps.
+
+<MermaidDiagram title="Read parallelizes; write serializes">
+graph TD
+  R["READ — parallelize"] --> R1["search N docs, N guardrail checks,<br/>breadth-first explore"]
+  R1 --> R2["no shared state → no conflict<br/>fan-out cuts latency, keeps main thread clean"]
+  W["WRITE — serialize"] --> W1["generate one artifact, edit state,<br/>answer a customer"]
+  W1 --> W2["shared mutable state → decision race<br/>one linear thread, one decision at a time"]
+</MermaidDiagram>
+
+The same asymmetry maps straight onto human-in-the-loop: reads auto-execute (parallelizable, no conflict risk), writes serialize behind a gate. If you've already built that for safety reasons, you've already built the orchestration principle. You just hadn't named it.
+
+## Why write-fan-out breaks: conflicting implicit decisions
+
+Cognition's mechanism is worth memorizing: actions carry implicit decisions, and conflicting decisions produce bad results.
+
+When two sub-agents generate parts of the same artifact without seeing each other's trace, each makes assumptions (style, format, how it read the requirement) that are individually reasonable and mutually incompatible. The synthesizer gets two halves that don't fit and has no way to reconcile them. The concrete example from the post: you build a Flappy Bird clone, one sub-agent makes a Super Mario–style background, another makes a bird that doesn't match it at all, because neither saw the other's decision.
+
+<Callout type="important" title="This is the hinge of the whole topic">
+Conflicting implicit decisions explain why fan-out works for search and fails for generation. Searching makes no decision that another agent's output must respect. Generating does. If sub-agents share no state, they can't coordinate edits. Full stop.
+</Callout>
+
+The second Cognition principle follows: when you delegate, don't pass only "the task" or the last message. Pass the full trace: history, tool calls, prior reasoning. And here's the trade-off people try to dodge and can't: coherence = shared context = tokens. The token cost of passing full traces is exactly what makes good multi-agent expensive.
+
+<Callout type="warning" title="The most common antipattern">
+People trim the context passed to sub-agents "to save tokens" and then act surprised the synthesized output is incoherent. The high cost of well-done multi-agent is a feature, not a bug to optimize away. If you can't afford the full traces, you probably shouldn't use multi-agent for that task.
+</Callout>
+
+## The failures are in the system, not the model
+
+A Berkeley study analyzed 1600+ traces across 7 multi-agent frameworks and built MAST, a taxonomy of 14 failure modes in three categories, with strong inter-annotator agreement. The finding that should reshape where you spend engineering effort: most failures don't come from model limits. They come from system design and inter-agent misalignment.
+
+| MAST category | Weight | Failure modes |
+| --- | --- | --- |
+| System design / specification | ~42% | poor decomposition, badly specified roles, task-spec violation |
+| Inter-agent misalignment | ~37% | information loss, ignoring another agent's input, conflicting assumptions |
+| Task verification | ~21% | nobody verifies output, termination not detected |
+
+<Callout type="note" title="The operational consequence">
+Switching to a better model does not fix a badly designed multi-agent system. If your fan-out fails, the answer is almost never "let's wait for the next model." It's fix the decomposition, the communication protocol, and the verification.
+</Callout>
+
+## Orchestrator-worker, with explicit effort budgets
+
+Anthropic's winning pattern isn't "spawn agents freely." It's a lead that dictates an effort budget per subtask: for a simple fact, one agent with 3-10 tool calls; for a comparison, 2-4 sub-agents with 10-15 calls each. Without those limits, agents duplicate work or over-research. Orchestrating well is teaching the lead to delegate with limits, not just to decompose.
+
+<MermaidDiagram title="Orchestrator-worker with bounded delegation">
+graph TD
+  L["Lead / orchestrator"] -->|"goal + format + tool allowlist + effort budget"| W1["Worker (read-only)"]
+  L -->|"goal + format + tool allowlist + effort budget"| W2["Worker (read-only)"]
+  L -->|"goal + format + tool allowlist + effort budget"| W3["Worker (read-only)"]
+  W1 -->|"distillate only"| S["Synthesize"]
+  W2 -->|"distillate only"| S
+  W3 -->|"distillate only"| S
+  S --> L
+</MermaidDiagram>
+
+This sits inside the canonical taxonomy from "Building Effective Agents," which separates *workflows* (predefined paths: prompt chaining, routing, parallelization, orchestrator-worker, evaluator-optimizer) from *agents* (the LLM directs its own process). The golden rule of that paper is the discipline that holds up this entire topic: start with the simplest thing, and add agency or agents only when the problem justifies it.
+
+<CodeBlock filename="escalation-ladder.txt">
+```text
+Single prompt          → enough? stop.
+Prompt chaining        → fixed steps with validation gates → enough? stop.
+Routing                → classifier → specialized handler → enough? stop.
+Single agent + tools   → add extended thinking, more tool calls → enough? stop.
+Multi-agent            → only now, and write down why you went up a level.
+```
+</CodeBlock>
+
+## Verification and termination are first-class
+
+A whole MAST category (~21%) is that nobody verifies the output and nobody knows when to stop. Multi-agent makes it worse: the synthesizer tends to trust sub-agents without re-checking. The evaluator-optimizer pattern (one LLM generates, another scores against criteria and returns feedback in a loop until a threshold) and code-based graders exist precisely to close this gap. It's one of the most underrated and disproportionately high-impact investments in reliability.
+
+<Callout type="warning" title="Cap the loop">
+Evaluator-optimizer closes the verification gap, but it brings its own risk: infinite loops. Always set an explicit iteration limit (say, max 2). A grader that never converges is worse than no grader.
+</Callout>
+
+## What the consensus overrates
+
+Multi-agent debate as a reasoning technique is overrated. The 2023 "society of minds" paper kicked off the wave: several instances debate for N rounds to converge, improving factuality and reasoning. But the 2025 systematic study shows debate frequently does not beat self-consistency (majority voting) at equal compute budget, reframing it as expensive consistency, not superior reasoning. Vaccine against the hype: try self-consistency first.
+
+Also overrated: organizational metaphors ("CEO," "analyst," "critic"). They induce architectures with rich communication and conflicting decisions, exactly the MAST antipattern. Heavy role-based frameworks invite you to skip "first try something simple," which is the opposite of what the evidence recommends.
+
+<Collapsible title="Underrated: orchestration determinism, and 'think like your agent'">
+Two things almost nobody designs for. First, orchestration determinism (the Temporal lesson): coordination logic must be deterministic and resumable; non-determinism (LLM/tool calls) lives only in the activities. Mix them and you can't resume after a crash: you restart a stateful agent from zero. Second, "think like your agent": simulating in a console with the exact prompts and tools reveals duplicated work and bad delegation before you pay for it in production. Both are cheaper than post-hoc debugging and both get skipped.
+
+One more, mostly relevant if you ever let agents from different parties talk to each other: opening agent-to-agent communication multiplies the attack surface (agent-card spoofing, cross-injection). Keep inter-agent communication restricted and mediated, never open. For a single-tenant agent, *not* adding cross-agent protocols is a security decision, not a missing feature.
+</Collapsible>
+
+## The honest summary
+
+Default to a single linear agent with context compaction. Reach for sub-agents when the task is breadth-first, read-only, and overflows the context window, isolating the noisy exploration so the main thread only ever sees the distillate. Tightly coupled write tasks (coding, generating one coherent artifact, answering a customer) belong on one thread, one decision at a time, because conflicting implicit decisions can't be reconciled after the fact. And when it does fail, look at the decomposition and the verification before you blame the model. The model is rarely the bottleneck.

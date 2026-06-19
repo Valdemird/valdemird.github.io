@@ -1,0 +1,178 @@
+---
+title: "El agente es una política sobre un POMDP, no 'un LLM con tools'"
+description: "Un solo modelo mental unifica RAG, memoria, HITL y evals: el agente es una política estocástica que actúa sobre un mundo parcialmente observable. Workflow vs agente es una decisión de control de flujo, y el error compuesto es lo que impone la arquitectura."
+phase: 1
+order: 2
+tier: fundamento
+durability: atemporal
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "Un agente es una política π(acción | observación, historial) sobre un POMDP. El contexto es el belief state, las tools son el espacio de acciones, el harness es la dinámica de transición."
+  - "Workflow vs agente no es '¿usa un LLM?', sino quién controla la trayectoria. La decide el código, o la decide el modelo en runtime."
+  - "El error por paso compone. La fiabilidad por paso le gana a la capacidad bruta en horizontes largos, y esa matemática obliga a verify-step y HITL: no son adorno opcional."
+sources:
+  - { grade: "A", title: "Building Effective Agents", author: "Anthropic (Schluntz, Zhang)", year: 2024, url: "https://www.anthropic.com/research/building-effective-agents" }
+  - { grade: "A", title: "The Landscape of Agentic Reinforcement Learning for LLMs: A Survey", author: "arXiv 2509.02547", year: 2025, url: "https://arxiv.org/html/2509.02547v5" }
+  - { grade: "A", title: "Effective Context Engineering for AI Agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
+  - { grade: "A", title: "The Illusion of Diminishing Returns: Measuring Long Horizon Execution in LLMs", author: "arXiv 2509.09677", year: 2025, url: "https://arxiv.org/pdf/2509.09677" }
+  - { grade: "A", title: "A Reduction of Imitation Learning and Structured Prediction (DAgger)", author: "Ross, Gordon & Bagnell", year: 2011, url: "https://arxiv.org/abs/1011.0686" }
+  - { grade: "A", title: "Levels of Autonomy for AI Agents", author: "Feng et al. (Knight First Amendment Institute / arXiv 2506.12469)", year: 2025, url: "https://arxiv.org/pdf/2506.12469" }
+  - { grade: "B", title: "Don't Build Multi-Agents", author: "Cognition (Walden Yan)", year: 2025, url: "https://cognition.ai/blog/dont-build-multi-agents" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+La diferencia entre un agente que sobrevive a producción y uno que colapsa rara vez está en el modelo. Está en si lo diseñaste como lo que de verdad es: una política que actúa sobre un sistema parcialmente observable, eligiendo la siguiente acción a partir de una creencia incompleta sobre un estado que nunca ve del todo. "LLM + tools" es la maqueta de juguete. El POMDP es el plano de ingeniería. Una vez que ves el agente con esta lente, las decisiones que parecían ad-hoc (qué meter en contexto, cuándo verificar, qué tool exponer, cuándo pedir permiso) se colapsan en las mismas tres preguntas de siempre. ¿Sobre qué creencia actúo, qué transición provoco, qué recompensa persigo?
+
+<Callout type="important" title="El único modelo mental">
+Un agente es una política **π(acción | observación, historial)**. El LLM-reasoner *es* π: mapea (system prompt + historial observación-acción) → acción. El harness ejecuta esa acción contra un entorno, y la observación resultante (**ground truth real, no la predicción del modelo**) realimenta el siguiente paso. Todo lo demás (RAG, memoria, HITL, evals) se deriva de aquí.
+</Callout>
+
+La formalización exacta (agente LLM como política sobre un POMDP, frente al MDP degenerado de un solo paso de una llamada simple) viene del survey de RL agéntico de 2025. No necesitas el aparato formal para construir. Necesitas la descomposición, porque renombra problemas que ya tienes en problemas sobre los que puedes razonar.
+
+## POMDP, en las palabras que ya usas
+
+Las siglas parecen académicas. No lo son. Cada letra es una pregunta que te haces en cada feature.
+
+| Símbolo POMDP | En un agente LLM | La pregunta de ingeniería que ya te hacías |
+| --- | --- | --- |
+| **S**, estado oculto | El estado real del mundo (p. ej. las filas reales de la base de datos) | (el agente nunca lo ve directo) |
+| **O**, observación | Lo que el agente ve: mensajes, documentos leídos, resultados de tools | ¿Qué meto en el contexto? |
+| **b**, belief state | La ventana de contexto: la estimación del agente sobre S | ¿Qué retengo, compacto o externalizo? |
+| **A**, espacio de acciones | El conjunto de tools disponibles | ¿Qué tools expongo? |
+| **T**, transición | El harness: worker, DB, locks, persistencia | ¿Cómo se ejecuta y persiste el efecto? |
+| **R**, recompensa | El eval de éxito de tarea | ¿Cómo sé que lo hizo bien? |
+| **π**, política | El LLM condicionado por el system prompt | ¿Cómo decide la siguiente acción? |
+
+<Callout type="important" title="El contexto ES el belief state">
+El contexto no es "el prompt". Es la creencia finita sobre la que opera la política. Curarlo (decidir qué entra, qué se compacta, qué se externaliza) no es un detalle de prompting. Es decidir **sobre qué realidad actúa tu agente.**
+</Callout>
+
+La analogía a la que siempre vuelvo: un médico de urgencias a las 3 a.m. nunca ve directamente lo que pasa dentro del paciente (el estado oculto S). Tiene observaciones parciales (lo que el paciente dice, una analítica, un monitor), forma una *creencia* sobre el diagnóstico, toma una acción (pedir una prueba, administrar un fármaco) y entonces espera el resultado real antes de la siguiente decisión. No actúa sobre lo que *cree* que dirá la prueba. Actúa sobre lo que la prueba *dice*. Un agente que confía en su propia predicción en vez de ejecutar y observar es un médico recetando según una analítica que solo imaginó. [Esto último es mi encuadre pedagógico, no un resultado citado.]
+
+La observabilidad parcial explica los fallos clásicos con una causa, en vez de un encogimiento de hombros ante "el modelo siendo tonto". El agente **alucina** (rellenó S no observado con una creencia falsa), **repite acciones** (su creencia no registró que ya actuó) o **se pierde** (la creencia se degradó al desbordar la ventana). Los tres son patologías del belief state.
+
+## Workflow vs agente: quién controla la trayectoria
+
+La distinción más malinterpretada del campo no es "¿usa un LLM?". Es **quién decide la trayectoria.** En un workflow, los caminos están predefinidos en código: tú fijas el flujo y el LLM rellena huecos dentro de ramas que ya dibujaste. En un agente, el LLM dirige sus propios pasos y uso de tools en runtime.
+
+<MermaidDiagram title="Workflow vs agente: dónde vive el control de flujo">
+graph TB
+  subgraph W["Workflow"]
+    direction LR
+    A1[código] --> A2[LLM] --> A3[código] --> A4[rama]
+  end
+  subgraph G["Agente"]
+    direction LR
+    B1[LLM elige acción] --> B2[tool] --> B3[observa] --> B1
+  end
+</MermaidDiagram>
+
+La mayoría de los sistemas "agénticos" de producción que ganaron en 2025 eran workflows con un LLM como componente. No es un insulto, es la recomendación. Anthropic nombra cinco patrones de workflow que cubren la mayoría de casos antes de necesitar un agente full: prompt chaining (secuencial), routing (clasifica y deriva), parallelization (sectioning/voting), orchestrator-workers (un líder delega dinámicamente) y evaluator-optimizer (genera y critica en bucle). Confundir workflow con agente produce la sobre-ingeniería arquetípica: un loop de razonamiento donde bastaba una llamada API de 10 ms.
+
+<Callout type="note" title="El átomo que hay debajo de los dos">
+El bloque base no es el LLM crudo. Es el **augmented LLM** = LLM + retrieval + tools + memoria, cada uno con su interfaz. Esto importa porque te impide tratar RAG, memoria y tools como features sueltas. Son las tres formas de extender el belief state más allá de la ventana de contexto. Workflows y agentes son *moléculas* construidas sobre este átomo.
+</Callout>
+
+## El loop es un bucle de control, no un pensamiento largo
+
+El bucle de control es `gather context → take action → verify → repeat`. Lo que separa a un agente de una larga cadena de pensamiento es que cada paso recibe una **observación real del entorno**, no una predicción del modelo. El paso verify (comparar contra ground truth en cada iteración) es lo que evita que el error componga. Tratar la salida del modelo como verdad en vez de ejecutar la acción y observar es chain-of-thought disfrazado de agente, y es el modo de fallo número uno.
+
+<Callout type="warning" title="Sin paso verify, no hay agente">
+Sin verificación contra ground truth, hasta una buena precisión por paso se degrada en un horizonte largo. La verificación no es un extra de calidad. Es lo único que rompe la cascada de error que vamos a cuantificar ahora.
+</Callout>
+
+## La aritmética que gobierna la arquitectura
+
+Aquí está el momento "click". Modela cada paso como si acertara de forma independiente con probabilidad `p`. Entonces una tarea de `t` pasos tiene éxito con probabilidad `p^t`. La intuición lineal te traiciona brutalmente:
+
+| Acierto por paso (p) | Pasos (t) | Éxito de la tarea (p^t) |
+| --- | --- | --- |
+| 90% | 10 | **≈ 35%** (0.90¹⁰ = 0.3487) |
+| 99% | 100 | **≈ 37%** (fallo acumulado ≈ 63%) |
+| 99.9% | 100 | ≈ 90% |
+
+Un agente que clava el 90% de sus pasos fracasa en dos de cada tres tareas de diez pasos.
+
+<Callout type="warning" title="Lee p^t como heurística, no como teorema">
+El modelo `p^t` asume pasos independientes e igual de fiables, cosa que los agentes no son: los pasos se correlacionan, el error se recupera, el harness interviene. Así que `p^t` es un medidor de fiabilidad de servilleta, útil para la forma del problema, no una demostración. El resultado establecido en imitation learning es más fuerte y distinto: el error compuesto crece de forma **cuadrática** con el horizonte (del orden de εT², del análisis de DAgger de Ross y Bagnell), porque un error ε pequeño por paso empuja a la política a estados que nunca entrenó, donde se equivoca más. Cita p^t para la intuición. Cita εT² cuando necesites la teoría de verdad.
+</Callout>
+
+<Callout type="warning" title="El '63%' necesita un horizonte">
+Vas a ver por ahí "1% de error por paso → 63% de fallo". Eso solo es cierto a **t = 100 pasos** (1 − 0.99¹⁰⁰ ≈ 0.634). Sin fijar t la afirmación está matemáticamente indefinida. Especifica siempre el horizonte al citarla.
+</Callout>
+
+El hallazgo de 2025 que importa: cerca de `p ≈ 1`, mejoras diminutas en la precisión por paso producen saltos enormes en el horizonte alcanzable. Por eso la **fiabilidad por paso domina la capacidad bruta** en tareas de horizonte largo. Pasar de 99% a 99.9% por paso (ingenierizando fiabilidad: tools sólidas, verificación, poka-yoke) rinde más, en horizontes largos, que cambiar a un modelo "más inteligente".
+
+<Collapsible title="Por qué esto impone arquitectura en vez de sugerirla">
+HITL en escrituras, checkpoints, un verify-step explícito, horizontes más cortos, descomposición de tareas: no son preferencias de estilo. Son consecuencias directas del error compuesto. Si no puedes subir p, acortas t. Si no puedes acortar t, metes un humano o un verificador que resetee el error efectivo en cada paso. A la matemática le da igual tu gusto; te dice las únicas tres palancas que tienes: subir p, bajar t, o romper la cadena.
+</Collapsible>
+
+## La autonomía es un espectro, se fija por acción
+
+La autonomía no es un binario, y no es una escalera de capacidad tipo L1-L5. Es un espectro definido por el **rol que adopta el humano**: operador (dirige cada acción) → colaborador (aprueba cada decisión, HITL) → consultor (el agente propone, el humano decide) → aprobador → observador (el agente actúa solo). Más autonomía no es mejor. La gradúas por **reversibilidad y stakes.**
+
+<Callout type="tip" title="Fija el espectro por acción, no por sistema">
+Las lecturas pueden vivir en "observador": se auto-ejecutan. Las escrituras irreversibles pertenecen a "aprobador": pasan por un gate de confirmación. Casi nadie diseña la autonomía a nivel de la tool individual, que es justo donde el HITL realmente vive. Mapeas el espectro sobre tu espacio de acciones.
+</Callout>
+
+Lo que nos devuelve a la pregunta de mayor apalancamiento de todo el campo. Casi nunca es "¿qué framework de agente?". Es "¿necesito siquiera un agente, o un workflow o una sola llamada LLM lo resuelve más barato, rápido y predecible?". La escalera de decisión:
+
+1. **Rules engine**, si todo output válido es enumerable en tests. Microsegundos, coste cero, cero plausible-pero-incorrecto.
+2. **1 llamada LLM** (+ ejemplos in-context), necesitas comprensión de lenguaje pero el flujo es fijo.
+3. **Workflow**, hay ramas conocidas; dibújalas como flowchart en código.
+4. **Agente**, solo si el espacio de acciones es abierto, el horizonte variable y la trayectoria impredecible.
+
+El default es la solución más simple que funcione. El agente se gana su lugar únicamente cuando su plus de performance paga la latencia, el coste y el error compuesto que trae.
+
+## Las tools son el espacio de acciones
+
+El espacio de acciones del agente *es* su conjunto de tools, y la calidad de ese conjunto moldea la política tanto como el modelo. Diseñar la Agent-Computer Interface es diseñar el espacio de acciones del POMDP: nombres obvios, ejemplos, edge cases documentados, formatos a prueba de errores (poka-yoke) y, este se salta, **restringir el conjunto** para recortar la varianza de la política.
+
+<CodeBlock filename="tool-restraint.ts" lang="typescript">
+```ts
+// Un conjunto de tools abierto de par en par es alta varianza de
+// política + más superficie de ataque. Menos tools, más afiladas,
+// hacen fiable a un modelo modesto.
+const DISALLOWED = ['Bash', 'Write', 'Edit', 'WebFetch', 'Task'];
+
+// El espacio de acciones es una palanca de seguridad y fiabilidad,
+// no solo una lista de capacidades. Default-deny, luego agrega lo
+// que la tarea de verdad necesita; nunca al revés.
+```
+</CodeBlock>
+
+Una mala ACI degrada cualquier modelo. Una buena hace fiable a un modelo modesto. El espacio de acciones es una palanca de fiabilidad infravalorada frente al debate eterno sobre qué modelo elegir.
+
+## Lo que el consenso sobrevalora y lo que ignora
+
+<Tabs labels={["Sobrevalorado", "Infravalorado"]}>
+<TabPanel>
+
+- **"Más agéntico = mejor".** Falso. En 2025 los workflows deterministas ganaron producción.
+- **Multi-agente por defecto.** Solo gana en trabajo paralelizable y read-heavy; en estado compartido produce decisiones conflictivas.
+- **Frameworks pesados como punto de partida.** Ocultan el loop. Llamadas directas a la API primero: la mayoría de patrones son pocas líneas.
+- **"Agente = LLM + tools".** Incompleto. Ignora el loop, el entorno y la observabilidad parcial, que es lo que de verdad define a un agente.
+
+</TabPanel>
+<TabPanel>
+
+- **Calcular el presupuesto de error antes de diseñar el horizonte.** Casi nadie lo hace; por eso verify-step y HITL no son opcionales.
+- **Fiabilidad por paso ≫ capacidad.** Cerca de p ≈ 1, ingenierizar fiabilidad le gana a cambiar de modelo.
+- **El contexto ES el belief state.** Curarlo es arquitectura de primer orden, no detalle de prompting.
+- **El entorno es parte del agente.** El harness, los locks y la persistencia *son* la dinámica de transición T.
+
+</TabPanel>
+</Tabs>
+
+<Collapsible title="La tensión Anthropic vs Cognition sobre multi-agente">
+No es un consenso cerrado, es un desacuerdo real entre dos labs serios. Anthropic reporta un sistema orchestrator-worker (un líder Opus más subagentes Sonnet) superando al single-agent en un 90.2% en su eval interna de investigación: el multi-agente gana en tareas *read-heavy y paralelizables*, donde cada subagente explora una rama independiente. Cognition argumenta lo opuesto para tareas con *estado compartido*: los subagentes paralelos toman decisiones independientes que entran en conflicto al recomponerse, y abogan por single-threaded más un LLM compresor. No se contradicen tanto como delimitan el dominio. Paraleliza lecturas independientes; quédate single-thread cuando hay escritura o estado compartido. (Una nota de precisión: Cognition populariza y define "context engineering" pero no lo acuñó; eso suele atribuirse a Tobi Lütke y Andrej Karpathy, mediados de 2025.)
+</Collapsible>
+
+El punto de la lente no es la elegancia. Es que una vez que el agente es una política sobre un POMDP, el resto de la ruta deja de ser una lista de técnicas inconexas. El context engineering es curar la creencia. El RAG y la búsqueda agéntica son formas de extenderla. El HITL y la seguridad son graduar la autonomía por acción. Los evals miden la política, no la respuesta. Fueron una sola cosa todo el tiempo.

@@ -1,0 +1,123 @@
+---
+title: "La frontera: horizonte temporal de tarea, auto-mejora y hacia dónde va"
+description: "La métrica creíble de frontera no es el IQ del modelo, es el horizonte temporal de tarea que mide METR, que se duplica cada ~7 meses. La auto-mejora solo funciona acoplada a un grader verificable. El resto es especulación, marcada como tal."
+phase: 8
+order: 16
+tier: frontera
+durability: efimero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "La métrica honesta de la frontera es el horizonte temporal de tarea: la longitud de tarea que un agente termina al ~50% de fiabilidad, que METR mide duplicándose cada ~7 meses."
+  - "La auto-mejora (estilo Darwin Gödel Machine) funciona porque cada cambio se mide contra un benchmark verificable, el mismo isomorfismo eval↔reward↔grader de módulos anteriores. El grader es el techo."
+  - "Casi todo lo que está más allá de la tendencia del horizonte es de baja credibilidad (C/D). Este módulo envejece más rápido que ningún otro del curso; trátalo como brújula, no como mapa."
+sources:
+  - { grade: "A", title: "Measuring AI Ability to Complete Long Tasks (Time Horizon) + Time Horizon 1.1", author: "METR", year: 2026, url: "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/" }
+  - { grade: "A", title: "Effective context engineering for AI agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
+  - { grade: "A", title: "Darwin Gödel Machine: Open-Ended Evolution of Self-Improving Agents", author: "Zhang et al. (Sakana AI, UBC, Vector Institute)", year: 2025, url: "https://arxiv.org/abs/2505.22954" }
+  - { grade: "B", title: "A Survey of Agent Interoperability Protocols (MCP, ACP, A2A, ANP)", author: "arXiv 2505.02279", year: 2025, url: "https://arxiv.org/html/2505.02279v1" }
+  - { grade: "C", title: "Gartner: más del 40% de los proyectos de IA agéntica se cancelarán para fin de 2027", author: "Gartner press release", year: 2025, url: "https://www.gartner.com/en/newsroom/press-releases/2025-06-25-gartner-predicts-over-40-percent-of-agentic-ai-projects-will-be-canceled-by-end-of-2027" }
+  - { grade: "C", title: "Genie 3 world model (foundation/model-based)", author: "Google DeepMind", year: 2025, url: "https://techcrunch.com/2025/08/05/deepmind-thinks-genie-3-world-model-presents-stepping-stone-towards-agi/" }
+  - { grade: "D", title: "Composición de fiabilidad (decaimiento geométrico, 0.95^n)", author: "síntesis del curso", year: 2026, url: "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+Este es el último módulo, y es del que menos me fío. Todo lo anterior eran fundamentos (propiedades del motor, el agent loop, evals, memoria, seguridad) y casi todo seguirá siendo cierto en cinco años. Lo que viene envejece rápido. Léelo como brújula, no como mapa, y mira los grados de credibilidad: la única tendencia cuantitativa aquí es sólida, y casi todo lo demás soy yo diciéndote hacia dónde creo que se mueve el suelo y admitiendo que puedo equivocarme.
+
+La pregunta correcta en la frontera no es "qué tan listo es el modelo". Es "cuánto puede sostener una tarea antes de desviarse". Computer use, lifelong learning, economías agente-a-agente, auto-mejora: todo se reduce a la misma apuesta. Convertir una función estocástica de un solo turno en un sistema que mantiene estado, recupera el contexto correcto y no se descarrila a lo largo de un horizonte largo.
+
+## Horizonte temporal de tarea: la única métrica que vale la pena extrapolar
+
+El principiante lee benchmarks de un solo turno (MMLU, GPQA) e infiere capacidad agéntica. Esos no te dicen casi nada sobre un horizonte largo. La que sí lo hace es el **horizonte temporal de tarea** de METR: la longitud de tarea, medida en tiempo humano, que un agente completa a un 50% de fiabilidad.
+
+<Callout type="important" title="La tendencia, dicha con honestidad">
+La medición de METR es el número creíble. La longitud de tarea que los agentes terminan al ~50% de fiabilidad se ha estado **duplicando cada ~7 meses** (~188 días en lo histórico). La pendiente reciente es más empinada: alrededor de cuatro meses si ajustas desde 2023, y hasta ~tres meses (≈10× por año) en los modelos de 2024-2025 según el update Time Horizon 1.1. La medición es real. La extrapolación no está garantizada. Un doblaje que se sostuvo unos años puede doblarse.
+</Callout>
+
+Para fijar la escala: un modelo como o3 sostiene un horizonte de unos 110 minutos al 50% de fiabilidad. Ese es el tipo de número contra el que diseñar. No "¿es listo el modelo?" sino "¿dónde se cae *el mío*?".
+
+<MermaidDiagram title="Horizonte temporal: un doblaje, no un techo">
+graph LR
+  A["~minutos<br/>(modelos 2023)"] --> B["~decenas de minutos<br/>(2024)"]
+  B --> C["~1-2 horas<br/>(2025)"]
+  C --> D["? horas<br/>(extrapolación,<br/>incierta)"]
+</MermaidDiagram>
+
+Lo interesante no es el titular. Es *por qué* el horizonte es finito siquiera. La fiabilidad colapsa cuando una tarea pasa de minutos a horas, no porque el modelo se vuelva más tonto por paso, sino porque no mantiene coherencia a lo largo de la secuencia.
+
+## La fiabilidad compone geométricamente
+
+Aquí está la matemática que gobierna toda afirmación de autonomía. Si un agente acierta cada paso con probabilidad `p`, completar una cadena de `n` pasos independientes es `p^n`, y eso decae rápido. Con 95% por paso: diez pasos cae cerca de 0.60, veinte pasos cerca de 0.36. Un agente "casi perfecto" por paso es mediocre a horizonte largo.
+
+| Por paso | 5 pasos | 10 pasos | 20 pasos |
+|---|---|---|---|
+| 0.99 | 0.95 | 0.90 | 0.82 |
+| 0.95 | 0.77 | **0.60** | **0.36** |
+| 0.90 | 0.59 | 0.35 | 0.12 |
+
+Esta es la razón real de que la mayoría de los proyectos de agentes nunca lleguen a producción. Cita la cifra con cuidado: los blogs de la industria lanzan un ~88%, pero la procedencia de ese número es débil; fuentes más sólidas caen en otra magnitud, y Gartner proyecta que más del 40% de los proyectos agénticos se cancelarán para fin de 2027. La conclusión de diseño no sale de la estadística. Sale de la aritmética: los agentes que escalan tienen scope acotado, un toolset definido y rechazo explícito fuera de sus límites.
+
+<Callout type="important" title="Esta es la justificación matemática del human-in-the-loop">
+La composición de fiabilidad *es* la razón de ser del HITL, los checkpoints y la descomposición en sub-tareas. Un checkpoint resetea la cadena. Convierte un `p^20` catastrófico en dos tramos `p^10` con una verificación en medio que restaura la probabilidad a ~1. Un agente que se desvía a los 15 pasos no se arregla comprando un modelo más listo. Acortas la cadena crítica o le pones una compuerta.
+</Callout>
+
+## Auto-mejora: el grader es el techo
+
+La versión de la auto-mejora que la gente teme es la Gödel machine teórica que se reescribe hacia la superinteligencia. La que de verdad funciona es mundana y mucho más útil.
+
+La **Darwin Gödel Machine** (Zhang et al., 2025) es un agente de código que reescribe su propio codebase y valida cada cambio empíricamente contra benchmarks, manteniendo un archivo diverso de variantes para no quedar atrapado en un óptimo local. Los resultados son concretos y modestos a la vez: SWE-bench 20% → 50%, Polyglot 14.2% → 30.7%. El patrón no es "reescritura recursiva ilimitada". Es **genera una variante → mide → archiva la mejor**.
+
+<Callout type="important" title="El isomorfismo se cierra aquí">
+Fíjate en lo que la hace funcionar: una función de fitness. La auto-mejora solo tiene éxito acoplada a un grader externo y *verificable*, no al auto-juicio. Es la misma equivalencia eval↔reward↔grader de los módulos de evaluación y reward, ahora corriendo el optimizador. El reward que moldea una policy, el grader que puntúa un eval y el fitness que selecciona una variante son el mismo objeto con tres sombreros. El techo de la auto-mejora es la calidad de ese grader.
+</Callout>
+
+Este es el punto más infravalorado de todo el campo. Un grader débil hace que el agente optimice la métrica en lugar de la tarea. Goodhart, aplicado a tu propio evaluador, y amplificado por el loop de optimización. Por eso todo lo que construiste antes (graders code-based más un juez LLM, puntuados por trayectoria, corridos pass^k) no es solo QA. Es el sustrato sobre el que se pararía cualquier auto-mejora futura.
+
+<Collapsible title="Profundizar: por qué el optimizador 'aburrido' le gana al recursivo">
+La historia seductora es un modelo que se mejora solo sin humano en el loop, compuesto sin límite. La historia empírica es más lenta y acotada: DGM está restringida a tareas de código con un eval verificable, escala con cómputo de forma gradual y es tan buena como su benchmark. La "Gödel machine que se reescribe sin límite" sigue siendo teórica. Leer DGM como AGI recursiva inminente es hype. Leerla como un optimizador offline potente para tu harness (evolucionar la persona, el toolset, la allowlist contra tu suite de evals) es correcto y útil hoy. La diferencia entre esas dos lecturas es si tienes un grader confiable.
+</Collapsible>
+
+## Hacia dónde va esto (menor credibilidad, marcada como tal)
+
+Más allá de la tendencia del horizonte, estoy extrapolando. Los grados bajan a C/D aquí a propósito.
+
+<Tabs labels={["World models", "Memoria como infra", "Protocolos de agentes"]}>
+<TabPanel>
+Los LLM puros imitan texto y topan con un techo en planificación física y dinámica. Los **world models** son la apuesta para agentes que planean con "what-if" en un estado latente y aprenden de ensayo y error *simulado* en vez de texto. Genie 3 (DeepMind, 2025) es un world model interactivo en tiempo real propuesto como sustrato para entrenar agentes; DreamerV3 muestra un solo algoritmo de RL basado en modelo resolviendo muchas tareas con rollouts imaginados. Para agentes GUI/web esto apunta a simuladores de UI donde entrenas una policy sin tocar producción. Hoy está fuera del stack de un SaaS de texto. Como dirección, es el puente hacia agentes que entienden una dinámica, no solo un vocabulario. [C]
+</TabPanel>
+<TabPanel>
+En 2025-26, la memoria dejó de ser tema académico y se volvió preocupación de infraestructura. La distinción que el principiante se pierde: memoria *personalizada* (preferencias del usuario) frente a memoria *auto-mejorante* (destilar skills de la experiencia). Lo contraintuitivo es que la versión aburrida gana. La memoria útil hoy es casi siempre note-taking estructurado en archivos (write-through, auditable) y no actualización de pesos ni stores de grafos exóticos. Las opciones exóticas existen; rara vez justifican su complejidad. [C]
+</TabPanel>
+<TabPanel>
+Se están formando dos estándares de interoperabilidad. MCP estandariza agente↔herramienta (vertical). A2A estandariza agente↔agente (horizontal) vía Agent Cards, JSON-RPC, SSE. Son complementarios, como HTTP y DNS. Un survey del espacio de protocolos (arXiv 2505.02279) mapea los modelos de descubrimiento y confianza y advierte que la fragmentación es en sí un riesgo de adopción. La lección de frontera es de seguridad: cada nuevo borde de confianza es un nuevo vector (fake agent advertisement, re-delegación de autoridad, tool poisoning en tránsito). Trata cada protocolo como superficie de ataque, no solo como integración. [B]
+</TabPanel>
+</Tabs>
+
+El hilo bajo los tres es el fallo de seguridad que no desaparece a medida que los sistemas se vuelven más autónomos: el **confused deputy**. Un LLM confía en cualquier token convincente, así que un agente con privilegios puede ser dirigido por contenido no confiable a actuar para un atacante. En setups multi-agente se amplifica: un agente comprometido inyecta en el siguiente.
+
+<Callout type="warning" title="El spotlighting a nivel de prompt no es la solución">
+La frontera real de seguridad es de privilegios, no de instrucciones. Default-deny, aislamiento a nivel de fila, capacidades acotadas por tarea. El spotlighting (declarar documentos como datos, no como instrucciones) ayuda, pero es un parche conductual donde hace falta un borde arquitectónico. La gente recurre al prompt porque el prompt es barato. El borde es lo que aguanta.
+</Callout>
+
+## Lo que el consenso sobrevalora, y lo que ignora
+
+El hype son demos de autonomía sin fiabilidad por paso y sin coste por intento. La señal es la arquitectura (compaction, sub-agentes, memoria externa, HITL en escrituras, scope acotado) y los evals que miden trayectoria.
+
+<Callout type="note" title="Las heurísticas baratas que conviene llevarse">
+Sobrevalorado: agentes totalmente autónomos como producto; computer use por píxeles puro cuando hay una API detrás de la GUI; RAG como respuesta por defecto a "memoria" para corpus acotados; benchmarks de un solo turno como medida de capacidad agéntica. Infravalorado: que la fiabilidad compone geométricamente; que el grader es el límite de la auto-mejora; que el determinismo en el borde (sacar el plano de control del loop agéntico no determinista) te da replay y fiabilidad; que el coste por intento se vuelve la métrica dominante a medida que crece el horizonte.
+</Callout>
+
+El context engineering lo amarra todo. Si la coherencia sostenida es el cuello de botella, el trabajo real no es escribir el prompt perfecto. Es curar qué tokens de alta señal entran en un presupuesto de atención finito a lo largo del tiempo: compaction, note-taking estructurado, sub-agentes con contexto limpio. Sin ese andamiaje, tu horizonte temporal queda acotado por el tamaño de la ventana, no por la capacidad del modelo.
+
+## El final del curso
+
+Llegaste queriendo construir agentes. Te vas sabiendo que el motor es una función estocástica, stateless y de ventana finita que predice el siguiente token, y que casi todo lo demás (el loop, la memoria, los evals, el HITL, la seguridad, toda esta frontera) es andamiaje para hacer esa función fiable a lo largo de un horizonte que nunca fue diseñada para sostener.
+
+No hay un lazo bonito que atar. El horizonte sigue duplicándose, los graders siguen siendo el techo, y el gap entre "responde" y "responde correctamente y para a tiempo" es donde vive toda la ingeniería de verdad. El campo te entregará un modelo más capaz cada pocos meses. No te entregará un sistema. Esa parte sigue siendo tuya, y quienes la construyan bien serán los que midieron el horizonte en vez de creerle a la demo.
+
+Ve a medir dónde se cae tu agente. Después pon una compuerta ahí.

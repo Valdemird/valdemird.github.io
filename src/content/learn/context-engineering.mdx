@@ -1,0 +1,165 @@
+---
+title: "Context engineering: curating the belief state every turn"
+description: "Context is not a bucket you fill, it's a finite attention budget you spend each turn. Just-in-time retrieval, compaction, and the four context pathologies that make an agent get dumber as the conversation grows."
+phase: 2
+order: 3
+tier: core
+durability: duradero
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "Context is a finite attention budget, not storage. The goal is the smallest set of high-signal tokens that maximizes the chance of the right output, not 'does it fit in the window'."
+  - "More context degrades accuracy (context rot), not just cost. The failure is non-uniform: worse on semantic tasks, with distractors, and away from the start and end of the window."
+  - "Just-in-time retrieval, compaction as a lossy operation, and externalized memory beat stuffing everything up front. Multi-agent isolation works only for read-only work."
+sources:
+  - { grade: "A", title: "Effective context engineering for AI agents", author: "Anthropic (Applied AI)", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
+  - { grade: "A", title: "Context Rot: Evaluating LLM Performance Degradation with Increasing Input Tokens", author: "Chroma Research", year: 2025, url: "https://www.trychroma.com/research/context-rot" }
+  - { grade: "A", title: "Effective harnesses for long-running agents", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents" }
+  - { grade: "A", title: "Don't Build Multi-Agents", author: "Cognition (Walden Yan)", year: 2025, url: "https://cognition.ai/blog/dont-build-multi-agents" }
+  - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
+  - { grade: "A", title: "MemGPT: Towards LLMs as Operating Systems", author: "Packer et al. (UC Berkeley)", year: 2023, url: "https://arxiv.org/abs/2310.08560" }
+  - { grade: "A", title: "Gemini 2.5 technical report (context poisoning, Pokémon agent)", author: "Google DeepMind", year: 2025, url: "https://arxiv.org/abs/2507.06261" }
+  - { grade: "B", title: "How Long Contexts Fail (How to Fix Your Context)", author: "Drew Breunig", year: 2025, url: "https://www.dbreunig.com/2025/06/22/how-contexts-fail-and-how-to-fix-them.html" }
+  - { grade: "B", title: "Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory", author: "Mem0", year: 2025, url: "https://arxiv.org/pdf/2504.19413" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+
+The beginner thinks the 200K or 1M-token window is a bucket: the more you pour in, the more the agent knows. The reality is the opposite. Context is a finite, non-uniform, degradable resource you have to curate on every single turn. Every irrelevant token you add doesn't just cost money and latency. It costs accuracy. This module is about treating context the way an operating system treats RAM, and about having the precise vocabulary to diagnose why your agent "gets dumber" as the conversation runs.
+
+## Context is curated every turn
+
+The line between prompt engineering and context engineering is temporal. Prompt engineering optimizes one static thing you write once: the system prompt. Context engineering manages the entire token stream (history, tool results, memory, files) that changes at every step of the agent loop. The system prompt still matters, but treated as an isolated artifact it's a subset of the problem, not the problem.
+
+The governing principle fits in one Anthropic sentence: *"find the smallest set of high-signal tokens that maximize the likelihood of your desired outcome."* That turns context design into a constrained optimization, not an accumulation. The physical reason: transformer attention is pairwise, so it's O(n²), and models have a limited number of parameters trained for long-range dependencies, so recall reliability decays as length grows.
+
+<Callout type="important" title="The attention budget">
+Don't ask "does it fit in the window?" Ask "what is the smallest set of high-signal tokens that maximizes the probability of the correct output?" Everything else gets isolated, compressed, or externalized. The window's capacity is not the metric that matters. Signal density is.
+</Callout>
+
+The most useful frame comes from MemGPT: treat the context window as limited working memory (RAM) and external storage as long-term memory (disk), with the LLM itself doing the paging, deciding what to load and what to evict, the way an OS moves pages between RAM and swap. The pedagogical extension is mine: thinking of context bloat as *thrashing* (when an OS spends more time paging than computing) explains why an agent with a window full of junk reasons worse even though "it all fits." [D]
+
+<MermaidDiagram title="The window is RAM, not an infinite buffer">
+graph LR
+  A["Working memory<br/>(context window)"] --- B["Long-term store<br/>(notes.md, DB, files)"]
+  A -.->|LLM decides paging:<br/>load / evict / compact| B
+</MermaidDiagram>
+
+## Context rot: the finding that breaks the intuition
+
+The central empirical evidence is Chroma's *Context Rot* study, which evaluated 18 frontier models (Claude Opus 4, GPT-4.1, Gemini 2.5, Qwen3 among them) and showed that models do not use their context uniformly: performance grows increasingly unreliable as input length grows.
+
+<Callout type="warning" title="Don't overstate the finding">
+It's wrong to say "every model degrades at every length increment." The study shows non-uniform degradation that depends on task and model, with non-linear curves. It's much worse on **semantic** (non-lexical) tasks, with **distractors**, and at **low question-answer similarity**. It's not monotonic at each step, and it doesn't only happen near the window's limit.
+</Callout>
+
+This is why the classic lexical needle-in-a-haystack (NIAH) is misleading as a long-context capability test: it returns ~100% and hides the real degradation, because finding an exact string is trivial next to reasoning semantically over the content. To measure anything real you need multi-step benchmarks like LongMemEval or LOCOMO.
+
+Two counterintuitive Chroma results almost nobody applies. First, accuracy is higher near the start of context than in the middle (the old "lost in the middle") so putting the critical stuff (instructions, HITL rules) at the front is a cheap lever. Second, shuffling the haystack (breaking the local coherence of the filler) sometimes *improves* performance: the logical structure of the filler can confuse attention, which means "arranging the context nicely" doesn't always help.
+
+## The four pathologies: a diagnostic vocabulary
+
+"Context rot" describes *that* long context fails. Drew Breunig gives the taxonomy of *why*, which is what hands you a debugging vocabulary: when your agent goes stupid, is it poisoning or distraction?
+
+<Callout type="note" title="Breunig's four failure modes">
+- **Poisoning**: a hallucination or hostile fact enters context and gets cited repeatedly, self-reinforcing. The agent chases an impossible goal or "remembers" something false. Remedy: quarantine, validate what enters memory.
+- **Distraction**: accumulated history drowns out the system prompt instructions. The agent ignores rules it used to follow. Remedy: compaction, pruning.
+- **Confusion**: superfluous tools or content sway responses where they shouldn't. Wrong tool selection. Remedy: shrink the tool set, make tools unambiguous.
+- **Clash**: contradictory information piled into context. The agent wavers or contradicts itself. Remedy: prune the conflict, offload.
+</Callout>
+
+The canonical poisoning case is documented by Google DeepMind: in their agent playing Pokémon with Gemini 2.5, a hallucination entered context and reinforced itself by being cited in later turns, derailing the agent's strategy. This connects straight to security: poisoning is a cousin of prompt injection, because a hostile fact injected through conversation can contaminate every future turn. [D]
+
+## Just-in-time retrieval: the agent explores, you don't pre-load
+
+Instead of pre-loading all the data into the window (embedding-RAG style that injects a blob), the agent keeps lightweight identifiers (paths, queries, links) and loads data on demand with tools, discovering relevance progressively: a file's size hints at complexity, names hint at purpose, timestamps hint at recency. The center of gravity moves from "retrieval pipeline" to "agent that explores."
+
+<Tabs labels={["Pre-loading (embedding RAG)", "Just-in-time (agentic search)"]}>
+<TabPanel>
+You index the whole corpus, retrieve top-k by similarity, inject the blob into the window. You pay for the pipeline, the indexing, and the drift, and the agent gets whatever the retriever decided. Still the right call for huge, heterogeneous corpora.
+</TabPanel>
+<TabPanel>
+The agent uses grep/glob/read over files and decides what to read turn by turn. No embeddings, no indexing. For bounded corpora it matches or beats RAG, and it sidesteps the index-drift problem entirely. The retriever's judgment is replaced by the agent's. [C]
+</TabPanel>
+</Tabs>
+
+The trade is real: just-in-time means slower runtime exploration and more turns spent navigating. For a small, fast-changing set of documents that's a good deal. For a million heterogeneous PDFs it isn't, and a hybrid (pre-index the obvious, explore the rest) often wins.
+
+## Compaction and memory: discarding without losing what matters
+
+Compaction is not "summarizing." It's a lossy operation where you choose what to throw away, at the risk of tossing context that's subtle but critical (an architecture decision, an unresolved bug). Anthropic's recommendation is to maximize recall first, over-preserve, then iterate on precision by removing the superfluous.
+
+<Callout type="tip" title="Tool-result clearing">
+The lowest-risk form of compaction: drop the raw outputs of old tool calls (file reads, searches) once their purpose is served, keeping the distilled decision. Low risk because it doesn't touch the reasoning, only the literal content that's no longer needed.
+</Callout>
+
+But compaction alone is not enough over very long horizons. Anthropic says it plainly: even a frontier coding model like Opus 4.5 falls short on very-long-horizon tasks with compaction alone. You complement it with filesystem memory (files like `claude-progress.txt`, `feature_list.json`, git) plus verification loops. That's structured note-taking: write-through long-term memory that survives context resets.
+
+The key architectural distinction is short-term vs long-term. Short-term memory is the turn or session (the session transcript). Long-term crosses sessions (a per-user notes file). Frameworks like Mem0 go past "flat" memory: they add extraction and consolidation for selective retrieval, instead of reloading the whole file every time.
+
+<Collapsible title="Profundizar: how a real harness approximates compaction">
+A harness doesn't need an explicit LLM-compaction step to get most of the benefit. A common pattern: rotate to a fresh session after N turns, persist only a pointer plus turn count, and resume with a recap fallback if the SDK's resume fails (distinguishing a timeout abort from a real error). Long-term memory is then a write-through save: the database is the source of truth, the local notes file is the turn's cache. The session transcript is short-term memory; the notes file is long-term. None of this is "true" compaction, but the combination of rotation plus externalized notes covers the same failure it's meant to prevent: the window filling with stale turns.
+</Collapsible>
+
+## The ignored tension: pruning vs prompt caching
+
+Here's the production knowledge almost everyone misses: compressing or pruning history invalidates cached prefixes. Prefix caching (the KV cache) requires *stable* prefixes. If you rotate or trim the start of the prompt, the cache breaks and you pay for the whole prefix again.
+
+<Callout type="warning" title="Caching numbers: attribute carefully">
+The figure attributable to a primary source: cached tokens cost about 10% of the input price (up to ~90% cost reduction on the cached prefix, roughly 0.1x) and improve time-to-first-token. You'll see numbers like "5-12x reduction" or "60-85% hit rates" floating around. Those are plausible practitioner estimates, not official data. Present them as such. [D]
+</Callout>
+
+The remedy is cache-aware layout (dynamic-content-at-the-end): put the stable prefixes (system prompt, tool definitions, persona) at the **front** to maximize the cache, and move what changes every request (timestamps, session ids, user input) to the **end**.
+
+<CodeBlock filename="prompt-layout.txt">
+```text
+[ system prompt ]   stable prefix, cacheable (~0.1x on hits)
+[ tool defs     ]   stable prefix
+[ persona       ]   stable prefix
+[ history       ]   semi-stable
+[ timestamp, session_id, user input ]   volatile, goes LAST
+```
+</CodeBlock>
+
+The conflict is real and it's an architecture decision, not a detail: aggressive context management (pruning, compaction) versus cache hit rate. The expert picks the cost-accuracy-latency trade-off deliberately. One caveat on durability: this caching knowledge is short-lived (APIs change their caching mechanisms), while the attention budget is timeless. [D]
+
+## Isolation via sub-agents, and its counter-thesis
+
+A sub-agent with a clean window can explore with tens of thousands of tokens and return only 1-2K distilled tokens to the coordinator, keeping it uncontaminated. That's pure context isolation. But there's a genuine debate here that a serious engineer has to be able to arbitrate.
+
+<Tabs labels={["Anthropic: multi-agent yes", "Cognition: don't"]}>
+<TabPanel>
+For read-heavy, parallel research with self-contained tasks, sub-agents work: each brings back its condensed finding and they don't coordinate mid-task. The regime where multi-agent earns its keep is parallel, read-heavy investigation.
+</TabPanel>
+<TabPanel>
+Actions carry implicit decisions; parallel sub-agents make conflicting choices that can't be reconciled. The example: you ask for a Flappy Bird and get something half Super Mario. The argument is for single-threaded plus a dedicated compression LLM.
+</TabPanel>
+</Tabs>
+
+<Callout type="important" title="The rule that reconciles the debate">
+Isolate context with sub-agents only for read-only / no-shared-state tasks (research, search, summarization). Never for write work that needs coherent decisions. The expertise is knowing when *not* to use multi-agent. [D]
+</Callout>
+
+## What the consensus overrates and what it ignores
+
+Overrated: the obsession with bigger windows (1M tokens) as the solution. Context rot shows filling the window degrades accuracy; what matters is signal density, not capacity. Prompt engineering as a standalone discipline. It is a subset of context engineering. Lexical NIAH as a capability test. Multi-agent "by default because it scales." Embedding RAG as the automatic answer to "it doesn't fit."
+
+Ignored or underused: degradation is position-dependent, so putting instructions and HITL rules at the start is a near-free lever almost nobody applies on purpose. Tools are context too. Bloated or ambiguous tool definitions cause confusion, so shrinking and disambiguating the tool set is context engineering, not just API design. Memory without verification is debt: a write-through memory with no quality gate can persist poisoned data that contaminates every future turn. And structure helps. Markdown or XML headers and sections improve instruction-following over "everything in one blob."
+
+## Common mistakes
+
+<Callout type="warning" title="Context-management anti-patterns">
+- **"More context = better"**: pre-loading everything ignores context rot and burns cost without buying accuracy.
+- **Compacting aggressively without recall-first**: you lose architecture decisions and subtle bugs the agent then ignores.
+- **Multi-agent by default for shared writes**: the Flappy-Bird-comes-out-Mario syndrome.
+- **Timestamps and ids in the prefix**: breaks the KV cache on every request and multiplies cost and latency.
+- **Trusting long-term memory blindly**: a bad fact persists and poisons every later turn.
+- **Measuring only with lexical NIAH**: and declaring yourself safe when the real tasks are semantic and multi-step.
+</Callout>
+
+The through-line is one reflex. When the agent degrades over a long run, don't reach for a bigger window. Name the pathology, find the stale tokens, and decide what to evict. That is the loop this whole field runs on.

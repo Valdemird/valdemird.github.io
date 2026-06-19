@@ -1,0 +1,95 @@
+---
+import { getLearnModules, groupByPhase, moduleHref, baseSlug, type Lang } from '../../lib/learn';
+
+interface Props {
+	lang: Lang;
+	currentSlug?: string;
+}
+
+const { lang, currentSlug } = Astro.props;
+const modules = await getLearnModules(lang);
+const phases = groupByPhase(modules);
+const es = lang === 'es';
+---
+
+<nav class="learn-sidebar" aria-label={es ? 'Índice del curso' : 'Course index'}>
+	<a class="sidebar-home" href={es ? '/es/learn/' : '/learn/'}>
+		{es ? '← Mapa del curso' : '← Course map'}
+	</a>
+	<ol class="phase-list">
+		{phases.map((p) => (
+			<li class="phase">
+				<p class="phase-label">
+					<span class="phase-num">{String(p.phase).padStart(2, '0')}</span>
+					{p.title[lang]}
+				</p>
+				<ul class="module-list">
+					{p.modules.map((m) => {
+						const slug = baseSlug(m.id);
+						const active = slug === currentSlug;
+						return (
+							<li>
+								<a href={moduleHref(slug, lang)} class:list={[{ active }]} aria-current={active ? 'page' : undefined}>
+									{m.data.title}
+								</a>
+							</li>
+						);
+					})}
+				</ul>
+			</li>
+		))}
+	</ol>
+</nav>
+
+<style>
+	.learn-sidebar {
+		font-size: 0.9rem;
+	}
+	.sidebar-home {
+		display: inline-block;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		margin-bottom: var(--space-lg);
+		transition: color 0.2s var(--ease-spring);
+	}
+	.sidebar-home:hover { color: var(--color-accent); }
+
+	.phase-list { list-style: none; margin: 0; padding: 0; }
+	.phase { margin-bottom: var(--space-lg); }
+
+	.phase-label {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5em;
+		margin: 0 0 0.5em;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-secondary);
+		line-height: 1.4;
+	}
+	.phase-num { color: var(--color-accent); font-weight: 600; }
+
+	.module-list { list-style: none; margin: 0; padding: 0; }
+	.module-list li { margin: 0; }
+	.module-list a {
+		display: block;
+		padding: 0.32em 0.6em;
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		line-height: 1.35;
+		transition: color 0.18s var(--ease-spring), background 0.18s var(--ease-spring);
+	}
+	.module-list a:hover { color: var(--color-text); background: var(--color-accent-subtle); }
+	.module-list a.active {
+		color: var(--color-accent);
+		background: var(--color-accent-subtle);
+		font-weight: 500;
+	}
+</style>

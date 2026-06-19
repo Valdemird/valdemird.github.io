@@ -6,7 +6,7 @@ import { getOgSatoriFonts } from '../../lib/og-fonts';
 
 export const getStaticPaths: GetStaticPaths = async () => {
 	const posts = await getCollection('blog');
-	return posts.map((post) => ({
+	const blogPaths = posts.map((post) => ({
 		params: { slug: post.id },
 		props: {
 			title: post.data.title,
@@ -16,6 +16,24 @@ export const getStaticPaths: GetStaticPaths = async () => {
 			lang: post.data.lang ?? 'en',
 		},
 	}));
+
+	// Learn modules: one shared OG per slug, generated from the EN entry
+	// (EN and ES both reference /og/learn-<slug>.png).
+	const learn = await getCollection('learn');
+	const learnPaths = learn
+		.filter((m) => (m.data.lang ?? 'en') === 'en')
+		.map((m) => ({
+			params: { slug: `learn-${m.id.replace(/^es\//, '')}` },
+			props: {
+				title: m.data.title,
+				description: m.data.description,
+				pubDate: m.data.updatedDate ?? new Date('2026-06-19'),
+				tags: [m.data.tier],
+				lang: m.data.lang ?? 'en',
+			},
+		}));
+
+	return [...blogPaths, ...learnPaths];
 };
 
 function formatDate(date: Date, lang: string): string {

@@ -1,0 +1,106 @@
+---
+import { GRADE_LABEL, type Lang } from '../../lib/learn';
+
+interface Source {
+	grade: 'A' | 'B' | 'C' | 'D';
+	title: string;
+	author?: string;
+	year?: string | number;
+	url?: string;
+}
+
+interface Props {
+	sources?: Source[];
+	lang: Lang;
+}
+
+const { sources, lang } = Astro.props;
+const es = lang === 'es';
+---
+
+{sources && sources.length > 0 && (
+	<section class="sources" aria-labelledby="sources-heading">
+		<p class="sources-eyebrow" id="sources-heading">{es ? 'Fuentes' : 'Sources'}</p>
+		<p class="sources-note">
+			{es
+				? 'Cada fuente lleva un grado de credibilidad: A primaria alta · B sólida · C emergente · D inferencia del autor, sin verificar.'
+				: 'Each source carries a credibility grade: A high-confidence primary · B solid · C emerging · D author inference, unverified.'}
+		</p>
+		<ul class="sources-list">
+			{sources.map((s) => (
+				<li>
+					<span class:list={['grade', `grade-${s.grade.toLowerCase()}`]} title={GRADE_LABEL[s.grade][lang]}>
+						{s.grade}
+					</span>
+					<span class="src-body">
+						{s.url ? (
+							<a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a>
+						) : (
+							<span>{s.title}</span>
+						)}
+						{(s.author || s.year) && (
+							<span class="src-meta">
+								{[s.author, s.year].filter(Boolean).join(', ')}
+							</span>
+						)}
+					</span>
+				</li>
+			))}
+		</ul>
+	</section>
+)}
+
+<style>
+	.sources {
+		margin-top: var(--space-2xl);
+		padding-top: var(--space-lg);
+		border-top: 1px solid var(--color-border);
+	}
+	.sources-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 0.4em;
+	}
+	.sources-note {
+		font-size: 0.82rem;
+		color: var(--color-text-secondary);
+		margin: 0 0 1.2em;
+		max-width: 60ch;
+	}
+	.sources-list { list-style: none; margin: 0; padding: 0; }
+	.sources-list li {
+		display: flex;
+		gap: 0.7em;
+		align-items: baseline;
+		padding: 0.45em 0;
+		font-size: 0.9rem;
+		line-height: 1.5;
+	}
+	.grade {
+		flex: none;
+		display: inline-grid;
+		place-items: center;
+		width: 1.5em;
+		height: 1.5em;
+		border-radius: var(--radius-sm);
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		font-weight: 600;
+		color: var(--color-bg);
+	}
+	.grade-a { background: oklch(0.62 0.17 150); }
+	.grade-b { background: oklch(0.65 0.15 230); }
+	.grade-c { background: oklch(0.72 0.15 70); }
+	.grade-d { background: var(--color-text-secondary); }
+
+	.src-body { display: flex; flex-direction: column; }
+	.src-body a { color: var(--color-text); text-decoration-color: var(--color-accent); }
+	.src-meta {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-text-secondary);
+	}
+</style>

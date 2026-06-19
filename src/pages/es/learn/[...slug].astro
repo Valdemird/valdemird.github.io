@@ -1,0 +1,30 @@
+---
+import { getCollection, render } from 'astro:content';
+import LearnModule from '../../../layouts/LearnModule.astro';
+import { baseSlug } from '../../../lib/learn';
+
+export async function getStaticPaths() {
+	const all = await getCollection('learn');
+	return all
+		.filter((m) => (m.data.lang ?? 'en') === 'es')
+		.map((entry) => ({ params: { slug: baseSlug(entry.id) }, props: { entry } }));
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const slug = baseSlug(entry.id);
+---
+
+<LearnModule
+	title={entry.data.title}
+	description={entry.data.description}
+	slug={slug}
+	lang="es"
+	phase={entry.data.phase}
+	tier={entry.data.tier}
+	durability={entry.data.durability}
+	updatedDate={entry.data.updatedDate}
+	sources={entry.data.sources}
+>
+	<Content />
+</LearnModule>

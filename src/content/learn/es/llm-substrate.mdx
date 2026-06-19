@@ -1,0 +1,126 @@
+---
+title: "Qué es de verdad un LLM: estocástico, stateless, ventana finita"
+description: "El motor de todo agente de IA es una función estocástica y stateless que predice el siguiente token sobre una ventana finita. Memoria, sesiones, HITL y evals existen para compensar esas tres propiedades."
+phase: 1
+order: 1
+tier: fundamento
+durability: atemporal
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "Para fines de ingeniería, un LLM se reduce a tres hechos: es estocástico, es stateless y corre sobre una ventana finita."
+  - "Casi toda decisión de diseño de un agente (memoria, evals, presupuesto de contexto) es un parche para una de esas tres."
+  - "El tool-use y seguir instrucciones no son magia del prompt. Son comportamiento aprendido en el post-entrenamiento; el prompt solo condiciona una distribución que ya existe."
+sources:
+  - { grade: "A", title: "In-context Learning and Induction Heads", author: "Olsson et al., Anthropic", year: 2022, url: "https://transformer-circuits.pub/2022/in-context-learning-and-induction-heads/index.html" }
+  - { grade: "A", title: "Lost in the Middle: How Language Models Use Long Contexts", author: "Liu et al., Stanford", year: 2023, url: "https://arxiv.org/abs/2307.03172" }
+  - { grade: "A", title: "Effective Context Engineering for AI Agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
+  - { grade: "A", title: "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via RL", author: "DeepSeek", year: 2025, url: "https://arxiv.org/abs/2501.12948" }
+  - { grade: "A", title: "The Bitter Lesson", author: "Rich Sutton", year: 2019, url: "http://www.incompleteideas.net/IncIdeas/BitterLesson.html" }
+  - { grade: "B", title: "Tokenization counts: the impact of tokenization on arithmetic", author: "Singh & Strouse", year: 2024, url: "https://arxiv.org/abs/2402.14903" }
+  - { grade: "B", title: "Effort & extended thinking (niveles de effort, deprecación de budget_tokens)", author: "Anthropic API docs", year: 2026, url: "https://platform.claude.com/docs/en/build-with-claude/effort" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+
+Antes de escribir una línea de tu harness, tienes que saber qué es realmente el motor. No es "un asistente con memoria". No es "una máquina de razonar". Un LLM es una función estocástica y stateless que predice el siguiente token sobre una ventana de contexto finita. Nada más. Casi todo lo que vas a construir como ingeniero de agentes (sesiones, memoria, human-in-the-loop, evals, presupuestos de tokens) existe para compensar esas tres propiedades. Las internalizas y dejas de pelear contra el modelo: empiezas a diseñar el andamiaje correcto a su alrededor.
+
+<Callout type="important" title="El único modelo mental">
+Reduce el LLM a tres hechos y el resto del campo se deriva de ellos. Es **estocástico** (la salida se muestrea de una distribución de probabilidad). Es **stateless** (no recuerda nada entre llamadas). Corre sobre una **ventana finita** cuya atención cuesta O(n²) y cuyo recall se degrada antes incluso de llenarse.
+</Callout>
+
+No necesitas implementar atención, gradientes ni un tokenizador para enviar un buen agente. Lo que decide si tu agente sobrevive a producción es tener un modelo causal de *por qué falla el modelo* (cuantización de dígitos por BPE, recencia, sampling, refusals) para diseñar el harness que lo absorbe.
+
+## Tres propiedades, y lo que fuerza cada una
+
+El movimiento útil es de traducción: cuando el agente se porta mal, no preguntes "¿por qué el modelo es tonto?". Pregunta "¿cuál de las tres propiedades estoy ignorando?".
+
+<MermaidDiagram title="Cada propiedad fuerza una categoría de ingeniería">
+graph LR
+  A[Estocástico] --> A1["evals pass^k<br/>(una corrida verde ≠ fiable)"]
+  B[Stateless] --> B1["memoria, sesiones,<br/>recap, persistencia"]
+  C["Ventana finita + O(n²)"] --> C1["presupuesto de atención,<br/>compaction, retrieval"]
+</MermaidDiagram>
+
+¿Olvidaste un dato del turno 3? Statelessness mal gestionado. ¿Sumó mal dos números? Tokenización. ¿Pasó el eval ayer y hoy falla? Estocasticidad. Ese reflejo de traducir síntoma a causa es la habilidad que separa a un ingeniero de agentes de un usuario de chatbots.
+
+La analogía a la que siempre vuelvo: el LLM es una CPU sin RAM ni disco. Potentísima por ciclo, pero amnésica. Tu harness es la memoria, el almacenamiento y el reloj que la convierten en una computadora usable.
+
+## El contexto es un presupuesto de atención, no un cubo
+
+Esta es la idea de mayor impacto de todo el campo. El contexto no es almacenamiento. Es un presupuesto de atención finito que gastas cada turno.
+
+La atención del transformer relaciona cada par de tokens, así que el cómputo es O(n²): doblar el contexto cuadruplica, más o menos, el coste de prefill. Esa es la raíz física, no negociable, del presupuesto de tokens.
+
+<Callout type="warning" title="No exageres el O(n²)">
+El *cómputo* de prefill es O(n²). La *memoria* del KV-cache, en cambio, crece de forma lineal: doblar el contexto duplica la cache, no la cuadruplica. El término cuadrático es la matriz de atención transitoria, no la cache persistente. La gente confunde las dos constantemente; mantenlas separadas.
+</Callout>
+
+Peor aún: el recall se degrada mucho antes de llegar al límite nominal. La forma documentada es la curva en U, el "lost in the middle". El modelo recupera bien lo que está al inicio y al final del contexto, y pierde lo que queda en el medio.
+
+<Callout type="warning" title="La cifra del '30-60%' tiene forma de folklore">
+Vas a ver por ahí que "la utilización efectiva del contexto es solo del 30-60% de la ventana nominal". Trátala como heurística cualitativa, no como medición. Lost-in-the-Middle muestra una curva en U sobre QA multidocumento; **no da ningún porcentaje**. Los números que sí existen (benchmarks tipo RULER) caen más cerca del ~50-65%, y varían mucho por modelo, tarea y posición. Si necesitas un número, mídelo con RULER o NIAH. No lo cites como dogma.
+</Callout>
+
+El principiante mete todo el historial porque "cabe en 1M". El experto sabe que cada token irrelevante diluye la señal y cuadruplica el coste. Más contexto no es más inteligencia. La técnica correcta es el just-in-time retrieval: mantener identificadores ligeros (paths, queries) y cargar datos bajo demanda con herramientas, en vez de volcarlo todo de antemano.
+
+## La conversación es una ilusión que reconstruyes
+
+El modelo no recuerda nada entre requests. La API es stateless. Una "conversación" es algo que tú fabricas reenviando el historial en cada llamada. Por eso la persistencia, las sesiones y el resume no son detalles de implementación: son la arquitectura central que sustituye a la memoria que el modelo no tiene.
+
+<Callout type="note" title="'Reenviar todo' vs 'reprocesar a precio completo'">
+El modelo mental por defecto (cada turno reenvías todo el historial) es correcto para entender el statelessness, pero ya no es literalmente cierto en coste. Con prompt caching, el prefijo estable se sirve a ~0.1× en vez de reprocesarse. El statelessness del modelo se mantiene; lo que cambia es cuánto pagas por reconstruir la conversación.
+</Callout>
+
+## El in-context learning sale de las induction heads, no de "entender"
+
+Aquí está la desmitificación más útil del prompting. La capacidad de aprender de ejemplos en el prompt (few-shot, seguir un formato, copiar un patrón de tool-call) no surge de que el modelo "entienda tus instrucciones". Surge de un mecanismo concreto: las induction heads, pares de cabezas de atención que detectan "vi A→B antes; ahora veo A, así que predigo B". Este circuito aparece en un cambio de fase abrupto durante el entrenamiento, y es el motor del in-context learning.
+
+La implicación de diseño es directa: los ejemplos canónicos funcionan porque activan un mecanismo aprendido de copia y generalización, no porque el modelo razone sobre tus reglas.
+
+<Collapsible title="Por qué esto cambia cómo escribes el system prompt">
+Si el modelo generaliza por copia de patrón, dos antipatrones se vuelven obvios. Primero, una lista de 30 ejemplos casi idénticos no le enseña nada nuevo al circuito: solo quema presupuesto de atención. Segundo, un ejemplo mal formateado enseña el formato *malo*, porque la induction head copia exactamente lo que le mostraste. La calidad y diversidad de 3-5 ejemplos canónicos le gana a la cantidad todas las veces.
+</Collapsible>
+
+## El tool-use se entrena, no se prompea
+
+Que un modelo decida cuándo llamar una herramienta, encadene varias y sepa detenerse no es magia del prompt. Es comportamiento moldeado por post-entrenamiento multiturno: SFT sobre trayectorias más RL con recompensa al final de la trayectoria. La receta de referencia hoy es GRPO con recompensas verificables (RLVR).
+
+<Callout type="warning" title="Cuenta bien lo de DeepSeek-R1">
+Es DeepSeek-R1-**Zero** el que demuestra que el RL puro (GRPO) sobre el modelo base induce razonamiento *sin SFT previo*. El modelo DeepSeek-R1 que se publicó **sí** usa SFT: añade un cold-start de SFT antes del RL precisamente para arreglar legibilidad y estabilidad. La receta es "GRPO + recompensas verificables". Lo que no debes afirmar es que R1 prescinde de SFT.
+</Callout>
+
+De aquí salen dos consecuencias prácticas. Primero, el modelo arrastra priors fuertes sobre cómo lucen las herramientas bien diseñadas (esquemas claros, nombres descriptivos, descripciones prescriptivas), porque es contra eso que se entrenó. Segundo, la frontera de fiabilidad del agente es la distribución de tareas sobre la que se entrenó, y por eso evalúas por trayectoria, no solo por la respuesta final.
+
+Hay un debate vivo que conviene señalar: si el RL solo afila capacidades que ya están en la distribución del modelo base, o si añade algunas genuinamente nuevas. Un bando (Yue et al., "Limit of RLVR") encuentra que los modelos base igualan a los afinados con RL para pass@k grande, lo que sugiere que el RL solo muestrea soluciones existentes con más eficiencia. Otro (ProRL) reporta que el RL prolongado descubre estrategias que el modelo base nunca alcanza. Trátalo como abierto, no como cerrado.
+
+## El BPE decide qué ve el modelo, y dónde se rompe
+
+El modelo no ve caracteres ni números. Ve tokens BPE. Eso causa fallos sistemáticos y predecibles. La aritmética se rompe porque los dígitos se agrupan en tokens de forma arbitraria. El conteo de caracteres se rompe por lo mismo. Y la estructura (JSON, tool-args) cuesta tokens reales de formato.
+
+<Callout type="tip" title="Regla de oro operativa">
+Nunca confíes en el modelo para cálculo exacto, conteo o manipulación fina de strings. Delégalo a una herramienta. Esta es la razón mecánica (no una preferencia de estilo) de por qué "usa una calculadora" no es opcional.
+</Callout>
+
+Cuando presupuestes tokens, cuenta con el tokenizador real del proveedor. El folklore de que "tiktoken subcuenta a Claude un 15-20%" está exagerado: la diferencia real es menor (~12% en prosa) y puede ir en cualquier dirección según el contenido. Usa el endpoint `count_tokens` del proveedor en vez de adivinar.
+
+## Sampling y "thinking": el determinismo siempre fue un mito
+
+La salida se muestrea de una distribución. Temperatura y top-p controlan su dispersión. Dos consecuencias rompen intuiciones comunes.
+
+La primera: la no-determinación rompe el caching ingenuo y obliga a evals pass^k. Una corrida verde no significa fiable. La segunda es más nueva, y es un cambio de modelo mental:
+
+<Callout type="warning" title="temperature=0 es un antipatrón heredado">
+En los modelos de razonamiento más nuevos (Opus 4.7 / 4.8, Fable 5) los parámetros de sampling se retiraron de la API: `temperature` / `top_p` / `top_k` devuelven un 400. Nunca garantizaron salidas idénticas, de todos modos. (Ojo con el alcance: Opus 4.6 y Sonnet 4.6 todavía los aceptan.) El control real ahora es `effort` y el thinking adaptativo. El código que arrastra `temperature=0` necesita migración.
+</Callout>
+
+El thinking extendido intercambia tokens de razonamiento por calidad. Es test-time compute, la palanca de escalado en inferencia, y es un resultado real: el escalado compute-óptimo en inferencia puede ganarle a un modelo mucho más grande en ciertos problemas. La perilla fija `budget_tokens` está deprecada (eliminada, 400, en 4.7+) a favor de `effort` (de low a max; `xhigh` llegó en Opus 4.7) y del thinking interleaved entre tool-calls. El thinking interleaved es justo lo que permite que el agente razone sobre el resultado de una herramienta antes de decidir la siguiente, en vez de planearlo todo al inicio.
+
+Más thinking no es gratis, y no es monótonamente mejor: hay un régimen documentado de "overthinking" donde la precisión cae con presupuestos largos. Calibra el effort por ruta.
+
+## La Bitter Lesson decide qué construir
+
+La última pieza es un criterio de decisión. La Bitter Lesson de Rich Sutton: los métodos generales que escalan con cómputo le ganan al conocimiento de dominio hecho a mano con el tiempo. Aplicado a agentes, el andamiaje que escribes hoy para parchear una limitación del modelo es deuda técnica que la próxima generación borra. Así que apuesta por capacidades que escalan (búsqueda agéntica, contexto largo, tool-use aprendido, razonamiento) y minimiza la lógica hecha a mano que el modelo acabará absorbiendo. Ese es el criterio para decidir qué construir y qué dejarle al modelo.

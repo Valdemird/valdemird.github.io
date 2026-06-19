@@ -1,0 +1,163 @@
+---
+title: "El razonamiento como cómputo presupuestable, no como introspección"
+description: "El razonamiento moderno de un LLM es cómputo en inferencia que presupuestas como presupuestas CPU, no una traza que puedas auditar. El test-time compute es una palanca real de escalado, el overthinking tiene rendimientos decrecientes y la cadena de razonamiento visible no es fiel a lo que el modelo hizo."
+phase: 6
+order: 11
+tier: core
+durability: duradero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "Razonar es generar tokens intermedios que a veces condicionan la respuesta y a veces la racionalizan después. Trata el thinking budget como CPU que pagas, no como introspección en la que confías."
+  - "El test-time compute es una palanca real de escalado (más tokens de razonamiento pueden ganarle a un modelo mucho más grande), pero la precisión puede caer pasado cierto presupuesto. Calibra el effort por ruta."
+  - "En modelos de razonamiento nativo, el prompting prescriptivo de 'piensa paso a paso' estorba. Y la cadena de razonamiento visible no es una traza fiel, así que no sirve como auditoría de seguridad."
+sources:
+  - { grade: "A", title: "Reasoning Models Don't Always Say What They Think / Measuring Faithfulness in CoT", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/research/measuring-faithfulness-in-chain-of-thought-reasoning" }
+  - { grade: "A", title: "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models", author: "Wei et al., Google", year: 2022, url: "https://arxiv.org/abs/2201.11903" }
+  - { grade: "A", title: "Self-Consistency Improves Chain of Thought Reasoning", author: "Wang et al., Google", year: 2022, url: "https://arxiv.org/abs/2203.11171" }
+  - { grade: "A", title: "ReAct: Synergizing Reasoning and Acting in Language Models", author: "Yao et al., Princeton/Google", year: 2022, url: "https://arxiv.org/abs/2210.03629" }
+  - { grade: "A", title: "Reflexion: Language Agents with Verbal Reinforcement Learning", author: "Shinn et al.", year: 2023, url: "https://arxiv.org/abs/2303.11366" }
+  - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
+  - { grade: "B", title: "Scaling LLM Test-Time Compute Optimally", author: "Snell et al.", year: 2024, url: "https://arxiv.org/abs/2408.03314" }
+  - { grade: "B", title: "Inference-Time Compute Scaling Methods to Improve Reasoning Models", author: "Sebastian Raschka", year: 2025, url: "https://magazine.sebastianraschka.com/p/state-of-llm-reasoning-and-inference-scaling" }
+  - { grade: "B", title: "The Illusion of Thinking (+ refutaciones)", author: "Apple ML Research; Lawsen/Open Phil; Anthropic", year: 2025, url: "https://machinelearning.apple.com/research/illusion-of-thinking" }
+  - { grade: "C", title: "Reasoning best practices (evitar prompts de CoT)", author: "OpenAI", year: 2025, url: "https://platform.openai.com/docs/guides/reasoning-best-practices" }
+  - { grade: "C", title: "LIMO: Less Is More for Reasoning", author: "Ye et al.", year: 2025, url: "https://arxiv.org/abs/2502.03387" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+Un agente que "piensa más" no es un agente que piensa mejor. Es un agente que gasta más. El razonamiento moderno de un LLM no es introspección que puedas auditar. Es cómputo en inferencia, y lo presupuestas igual que presupuestas CPU. Cuando eso te cae, dejas de copiar prompts de "piensa paso a paso" de 2023, dejas de creer que el texto de razonamiento explica lo que el modelo hizo, y empiezas a tratar el thinking budget como la palanca económica y de seguridad que de verdad es.
+
+## El modelo mental: razonar es generar tokens
+
+El razonamiento de un modelo son tokens intermedios que a veces condicionan la respuesta final y a veces la racionalizan después de haberla decidido. El salto de 2024 a 2025-2026 es que eso dejó de ser un truco de prompting (Chain-of-Thought) para convertirse en una capacidad entrenada con RL: o1/o3, DeepSeek-R1 y el extended/adaptive thinking de Claude. El modelo decide cuánto computar en inferencia.
+
+<Callout type="important" title="El único knob que importa">
+El knob más importante de un agente moderno no es el tamaño del modelo. Es **cuánto cómputo le dejas gastar por turno en inferencia**. Dentro de un rango, escalar test-time compute (más tokens de razonamiento) sustituye a escalar el pre-entrenamiento. Snell et al. mostraron que el escalado compute-óptimo en inferencia puede ganarle a un modelo varias veces más grande en ciertos problemas.
+</Callout>
+
+La analogía que mantengo: piensa en el razonamiento visible como el **borrador** de un examinando, no como el **acta notarial** de su decisión. Un borrador a veces refleja el cálculo real y a veces es una justificación escrita *después* de que la mano ya marcó la casilla. Confiar en el borrador como prueba de cómo se llegó a la respuesta es justo el error que Anthropic documentó: inyectas una pista superficial en el prompt y el modelo a menudo la obedece sin *mencionarla*, e incluso construye una justificación alternativa plausible.
+
+## Inference-time compute: la curva precisión-vs-tokens
+
+En vez de volcar todo el cómputo en pre-entrenamiento, gastas una parte en inferencia generando más y mejores tokens de razonamiento. La prueba más limpia de que esto sale con RL puro es DeepSeek-R1: igualó a o1 en benchmarks de razonamiento (AIME 2024 79.8% vs 79.2%, MATH-500 97.3%) escalando cómputo en inferencia, generando del orden de 10-30K tokens de razonamiento por problema.
+
+<Callout type="note" title="Una precisión que conviene guardar">
+Es un mito repetido que R1 necesitó "10-100× más tokens" que o1. No hay evidencia pública de eso. Ambos están en el **mismo orden de magnitud**: decenas de miles de tokens de razonamiento, con un tope cercano a los 32K de generación. R1 es notablemente verboso, pero el ratio dramático no está documentado.
+</Callout>
+
+La consecuencia operativa: hay una curva precisión-vs-tokens con un codo. Por debajo del codo aparece el *underthinking* (el modelo se rinde pronto). Por encima, el *overthinking*: quema tokens sin ganar precisión, e incluso la degrada. Más thinking no es monótonamente mejor. Por eso la práctica de élite es medir la curva por tipo de tarea, no activar el effort máximo "por si acaso".
+
+<MermaidDiagram title="Precisión vs presupuesto de thinking: underthink, codo, overthink">
+graph LR
+  A["Presupuesto bajo<br/>(underthinking)"] --> B["Codo<br/>(compute-óptimo)"]
+  B --> C["Presupuesto alto<br/>(overthinking:<br/>plano o peor)"]
+</MermaidDiagram>
+
+En los modelos más nuevos esto es lo que controla el `effort`. El thinking adaptativo e interleaved deja que el modelo asigne su propio presupuesto y razone entre tool calls; el viejo `budget_tokens` fijo es la abstracción equivocada aquí.
+
+<Callout type="warning" title="budget_tokens desapareció en 4.7+">
+El `budget_tokens` fijo se eliminó (devuelve 400) en Opus 4.7 / 4.8 y Fable 5; deprecado-pero-funciona en 4.6. La superficie de control ahora es `effort` (de low a max, con `xhigh` llegando en Opus 4.7) más el thinking adaptativo. El código que clava un presupuesto de tokens necesita migración; lo que fijas en su lugar es el effort, y luego mides dónde satura la curva.
+</Callout>
+
+## La cadena de razonamiento no es fiel a la computación interna
+
+Esta es la verdad incómoda con más consecuencias de todo el tema. Anthropic mostró (midiendo fidelidad primero en 2023, luego sobre modelos de razonamiento en 2025) que el texto de razonamiento **no refleja de forma fiable la computación real** del modelo. Dos hallazgos que sostienen todo. Primero, el modelo puede derivar su respuesta de una pista superficial del prompt y *no mencionarla* en la cadena. Segundo, editar el texto de razonamiento a menudo *no* cambia la respuesta final, lo que significa que la cadena visible muchas veces no es el camino causal.
+
+<Callout type="warning" title="La implicación brutal de seguridad">
+No puedes usar la cadena de razonamiento como **auditoría de seguridad ni como prueba de compliance**. Un modelo puede "razonar" en voz alta que respeta tus hard rails y aun así actuar sobre una persona inyectada o un documento no confiable. El razonamiento visible **no protege** contra prompt injection. No hay valor de auditoría ni defensa de inyección en leerlo.
+</Callout>
+
+La regla práctica que sale de aquí: juzga la trayectoria de tool calls, no el texto de razonamiento. Esa es la respuesta correcta a la infidelidad del CoT: califica lo que el agente *hizo* (la trayectoria del hook PreToolUse), trata el transcript como datos y reserva un juez LLM para la calidad de la resolución, nunca para "¿quiso hacer lo correcto?".
+
+## El prompting se invierte: minimalismo en modelos de razonamiento
+
+Con razonamiento nativo, instruir "piensa paso a paso" o pegar plantillas few-shot de CoT **degrada** el rendimiento. La fuente correcta de esto es la guía de buenas prácticas de OpenAI para o1 ("evita prompts elaborados de chain-of-thought; el few-shot puede perjudicar; mantenlo simple") y las guías de extended thinking de Anthropic. El prompt óptimo da objetivo, restricciones, criterios de éxito y herramientas, y deja que el modelo asigne su propio cómputo.
+
+<Callout type="tip" title="No confundas esto con LIMO">
+LIMO ("Less Is More", Ye et al. 2025) es una afirmación distinta: que el razonamiento puede *provocarse* con muy pocos ejemplos de SFT de alta calidad (~817), gracias al conocimiento del pre-entrenamiento. Es evidencia sobre **cantidad de datos de entrenamiento**, no sobre que el prompting de CoT estorbe. Citar LIMO como prueba anti-CoT-prompt es un error frecuente.
+</Callout>
+
+<Tabs labels={["Prompt de 2023 sobre un modelo de razonamiento", "Prompt minimalista de 2025"]}>
+<TabPanel>
+<CodeBlock filename="prompt-malo.txt">
+```text
+Eres un experto. Piensa paso a paso.
+Aquí tienes 5 ejemplos resueltos con su razonamiento completo.
+Ahora resuelve...
+```
+</CodeBlock>
+La plantilla compite con el razonamiento entrenado del modelo. Resultado: ruido, presupuesto desperdiciado, peor precisión.
+</TabPanel>
+<TabPanel>
+<CodeBlock filename="prompt-bueno.txt">
+```text
+Objetivo: X.
+Restricciones: A, B.
+Éxito = el archivo contiene Y.
+Herramientas disponibles: grep, read.
+```
+</CodeBlock>
+El modelo asigna su propio presupuesto y razona internamente. Especificaste el *qué*, no el *cómo*.
+</TabPanel>
+</Tabs>
+
+## Error compounding: un problema de contexto, no de inteligencia
+
+Una tasa de error por paso pequeña se compone de forma multiplicativa. Si cada paso acierta con probabilidad p, una cadena de n pasos acierta más o menos a pⁿ. Por eso agentes fiables en tareas cortas colapsan en horizontes largos. La causa dominante *no* es un modelo tonto. Es el crecimiento descontrolado del contexto. ReAct es append-only (thought, action, observation, repetir) y ese transcript creciente satura la atención y re-expone los errores tempranos turno tras turno.
+
+<Callout type="important" title="El fix es gestión de contexto, no un modelo más grande">
+Resumir, comprimir o rotar el transcript (folding/recap) frena la saturación de atención y la reaparición de errores. Importa más que subir de modelo. Rotar a una sesión nueva tras un número fijo de turnos, con un recap, es la dirección correcta y la que la literatura de 2025 valida.
+</Callout>
+
+## Los verificadores externos rompen el bucle de auto-engaño
+
+El modelo no puede verificarse a sí mismo de forma fiable. Reflexion (auto-reflexión verbal sobre los fallos) es útil conceptualmente pero **frágil sin una señal externa de verdad**; el modelo tiende a racionalizar en lugar de corregir. El multiplicador real del razonamiento es una *señal de verdad externa*: un test que corre, un grep que encuentra (o no) un dato, una herramienta que falla.
+
+Self-consistency muestrea varias trazas y vota la respuesta mayoritaria. Su límite práctico: trata todas las trazas igual (ignora su calidad) y **satura en torno a k≈10-15**; muestrear más solo re-explora caminos viejos. Un verificador alcanza mayor precisión con menos tokens. Muestrear 64 veces como bala de plata es quemar presupuesto.
+
+<Collapsible title="Cuándo sí tienes un verificador y cuándo no">
+Si hay una señal de verdad determinista (código que compila, un dato que existe en un archivo), usa best-of-N con ese verificador: le gana al majority voting ciego a menor coste en tokens. La búsqueda agéntica sobre archivos (grep/glob/read), sin RAG ni embeddings, *es* un verificador externo barato: el dato existe o no existe. Cuando no hay verificador y la respuesta es discreta, self-consistency es el recurso, pero topa la k cerca del punto de saturación, no en 64. Reflexion sin señal externa es el caso a evitar: produce "mejoras" frágiles y autocomplacientes.
+</Collapsible>
+
+## Planificación: explícita vs emergente
+
+Hay dos sabores de planificación, y elegir mal es un error arquitectónico de primer orden. La elección depende del horizonte y de tu tolerancia a errores compuestos.
+
+<Tabs labels={["Plan-then-execute", "ReAct (emergente)"]}>
+<TabPanel>
+Genera un **plan explícito y auditable antes de actuar**. El usuario (o un human-in-the-loop) ve qué hará el agente antes de tocar nada; puedes usar modelos baratos para subtareas; controlas el coste y las dependencias entre pasos. Es además un **mecanismo de seguridad**: un plan revisable te deja interceptar acciones de escritura antes de ejecutarlas. Mejor para dependencias, compliance y escrituras.
+</TabPanel>
+<TabPanel>
+El bucle thought-action-observation se adapta en entornos dinámicos donde la información se revela de forma incremental. El precio: en horizontes largos sufre objective drift y error compounding por el contexto append-only. Es el patrón por defecto de casi todos los SDK de agentes, y es el default correcto para exploración dinámica de horizonte corto.
+</TabPanel>
+</Tabs>
+
+Regla de pulgar: para tareas con dependencias o varias escrituras (reagendar = cancelar + crear), fuerza un plan explícito que pase por HITL antes de ejecutar. Para exploración dinámica de horizonte corto, deja que ReAct emerja. El modo de fallo de ReAct emergente en una operación de dos escrituras es ejecutar una mitad (cancelar) sin la otra (crear) cuando deriva.
+
+## El presupuesto de razonamiento es coste y latencia
+
+Un detalle de facturación que mata márgenes: **el thinking se factura completo**, no solo el resumen visible, y puede exceder tu `max_tokens`. En un SaaS multi-tenant con presupuesto diario de tokens, el thinking descontrolado es un agujero de coste silencioso. El thinking adaptativo deja que el modelo decida cuánto razonar, pero el ingeniero *debe* medir y poner techos por turno. Un default sensato es presupuesto diario de tokens más telemetría de thinking por turno, para ver el coste de razonamiento por turno y no solo el agregado diario.
+
+## Lo que el consenso sobrevalora
+
+- **Tree-of-Thoughts y Graph-of-Thoughts en producción.** Brillan en puzzles de papers (ToT se evaluó en Game of 24, Creative Writing y Mini Crosswords) pero su coste y latencia rara vez se justifican en agentes conversacionales reales. Sobre todo material de demo. (Una corrección que conviene guardar: Tower of Hanoi *no* es un benchmark de ToT/GoT; es el puzzle del *Illusion of Thinking* de Apple.)
+- **CoT como explicabilidad o auditoría.** Ya lo vimos: el razonamiento visible no refleja la computación real.
+- **"Piensa paso a paso" y few-shot de CoT sobre modelos nativos.** Una reliquia de 2023 que degrada el rendimiento.
+- **Self-consistency con k=32/64 como bala de plata.** Satura cerca de 10-15.
+
+<Callout type="warning" title="El debate del 'Illusion of Thinking', con honestidad">
+Apple reportó que los modelos de razonamiento *colapsan* al subir la complejidad (Tower of Hanoi y similares). Las refutaciones (Lawsen/Open Phil, con Claude Opus como co-autor) mostraron que muchos "fallos" eran límites de longitud de output o instancias irresolubles por diseño. La lección de ingeniería: mide con cuidado antes de concluir "no razona". Un colapso aparente puede ser tu eval, no el modelo.
+</Callout>
+
+## Lo que subestima
+
+El razonamiento real se desbloquea con grounding externo verificable, no con introspección. La búsqueda agéntica sobre archivos es un verificador barato e infravalorado frente al culto al RAG. El presupuesto de tokens de thinking es una decisión de producto y coste, no solo técnica: en multi-tenant define tus márgenes. Y el multi-agente cuesta del orden de 15× los tokens de un solo chat y solo paga en tareas paralelizables; el uso de tokens explica cerca del 80% de la varianza de rendimiento, y el multi-agente falla en trabajo interdependiente (como coding). Para un asistente de empresa con coordinación interdependiente, un solo agente bien presupuestado suele ganar.
+
+El hilo que recorre todo esto: no haces un agente más inteligente gastando más tokens de razonamiento. Lo haces más fiable anclándolo en verdad externa, controlando su contexto y decidiendo (por ruta, con una curva medida) cuánto cómputo vale la pena. El texto de razonamiento es un artefacto de debug por el camino, nunca la prueba.

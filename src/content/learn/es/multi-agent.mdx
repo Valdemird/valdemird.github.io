@@ -1,0 +1,155 @@
+---
+title: "Multi-agente es una decisión de ingeniería de contexto, no una arquitectura más lista"
+description: "Los subagentes te dan ventanas de contexto limpias y aisladas, y exploración paralela de solo lectura. El precio es el coste de coordinación, y un solo agente gana a menudo. La asimetría read/write y el patrón orquestador-worker deciden cuándo el fan-out ayuda."
+phase: 8
+order: 14
+tier: produccion
+durability: duradero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "Un subagente es un truco de ventana de contexto, no un colega en un organigrama. Úsalo para aislar exploración ruidosa y devolver solo el destilado."
+  - "Paraleliza lecturas, serializa escrituras. El fan-out read-only es seguro; los agentes que escriben estado compartido no ven las decisiones implícitas del otro y producen output incoherente."
+  - "La mayoría de fallos multi-agente son de diseño y coordinación, no del modelo. Un modelo mejor no arregla una descomposición mala, y el multi-agente cuesta ~15x los tokens."
+sources:
+  - { grade: "A", title: "Building Effective Agents", author: "Schluntz & Zhang, Anthropic", year: 2024, url: "https://www.anthropic.com/engineering/building-effective-agents" }
+  - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/built-multi-agent-research-system" }
+  - { grade: "B", title: "Don't Build Multi-Agents", author: "Walden Yan, Cognition", year: 2025, url: "https://cognition.ai/blog/dont-build-multi-agents" }
+  - { grade: "A", title: "Why Do Multi-Agent LLM Systems Fail? (MAST)", author: "Cemri, Pan et al., UC Berkeley — NeurIPS 2025", year: 2025, url: "https://arxiv.org/abs/2503.13657" }
+  - { grade: "B", title: "Revisiting Multi-Agent Debate as Test-Time Scaling", author: "arXiv 2505.22960", year: 2025, url: "https://arxiv.org/pdf/2505.22960" }
+  - { grade: "B", title: "Improving Factuality and Reasoning through Multiagent Debate", author: "Du, Li, Torralba, Tenenbaum, Mordatch (MIT/Google), ICML 2024", year: 2023, url: "https://arxiv.org/pdf/2305.14325" }
+  - { grade: "C", title: "Security Threat Modeling for AI-Agent Protocols (MCP, A2A, ANP)", author: "arXiv 2602.11327", year: 2026, url: "https://arxiv.org/pdf/2602.11327" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+El debate "¿debo usar multi-agente?" está mal planteado. La pregunta no es cuántos agentes. Es cómo fluye el contexto entre las llamadas al LLM. Cuando dejas de antropomorfizar ("un agente CEO, un agente analista") y empiezas a razonar sobre qué contexto necesita de verdad cada generación, dos posturas que parecen una contradicción dejan de serlo. Anthropic construye un sistema multi-agente de research y reporta una mejora grande. Cognition publica un post titulado "Don't Build Multi-Agents". Mismo eje, distinto punto.
+
+<Callout type="important" title="El reencuadre central">
+Un subagente no es un colega en un organigrama. Es un truco de gestión de la ventana de contexto. Aísla la exploración ruidosa y devuelve solo el destilado al hilo principal. La pregunta correcta es "¿qué contexto necesita cada llamada al LLM, y qué contaminación quiero mantener fuera del hilo principal?", no "¿cuántos agentes?".
+</Callout>
+
+La analogía que uso: un subagente read-only es como mandar a un becario a la biblioteca con una sola orden. "Tráeme un resumen de tres párrafos, no el carro entero de libros." Tú, el hilo principal, nunca ves los 400 libros que hojeó. Recibes el destilado. El coste es que el becario gastó horas (tokens) que no contabilizas en tu mesa. La ganancia es que tu mesa sigue despejada. El error de novato es darle al becario un bolígrafo para editar el documento final mientras otro becario edita el mismo documento sin verlo. Ahí nacen las contradicciones.
+
+## El multi-agente es, sobre todo, comprar cómputo
+
+Aquí está el número más contraintuitivo del campo. El sistema multi-agente de research de Anthropic gasta unas 15 veces los tokens de un chat normal, y el uso de tokens por sí solo explica cerca del 80% de la varianza de rendimiento entre configuraciones. Léelo dos veces. Buena parte de la "magia" del multi-agente es simplemente gastar más cómputo en paralelo. Si el coste explica casi toda la varianza, entonces el coste no es solo una métrica financiera. El coste es una métrica de rendimiento.
+
+Así que antes de añadir agentes, la pregunta honesta es: ¿un solo agente con más tool calls o extended thinking daría el mismo lift, más barato?
+
+<Tabs labels={["Coste vs cuándo gana", "El mito del escalado"]}>
+<TabPanel label="Coste vs cuándo gana">
+| Configuración | Coste relativo | Gana cuando |
+| --- | --- | --- |
+| Chat de un turno | 1x | Tarea trivial, sin tools |
+| Single agent + tools | unas pocas x | La mayoría de tareas de producción |
+| Multi-agente (fan-out) | ~15x | Research breadth-first y read-only que desborda la ventana |
+
+Las cifras de 1x y ~15x son de Anthropic. La fila del medio es una estimación de orden de magnitud al ojo, no un número medido. Tómala como forma, no como dato.
+</TabPanel>
+<TabPanel label="El mito del escalado">
+"Más agentes = más inteligencia" es falso. Las mejoras vienen en gran parte de gastar 15x los tokens, y mucho de eso es cómputo, no estructura. Desplegar un fan-out de 15x para una tarea de bajo valor donde un solo agente bastaba es uno de los errores más caros y comunes que existen.
+</TabPanel>
+</Tabs>
+
+## La asimetría read/write reconcilia el debate
+
+Esta es la frase que casi nadie dice en voz alta, y unifica a los dos bandos: paraleliza lecturas, serializa escrituras.
+
+Paralelizar agentes de solo lectura (buscar, leer archivos, responder preguntas) es seguro porque no producen decisiones en conflicto. No hay estado mutable compartido. Paralelizar escrituras comparte estado mutable y genera una carrera de decisiones. Por eso la propia excepción que admite Cognition, los subagentes read-only, coincide exactamente con el patrón que usa Claude Code y con los casos donde Anthropic dice que el multi-agente ayuda.
+
+<MermaidDiagram title="La lectura se paraleliza; la escritura se serializa">
+graph TD
+  R["READ — paraleliza"] --> R1["buscar en N docs, N chequeos de guardrails,<br/>explorar breadth-first"]
+  R1 --> R2["sin estado compartido → sin conflicto<br/>el fan-out baja latencia y mantiene limpio el hilo"]
+  W["WRITE — serializa"] --> W1["generar un artefacto único, editar estado,<br/>responder a un cliente"]
+  W1 --> W2["estado mutable compartido → carrera de decisiones<br/>un hilo lineal, una decisión a la vez"]
+</MermaidDiagram>
+
+La misma asimetría se mapea directo sobre el human-in-the-loop: las lecturas auto-ejecutan (paralelizables, sin riesgo de conflicto), las escrituras se serializan tras una compuerta. Si ya construiste eso por razones de seguridad, ya construiste el principio de orquestación. Solo que no lo habías nombrado.
+
+## Por qué el fan-out de escritura se rompe: decisiones implícitas en conflicto
+
+El mecanismo de Cognition conviene memorizarlo: las acciones llevan decisiones implícitas, y las decisiones en conflicto producen malos resultados.
+
+Cuando dos subagentes generan partes de un mismo artefacto sin ver la traza del otro, cada uno toma supuestos (estilo, formato, cómo leyó el requisito) que son individualmente razonables y mutuamente incompatibles. El sintetizador recibe dos mitades que no encajan y no tiene forma de reconciliarlas. El ejemplo concreto del post: construyes un clon de Flappy Bird, un subagente hace un fondo estilo Super Mario y otro hace un pájaro que no encaja para nada con ese estilo, porque ninguno vio la decisión del otro.
+
+<Callout type="important" title="Esta es la bisagra de todo el módulo">
+Las decisiones implícitas en conflicto explican por qué el fan-out funciona para buscar y falla para generar. Buscar no toma ninguna decisión que el resultado de otro deba respetar. Generar sí. Si los subagentes no comparten estado, no pueden coordinar ediciones. Punto.
+</Callout>
+
+De ahí sale el segundo principio de Cognition: cuando delegas, no pases solo "la tarea" ni el último mensaje. Pasa la traza completa, historial, tool calls, razonamiento previo. Y aquí está el trade-off que la gente intenta esquivar y no puede: coherencia = contexto compartido = tokens. El coste de tokens de pasar trazas completas es justo lo que hace caro al multi-agente bien hecho.
+
+<Callout type="warning" title="El antipatrón más frecuente">
+La gente recorta el contexto que pasa a los subagentes "para ahorrar tokens" y luego se sorprende de que el output sintetizado sea incoherente. El coste alto del multi-agente bien hecho es una característica, no un bug que optimizar. Si no puedes pagar las trazas completas, probablemente no debas usar multi-agente para esa tarea.
+</Callout>
+
+## Los fallos están en el sistema, no en el modelo
+
+Un estudio de Berkeley analizó más de 1600 trazas en 7 frameworks multi-agente y construyó MAST, una taxonomía de 14 modos de fallo en tres categorías, con fuerte acuerdo entre anotadores. El hallazgo que debería reorientar dónde gastas esfuerzo de ingeniería: la mayoría de los fallos no vienen de los límites del modelo. Vienen del diseño del sistema y de la desalineación entre agentes.
+
+| Categoría MAST | Peso | Modos de fallo |
+| --- | --- | --- |
+| Diseño de sistema / especificación | ~42% | descomposición pobre, roles mal especificados, violación de la spec |
+| Desalineación inter-agente | ~37% | pérdida de información, ignorar el input de otro agente, supuestos en conflicto |
+| Verificación de la tarea | ~21% | nadie verifica el output, no se detecta la terminación |
+
+<Callout type="note" title="La consecuencia operativa">
+Cambiar a un modelo mejor no arregla un sistema multi-agente mal diseñado. Si tu fan-out falla, la respuesta casi nunca es "esperemos al próximo modelo". Es arreglar la descomposición, el protocolo de comunicación y la verificación.
+</Callout>
+
+## Orquestador-worker, con presupuesto de esfuerzo explícito
+
+El patrón ganador de Anthropic no es "spawnea agentes libremente". Es un lead que dicta un presupuesto de esfuerzo por subtarea: para un hecho simple, un agente con 3-10 tool calls; para una comparación, 2-4 subagentes con 10-15 calls cada uno. Sin esos límites, los agentes duplican trabajo o sobre-investigan. Orquestar bien es enseñarle al lead a delegar con límites, no solo a descomponer.
+
+<MermaidDiagram title="Orquestador-worker con delegación acotada">
+graph TD
+  L["Lead / orquestador"] -->|"objetivo + formato + allowlist de tools + presupuesto"| W1["Worker (read-only)"]
+  L -->|"objetivo + formato + allowlist de tools + presupuesto"| W2["Worker (read-only)"]
+  L -->|"objetivo + formato + allowlist de tools + presupuesto"| W3["Worker (read-only)"]
+  W1 -->|"solo el destilado"| S["Sintetizar"]
+  W2 -->|"solo el destilado"| S
+  W3 -->|"solo el destilado"| S
+  S --> L
+</MermaidDiagram>
+
+Esto encaja en la taxonomía canónica de "Building Effective Agents", que separa *workflows* (rutas predefinidas: prompt chaining, routing, parallelization, orquestador-worker, evaluator-optimizer) de *agents* (el LLM dirige su propio proceso). La regla de oro de ese paper es la disciplina que sostiene todo este tema: empieza con lo más simple, y añade agencia o agentes solo cuando el problema lo justifique.
+
+<CodeBlock filename="escalera-de-escalado.txt">
+```text
+Prompt único          → ¿basta? Para.
+Prompt chaining       → pasos fijos con compuertas de validación → ¿basta? Para.
+Routing               → clasificador → handler especializado → ¿basta? Para.
+Single agent + tools  → añade extended thinking, más tool calls → ¿basta? Para.
+Multi-agente          → solo ahora, y deja por escrito por qué subiste de nivel.
+```
+</CodeBlock>
+
+## Verificación y terminación, de primera clase
+
+Una categoría entera de MAST (~21%) es que nadie verifica el output y nadie sabe cuándo parar. El multi-agente lo agrava: el sintetizador tiende a confiar en los subagentes sin re-verificar. El patrón evaluator-optimizer (un LLM genera, otro evalúa contra criterios y devuelve feedback en bucle hasta un umbral) y los graders code-based existen justo para cerrar este hueco. Es de las inversiones más infravaloradas y desproporcionadamente impactantes en fiabilidad.
+
+<Callout type="warning" title="Acota el bucle">
+El evaluator-optimizer cierra el hueco de verificación, pero trae su propio riesgo: bucles infinitos. Pon siempre un límite de iteraciones explícito (digamos, máx 2). Un grader que nunca converge es peor que no tener grader.
+</Callout>
+
+## Lo que el consenso sobrevalora
+
+El debate multi-agente como técnica de razonamiento está sobrevalorado. El paper "society of minds" de 2023 lanzó la ola: varias instancias debaten N rondas para converger, mejorando factualidad y razonamiento. Pero el estudio sistemático de 2025 muestra que el debate frecuentemente no le gana a self-consistency (majority voting) a igual presupuesto de cómputo, reframeándolo como consistencia cara, no razonamiento superior. Vacuna contra el hype: prueba self-consistency primero.
+
+También sobrevalorado: las metáforas organizacionales ("CEO", "analista", "crítico"). Inducen arquitecturas con comunicación rica y decisiones en conflicto, justo el antipatrón de MAST. Los frameworks pesados orientados a roles te invitan a saltarte el "primero prueba algo simple", que es lo contrario de lo que recomienda la evidencia.
+
+<Collapsible title="Infravalorado: determinismo de la orquestación y 'piensa como tu agente'">
+Dos cosas que casi nadie diseña. La primera, el determinismo de la orquestación (la lección de Temporal): la lógica de coordinación debe ser determinista y reanudable; el no-determinismo (llamadas a LLM y tools) vive solo en las activities. Si los mezclas, no puedes reanudar tras un crash, reinicias un agente stateful desde cero. La segunda, "piensa como tu agente": simular en consola con los prompts y tools exactos revela trabajo duplicado y mala delegación antes de pagarlo en producción. Las dos salen más baratas que el debugging post-hoc y las dos se saltan.
+
+Una más, relevante sobre todo si algún día dejas que agentes de partes distintas hablen entre sí: abrir comunicación agente-a-agente multiplica la superficie de ataque (suplantación de agent cards, inyección cruzada). Mantén la comunicación entre agentes restringida y mediada, nunca abierta. Para un agente de un solo tenant, *no* añadir protocolos inter-agente es una decisión de seguridad, no una funcionalidad que falta.
+</Collapsible>
+
+## El resumen honesto
+
+Por defecto, un solo agente lineal con compactación de contexto. Recurre a subagentes cuando la tarea sea breadth-first, read-only, y desborde la ventana de contexto, y aísla la exploración ruidosa para que el hilo principal solo vea el destilado. Las tareas de escritura fuertemente acopladas (programar, generar un artefacto coherente, responder a un cliente) van en un solo hilo, una decisión a la vez, porque las decisiones implícitas en conflicto no se pueden reconciliar después. Y cuando falle, mira la descomposición y la verificación antes de culpar al modelo. El modelo rara vez es el cuello de botella.

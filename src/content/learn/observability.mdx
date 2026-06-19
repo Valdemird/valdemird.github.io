@@ -1,0 +1,144 @@
+---
+title: "Observability for non-deterministic agents: reconstruct the trajectory, don't trust the narration"
+description: "You can't debug what you can't reconstruct. Observability for agents is the discipline of rebuilding a non-deterministic system's actual decision trajectory from structured traces (the tools it called, the args, the results, the decisions), not the model's story about what it did."
+phase: 7
+order: 12
+tier: produccion
+durability: duradero
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "An agent failure almost never lives in one LLM call. It lives in the trajectory: the decisions, retries, and tool calls around it. The unit of debugging is the turn trace, a tree of spans, not the isolated span."
+  - "The model's chain-of-thought is not a faithful log. Observability means recording the actual trajectory (tools called, args, results, decisions), not trusting the narration."
+  - "temperature=0 is not reproducible. Non-determinism is an infrastructure property. Debug with replay over recorded tool-responses, not by re-running and hoping."
+  - "Traces and metrics have opposite cardinality needs. High-cardinality IDs live in spans; metrics get bounded labels only. Mixing them is the central architectural error."
+sources:
+  - { grade: "A", title: "Inside the LLM Call: GenAI Observability with OpenTelemetry", author: "OpenTelemetry / CNCF", year: 2026, url: "https://opentelemetry.io/blog/2026/genai-observability/" }
+  - { grade: "A", title: "Defeating Nondeterminism in LLM Inference", author: "Horace He, Thinking Machines Lab", year: 2025, url: "https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/" }
+  - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
+  - { grade: "B", title: "Seeing the Whole Elephant (TraceElephant): Failure Attribution in LLM-based Multi-Agent Systems", author: "arXiv 2604.22708", year: 2026, url: "https://arxiv.org/html/2604.22708v1" }
+  - { grade: "B", title: "Safe Observability: Automated PII Redaction from LLM Prompts in OpenTelemetry Pipelines", author: "IJCJournal / ResearchGate", year: 2025, url: "https://ijcjournal.org/InternationalJournalOfComputer/article/download/2458/919/6203" }
+  - { grade: "B", title: "DoVer: Intervention-Driven Auto Debugging for LLM Multi-Agent Systems", author: "Microsoft Research, arXiv 2512.06749", year: 2025, url: "https://arxiv.org/pdf/2512.06749" }
+  - { grade: "C", title: "The Good, The Bad, and The Greedy (variance at temp=0)", author: "arXiv 2407.10457", year: 2024, url: "https://arxiv.org/abs/2407.10457" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+
+Your agent just failed in production. A user asked for an appointment and got a slot that was already booked. You open the logs and all you have is the final output. You don't know which documents the model read, what arguments it passed to `check_availability`, or why it skipped the step that proposes free slots. You re-run the same message hoping to reproduce the bug, and it works perfectly. Welcome to the central problem: you are not debugging a program. You are trying to reconstruct the reasoning of a non-deterministic system. The first thing to give up is the idea that the model will tell you what it did.
+
+<Callout type="important" title="You can't debug what you can't reconstruct">
+Observability for agents is not logging with extra steps. It's the forensic reconstruction of a trajectory you can't replay by re-running. And the trajectory you reconstruct has to be the *actual* one (the tools called, the args, the results, the decisions), not the chain-of-thought the model emitted. CoT reads like an explanation. It isn't a faithful trace of the computation. Log what happened, not what the model said happened.
+</Callout>
+
+## The unit of debugging is the turn, not the span
+
+A failure almost never lives in a single generation. It lives in the *trajectory*: the decisions, retries, and tool calls around it. If your mental unit is the isolated span, you'll never see that the model called the wrong tool at step 3 because the document it read at step 1 was badly written.
+
+The right unit is the turn trace, a tree of spans. A root `invoke_agent`, `chat` children (each generation, with its tokens and `finish_reason`), and `execute_tool` children (each tool, with its args, duration, and result).
+
+<MermaidDiagram title="A turn trace is a tree of spans">
+graph TD
+  A["invoke_agent (turn · 4.2s · $0.011)"] --> B["chat #1 (1.37s · 3.1k tok)"]
+  B --> C["execute_tool · search (350ms · ok)"]
+  B --> D["execute_tool · read (300ms · ok)"]
+  A --> E["chat #2 (1.3s · 4.8k tok)"]
+  E --> F["execute_tool · create_event (130ms · denied at gate)"]
+  A --> G["channel.send (330ms)"]
+</MermaidDiagram>
+
+Without this hierarchy you can't measure latency per step, attribute cost to a sub-goal, or see the wrong decision. The analogy I keep: the turn trace is the *flight data recorder*, not the pilot's report after landing. The report (the output) says "there was turbulence." The black box gives you every sensor reading and every decision in temporal order. That's the only thing that lets you reconstruct an accident you can't reproduce by flying again.
+
+## Capture the input context per step, not output-only
+
+Here's the counterintuitive part. Observability has to be an architecture requirement, not a logging add-on. The reason is empirical. The TraceElephant benchmark measures failure attribution in multi-agent systems and finds that with full traces, attribution reaches around 65.9% at the agent level and 30.3% at the step level, a relative gain of up to +76% at the step level against the partial-observability counterpart (16% to 30.3%).
+
+<Callout type="warning" title="Be honest about those numbers">
+It's tempting to write "51% to 65.9% just from having full traces," but that distorts the paper. The 51% (agent) and 16% (step) come from a *different* configuration than the 65.9% and 30.3%: different methods in different tables, not the same technique with traces toggled on and off. Part of the gain is the method change, not the observability. The claim that holds up is the relative +76% at the step level. The separate "≥21% of failures aren't attributable from output-only logs" figure is also widely miscited. It comes from a prior benchmark's 184 failure cases that the paper analyzes, not from TraceElephant's own 220 traces. The design conclusion holds either way: logging outputs without inputs makes attribution impossible in a material fraction of cases.
+</Callout>
+
+So design the agent to emit its prompt, its state, and its tool-args at each step. The cheapest place to hook this is right before a tool runs: a `PreToolUse`-style interceptor records the call, the arguments, and what it got back. That recorded step-context is exactly what the attribution research identifies as decisive.
+
+## Non-determinism is an infrastructure property, not sampling
+
+The most expensive belief a novice debugger holds is that `temperature=0` gives reproducibility. It's false. Thinking Machines showed in 2025 that LLM inference non-determinism doesn't come from sampling. It comes from the lack of *batch-invariance* in GPU kernels (matmul, RMSNorm, attention). Your request's output changes with the *batch size*, which changes with the server's concurrent traffic. The same input can give two different outputs at temperature 0 simply because another user was hitting the server at the same moment.
+
+<Callout type="warning" title="Antipattern: debugging by re-running">
+Re-running the same input in a loop hoping to reproduce the failure is wasted time. Determinism at `temp=0` is an infrastructure illusion. Studies measure accuracy variance of ~5 points typically, and up to ~15-16 points on specialized models, at temperature 0. Those are conservative figures. The inflated "70% best-vs-worst" claim you'll see around doesn't hold up in the sources I could check.
+</Callout>
+
+The design consequence is **replay over recorded tool-responses**. You capture a production trace (messages, tool calls, and the real tool results) and re-run the agent feeding it the recorded responses as fixtures, instead of calling tools live.
+
+<CodeBlock filename="replay.test.ts">
+```ts
+// A non-reproducible production failure becomes a repeatable test.
+// We feed recorded tool-responses instead of calling tools live.
+const fixture = loadTrace("trace_2026-06-19_booking-collision.json");
+
+const result = await runAgent(fixture.messages, {
+  // Intercept every tool call; return the recorded result, no live I/O.
+  onToolCall: (name, args) => fixture.toolResponses.next(name, args),
+});
+
+// Deterministic across runs, and it costs zero LLM tokens to replay
+// the tool layer. temp=0 alone would NOT give you this.
+expect(result.finalDecision).toMatchSnapshot();
+```
+</CodeBlock>
+
+This turns an irreproducible failure into a repeatable test, and it spends no tokens. It's one of the most cost-effective and least implemented techniques in the field. The frontier goes further: intervention-driven debugging (DoVer, from Microsoft Research) actively intervenes at steps with counterfactual replay to validate root cause, instead of inspecting the trace passively.
+
+## Traces and metrics have opposite cardinality needs
+
+This is the central architectural error: mixing the trace plane with the metric plane. They want opposite things.
+
+A **span** wants `conversation_id`, `user_id`, `tenant`, content. Each unique value is *good*. It's what makes forensics possible. You index it to find one specific trace. A **Prometheus metric** is the reverse: every label combination creates a new time series. Put `conversation_id` in a label and you generate one series per conversation. Memory blows up, metrics get dropped, retention is lost.
+
+The expert rule is simple and hard: high-cardinality IDs live in spans and logs; metrics use bounded labels only (status, tool_name, channel, model if it's controlled). A back-of-envelope calculation makes it visceral. 100,000 conversations a month, a latency histogram with 12 buckets, `conversation_id` as a label, and that's on the order of 1.2 million time series for a *single* metric. Prometheus collapses well before that. (Order of magnitude, not a measurement.)
+
+<Collapsible title="HMAC, not a plain hash, for IDs in traces">
+Hashing isn't enough. Use **HMAC** (a keyed hash) over identifiers like `conversation_id`. Why not a plain hash? Because HMAC with a shared secret (a *pepper*) gives you deterministic internal correlation. The same ID always produces the same HMAC, so you can join across traces, without exposing the real identifier or leaving it brute-forceable. A keyless hash of a phone number or a short user ID is trivially reversible by a dictionary attack. The trap to avoid: a pepper that ships with a default value and degrades silently when it isn't set in production. Then your "hashed" IDs are brute-forceable again, and nobody gets paged about it.
+</Collapsible>
+
+## OTel GenAI conventions are the lingua franca
+
+How do you name these attributes so you don't get locked into one vendor? With the OpenTelemetry GenAI semantic conventions, the CNCF schema adopted by Datadog, AWS, Azure, GCP, and the open-source backends. Instrument with semconv and you can change observability backend *without reinstrumenting your code*.
+
+<CodeBlock filename="span.json">
+```json
+{
+  "name": "chat",
+  "attributes": {
+    "gen_ai.operation.name": "chat",
+    "gen_ai.request.model": "claude-opus-4-8",
+    "gen_ai.usage.input_tokens": 3120,
+    "gen_ai.usage.output_tokens": 412,
+    "gen_ai.response.finish_reasons": ["tool_use"]
+  }
+}
+```
+</CodeBlock>
+
+<Callout type="warning" title="Two caveats that can bite you">
+**(1)** The GenAI semconv is still in *Development*/experimental status. Use the stability opt-in to dual-emit during transitions so you don't break dashboards. **(2)** By default OTel GenAI does *not* capture prompts or tool-args. Content is opt-in, a deliberate privacy decision.
+</Callout>
+
+Respecting that default matters because trace backends become PII repositories the moment they ingest unfiltered prompts, which collides with GDPR. The fix is not to give up content. The attribution work showed content is what makes failures debuggable. The fix is a *redaction processor* in the OTel pipeline that masks phone numbers and emails (regex plus NER) in transit, before anything is persisted.
+
+## Cost is a primary signal, not secondary FinOps
+
+If you keep one counterintuitive idea from this module, keep this one: token cost is a primary signal of quality and regression, not a finance metric. Anthropic reports from its real multi-agent system that token usage explains around 80% of performance variance, and that a multi-agent system consumes on the order of 15× the tokens of a chat.
+
+<Callout type="tip" title="A prompt change that doubles tokens is a bug">
+If 80% of your performance variance is tokens, then tokens are a direct proxy for quality and efficiency, and a regression detector. A prompt change that doubles tokens without improving `task_success` isn't "more expensive." It's an efficiency bug. So is an agent that gets the right answer but calls five tools too many. `tool_call` success and tool restraint are first-class metrics, not afterthoughts.
+</Callout>
+
+Most teams use cost as a *budget limit*. The move with more payoff is to wire it into evals as a regression grader: fail the gate if tokens-per-turn rise without `task_success` rising. That closes the loop between observability and evals, and it connects directly to the eval pillar, which is the other half of this story. Online evals on sampled production traffic catch the distribution drift offline scenarios miss: cheap code-based heuristics on 100% of traffic, an expensive LLM-as-judge on a sampled 5-15%, thresholds that page or trigger a canary rollback, and the failures you catch online get promoted into your offline dataset. The traces feed the error analysis. The error analysis feeds the next eval.
+
+## Don't observe the wrong things
+
+A dashboard of requests-per-minute and uptime is not agent observability. It tells you nothing about quality. Without tool-call success, `task_success`, and cost-per-turn, you aren't observing the agent. You're observing the web server it happens to run behind. And latency itself is a trap when it's aggregated. In agents with debounce, queues, and workers, user-perceived latency is *not* LLM latency. The turn span should break out queue time, debounce, lock, generation, and tools as sub-spans. Aggregate it into one number and you'll spend a week optimizing the component that wasn't the bottleneck.
+
+One last thing worth saying out loud, because it's easy to skip when you're staring at green dashboards: the absence of a span is itself a finding. A tool that writes to disk outside its sandbox, or a memory write that bypasses human approval, leaves no trace if you never emitted the event for it. Security observability is the part nobody designs until the audit asks "show me every access to that path," and the honest answer is that you can't, because you weren't recording it.

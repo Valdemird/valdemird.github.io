@@ -1,0 +1,160 @@
+---
+title: "La seguridad agéntica es arquitectónica: el modelo es un reducer no confiable"
+description: "El prompt injection no se arregla a nivel de modelo, así que la frontera de confianza tiene que vivir en el código. Default-deny, mínimo privilegio, RLS para aislar tenants y separar el control de los datos son la defensa real, no un mejor system prompt."
+phase: 5
+order: 9
+tier: fiabilidad
+durability: atemporal
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "El prompt injection no tiene solución a nivel de modelo. Toda defensa probabilística (clasificadores, spotlighting, prompts defensivos) cae ante ataques adaptativos, así que trata la detección como un callejón sin salida y contén el blast radius."
+  - "Diseña para el peor caso: asume que el agente está comprometido y verifica que aun así no pueda causar daño irreversible. Eso significa default-deny, mínimo privilegio por tool, RLS para aislar tenants y una separación dura entre control y datos."
+  - "La lethal trifecta (datos privados + contenido no confiable + canal de exfiltración) y el Agents Rule of Two convierten la 'seguridad' en un presupuesto de capacidades que enumeras y verificas, no en un prompt que afinas."
+sources:
+  - { grade: "A", title: "The Attacker Moves Second: Stronger Adaptive Attacks Bypass Defenses Against LLM Jailbreaks and Prompt Injections", author: "Nasr et al. (OpenAI, Anthropic, Google DeepMind)", year: 2025, url: "https://arxiv.org/abs/2510.09023" }
+  - { grade: "A", title: "Defeating Prompt Injections by Design (CaMeL)", author: "Debenedetti et al. (Google DeepMind, ETH Zurich)", year: 2025, url: "https://arxiv.org/pdf/2503.18813" }
+  - { grade: "A", title: "Defending Against Indirect Prompt Injection Attacks With Spotlighting", author: "Hines et al. (Microsoft)", year: 2024, url: "https://arxiv.org/pdf/2403.14720" }
+  - { grade: "A", title: "AgentDojo: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for LLM Agents", author: "Debenedetti et al. (ETH Zurich)", year: 2024, url: "https://arxiv.org/abs/2406.13352" }
+  - { grade: "B", title: "The lethal trifecta for AI agents: private data, untrusted content, and external communication", author: "Simon Willison", year: 2025, url: "https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/" }
+  - { grade: "B", title: "Agents Rule of Two: A Practical Approach to AI Agent Security", author: "Meta AI", year: 2025, url: "https://simonwillison.net/2025/Nov/2/new-prompt-injection-papers/" }
+  - { grade: "B", title: "OWASP Top 10 for Agentic Applications (2026)", author: "OWASP GenAI Security Project", year: 2026, url: "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/" }
+  - { grade: "C", title: "MCP Security Notification: Tool Poisoning Attacks", author: "Invariant Labs", year: 2025, url: "https://www.truefoundry.com/blog/blog-mcp-tool-poisoning-gateway-defense" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+
+La pregunta que decide si tu agente sobrevive a producción no es "¿qué tan bueno es mi system prompt?". Es "¿qué daño puede hacer cuando esté totalmente comprometido?". Porque lo estará. La seguridad agéntica empieza aceptando una verdad incómoda: el prompt injection no tiene solución a nivel de modelo, y probablemente nunca la tendrá. Todo lo demás de este módulo se deriva de tomarse esa frase en serio.
+
+## El modelo no tiene frontera de privilegio
+
+Un sistema operativo separa el kernel del espacio de usuario con hardware. El ring 0 y el ring 3 son fronteras físicas. Un LLM no tiene nada de eso. El system prompt, el mensaje del usuario y un fragmento de un documento no confiable se concatenan en una sola secuencia de tokens, y el modelo no posee mecanismo para tratar unos tokens como instrucciones privilegiadas y otros como datos inertes. Esta es la causa raíz, no un bug que un parche arregle.
+
+<Callout type="important" title="El modelo es un reducer no confiable">
+Piensa en el LLM como una función pura que toma un montón de tokens y devuelve una acción. Algunos de esos tokens los puso un atacante, y la función no sabe cuáles. Así que tratas su salida como tratarías cualquier input de un cliente no confiable: validada, gateada y sin poder para hacer nada irreversible por su cuenta. La frontera de confianza no vive en el prompt. Vive en el código que rodea al modelo.
+</Callout>
+
+Esta es la versión LLM del problema del confused deputy: una entidad con autoridad legítima (tu agente) es manipulada por un tercero (el dato envenenado) para que use esa autoridad en su nombre. Mientras instrucciones y datos compartan un mismo canal sin etiqueta de procedencia, el deputy seguirá confundido.
+
+Por eso ninguna defensa conductual puede dar garantías. El experimento decisivo es "The Attacker Moves Second": tomaron 12 defensas publicadas y, con ataques adaptativos optimizados contra cada defensa concreta, las rompieron con más del 90% de éxito. Con red-teaming humano (una competición de 500 participantes) llegaron al 100%. El nombre lo dice todo. Tú publicas tu defensa primero; el atacante la lee y mueve después. Cualquier métrica del tipo "detectamos el 95% de los ataques" es, en términos de seguridad, un suspenso.
+
+La consecuencia operativa es un giro de 180 grados. Deja de invertir en detectar inyecciones. Empieza a invertir en contener el blast radius. La seguridad tiene que ser arquitectónica, es decir, propiedades deterministas del sistema, fuera del LLM, no conductual.
+
+## La lethal trifecta: auditar por capacidades, no por intenciones
+
+Simon Willison destiló el riesgo en un modelo mental de una línea. Un agente se vuelve una herramienta de exfiltración garantizada cuando reúne tres capacidades a la vez: acceso a datos privados, exposición a contenido no confiable y un canal para comunicarse al exterior.
+
+<MermaidDiagram title="La lethal trifecta">
+graph LR
+  A["Datos privados"] --> X["Exfiltración garantizada<br/>con un prompt inyectado"]
+  B["Contenido no confiable"] --> X
+  C["Canal externo"] --> X
+</MermaidDiagram>
+
+La potencia de este marco es que te obliga a auditar agentes por capacidades, no por intenciones. No importa cuán bien escrito esté tu system prompt: si las tres están presentes, un solo prompt inyectado en el contenido no confiable convierte al agente en exfiltrador. Y la inversa es liberadora: rompe cualquiera de los tres vértices y la cadena de ataque se corta. El vértice más barato de eliminar suele ser el tercero. Una egress allowlist que limite las conexiones salientes a una lista cerrada de destinos hace que, aunque el agente esté comprometido, no tenga por dónde sacar los datos.
+
+## El Agents Rule of Two: un presupuesto de capacidades
+
+Meta generalizó la trifecta de "exfiltración de datos" a "cualquier acción consecuente". El Agents Rule of Two dice que un agente autónomo, sin humano en el loop, puede tener como mucho dos de estas tres: procesa input no confiable, accede a datos sensibles, o puede cambiar estado / comunicar al exterior. Las tres juntas exigen un humano en el loop.
+
+La belleza es que convierte la "seguridad", algo abstracto, en un presupuesto de capacidades por sesión que enumeras y verificas como un invariante de diseño. Es la mejor guía práctica de diseño que existe hoy, en ausencia de defensas fiables.
+
+<Callout type="note" title="Trifecta vs Rule of Two">
+La trifecta es el caso particular del Rule of Two donde la acción consecuente es específicamente *exfiltrar*. El Rule of Two es más general porque cubre también reagendar una cita, borrar un registro o enviar un mensaje. Mismo principio, mayor cobertura.
+</Callout>
+
+## La arquitectónica le gana a la conductual
+
+Aquí está el salto conceptual que separa juguetes de sistemas de producción. Una defensa conductual le pide al modelo que se porte bien (es probabilística). Una defensa arquitectónica hace que el comportamiento peligroso sea imposible por construcción (es determinista).
+
+La prueba más clara del enfoque arquitectónico es CaMeL ("Defeating Prompt Injections by Design"): envuelve al LLM con capability tracking, integridad de flujo de control y control de flujo de información, de modo que un valor de procedencia no confiable no puede disparar una acción consecuente. Resolvió el 77% de las tareas de AgentDojo con seguridad demostrable, frente a ~84% del sistema sin defensa, pagando solo una caída modesta de utilidad. Esa es la prueba de existencia. La defensa determinista es posible.
+
+<Collapsible title="El patrón dual-LLM / cuarentena">
+La pieza más accesible del arsenal arquitectónico. Un LLM privilegiado orquesta y nunca ve datos no confiables. Un LLM en cuarentena procesa el contenido no confiable y devuelve solo valores tipados (una fecha, un nombre, un booleano), nunca instrucciones que el privilegiado obedezca. Como el privilegiado nunca lee texto controlado por el atacante, no hay superficie para inyectarle instrucciones. CaMeL y FIDES construyen sobre esta idea; puedes aproximarla mucho antes de adoptar IFC completo.
+</Collapsible>
+
+Lo que hace funcionar todo esto es la procedencia: saber, para cada valor, de dónde vino. El taint tracking marca qué datos provienen de fuentes no confiables y propaga esa marca a través de las tools, de modo que una acción consecuente derivada de un dato envenenado se bloquea automáticamente. El modelo no puede hacer esto solo (olvida, se deja persuadir), así que el taint tiene que vivir en el orchestrator, en código determinista. Esto es exactamente lo que separa el spotlighting (cosmético) del IFC (real). El spotlighting *marca* el texto y confía en que el modelo respete la marca; el taint tracking *aplica* la marca en código que el modelo no puede sobrescribir.
+
+<Callout type="warning" title="El spotlighting es una capa, no un control">
+El spotlighting de Microsoft (delimitar, datamarking, codificar en base64) baja el éxito de inyección de más del 50% a menos del 2% en modelos GPT. Impresionante, hasta que un atacante adaptativo destruye ese 2% residual. Cuéntalo como ruido reducido por defensa en profundidad. Nunca lo cuentes como control de seguridad, y nunca dejes que sea lo único entre el texto no confiable y una escritura.
+</Callout>
+
+## El default-deny es toda la postura
+
+Como no puedes evitar el compromiso, diseñas para que el agente comprometido tenga el menor poder posible. Eso empieza por la dirección en la que falla cada gate. Un gate default-allow, el que permite todo lo que no esté explícitamente prohibido, se evade añadiendo un caso que nadie listó. Un path-jail basado en una allowlist fija de campos de input conocidos es la versión canónica de este antipatrón: un tool nuevo con un campo de ruta no contemplado pasa de largo. El arreglo es estructural: validar *toda* ruta contra el jail antes de cualquier acceso, resolviendo symlinks con `realpath`, y denegar por defecto.
+
+<CodeBlock filename="tool-gate.ts">
+```ts
+// Antipatrón: default-allow basado en campos conocidos.
+// Un tool nuevo con un campo de ruta no listado evade el jail en silencio.
+function checkPath_MAL(args: Record<string, unknown>) {
+  for (const key of ["path", "file", "dir"]) {   // allowlist fija de claves
+    if (key in args && !inJail(args[key])) throw new Error("escape");
+  }
+  return true; // lo que no esté en la lista pasa: falla en abierto
+}
+
+// Default-deny: validar todo string que pueda ser una ruta,
+// resolver symlinks y rechazar por construcción.
+function checkPath_BIEN(args: Record<string, unknown>) {
+  for (const value of Object.values(args)) {
+    if (typeof value !== "string") continue;
+    const real = realpathSync(resolve(value));     // colapsa symlinks
+    if (!real.startsWith(JAIL_ROOT + sep)) {
+      throw new Error(`ruta fuera del jail: ${real}`); // falla en cerrado
+    }
+  }
+  return true;
+}
+```
+</CodeBlock>
+
+La misma postura aplica a tools y a la red. Deshabilita `Bash`, `Write`, `Edit`, el fetch web y los subprocesos arbitrarios salvo que una ruta los necesite explícitamente. Cada nueva capacidad se añade conscientemente, nunca se hereda. Enruta todo tool consecuente por un gate de aprobación. Corre el agente en un sandbox con aislamiento de filesystem y de red: sin red, no hay exfil; sin filesystem, no hay escape. Nada de esto es infalible: el Claude Agent SDK tuvo un bypass de deny-rule por encadenar muchos subcomandos, parcheado después. La config es una capa, no una garantía, y por eso mismo apilas varias.
+
+<Callout type="warning" title="Los gates de config fallan; asume que lo harán">
+Una deny rule, una allowlist, un sandbox: cada uno ha sido evadido en algún sistema real. Trata cada control individual como vencible y apóyate en la *combinación*: si la egress allowlist aguanta, el bug del path-jail no filtra datos; si el sandbox aguanta, el bug de la deny-rule no llega a la red. La profundidad es el punto.
+</Callout>
+
+## El aislamiento de tenant vive en la base de datos
+
+Para un SaaS multi-tenant donde un agente de IA sirve a muchas organizaciones, aislar tenants solo en la capa de aplicación es un single point of failure. Una query con bug, o un agente comprometido que arma su propia query, cruza orgs. El arreglo es empujar el aislamiento a la base de datos con row-level security, para que la capa de datos filtre aunque el código tenga bugs.
+
+<CodeBlock filename="rls.sql">
+```sql
+-- Postgres aplica el aislamiento aunque la app olvide el WHERE.
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY tenant_isolation ON messages
+  USING (org_id = current_setting('app.current_org')::uuid);
+
+-- Por request, la app fija el tenant de la sesión.
+-- Ahora cada query la acota la DB, no la confianza en el código.
+SET LOCAL app.current_org = '...';
+
+-- Mantén org_id como columna líder del índice: RLS cuesta ~2-4%, no un scan.
+CREATE INDEX ON messages (org_id, created_at);
+```
+</CodeBlock>
+
+Esto es defensa en profundidad, no un reemplazo de los chequeos de la app. El punto es que la capa más profunda falle en cerrado.
+
+## La memoria es un vector de inyección persistente
+
+Una trampa merece su propio aviso. Escribir en la memoria de largo plazo de un agente es una *acción consecuente*, no una comodidad que se pre-aprueba. Si contenido no confiable de un documento o un mensaje puede fluir hasta una nota guardada, una inyección sobrevive a la sesión y reescribe el comportamiento del agente en turnos futuros. El memory poisoning es la versión lenta de la trifecta: la exfil ocurre días después, a partir de datos que el atacante plantó hoy. Gatea las escrituras a memoria igual que cualquier otra escritura, o al menos etiqueta la procedencia de lo que se guarda.
+
+<Callout type="warning" title="La cadena de suministro escribe en tu prompt">
+Las descripciones de tools, los resultados de servidores MCP de terceros y las skills entran al contexto del modelo sin sanitización ni provenance. Confiar en un MCP server es confiar en código que escribe en tu prompt. El envenenamiento de descripciones de tools es una clase reconocida con CVEs reales (CVE-2025-54136, "MCPoison", un rug-pull que cambia la definición de un tool después de aprobado, y CVE-2025-54135, "CurXecute"), y está en el Top 10 agéntico de OWASP junto al goal hijacking y el memory poisoning. Pinea versiones, audita servers, trata sus descripciones y resultados como input no confiable, y alerta ante cambios de descripción.
+</Callout>
+
+## El HITL solo cuenta si el humano aprueba lo de verdad
+
+El humano-en-el-loop sobre las escrituras es el mecanismo que rompe la trifecta, convirtiendo al agente en "solo-lectura autónomo". Pero solo funciona bajo dos condiciones. El humano debe confirmar el payload *exacto* que se va a ejecutar, no un resumen regenerado por el modelo. Si el modelo re-renderiza, el humano aprueba una cosa y se ejecuta otra. Y ninguna ruta puede evadir el gate. Un solo tool pre-aprobado que escribe es un agujero. Congela el payload entre la confirmación y la ejecución, y registra qué se mostró frente a qué se ejecutó.
+
+Una nota sobre lo que *no* es un audit trail. El chain-of-thought no es fiel al cómputo interno del modelo, así que leer el texto del razonamiento te dice lo que el modelo dijo que hacía, no lo que hizo. No lo trates como defensa contra inyección ni como evidencia de que el agente se mantuvo en política. Tu audit trail es el log determinista de tool-calls y aprobaciones que guardas en el orchestrator.
+
+## Cómo saber si tus defensas funcionan
+
+Mide utilidad *y* seguridad bajo ataque. AgentDojo es el harness estándar: 97 tareas más 629 casos de seguridad, reportando utilidad benigna, utilidad bajo ataque y attack-success-rate. Los scripts de red-team estáticos no bastan: celebras un "ASR casi cero" y un atacante adaptativo igual logra más del 90%. Corre red-teaming adaptativo en CI y gatea los releases por attack-success-rate, no solo por task success. El encuadre honesto: no hay defensa probabilística que puedas comprar y cierre el prompt injection. Lo que sí puedes hacer es acotar el peor caso, probar la cota en la arquitectura, y seguir testeando si la cota aguanta.

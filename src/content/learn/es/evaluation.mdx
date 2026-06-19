@@ -1,0 +1,151 @@
+---
+title: "La evaluación es el loop de control, no el examen final"
+description: "El eval es donde tus intuiciones difusas sobre 'correcto' se vuelven una señal que puedes optimizar. Constrúyelo desde el análisis de errores real, mide trayectoria y pass^k, y recuerda que la misma función verificable que califica también entrena y auto-mejora al agente."
+phase: 5
+order: 10
+tier: fiabilidad
+durability: atemporal
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "El eval no es el QA del final. Es el loop de control: la única superficie donde 'esto está bien' se vuelve un número que puedes optimizar. Un eval ruidoso es conducir a ciegas."
+  - "Construye los evals desde el análisis de errores sobre trazas reales, no desde métricas que imaginaste a priori. Mide la trayectoria, no solo la respuesta final. Reporta pass^k, no pass@1: una corrida verde no es fiabilidad."
+  - "El grader del eval, la recompensa de entrenamiento RLVR y la fitness de auto-mejora son la misma función verificable. Prefiere graders por código antes que juez LLM, y audita el propio grader."
+sources:
+  - { grade: "A", title: "τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains", author: "Yao et al., Sierra", year: 2024, url: "https://arxiv.org/abs/2406.12045" }
+  - { grade: "A", title: "Who Validates the Validators? Aligning LLM-Assisted Evaluation with Human Preferences (EvalGen)", author: "Shankar et al., UIST", year: 2024, url: "https://people.eecs.berkeley.edu/~bjoern/papers/shankar-validators-uist2024.pdf" }
+  - { grade: "A", title: "Justice or Prejudice? Quantifying Biases in LLM-as-a-Judge", author: "arXiv 2410.02736", year: 2024, url: "https://arxiv.org/pdf/2410.02736" }
+  - { grade: "A", title: "The Berkeley Function Calling Leaderboard (BFCL): From Tool Use to Agentic Evaluation", author: "Patil et al., PMLR", year: 2025, url: "https://proceedings.mlr.press/v267/patil25a.html" }
+  - { grade: "A", title: "Pairwise or Pointwise? Evaluating Feedback Protocols for Bias in LLM-Based Evaluation", author: "arXiv 2504.14716, COLM", year: 2025, url: "https://arxiv.org/abs/2504.14716" }
+  - { grade: "B", title: "Why is error analysis so important in LLM evals", author: "Hamel Husain", year: 2024, url: "https://hamel.dev/blog/posts/evals-faq/why-is-error-analysis-so-important-in-llm-evals-and-how-is-it-performed.html" }
+  - { grade: "B", title: "UTBoost: Rigorous Evaluation of Coding Agents on SWE-Bench", author: "arXiv 2506.09289", year: 2025, url: "https://arxiv.org/pdf/2506.09289" }
+  - { grade: "B", title: "The SWE-Bench Illusion / Does SWE-Bench Test Agent Ability or Model Memory?", author: "arXiv 2506.12286, 2512.10218", year: 2025, url: "https://arxiv.org/abs/2506.12286" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+Tu agente pasó la demo. Confirmó la cita, respetó el tono, sonó impecable. A la semana en producción un cliente jura que le agendó dos veces el mismo turno y otro que escribió a la agenda sin pedir confirmación. ¿Qué falló? Casi nunca el modelo. Lo que falló es tu capacidad de medir. La evaluación no es el examen de QA que pegas al final: es el loop de control del sistema. No escalas lo que no mides, y en LLMs el "comportamiento" no es ni determinista ni inspeccionable por código, así que el eval es la única superficie donde conviertes intuiciones difusas en señal accionable.
+
+<Callout type="important" title="El eval es el producto">
+El eval no es un termómetro que cuelgas al final del proceso. Es el volante: la única superficie donde tu sensación de "esto está bien" se vuelve una señal que puedes optimizar. Si el volante mide ruido, conduces a ciegas por más que aceleres. Y **define qué significa 'correcto' para tu dominio**, no para un benchmark público. Son cosas distintas, y confundirlas es la raíz de casi todo lo que sale mal.
+</Callout>
+
+Tres distinciones que un principiante fusiona y un experto separa con cuidado, y que estructuran el resto del módulo: resultado contra trayectoria (¿se logró el goal-state, o cómo se logró?), graders por código contra juez LLM (deterministas y baratos contra necesarios para lo subjetivo pero sesgados y caros) y pass@1 contra pass^k (rendimiento medio contra fiabilidad).
+
+## Primero el análisis de errores, después los graders
+
+El instinto disciplinado dice: escribe los graders antes de construir la feature, estilo test-driven. Hamel Husain sostiene lo contrario para LLMs, y tiene razón. Los LLMs tienen una superficie de fallos prácticamente infinita que no puedes anticipar desde una pizarra. Si escribes graders a priori, terminas midiendo lo que *imaginaste* que importaría, y produces métricas vanidosas que suben mientras el producto no mejora.
+
+El método correcto es etnográfico, no especulativo.
+
+<Tabs labels={["Open coding", "Axial coding", "Derivar evals"]}>
+<TabPanel>
+Lees N trazas reales (50 es un buen número de arranque) y escribes una *nota libre* por cada fallo que observas, sin categorías predefinidas. "Llamó a propose_slots antes de check_availability." "Confirmó sin esperar el tap." "Respondió en tono robótico." Cero estructura, máxima fidelidad a lo que de verdad pasó.
+</TabPanel>
+<TabPanel>
+Agrupas esas notas en 5-10 temas. "Violación de orden de tools", "escritura sin confirmación", "tono/canal", "alucinación sobre los docs". Aquí emerge la *distribución real* de tus fallos, que casi nunca coincide con la que habrías adivinado.
+</TabPanel>
+<TabPanel>
+Construyes graders solo para las categorías frecuentes o costosas. Si "tono robótico" apareció una vez y "escritura sin confirmación" diez, ya sabes dónde invertir. La excepción legítima al "análisis de errores primero" es un *constraint conocido*: "nunca escribir sin tap de confirmación" merece un eval a priori porque es una invariante de seguridad, no una hipótesis.
+</TabPanel>
+</Tabs>
+
+Escribir evals a priori se *siente* como ingeniería seria. Pero estás optimizando contra tu propio modelo mental del problema, que es justo lo que el LLM va a sorprender. El análisis de errores te obliga a mirar la realidad antes de medirla. Es la diferencia entre un médico que receta sin examinar y uno que primero ausculta.
+
+## pass^k: la frontera entre demo y producción
+
+Aquí está la distinción estadística más cara de ignorar. **pass@1** mide el rendimiento medio: la probabilidad de que *un* intento pase. Es lo que un benchmark publicita porque es la cifra más alta. **pass^k** = pᵏ mide la probabilidad de que *los k intentos pasen todos*, que es la fiabilidad real.
+
+La diferencia decae exponencialmente. Un agente al 90% pass@1 cae a 0,9⁸ ≈ 57% en k=8. τ-bench lo muestra con datos: GPT-4o logra 61% pass@1 pero solo 25% pass^8 en el dominio retail. Traducido a tu negocio: una de cada cuatro veces, la misma confirmación de cita falla de forma no-determinista. Nadie en un SaaS multi-tenant acepta eso.
+
+<Callout type="warning" title="Declarar 'listo' con pass@1 es el antipatrón">
+Reportar pass@1 y declarar el agente listo para producción esconde la fragilidad no-determinista: estás midiendo el mejor caso, no la fiabilidad. Para cualquier escenario con acción irreversible (una escritura tras confirmación, una cita), pass^k con k≥5 no es una métrica de vanidad. Es un gate de release.
+</Callout>
+
+¿Por qué muerde tanto en agentes? Los errores se componen. Si cada paso falla de forma independiente con probabilidad *e*, una tarea de T pasos tiene éxito como (1−e)ᵀ. Por eso las mejoras *marginales* en accuracy por paso producen mejoras *exponenciales* en la longitud de tarea resoluble. Hay un agravante que casi nadie modela: los errores entre pasos están positivamente correlacionados. Un agente confundido tiende a seguir confundido, lo que infla la varianza y hace que pass^k caiga *más rápido* de lo que el cálculo ingenuo de independencia predice. El trabajo reciente sobre fiabilidad de horizonte largo propone métricas empíricas (Reliability Decay Curve, Variance Amplification Factor y compañía) para caracterizar ese decaimiento sin asumir independencia. [B] Trata la curva como el objeto honesto; la fórmula cerrada pᵏ es un piso, no la verdad.
+
+## Trayectoria contra resultado
+
+Un agente puede dar la respuesta *correcta* habiendo llamado tools inútiles, con parámetros erróneos, repitiendo pasos o saltándose una confirmación. Un eval de solo-resultado te dice *que* algo falló; nunca *dónde* ni *por qué*. Para un agente con gates de confirmación y escrituras peligrosas, la trayectoria no es opcional.
+
+<MermaidDiagram title="El solo-resultado es ciego al método">
+graph LR
+  R["Trazas reales"] --> E["Análisis de errores<br/>(open / axial)"]
+  E --> G["Graders derivados"]
+  G --> K["pass^k<br/>+ trayectoria"]
+  K --> C["Gate CI /<br/>online eval"]
+  C -.alimenta.-> R
+</MermaidDiagram>
+
+La trayectoria la capturas interceptando las tool calls *antes* de que se ejecuten: el hook pre-tool-use registra cada intento de llamada antes de que decida el gate de permisos. Eso habilita graders imposibles con solo-resultado: ¿pidió confirmación antes de escribir, y se *abstuvo* de llamar un tool cuando no debía? Ambos son graders de trayectoria puros.
+
+## Graders por código: la primera línea
+
+Antes de invocar un juez LLM (caro, sesgado, no-determinista), una gran parte de lo que importa es verificable por código puro. ¿Tool correcto, en orden? ¿Nada de escritura sin confirmación? ¿Se respetaron los límites de canal? Todo determinista, reproducible, libre de sesgo.
+
+El linaje técnico es el Berkeley Function Calling Leaderboard, que introdujo el *AST matching* de llamadas a función: comparas el árbol de sintaxis de la llamada generada contra el esperado, sin un LLM en el medio, y escala a miles de funciones. BFCL aporta además la categoría crítica de *relevance/restraint*: detectar cuándo el agente *no* debería llamar a un tool.
+
+<CodeBlock filename="graders/hitl_compliance.ts">
+```ts
+// Grader de trayectoria: una escritura debe ir precedida de un tap aprobado.
+// Código puro. Determinista. Sin LLM, sin sesgo, sin coste de tokens.
+export function hitlCompliance(trace) {
+  for (let i = 0; i < trace.length; i++) {
+    const call = trace[i];
+    if (!isDangerousWrite(call)) continue;
+    const aprobado = trace
+      .slice(0, i)
+      .some((c) => c.name === "request_confirmation" && c.approved);
+    if (!aprobado) {
+      return { pass: false, reason: "escritura " + call.name + " sin tap previo" };
+    }
+  }
+  return { pass: true };
+}
+```
+</CodeBlock>
+
+<Callout type="tip" title="Reserva el juez para lo subjetivo">
+Verifica por código todo lo objetivo (orden de tools, confirmación, límites de canal) y reserva el juez LLM solo para lo genuinamente subjetivo: fidelidad a la documentación, calidad de resolución, tono. Cada vez que un grader determinista puede responder, ahorras tokens, eliminas un sesgo y ganas reproducibilidad.
+</Callout>
+
+<Collapsible title="Profundizar: el restraint importa tanto como llamar bien">
+Medir cuándo el agente *no* debería llamar a un tool está subvalorado. Un agente que escribe sin necesidad, o que consulta de más, no es solo un problema de UX: es un riesgo de seguridad y de coste. El grader de restraint es descendiente directo de la categoría de relevance de BFCL, y es el que más equipos olvidan escribir porque el camino feliz no lo dispara.
+</Collapsible>
+
+## La isomorfía eval ↔ recompensa ↔ grader
+
+Esta es la idea que amarra todo el campo, y es por la que los graders por código merecen la preferencia. La función verificable que escribes para *calificar* un eval es, estructuralmente, la misma que sirve de *recompensa de entrenamiento* en RLVR y de *señal de fitness* en los loops de auto-mejora. Una función, tres trabajos: te dice si una corrida pasó (eval), le dice al optimizador qué trayectoria reforzar (recompensa) y le dice a un agente que se auto-mejora cuál de sus propios intentos conservar (fitness).
+
+La consecuencia es filosa. Un grader que se puede hackear es una recompensa que se puede hackear. Si tu verificador premia "parece resuelto" en vez de "está resuelto", entonces la evaluación te miente, el RL entrena al modelo para producir outputs convincentes-pero-equivocados, y cualquier loop de auto-mejora deriva hacia el exploit. Un grader no-hackeable es el mismo artefacto trabajes midiendo, entrenando o dejando que el agente se reescriba a sí mismo, y por eso empujas tanto de él hacia código determinista como la tarea permita, y tratas al juez LLM como el respaldo con pérdida para lo que el código no alcanza.
+
+## Juez LLM: sesgos sistemáticos
+
+Cuando el código no captura la calidad, necesitas un juez LLM. Pero un juez no es un oráculo: es un instrumento de medición con sesgos sistemáticos, y un instrumento sin calibrar mide ruido. Los sesgos están catalogados; el benchmark CALM de "Justice or Prejudice?" enumera doce. Los tres que más te van a morder: sesgo de posición (favorece A o B según el orden de presentación), sesgo de verbosidad (premia respuestas largas sin importar la calidad) y auto-preferencia (favorece outputs de su propia familia de modelo).
+
+La defensa es doble. Calibrar contra etiquetas humanas con Cohen's kappa: la convención es kappa >0,6 aceptable, >0,8 fuerte. Un juez con kappa por debajo de 0,4 es un generador de ruido caro disfrazado de métrica. Y diseñar mitigaciones: permutar posiciones y promediar (swap & average), rúbricas con ejemplos ancla, escalas binarias o de 3 niveles en vez de Likert 1-5.
+
+<Callout type="note" title="Pairwise o pointwise: cuál para qué decisión">
+Pointwise (puntuar cada output 0-1 contra una rúbrica) es comparable en el tiempo: mejor para debugging y monitoreo longitudinal. Pairwise (¿B es mejor que A?) correlaciona mejor con humanos, mejor para selección de modelo. El precio del pairwise: las preferencias se invierten ~35% de las veces al intercambiar el orden, frente a ~9% en scores pointwise absolutos, y es más explotable. No es "cuál es mejor" sino "cuál para qué decisión".
+</Callout>
+
+## El eval como moat, y el folklore de los benchmarks
+
+Los benchmarks públicos (SWE-bench, τ-bench, GAIA) sirven para *elegir el modelo base*. Nunca miden tu política de negocio, y muchos están contaminados o saturados. Unas cifras, ya corregidas respecto a las infladas que circulan:
+
+<Callout type="warning" title="No repitas el folklore de la contaminación">
+La cifra del "8-10% de contaminación" de SWE-bench Verified es una subestimación: la literatura reporta match verbatim del 12-32% según el modelo y solution leakage en más del 30% de los parches exitosos. [B] En *localización* de bugs los modelos llegan a ~76% en Verified contra ~53% en repos held-out: un ratio de ~1,4x, no el "3-6x" que se repite sin fuente. Y GAIA Level 1 está saturado por modelos frontier, pero los Levels 2-3 todavía discriminan en 2026; decir "L1/L2 están saturados" agrupa mal el L2.
+</Callout>
+
+Tu moat no es ganar un leaderboard público. Es el dataset de evals derivado de tus propios fallos de producción: los escenarios multi-turn con políticas, gates de confirmación y trampas de inyección que nadie más tiene, porque nadie más vive tu negocio.
+
+## Audita tus propios graders
+
+Aquí se esconde el riesgo más sutil: el grader puede estar más roto que el agente. UTBoost aumentó las suites de tests de SWE-bench y cambió el *ranking* del leaderboard en 40,9% (Lite) / 24,4% (Verified) de los casos, detectó 28,4%/15,7% más parches incorrectos antes considerados correctos, y halló ~5,2% de tareas Verified con cobertura de tests inadecuada. Ojo a la conflación que hay que evitar: ese 24,4% es la fracción de casos donde cambió el ranking, *no* la de entries mal puntuadas. La lección práctica sobrevive intacta a la corrección: tus graders necesitan sus propios tests y revisión humana de los desacuerdos juez-vs-código. Y dada la isomorfía de arriba, un grader sin auditar no es solo un mal eval: es una mala recompensa sobre la que quizá ya estás entrenando.
+
+De aquí en adelante, el loop se cierra sobre sí mismo: el online eval sobre trazas de producción es donde aparecen los fallos reales, y esos fallos reinician el análisis de errores, lo que evita que la suite offline se fosilice alrededor de bugs viejos que ya arreglaste. El loop de control solo funciona si sigues alimentándolo con la realidad que fue construido para medir.

@@ -1,0 +1,144 @@
+---
+title: "Observabilidad para agentes no deterministas: reconstruye la trayectoria, no confíes en la narración"
+description: "No puedes depurar lo que no puedes reconstruir. La observabilidad de agentes es la disciplina de reconstruir la trayectoria real de decisiones de un sistema no determinista a partir de trazas estructuradas (las tools que llamó, los args, los resultados, las decisiones), no la historia que el modelo cuenta sobre lo que hizo."
+phase: 7
+order: 12
+tier: produccion
+durability: duradero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "Un fallo de agente casi nunca vive en una sola llamada LLM. Vive en la trayectoria: las decisiones, retries y tool calls que la rodean. La unidad de debugging es la traza de turno, un árbol de spans, no el span aislado."
+  - "El chain-of-thought del modelo no es un log fiel. Observar significa grabar la trayectoria real (tools llamadas, args, resultados, decisiones), no confiar en la narración."
+  - "temperature=0 no es reproducible. El no-determinismo es una propiedad de infraestructura. Depura con replay sobre tool-responses grabadas, no re-ejecutando y esperando."
+  - "Trazas y métricas tienen necesidades de cardinalidad opuestas. Los IDs de alta cardinalidad viven en spans; las métricas llevan solo labels acotados. Mezclarlos es el error arquitectónico central."
+sources:
+  - { grade: "A", title: "Inside the LLM Call: GenAI Observability with OpenTelemetry", author: "OpenTelemetry / CNCF", year: 2026, url: "https://opentelemetry.io/blog/2026/genai-observability/" }
+  - { grade: "A", title: "Defeating Nondeterminism in LLM Inference", author: "Horace He, Thinking Machines Lab", year: 2025, url: "https://thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference/" }
+  - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
+  - { grade: "B", title: "Seeing the Whole Elephant (TraceElephant): Failure Attribution in LLM-based Multi-Agent Systems", author: "arXiv 2604.22708", year: 2026, url: "https://arxiv.org/html/2604.22708v1" }
+  - { grade: "B", title: "Safe Observability: Automated PII Redaction from LLM Prompts in OpenTelemetry Pipelines", author: "IJCJournal / ResearchGate", year: 2025, url: "https://ijcjournal.org/InternationalJournalOfComputer/article/download/2458/919/6203" }
+  - { grade: "B", title: "DoVer: Intervention-Driven Auto Debugging for LLM Multi-Agent Systems", author: "Microsoft Research, arXiv 2512.06749", year: 2025, url: "https://arxiv.org/pdf/2512.06749" }
+  - { grade: "C", title: "The Good, The Bad, and The Greedy (varianza a temp=0)", author: "arXiv 2407.10457", year: 2024, url: "https://arxiv.org/abs/2407.10457" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+
+Tu agente acaba de fallar en producción. Un usuario pidió una cita y recibió una hora ya ocupada. Abres los logs y solo tienes el output final. No sabes qué documentos leyó el modelo, qué argumentos pasó a `check_availability` ni por qué se saltó el paso que propone huecos libres. Re-ejecutas el mismo mensaje esperando reproducir el bug, y funciona perfecto. Bienvenido al problema central: no estás depurando un programa. Estás intentando reconstruir el razonamiento de un sistema no determinista. Lo primero que hay que soltar es la idea de que el modelo te va a contar qué hizo.
+
+<Callout type="important" title="No puedes depurar lo que no puedes reconstruir">
+La observabilidad de agentes no es logging con esteroides. Es la reconstrucción forense de una trayectoria que no puedes reproducir re-ejecutando. Y la trayectoria que reconstruyes tiene que ser la *real* (las tools llamadas, los args, los resultados, las decisiones), no el chain-of-thought que el modelo emitió. El CoT se lee como una explicación. No es una traza fiel del cómputo. Graba lo que pasó, no lo que el modelo dijo que pasó.
+</Callout>
+
+## La unidad de debugging es el turno, no el span
+
+Un fallo casi nunca vive en una sola generación. Vive en la *trayectoria*: las decisiones, los retries y los tool calls que la rodean. Si tu unidad mental es el span aislado, jamás verás que el modelo llamó la tool equivocada en el paso 3 porque el documento que leyó en el paso 1 estaba mal redactado.
+
+La unidad correcta es la traza de turno, un árbol de spans. Una raíz `invoke_agent`, hijos `chat` (cada generación, con sus tokens y `finish_reason`) e hijos `execute_tool` (cada herramienta, con sus args, duración y resultado).
+
+<MermaidDiagram title="Una traza de turno es un árbol de spans">
+graph TD
+  A["invoke_agent (turno · 4.2s · $0.011)"] --> B["chat #1 (1.37s · 3.1k tok)"]
+  B --> C["execute_tool · search (350ms · ok)"]
+  B --> D["execute_tool · read (300ms · ok)"]
+  A --> E["chat #2 (1.3s · 4.8k tok)"]
+  E --> F["execute_tool · create_event (130ms · denegado en gate)"]
+  A --> G["channel.send (330ms)"]
+</MermaidDiagram>
+
+Sin esta jerarquía no puedes medir latencia por paso, atribuir costo a un sub-objetivo ni ver la decisión equivocada. La analogía a la que vuelvo: la traza de turno es la *caja negra del avión*, no el reporte del piloto al aterrizar. El reporte (el output) dice "hubo turbulencia". La caja negra te da cada lectura de sensor y cada decisión en orden temporal. Eso es lo único que permite reconstruir un accidente que no puedes reproducir volando otra vez.
+
+## Captura el contexto de entrada por paso, no output-only
+
+Aquí viene la parte contraintuitiva. La observabilidad tiene que ser un requisito de arquitectura, no un add-on de logging. El motivo es empírico. El benchmark TraceElephant mide la atribución de fallo en sistemas multi-agente y encuentra que, con trazas completas, la atribución alcanza alrededor del 65.9% a nivel de agente y el 30.3% a nivel de paso, una mejora relativa de hasta +76% a nivel de paso frente a la contraparte con observabilidad parcial (16% a 30.3%).
+
+<Callout type="warning" title="Honestidad sobre esas cifras">
+Es tentador escribir "51% a 65.9% solo por tener trazas completas", pero eso distorsiona el paper. El 51% (agente) y el 16% (paso) vienen de una configuración *distinta* a la del 65.9% y 30.3%: métodos distintos en tablas distintas, no la misma técnica con las trazas encendidas y apagadas. Parte de la mejora es el cambio de método, no la observabilidad. La afirmación sólida es el +76% relativo a nivel de paso. El dato separado de "≥21% de fallos no son atribuibles con logs solo-de-output" también se cita mal. Proviene de los 184 casos de fallo de un benchmark previo que el paper analiza, no de las 220 trazas propias de TraceElephant. La conclusión de diseño se sostiene igual: loguear outputs sin inputs hace imposible la atribución en una fracción material de casos.
+</Callout>
+
+Así que diseña el agente para que emita su prompt, su estado y sus tool-args en cada paso. El sitio más barato para engancharlo es justo antes de que la tool se ejecute: un interceptor tipo `PreToolUse` registra la llamada, los argumentos y lo que devolvió. Ese contexto-por-paso es exactamente lo que la investigación de atribución identifica como decisivo.
+
+## El no-determinismo es de infraestructura, no de muestreo
+
+La creencia más cara que sostiene un depurador novato es que `temperature=0` da reproducibilidad. Es falso. Thinking Machines demostró en 2025 que el no-determinismo de la inferencia LLM no viene del muestreo. Viene de la falta de *batch-invariance* en los kernels GPU (matmul, RMSNorm, attention). El output de tu petición cambia con el *batch size*, que a su vez cambia con el tráfico concurrente del servidor. El mismo input puede dar dos outputs distintos a temperatura 0 simplemente porque otro usuario estaba pegándole al servidor en ese momento.
+
+<Callout type="warning" title="Antipatrón: depurar re-ejecutando">
+Re-ejecutar el mismo input en bucle esperando reproducir el fallo es perder el tiempo. El determinismo a `temp=0` es una ilusión de infraestructura. Los estudios miden varianzas de accuracy de ~5 puntos típicas, y hasta ~15-16 puntos en modelos especializados, a temperatura 0. Son cifras conservadoras. El "70% best-vs-worst" que verás por ahí no se sostiene en las fuentes que pude revisar.
+</Callout>
+
+La consecuencia de diseño es el **replay sobre tool-responses grabadas**. Capturas una traza de producción (mensajes, tool calls y las respuestas reales de las tools) y re-ejecutas el agente alimentándole las respuestas grabadas como fixtures, en vez de llamar a las tools en vivo.
+
+<CodeBlock filename="replay.test.ts">
+```ts
+// Un fallo de producción irreproducible se vuelve un test repetible.
+// Alimentamos tool-responses grabadas en vez de llamar tools en vivo.
+const fixture = loadTrace("trace_2026-06-19_colision-cita.json");
+
+const result = await runAgent(fixture.messages, {
+  // Intercepta cada tool call; devuelve el resultado grabado, sin I/O real.
+  onToolCall: (name, args) => fixture.toolResponses.next(name, args),
+});
+
+// Determinista entre corridas, y cuesta cero tokens de LLM volver a
+// reproducir la capa de tools. temp=0 por sí solo NO te da esto.
+expect(result.finalDecision).toMatchSnapshot();
+```
+</CodeBlock>
+
+Esto convierte un fallo irreproducible en un test repetible, y no gasta tokens. Es una de las técnicas más rentables y menos implementadas del campo. La frontera va más allá: el debugging por intervención (DoVer, de Microsoft Research) interviene activamente en pasos con replay contrafactual para validar la causa raíz, en vez de inspeccionar la traza de forma pasiva.
+
+## Trazas y métricas tienen cardinalidades opuestas
+
+Este es el error arquitectónico central: mezclar el plano de trazas con el de métricas. Quieren cosas opuestas.
+
+Un **span** quiere `conversation_id`, `user_id`, `tenant`, contenido. Cada valor único es *bueno*. Es lo que hace posible el forense. Lo indexas para encontrar una traza concreta. Una **métrica Prometheus** es lo contrario: cada combinación de labels crea una serie temporal nueva. Mete `conversation_id` en un label y generas una serie por conversación. La memoria explota, las métricas se dropean, se pierde la retención.
+
+La regla experta es simple y dura: los IDs de alta cardinalidad viven en spans y logs; las métricas usan solo labels acotados (status, tool_name, canal, model si está controlado). Un cálculo de servilleta lo hace visceral. 100 000 conversaciones al mes, un histograma de latencia con 12 buckets, `conversation_id` como label, y eso es del orden de 1.2 millones de series temporales para una *sola* métrica. Prometheus colapsa mucho antes. (Orden de magnitud, no una medición.)
+
+<Collapsible title="HMAC, no un hash simple, para los IDs en trazas">
+Hashear no basta. Usa **HMAC** (un hash con clave) sobre identificadores como `conversation_id`. ¿Por qué no un hash simple? Porque el HMAC con un secreto compartido (un *pepper*) te da correlación interna determinista. El mismo ID siempre produce el mismo HMAC, así que puedes hacer joins entre trazas, sin exponer el identificador real ni dejarlo brute-forceable. Un hash sin clave de un número de teléfono o de un user ID corto se revierte trivialmente con un ataque de diccionario. La trampa a evitar: un pepper que viene con un valor por defecto y degrada en silencio cuando no se setea en producción. Entonces tus IDs "hasheados" vuelven a ser brute-forceables, y nadie recibe una alerta de ello.
+</Collapsible>
+
+## Las convenciones OTel GenAI son la lingua franca
+
+¿Cómo nombras estos atributos para no quedar atrapado en un solo vendor? Con las OpenTelemetry GenAI semantic conventions, el esquema CNCF adoptado por Datadog, AWS, Azure, GCP y los backends open-source. Instrumentar con semconv significa que puedes cambiar de backend de observabilidad *sin reinstrumentar tu código*.
+
+<CodeBlock filename="span.json">
+```json
+{
+  "name": "chat",
+  "attributes": {
+    "gen_ai.operation.name": "chat",
+    "gen_ai.request.model": "claude-opus-4-8",
+    "gen_ai.usage.input_tokens": 3120,
+    "gen_ai.usage.output_tokens": 412,
+    "gen_ai.response.finish_reasons": ["tool_use"]
+  }
+}
+```
+</CodeBlock>
+
+<Callout type="warning" title="Dos caveats que te pueden morder">
+**(1)** La semconv GenAI sigue en estado *Development*/experimental. Usa el stability opt-in para dual-emitir durante las transiciones y no romper dashboards. **(2)** Por defecto OTel GenAI *no* captura prompts ni tool-args. El contenido es opt-in, una decisión deliberada de privacidad.
+</Callout>
+
+Respetar ese default importa porque los backends de trazas se vuelven repositorios de PII en cuanto ingieren prompts sin filtrar, lo que choca con GDPR. La solución no es renunciar al contenido. La investigación de atribución mostró que el contenido es lo que hace depurables los fallos. La solución es un *processor de redacción* en el pipeline OTel que enmascara teléfonos y emails (regex más NER) en tránsito, antes de persistir nada.
+
+## El costo es señal primaria, no FinOps secundario
+
+Si te quedas con una sola idea contraintuitiva de este módulo, que sea esta: el costo en tokens es una señal primaria de calidad y de regresión, no una métrica de finanzas. Anthropic reporta de su sistema multi-agente real que el uso de tokens explica alrededor del 80% de la varianza de rendimiento, y que un sistema multi-agente consume del orden de 15× los tokens de un chat.
+
+<Callout type="tip" title="Un cambio de prompt que duplica tokens es un bug">
+Si el 80% de tu varianza de rendimiento son tokens, entonces los tokens son un proxy directo de calidad y eficiencia, y un detector de regresión. Un cambio de prompt que duplica tokens sin mejorar `task_success` no es "más caro". Es un bug de eficiencia. También lo es un agente que acierta la respuesta pero llama cinco tools de más. El éxito de `tool_call` y el tool restraint son métricas de primera clase, no notas al pie.
+</Callout>
+
+La mayoría de los equipos usa el costo como *límite de presupuesto*. El movimiento de más impacto es cablearlo a los evals como grader de regresión: que falle el gate si los tokens por turno suben sin que suba `task_success`. Eso cierra el loop entre observabilidad y evals, y conecta directo con el pilar de evals, que es la otra mitad de esta historia. Los evals online sobre tráfico muestreado cazan el drift de distribución que los escenarios offline no ven: heurísticas baratas code-based en el 100% del tráfico, un LLM-as-judge caro en un 5-15% muestreado, umbrales que paginan o disparan un canary rollback, y los fallos que cazas online se promueven a tu dataset offline. Las trazas alimentan el análisis de errores. El análisis de errores alimenta el siguiente eval.
+
+## No observes lo que no toca
+
+Un dashboard de requests-por-minuto y uptime no es observabilidad de agentes. No te dice nada de calidad. Sin tool-call success, `task_success` y costo-por-turno, no estás observando el agente. Estás observando el servidor web detrás del que casualmente corre. Y la latencia misma es una trampa cuando se agrega. En agentes con debounce, colas y workers, la latencia que percibe el usuario *no es* la latencia del LLM. El span de turno debería desglosar tiempo de cola, debounce, lock, generación y tools como sub-spans. Agrégalo en un solo número y te pasarás una semana optimizando el componente que no era el cuello de botella.
+
+Una última cosa que conviene decir en voz alta, porque es fácil saltársela mirando dashboards en verde: la ausencia de un span también es un hallazgo. Una tool que escribe en disco fuera de su sandbox, o una escritura de memoria que se salta la aprobación humana, no deja rastro si nunca emitiste el evento para ella. La observabilidad de seguridad es la parte que nadie diseña hasta que la auditoría pide "muéstrame cada acceso a ese path", y la respuesta honesta es que no puedes, porque no lo estabas grabando.

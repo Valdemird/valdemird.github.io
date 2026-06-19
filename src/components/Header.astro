@@ -41,6 +41,9 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 			<a href={locale === 'es' ? '/es/blog/' : '/blog/'} class:list={[{ active: Astro.url.pathname.includes('/blog') }]}>
 				{strings.nav.blog}
 			</a>
+			<a href={locale === 'es' ? '/es/learn/' : '/learn/'} class:list={[{ active: Astro.url.pathname.includes('/learn') }]}>
+				{strings.nav.learn}
+			</a>
 			<a href={locale === 'es' ? '/es/lab/' : '/lab/'} class:list={[{ active: Astro.url.pathname.includes('/lab') }]}>
 				{strings.nav.lab}
 			</a>
@@ -67,6 +70,7 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 	<div id="mobile-nav" class="mobile-nav">
 		<a href={locale === 'es' ? '/es/' : '/'}>{strings.nav.home}</a>
 		<a href={locale === 'es' ? '/es/blog/' : '/blog/'}>{strings.nav.blog}</a>
+		<a href={locale === 'es' ? '/es/learn/' : '/learn/'}>{strings.nav.learn}</a>
 		<a href={locale === 'es' ? '/es/lab/' : '/lab/'}>{strings.nav.lab}</a>
 		<a href={locale === 'es' ? '/es/about/' : '/about/'}>{strings.nav.about}</a>
 	</div>

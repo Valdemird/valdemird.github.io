@@ -1,0 +1,337 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import ReadingProgress from '../components/blog/ReadingProgress.astro';
+import HeadingAnchors from '../components/blog/HeadingAnchors.astro';
+import LearnSidebar from '../components/learn/LearnSidebar.astro';
+import LearnSources from '../components/learn/LearnSources.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import {
+	getLearnModules,
+	getPrevNext,
+	moduleHref,
+	learnHomeHref,
+	baseSlug,
+	PHASES,
+	TIER_LABEL,
+	DURABILITY_LABEL,
+	type Lang,
+} from '../lib/learn';
+import { PERSON, PERSON_REF, UI_STRINGS } from '../consts';
+
+interface Source {
+	grade: 'A' | 'B' | 'C' | 'D';
+	title: string;
+	author?: string;
+	year?: string | number;
+	url?: string;
+}
+
+interface Props {
+	title: string;
+	description: string;
+	slug: string;
+	lang: Lang;
+	phase: number;
+	tier: keyof typeof TIER_LABEL;
+	durability?: string;
+	updatedDate?: Date;
+	sources?: Source[];
+}
+
+const { title, description, slug, lang, phase, tier, durability, updatedDate, sources } = Astro.props;
+const es = lang === 'es';
+
+const modules = await getLearnModules(lang);
+const { prev, next } = getPrevNext(modules, slug);
+const phaseMeta = PHASES.find((p) => p.phase === phase);
+
+const currentPath = Astro.url.pathname;
+const homePath = es ? '/es/' : '/';
+const learnHome = learnHomeHref(lang);
+
+// hreflang: EN/ES share the slug.
+const alternates = [
+	{ hreflang: 'en', href: `https://valdemird.com/learn/${slug}/` },
+	{ hreflang: 'es', href: `https://valdemird.com/es/learn/${slug}/` },
+];
+
+const ogImage = `/og/learn-${slug}.png`;
+
+const articleJsonLd: Record<string, unknown> = {
+	'@context': 'https://schema.org',
+	'@type': 'TechArticle',
+	headline: title,
+	description,
+	author: PERSON,
+	publisher: PERSON_REF,
+	inLanguage: lang,
+	isPartOf: {
+		'@type': 'Course',
+		name: es ? 'Ingeniería de sistemas agénticos' : 'Engineering agentic systems',
+		url: `https://valdemird.com${learnHome}`,
+	},
+	mainEntityOfPage: { '@type': 'WebPage', '@id': `https://valdemird.com${currentPath}` },
+	...(updatedDate && { dateModified: updatedDate.toISOString() }),
+	...(sources && sources.length > 0 && {
+		citation: sources.map((s) => ({
+			'@type': 'CreativeWork',
+			name: s.title,
+			...(s.author && { author: s.author }),
+			...(s.url && { url: s.url }),
+		})),
+	}),
+};
+
+const breadcrumbJsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'BreadcrumbList',
+	itemListElement: [
+		{ '@type': 'ListItem', position: 1, name: es ? 'Inicio' : 'Home', item: `https://valdemird.com${homePath}` },
+		{ '@type': 'ListItem', position: 2, name: 'Learn', item: `https://valdemird.com${learnHome}` },
+		{ '@type': 'ListItem', position: 3, name: title, item: `https://valdemird.com${currentPath}` },
+	],
+};
+---
+
+<html lang={lang}>
+	<head>
+		<BaseHead title={`${title} · Learn`} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={articleJsonLd} extraJsonLd={[breadcrumbJsonLd]} />
+	</head>
+	<body>
+		<a class="skip-link" href="#main-content">{UI_STRINGS[lang].nav.skipToContent}</a>
+		<ReadingProgress />
+		<HeadingAnchors lang={lang} />
+		<Header />
+		<main id="main-content">
+			<div class="learn-layout">
+				<aside class="sidebar-col">
+					<LearnSidebar lang={lang} currentSlug={slug} />
+				</aside>
+				<article class="content-col">
+					<nav class="crumbs" aria-label={es ? 'Migas de pan' : 'Breadcrumb'}>
+						<a href={learnHome}>Learn</a>
+						<span aria-hidden="true">/</span>
+						<span class="crumb-phase">{phaseMeta?.title[lang]}</span>
+					</nav>
+
+					<header class="module-header">
+						<p class="module-eyebrow">
+							<span class="phase-num">{String(phase).padStart(2, '0')}</span>
+							{TIER_LABEL[tier][lang]}
+							{durability && DURABILITY_LABEL[durability] && <span class="dur">· {DURABILITY_LABEL[durability][lang]}</span>}
+						</p>
+						<h1>{title}</h1>
+						<p class="lead">{description}</p>
+						{updatedDate && (
+							<p class="updated">
+								{es ? 'Actualizado' : 'Updated'} <FormattedDate date={updatedDate} locale={lang} />
+							</p>
+						)}
+						<hr />
+					</header>
+
+					<div class="article-body">
+						<slot />
+					</div>
+
+					<LearnSources sources={sources} lang={lang} />
+
+					<nav class="pager" aria-label={es ? 'Navegación entre módulos' : 'Module navigation'}>
+						{prev ? (
+							<a class="pager-link prev" href={moduleHref(baseSlug(prev.id), lang)}>
+								<span class="pager-dir">{es ? '← Anterior' : '← Previous'}</span>
+								<span class="pager-title">{prev.data.title}</span>
+							</a>
+						) : <span />}
+						{next ? (
+							<a class="pager-link next" href={moduleHref(baseSlug(next.id), lang)}>
+								<span class="pager-dir">{es ? 'Siguiente →' : 'Next →'}</span>
+								<span class="pager-title">{next.data.title}</span>
+							</a>
+						) : <span />}
+					</nav>
+				</article>
+			</div>
+		</main>
+		<Footer />
+		<script>
+			import { initScrollReveals, cleanupAll, isReducedMotion } from '../lib/animations';
+			function init() {
+				if (isReducedMotion()) return;
+				initScrollReveals('.article-body h2, .article-body h3');
+				document.addEventListener('astro:before-swap', cleanupAll, { once: true });
+			}
+			init();
+			document.addEventListener('astro:after-swap', init);
+		</script>
+	</body>
+</html>
+
+<style>
+	main { max-width: 100%; margin: 0; padding: 0; }
+
+	.learn-layout {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: var(--space-lg);
+		display: grid;
+		grid-template-columns: 16rem minmax(0, 1fr);
+		gap: var(--space-2xl);
+		align-items: start;
+	}
+
+	.sidebar-col {
+		position: sticky;
+		top: 5.5rem;
+		max-height: calc(100vh - 7rem);
+		overflow-y: auto;
+		padding-right: var(--space-sm);
+	}
+
+	.content-col { max-width: var(--content-width); }
+
+	.crumbs {
+		display: flex;
+		gap: 0.5em;
+		align-items: center;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-secondary);
+		margin-bottom: var(--space-lg);
+	}
+	.crumbs a { color: var(--color-text-secondary); text-decoration: none; }
+	.crumbs a:hover { color: var(--color-accent); }
+	.crumb-phase { color: var(--color-text); }
+
+	.module-header { margin-bottom: var(--space-xl); }
+	.module-eyebrow {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5em;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-secondary);
+		margin: 0 0 0.6em;
+	}
+	.phase-num { color: var(--color-accent); font-weight: 600; }
+	.dur { opacity: 0.75; }
+
+	.module-header h1 {
+		margin: 0 0 0.3em;
+		font-size: clamp(2rem, 4.5vw, 2.6rem);
+		line-height: 1.15;
+		letter-spacing: -0.02em;
+	}
+	.lead {
+		font-size: 1.2rem;
+		color: var(--color-text-secondary);
+		line-height: 1.6;
+		margin: 0;
+	}
+	.updated {
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		color: var(--color-text-secondary);
+		margin: 0.8em 0 0;
+	}
+	.module-header hr { margin-top: var(--space-lg); }
+
+	.article-body {
+		font-size: 1.08rem;
+		line-height: 1.8;
+		color: var(--color-text-secondary);
+	}
+	.article-body :global(h2) {
+		font-family: var(--font-serif);
+		font-size: 1.55rem;
+		margin-top: 2.3em;
+		margin-bottom: 0.5em;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+		scroll-margin-top: 5.5rem;
+	}
+	.article-body :global(h3) {
+		font-family: var(--font-serif);
+		font-size: 1.25rem;
+		margin-top: 1.8em;
+		margin-bottom: 0.45em;
+		color: var(--color-text);
+		scroll-margin-top: 5.5rem;
+	}
+	.article-body :global(h2:target), .article-body :global(h3:target) {
+		opacity: 1 !important; transform: none !important;
+	}
+	.article-body :global(p) { margin-bottom: 1.5em; }
+	.article-body :global(ul), .article-body :global(ol) { padding-left: 1.25em; margin-bottom: 1.5em; }
+	.article-body :global(li) { margin-bottom: 0.4em; }
+	.article-body :global(blockquote:not(.pullquote-body)) {
+		padding: 0.25em 0 0.25em 1.75em;
+		margin: 2em 0;
+		font-style: italic;
+		color: var(--color-text-secondary);
+	}
+	.article-body :global(a) {
+		text-decoration-color: var(--color-accent);
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
+	}
+	.article-body :global(strong) { color: var(--color-text); }
+	.article-body :global(code) { font-size: 0.88em; }
+	.article-body :global(pre) { font-size: 0.86rem; margin: 1.6em 0; }
+
+	.pager {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-md);
+		margin-top: var(--space-2xl);
+		padding-top: var(--space-lg);
+		border-top: 1px solid var(--color-border);
+	}
+	.pager-link {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3em;
+		padding: var(--space-md);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		text-decoration: none;
+		transition: transform 0.2s var(--ease-spring), border-color 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring);
+	}
+	.pager-link:hover {
+		transform: translateY(-2px);
+		border-color: var(--color-accent);
+		box-shadow: var(--shadow-md);
+	}
+	.pager-link.next { text-align: right; }
+	.pager-dir {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-accent);
+	}
+	.pager-title { color: var(--color-text); font-weight: 500; line-height: 1.3; }
+
+	@media (max-width: 900px) {
+		.learn-layout { grid-template-columns: 1fr; gap: var(--space-lg); }
+		.sidebar-col {
+			position: static;
+			max-height: none;
+			overflow: visible;
+			padding: var(--space-md);
+			border: 1px solid var(--color-border);
+			border-radius: var(--radius-md);
+		}
+	}
+	@media (max-width: 768px) {
+		.article-body { font-size: 1rem; }
+		.pager { grid-template-columns: 1fr; }
+		.pager-link.next { text-align: left; }
+	}
+</style>
