@@ -21,10 +21,16 @@ interface Props {
 const { lang } = Astro.props;
 const strings = UI_STRINGS[lang];
 
-const recentPosts = (await getCollection('blog'))
+// Pin any `featured` post first (so the breakout post keeps its high-authority
+// homepage link as newer posts publish), then fill the remaining slots by
+// recency. Total stays at 3.
+const postsByRecency = (await getCollection('blog'))
 	.filter((p) => p.data.lang === lang)
-	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
-	.slice(0, 3);
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const recentPosts = [
+	...postsByRecency.filter((p) => p.data.featured),
+	...postsByRecency.filter((p) => !p.data.featured),
+].slice(0, 3);
 
 const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma', 'Tailwind CSS', 'PostgreSQL', 'Vercel AI SDK', 'Claude Code'];
 

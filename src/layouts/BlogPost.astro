@@ -9,6 +9,7 @@ import HeadingAnchors from '../components/blog/HeadingAnchors.astro';
 import CopyPageButton from '../components/blog/CopyPageButton.astro';
 import FreshnessLine from '../components/blog/FreshnessLine.astro';
 import Comments from '../components/blog/Comments.astro';
+import PostPreview from '../components/PostPreview.astro';
 import { cleanMdxBody, countWords, extractTldr } from '../lib/mdx-plaintext';
 import { PERSON, PERSON_REF, UI_STRINGS } from '../consts';
 
@@ -101,6 +102,21 @@ if (lang === 'en') {
 		);
 	}
 }
+
+// "Read next": up to 3 same-language posts (never cross-language), excluding the
+// current one, ranked by shared-tag overlap and falling back to recency. This is
+// the internal-linking lever — every post becomes a hub that passes equity to
+// related posts instead of dead-ending after the body.
+const currentTags = new Set(tags ?? []);
+const relatedPosts = allPosts
+	.filter((p) => p.id !== slug && (p.data.lang ?? 'en') === lang)
+	.map((p) => ({
+		post: p,
+		overlap: (p.data.tags ?? []).filter((t: string) => currentTags.has(t)).length,
+	}))
+	.sort((a, b) => b.overlap - a.overlap || b.post.data.pubDate.valueOf() - a.post.data.pubDate.valueOf())
+	.slice(0, 3)
+	.map((s) => s.post);
 ---
 
 <html lang={lang}>
@@ -195,6 +211,23 @@ if (lang === 'en') {
 					<div class="article-body">
 						<slot />
 					</div>
+					{relatedPosts.length > 0 && (
+						<aside class="read-next" aria-label={lang === 'es' ? 'Sigue leyendo' : 'Read next'}>
+							<p class="read-next-eyebrow">{lang === 'es' ? 'Sigue leyendo' : 'Read next'}</p>
+							<div class="read-next-list">
+								{relatedPosts.map((post) => (
+									<PostPreview
+										id={post.id}
+										title={post.data.title}
+										description={post.data.description}
+										pubDate={post.data.pubDate}
+										tags={post.data.tags}
+										locale={lang}
+									/>
+								))}
+							</div>
+						</aside>
+					)}
 					<Comments lang={lang} pathname={currentPath} />
 				</div>
 			</article>
@@ -242,6 +275,27 @@ if (lang === 'en') {
 		.article-utility {
 			justify-content: center;
 		}
+	}
+
+	/* --- Read next (related posts) --- */
+	.read-next {
+		margin-top: var(--space-2xl);
+		padding-top: var(--space-lg);
+		border-top: 1px solid var(--color-border);
+	}
+
+	.read-next-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 var(--space-sm);
+	}
+
+	.read-next-list {
+		display: flex;
+		flex-direction: column;
 	}
 
 	/* --- Article Header --- */
