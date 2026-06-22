@@ -41,12 +41,12 @@ No está en la ruta crítica para construir agentes en 2025-2026. Para el 95% de
 
 Un modelo base es un predictor de tokens. Completa texto con la distribución de internet. No es un asistente, no sigue instrucciones de forma fiable, no usa herramientas. El post-training es todo lo que ocurre después del pretraining para convertir ese predictor en algo útil, alineado y agéntico. Conviene separarlo en tres capas, porque cada una graba algo distinto y falla de forma distinta.
 
-<MermaidDiagram title="El pipeline de post-training: cada capa graba algo distinto">
+<MermaidDiagram title="El pipeline de post-training: cada capa graba algo distinto" chart={`
 graph LR
   A["Modelo base<br/>(predictor de tokens)"] --> B["1. SFT / distillation<br/>(graba formato + comportamiento)"]
   B --> C["2. Optim. preferencias<br/>(RLHF→DPO, CAI)<br/>(alinea estilo + seguridad)"]
   C --> D["3. RLVR (GRPO)<br/>(emerge el reasoning)"]
-</MermaidDiagram>
+`} />
 
 **Capa 1, SFT / distillation.** Fine-tuning supervisado sobre trayectorias de buen comportamiento, a menudo generadas por un modelo maestro grande y destiladas a uno pequeño. Graba *forma*: formato de respuesta, estructura de cadena de pensamiento, tono. Su riesgo es exactamente ese. Enseña la forma sobre el fondo, produce CoT plausible con pasos intermedios incorrectos.
 

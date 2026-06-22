@@ -3,6 +3,8 @@ import BaseHead from '../../components/BaseHead.astro';
 import Header from '../../components/Header.astro';
 import Footer from '../../components/Footer.astro';
 import PostPreview from '../../components/PostPreview.astro';
+import DeepDiveCard from '../../components/DeepDiveCard.astro';
+import LabCard from '../../components/LabCard.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
 import { SITE_TITLE, PERSON_ID, t } from '../../consts';
 import { getCollection } from 'astro:content';
@@ -66,6 +68,10 @@ const blogJsonLd = {
 			</div>
 
 			<div class="blog-content">
+				<!-- Special, content-heavy blog entries surfaced from the wiki and the component lab -->
+				<DeepDiveCard lang="en" />
+				<LabCard lang="en" />
+
 				<!-- Featured post -->
 				{featuredPost && (
 					<a href={`/blog/${featuredPost.id}/`} class="featured-post animate-fade-in delay-1">

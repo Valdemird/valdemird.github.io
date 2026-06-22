@@ -2,7 +2,8 @@
 import BaseHead from '../BaseHead.astro';
 import Header from '../Header.astro';
 import Footer from '../Footer.astro';
-import { getLearnModules, groupByPhase, moduleHref, baseSlug, TIER_LABEL, type Lang } from '../../lib/learn';
+import { getLearnModules, groupByPhase, getLearnStats, moduleHref, courseHomeHref, baseSlug, TIER_LABEL, type Lang } from '../../lib/learn';
+import { GLOSSARY, glossaryHref } from '../../lib/learn-glossary';
 import { UI_STRINGS, PERSON, PERSON_REF } from '../../consts';
 
 interface Props {
@@ -13,16 +14,27 @@ const { lang } = Astro.props;
 const es = lang === 'es';
 const modules = await getLearnModules(lang);
 const phases = groupByPhase(modules);
+const stats = await getLearnStats(lang);
+
+const readLabel =
+	stats.readingMinutes >= 60 ? `${Math.round(stats.readingMinutes / 60)}h` : `${stats.readingMinutes} min`;
+const heroMetrics: { value: string; label: string }[] = [
+	{ value: String(stats.modules), label: es ? 'módulos' : 'modules' },
+	{ value: String(stats.phases), label: es ? 'fases' : 'phases' },
+	{ value: `~${Math.round(stats.words / 1000)}k`, label: es ? 'palabras' : 'words' },
+	{ value: `~${readLabel}`, label: es ? 'de lectura' : 'read' },
+	{ value: String(stats.sources), label: es ? 'fuentes' : 'sources' },
+];
 
 const title = es ? 'Aprende: ingeniería de sistemas agénticos' : 'Learn: engineering agentic systems';
 const description = es
 	? 'Un curso-wiki bilingüe para construir agentes de IA de verdad: del sustrato (qué es un LLM, qué es un agente) a la frontera. 16 módulos, cada afirmación con fuente y grado de credibilidad.'
 	: 'A bilingual course-wiki for building real AI agents: from the substrate (what an LLM is, what an agent is) to the frontier. 16 modules, every claim sourced and graded for credibility.';
 
-const path = es ? '/es/learn/' : '/learn/';
+const path = courseHomeHref(lang);
 const alternates = [
-	{ hreflang: 'en', href: 'https://valdemird.com/learn/' },
-	{ hreflang: 'es', href: 'https://valdemird.com/es/learn/' },
+	{ hreflang: 'en', href: `https://valdemird.com${courseHomeHref('en')}` },
+	{ hreflang: 'es', href: `https://valdemird.com${courseHomeHref('es')}` },
 ];
 
 const metaInsights: { en: string; es: string }[] = [
@@ -91,19 +103,30 @@ const courseJsonLd = {
 		<main id="main-content">
 			<div class="wrap">
 				<header class="hero">
-					<p class="eyebrow">{es ? 'Curso · wiki · bilingüe' : 'Course · wiki · bilingual'}</p>
+					<p class="eyebrow">{es ? 'Deep dive · curso-wiki · bilingüe' : 'Deep dive · course-wiki · bilingual'}</p>
 					<h1>{es ? 'Cómo construir sistemas agénticos de verdad' : 'How to build agentic systems for real'}</h1>
 					<p class="lead">
 						{es
 							? 'Monté un pipeline multiagente que leyó el estado del arte de agentes de IA (2025–2026), lo verificó contra las fuentes primarias y lo organizó en 16 módulos. Esto es esa investigación, reescrita en mi voz y comprobada de nuevo. Ninguna afirmación aparece sin fuente y sin un grado de credibilidad honesto.'
 							: 'I ran a multi-agent pipeline that read the state of the art on AI agents (2025–2026), checked it against the primary sources, and organized it into 16 modules. This is that research, rewritten in my voice and fact-checked again. No claim appears without a source and an honest credibility grade.'}
 					</p>
+					<dl class="hero-metrics" aria-label={es ? 'Cuánta información contiene' : 'How much it contains'}>
+						{heroMetrics.map((m) => (
+							<div class="hm">
+								<dt>{m.value}</dt>
+								<dd>{m.label}</dd>
+							</div>
+						))}
+					</dl>
 					<div class="grades">
 						<span class="g g-a">A</span><span class="gl">{es ? 'primaria alta' : 'high-confidence primary'}</span>
 						<span class="g g-b">B</span><span class="gl">{es ? 'sólida' : 'solid'}</span>
 						<span class="g g-c">C</span><span class="gl">{es ? 'emergente' : 'emerging'}</span>
 						<span class="g g-d">D</span><span class="gl">{es ? 'inferencia, sin verificar' : 'inference, unverified'}</span>
 					</div>
+					<p class="hero-resources">
+						<a href={glossaryHref(lang)}>{es ? 'Glosario' : 'Glossary'} · {GLOSSARY.length} {es ? 'términos' : 'terms'} →</a>
+					</p>
 				</header>
 
 				<section class="path" aria-label={es ? 'Ruta de aprendizaje' : 'Learning path'}>
@@ -183,6 +206,44 @@ const courseJsonLd = {
 		max-width: 60ch;
 	}
 	.hero .eyebrow { text-align: center; }
+	.hero-resources {
+		margin: var(--space-md) 0 0;
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+	}
+	.hero-resources a { color: var(--color-accent); text-decoration: none; }
+	.hero-resources a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+	.hero-metrics {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 1.4rem 2.2rem;
+		margin: var(--space-lg) auto 0;
+		padding: 1.1rem 0;
+		max-width: 52ch;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+	.hm { display: flex; flex-direction: column; gap: 0.15rem; }
+	.hm dt {
+		font-family: var(--font-mono);
+		font-size: 1.4rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+	}
+	.hm dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
 
 	.grades {
 		display: inline-flex;

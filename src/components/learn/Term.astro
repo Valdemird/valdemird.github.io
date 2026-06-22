@@ -1,0 +1,114 @@
+---
+import { findTerm, glossaryHref, type Lang } from '../../lib/learn-glossary';
+
+interface Props {
+	/** Canonical glossary term to look up (case-insensitive). */
+	name: string;
+	/** Page language — pass lang="es" inside Spanish modules. Defaults to en. */
+	lang?: Lang;
+}
+
+const { name, lang = 'en' } = Astro.props;
+const es = lang === 'es';
+const entry = findTerm(name);
+// If the term isn't in the glossary, render the text plainly (fail open).
+const def = entry?.def[lang] ?? '';
+const href = entry ? `${glossaryHref(lang)}#${entry.slug}` : glossaryHref(lang);
+---
+
+{entry ? (
+	<span class="gloss">
+		<button type="button" class="gloss-term" aria-expanded="false">
+			<slot>{name}</slot>
+		</button>
+		<span class="gloss-pop" role="tooltip">
+			<span class="gloss-def">{def}</span>
+			<a class="gloss-more" href={href}>{es ? 'glosario →' : 'glossary →'}</a>
+		</span>
+	</span>
+) : (
+	<slot>{name}</slot>
+)}
+
+<style>
+	.gloss { position: relative; display: inline; }
+	.gloss-term {
+		font: inherit;
+		color: inherit;
+		background: none;
+		border: 0;
+		padding: 0;
+		cursor: help;
+		text-decoration: underline dotted;
+		text-decoration-color: var(--color-accent);
+		text-underline-offset: 3px;
+	}
+	.gloss-pop {
+		position: absolute;
+		bottom: calc(100% + 0.5em);
+		left: 0;
+		z-index: 40;
+		width: max-content;
+		max-width: min(22rem, 80vw);
+		padding: 0.7em 0.85em;
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-lg);
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-text-secondary);
+		opacity: 0;
+		visibility: hidden;
+		transform: translateY(4px);
+		transition: opacity 0.16s var(--ease-smooth), transform 0.16s var(--ease-spring), visibility 0.16s;
+	}
+	.gloss-term:hover + .gloss-pop,
+	.gloss-term:focus-visible + .gloss-pop,
+	.gloss-term[aria-expanded='true'] + .gloss-pop,
+	.gloss-pop:hover {
+		opacity: 1;
+		visibility: visible;
+		transform: translateY(0);
+	}
+	.gloss-def { display: block; }
+	.gloss-more {
+		display: inline-block;
+		margin-top: 0.45em;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-accent);
+		text-decoration: none;
+	}
+	@media (max-width: 560px) {
+		.gloss-pop { left: auto; right: 0; }
+	}
+</style>
+
+<script>
+	// Touch devices have no hover: toggle the tooltip on tap via aria-expanded.
+	function initGlossTerms() {
+		document.querySelectorAll<HTMLButtonElement>('.gloss-term').forEach((btn) => {
+			if (btn.dataset.bound) return;
+			btn.dataset.bound = '1';
+			btn.addEventListener('click', (e) => {
+				e.preventDefault();
+				const open = btn.getAttribute('aria-expanded') === 'true';
+				document.querySelectorAll('.gloss-term[aria-expanded="true"]').forEach((o) => o.setAttribute('aria-expanded', 'false'));
+				btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+			});
+		});
+		if (!(document as any)._glossDismiss) {
+			(document as any)._glossDismiss = true;
+			document.addEventListener('click', (e) => {
+				if (!(e.target as HTMLElement).closest?.('.gloss')) {
+					document.querySelectorAll('.gloss-term[aria-expanded="true"]').forEach((o) => o.setAttribute('aria-expanded', 'false'));
+				}
+			});
+		}
+	}
+	initGlossTerms();
+	document.addEventListener('astro:after-swap', initGlossTerms);
+</script>

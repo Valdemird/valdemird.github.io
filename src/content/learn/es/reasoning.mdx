@@ -54,11 +54,11 @@ Es un mito repetido que R1 necesitó "10-100× más tokens" que o1. No hay evide
 
 La consecuencia operativa: hay una curva precisión-vs-tokens con un codo. Por debajo del codo aparece el *underthinking* (el modelo se rinde pronto). Por encima, el *overthinking*: quema tokens sin ganar precisión, e incluso la degrada. Más thinking no es monótonamente mejor. Por eso la práctica de élite es medir la curva por tipo de tarea, no activar el effort máximo "por si acaso".
 
-<MermaidDiagram title="Precisión vs presupuesto de thinking: underthink, codo, overthink">
+<MermaidDiagram title="Precisión vs presupuesto de thinking: underthink, codo, overthink" chart={`
 graph LR
   A["Presupuesto bajo<br/>(underthinking)"] --> B["Codo<br/>(compute-óptimo)"]
   B --> C["Presupuesto alto<br/>(overthinking:<br/>plano o peor)"]
-</MermaidDiagram>
+`} />
 
 En los modelos más nuevos esto es lo que controla el `effort`. El thinking adaptativo e interleaved deja que el modelo asigne su propio presupuesto y razone entre tool calls; el viejo `budget_tokens` fijo es la abstracción equivocada aquí.
 

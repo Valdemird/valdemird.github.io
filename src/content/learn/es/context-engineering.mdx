@@ -44,11 +44,11 @@ No preguntes "¿cabe en la ventana?". Pregunta "¿cuál es el mínimo conjunto d
 
 El marco más útil viene de MemGPT: trata la ventana de contexto como working memory limitada (RAM) y el almacenamiento externo como memoria de largo plazo (disco), con el LLM haciendo el paginado, decidiendo qué cargar y qué descargar, igual que un SO mueve páginas entre RAM y swap. La extensión pedagógica es mía: pensar el context bloat como *thrashing* (cuando un SO pasa más tiempo paginando que computando) explica por qué un agente con la ventana llena de basura razona peor aunque "todo quepa". [D]
 
-<MermaidDiagram title="La ventana es RAM, no un buffer infinito">
+<MermaidDiagram title="La ventana es RAM, no un buffer infinito" chart={`
 graph LR
   A["Working memory<br/>(ventana de contexto)"] --- B["Long-term store<br/>(notes.md, DB, ficheros)"]
   A -.->|el LLM decide el paginado:<br/>cargar / descargar / compactar| B
-</MermaidDiagram>
+`} />
 
 ## Context rot: el hallazgo que rompe la intuición
 

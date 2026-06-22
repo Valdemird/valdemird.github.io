@@ -1,5 +1,6 @@
 ---
-import { getLearnModules, groupByPhase, moduleHref, baseSlug, type Lang } from '../../lib/learn';
+import { getLearnModules, groupByPhase, moduleHref, courseHomeHref, baseSlug, type Lang } from '../../lib/learn';
+import { glossaryHref } from '../../lib/learn-glossary';
 
 interface Heading {
 	depth: number;
@@ -22,7 +23,7 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 ---
 
 <nav class="learn-sidebar" aria-label={es ? 'Índice del curso' : 'Course index'}>
-	<a class="sidebar-home" href={es ? '/es/learn/' : '/learn/'}>
+	<a class="sidebar-home" href={courseHomeHref(lang)}>
 		{es ? '← Mapa del curso' : '← Course map'}
 	</a>
 	<ol class="phase-list">
@@ -57,6 +58,7 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 			</li>
 		))}
 	</ol>
+	<a class="sidebar-glossary" href={glossaryHref(lang)}>{es ? 'Glosario →' : 'Glossary →'}</a>
 </nav>
 
 <script>
@@ -72,7 +74,9 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 			const link = byId.get(id);
 			if (!link || link === current) return;
 			current?.classList.remove('toc-active');
+			current?.removeAttribute('aria-current');
 			link.classList.add('toc-active');
+			link.setAttribute('aria-current', 'true');
 			current = link;
 		};
 		const obs = new IntersectionObserver(
@@ -115,6 +119,19 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 	@media (max-width: 900px) {
 		.sidebar-home { display: none; }
 	}
+
+	.sidebar-glossary {
+		display: inline-block;
+		margin-top: var(--space-md);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-accent);
+		text-decoration: none;
+		transition: opacity 0.2s var(--ease-spring);
+	}
+	.sidebar-glossary:hover { opacity: 0.75; }
 
 	.phase-list { list-style: none; margin: 0; padding: 0; }
 	.phase { margin-bottom: var(--space-lg); }
@@ -174,5 +191,18 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 		color: var(--color-accent);
 		background: var(--color-accent-subtle);
 		font-weight: 500;
+	}
+
+	/* Mobile: the rail becomes a tapped-open card, so grow the touch targets to
+	   the 44px WCAG minimum and bump the body size for thumb reading. */
+	@media (max-width: 900px) {
+		.learn-sidebar { font-size: 0.95rem; }
+		.module-list a {
+			display: flex;
+			align-items: center;
+			min-height: 44px;
+			padding: 0.5em 0.7em;
+		}
+		.section-list a { min-height: 40px; display: flex; align-items: center; }
 	}
 </style>

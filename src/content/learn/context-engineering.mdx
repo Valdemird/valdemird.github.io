@@ -44,11 +44,11 @@ Don't ask "does it fit in the window?" Ask "what is the smallest set of high-sig
 
 The most useful frame comes from MemGPT: treat the context window as limited working memory (RAM) and external storage as long-term memory (disk), with the LLM itself doing the paging, deciding what to load and what to evict, the way an OS moves pages between RAM and swap. The pedagogical extension is mine: thinking of context bloat as *thrashing* (when an OS spends more time paging than computing) explains why an agent with a window full of junk reasons worse even though "it all fits." [D]
 
-<MermaidDiagram title="The window is RAM, not an infinite buffer">
+<MermaidDiagram title="The window is RAM, not an infinite buffer" chart={`
 graph LR
   A["Working memory<br/>(context window)"] --- B["Long-term store<br/>(notes.md, DB, files)"]
   A -.->|LLM decides paging:<br/>load / evict / compact| B
-</MermaidDiagram>
+`} />
 
 ## Context rot: the finding that breaks the intuition
 

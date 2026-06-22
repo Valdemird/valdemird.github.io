@@ -61,7 +61,7 @@ Escribir evals a priori se *siente* como ingeniería seria. Pero estás optimiza
 
 Aquí está la distinción estadística más cara de ignorar. **pass@1** mide el rendimiento medio: la probabilidad de que *un* intento pase. Es lo que un benchmark publicita porque es la cifra más alta. **pass^k** = pᵏ mide la probabilidad de que *los k intentos pasen todos*, que es la fiabilidad real.
 
-La diferencia decae exponencialmente. Un agente al 90% pass@1 cae a 0,9⁸ ≈ 57% en k=8. τ-bench lo muestra con datos: GPT-4o logra 61% pass@1 pero solo 25% pass^8 en el dominio retail. Traducido a tu negocio: una de cada cuatro veces, la misma confirmación de cita falla de forma no-determinista. Nadie en un SaaS multi-tenant acepta eso.
+La diferencia decae exponencialmente. Un agente al 90% pass@1 cae a 0,9⁸ ≈ 43% en k=8. τ-bench lo muestra con datos: GPT-4o logra 61% pass@1 pero solo 25% pass^8 en el dominio retail. Traducido a tu negocio: una de cada cuatro veces, la misma confirmación de cita falla de forma no-determinista. Nadie en un SaaS multi-tenant acepta eso.
 
 <Callout type="warning" title="Declarar 'listo' con pass@1 es el antipatrón">
 Reportar pass@1 y declarar el agente listo para producción esconde la fragilidad no-determinista: estás midiendo el mejor caso, no la fiabilidad. Para cualquier escenario con acción irreversible (una escritura tras confirmación, una cita), pass^k con k≥5 no es una métrica de vanidad. Es un gate de release.
@@ -73,14 +73,14 @@ Reportar pass@1 y declarar el agente listo para producción esconde la fragilida
 
 Un agente puede dar la respuesta *correcta* habiendo llamado tools inútiles, con parámetros erróneos, repitiendo pasos o saltándose una confirmación. Un eval de solo-resultado te dice *que* algo falló; nunca *dónde* ni *por qué*. Para un agente con gates de confirmación y escrituras peligrosas, la trayectoria no es opcional.
 
-<MermaidDiagram title="El solo-resultado es ciego al método">
+<MermaidDiagram title="El solo-resultado es ciego al método" chart={`
 graph LR
   R["Trazas reales"] --> E["Análisis de errores<br/>(open / axial)"]
   E --> G["Graders derivados"]
   G --> K["pass^k<br/>+ trayectoria"]
   K --> C["Gate CI /<br/>online eval"]
   C -.alimenta.-> R
-</MermaidDiagram>
+`} />
 
 La trayectoria la capturas interceptando las tool calls *antes* de que se ejecuten: el hook pre-tool-use registra cada intento de llamada antes de que decida el gate de permisos. Eso habilita graders imposibles con solo-resultado: ¿pidió confirmación antes de escribir, y se *abstuvo* de llamar un tool cuando no debía? Ambos son graders de trayectoria puros.
 

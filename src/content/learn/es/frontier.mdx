@@ -41,12 +41,12 @@ La medición de METR es el número creíble. La longitud de tarea que los agente
 
 Para fijar la escala: un modelo como o3 sostiene un horizonte de unos 110 minutos al 50% de fiabilidad. Ese es el tipo de número contra el que diseñar. No "¿es listo el modelo?" sino "¿dónde se cae *el mío*?".
 
-<MermaidDiagram title="Horizonte temporal: un doblaje, no un techo">
+<MermaidDiagram title="Horizonte temporal: un doblaje, no un techo" chart={`
 graph LR
   A["~minutos<br/>(modelos 2023)"] --> B["~decenas de minutos<br/>(2024)"]
   B --> C["~1-2 horas<br/>(2025)"]
   C --> D["? horas<br/>(extrapolación,<br/>incierta)"]
-</MermaidDiagram>
+`} />
 
 Lo interesante no es el titular. Es *por qué* el horizonte es finito siquiera. La fiabilidad colapsa cuando una tarea pasa de minutos a horas, no porque el modelo se vuelva más tonto por paso, sino porque no mantiene coherencia a lo largo de la secuencia.
 

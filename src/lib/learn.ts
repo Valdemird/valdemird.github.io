@@ -61,13 +61,68 @@ export function groupByPhase(modules: LearnEntry[]) {
 	})).filter((p) => p.modules.length > 0);
 }
 
+/**
+ * URL slug that namespaces this course under the `/learn/` topic directory.
+ * `/learn/` is the directory of learning tracks; this course lives at
+ * `/learn/agentic-systems/`, leaving room for future topics.
+ */
+export const COURSE_SLUG = 'agentic-systems';
+
 /** Public URL for a module in a given language. */
 export function moduleHref(slug: string, lang: Lang): string {
-	return lang === 'es' ? `/es/learn/${slug}/` : `/learn/${slug}/`;
+	return lang === 'es' ? `/es/learn/${COURSE_SLUG}/${slug}/` : `/learn/${COURSE_SLUG}/${slug}/`;
 }
 
+/** The `/learn/` topic directory (lists every learning track). */
 export function learnHomeHref(lang: Lang): string {
 	return lang === 'es' ? '/es/learn/' : '/learn/';
+}
+
+/** This course's hub page, `/learn/agentic-systems/`. */
+export function courseHomeHref(lang: Lang): string {
+	return lang === 'es' ? `/es/learn/${COURSE_SLUG}/` : `/learn/${COURSE_SLUG}/`;
+}
+
+/**
+ * Aggregate "how much data is in here" stats for one language, computed at
+ * build time. Powers the deep-dive metrics on the blog card and the hub hero.
+ */
+export interface LearnStats {
+	modules: number;
+	phases: number;
+	words: number;
+	readingMinutes: number;
+	sources: number;
+}
+
+export async function getLearnStats(lang: Lang): Promise<LearnStats> {
+	const modules = await getLearnModules(lang);
+	const words = modules.reduce((sum, m) => {
+		const tokens = (m.body ?? '').trim().split(/\s+/).filter(Boolean);
+		return sum + tokens.length;
+	}, 0);
+	const sources = modules.reduce((sum, m) => sum + (m.data.sources?.length ?? 0), 0);
+	return {
+		modules: modules.length,
+		phases: groupByPhase(modules).length,
+		words,
+		readingMinutes: Math.max(1, Math.round(words / 200)),
+		sources,
+	};
+}
+
+/**
+ * Estimated reading time in minutes for one module's MDX body. Strips import
+ * lines and JSX/HTML tags so component markup doesn't inflate the count, then
+ * assumes ~200 wpm. Used in the module header so learners can budget the read.
+ */
+export function readingMinutes(body: string | undefined): number {
+	const text = (body ?? '')
+		.replace(/^import .*$/gm, '')
+		.replace(/```[\s\S]*?```/g, ' ')
+		.replace(/<[^>]+>/g, ' ');
+	const words = text.split(/\s+/).filter(Boolean).length;
+	return Math.max(1, Math.round(words / 200));
 }
 
 /** Previous / next module in reading order, for the footer pager. */

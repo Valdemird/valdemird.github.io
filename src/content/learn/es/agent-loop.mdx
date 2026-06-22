@@ -118,7 +118,7 @@ Los errores crudos (stack traces, fallos verbosos de tools) son veneno para la v
 
 Cuándo parar es un problema de primer orden que la mayoría de los tutoriales ignora. Hay dos fallos simétricos: **non-termination** (loop infinito, tokens quemados) y **early-stopping** (el modelo declara "listo" antes de estarlo). Necesitás varias condiciones a la vez.
 
-<MermaidDiagram title="La terminación necesita varias condiciones, no una">
+<MermaidDiagram title="La terminación necesita varias condiciones, no una" chart={`
 graph TD
   A[Cada turno] --> B[max-turns alcanzado?]
   B -->|si| Z[parar]
@@ -129,7 +129,7 @@ graph TD
   D -->|no| E[tool de terminacion?]
   E -->|si| Z
   E -->|no| A
-</MermaidDiagram>
+`} />
 
 Un max-turns duro y un budget de tokens son los dos fáciles. El que la gente saltea es el **loop-guard de no-progreso**: hashear los últimos N tool calls (nombre más args normalizados) y cortar, o forzar un cambio de estrategia, cuando el mismo call se repite. Sin él, un agente puede quemar un budget entero girando en falso antes de que algún cap grueso lo salve. Y una tool de terminación (una acción explícita de "terminé" o "escalá a un humano") le da al modelo una forma limpia de parar en vez de irse apagando.
 

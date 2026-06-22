@@ -31,7 +31,7 @@ import TabPanel from '../../../components/blog/TabPanel.astro';
 
 La demo funcionó. Escribiste una petición, el agente recorrió tres herramientas, devolvió una respuesta limpia y la enviaste. Después se topó con tráfico real y se cayó. Esta es la brecha de la que nadie te avisa: el salto de demo a producción no es escribir más código alrededor del modelo. Es reconocer que lo que construiste es un workflow distribuido, de larga duración y no determinista, donde cada paso tiene efectos que cuestan dinero (tokens) y efectos que no puedes deshacer (escrituras de negocio).
 
-Quédate con esa idea. En el [módulo del loop](/es/learn/agent-loop) el control de flujo del agente vivía en el código: llamar al modelo, ejecutar la herramienta que pidió, devolverle el resultado, repetir. Ese loop es correcto. El problema es que corre sobre una máquina que se cae, detrás de una cola que reintenta, contra un modelo que devuelve algo distinto cada vez. La ingeniería de producción consiste en hacer que ese loop sobreviva a las tres cosas.
+Quédate con esa idea. En el [módulo del loop](/es/learn/agentic-systems/agent-loop) el control de flujo del agente vivía en el código: llamar al modelo, ejecutar la herramienta que pidió, devolverle el resultado, repetir. Ese loop es correcto. El problema es que corre sobre una máquina que se cae, detrás de una cola que reintenta, contra un modelo que devuelve algo distinto cada vez. La ingeniería de producción consiste en hacer que ese loop sobreviva a las tres cosas.
 
 <Callout type="important" title="El único modelo mental">
 Un agente en producción es un **workflow distribuido durable**. Lento (el modelo es el cuello de botella), caro (cada turno gasta tokens) y probabilístico (la misma entrada da una trayectoria diferente). Cuando aceptas eso, todo el campo de los sistemas distribuidos aparece para ayudarte, y todos los fallos de los sistemas distribuidos aparecen para morderte.
@@ -55,7 +55,7 @@ La primera decisión estructural, y la que los principiantes hacen mal, es *dón
 
 El arreglo es una separación limpia. El edge (stateless, rápido) solo valida, persiste y encola. El worker (durable, lento) hace la llamada al modelo y las herramientas.
 
-<MermaidDiagram title="El edge nunca llama al modelo">
+<MermaidDiagram title="El edge nunca llama al modelo" chart={`
 sequenceDiagram
   participant U as Cliente
   participant E as Edge (stateless)
@@ -74,7 +74,7 @@ sequenceDiagram
     W->>DB: checkpoint del paso
   end
   W-->>U: stream de tokens
-</MermaidDiagram>
+`} />
 
 Ahora la durabilidad, el backpressure y el escalado viven en la capa de workers, desacoplados de la petición. El usuario recibe un acuse instantáneo; la parte lenta ocurre detrás de la cola, donde se puede reintentar, drenar y observar.
 

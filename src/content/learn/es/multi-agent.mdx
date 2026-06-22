@@ -63,13 +63,13 @@ Esta es la frase que casi nadie dice en voz alta, y unifica a los dos bandos: pa
 
 Paralelizar agentes de solo lectura (buscar, leer archivos, responder preguntas) es seguro porque no producen decisiones en conflicto. No hay estado mutable compartido. Paralelizar escrituras comparte estado mutable y genera una carrera de decisiones. Por eso la propia excepción que admite Cognition, los subagentes read-only, coincide exactamente con el patrón que usa Claude Code y con los casos donde Anthropic dice que el multi-agente ayuda.
 
-<MermaidDiagram title="La lectura se paraleliza; la escritura se serializa">
+<MermaidDiagram title="La lectura se paraleliza; la escritura se serializa" chart={`
 graph TD
   R["READ — paraleliza"] --> R1["buscar en N docs, N chequeos de guardrails,<br/>explorar breadth-first"]
   R1 --> R2["sin estado compartido → sin conflicto<br/>el fan-out baja latencia y mantiene limpio el hilo"]
   W["WRITE — serializa"] --> W1["generar un artefacto único, editar estado,<br/>responder a un cliente"]
   W1 --> W2["estado mutable compartido → carrera de decisiones<br/>un hilo lineal, una decisión a la vez"]
-</MermaidDiagram>
+`} />
 
 La misma asimetría se mapea directo sobre el human-in-the-loop: las lecturas auto-ejecutan (paralelizables, sin riesgo de conflicto), las escrituras se serializan tras una compuerta. Si ya construiste eso por razones de seguridad, ya construiste el principio de orquestación. Solo que no lo habías nombrado.
 
@@ -107,7 +107,7 @@ Cambiar a un modelo mejor no arregla un sistema multi-agente mal diseñado. Si t
 
 El patrón ganador de Anthropic no es "spawnea agentes libremente". Es un lead que dicta un presupuesto de esfuerzo por subtarea: para un hecho simple, un agente con 3-10 tool calls; para una comparación, 2-4 subagentes con 10-15 calls cada uno. Sin esos límites, los agentes duplican trabajo o sobre-investigan. Orquestar bien es enseñarle al lead a delegar con límites, no solo a descomponer.
 
-<MermaidDiagram title="Orquestador-worker con delegación acotada">
+<MermaidDiagram title="Orquestador-worker con delegación acotada" chart={`
 graph TD
   L["Lead / orquestador"] -->|"objetivo + formato + allowlist de tools + presupuesto"| W1["Worker (read-only)"]
   L -->|"objetivo + formato + allowlist de tools + presupuesto"| W2["Worker (read-only)"]
@@ -116,7 +116,7 @@ graph TD
   W2 -->|"solo el destilado"| S
   W3 -->|"solo el destilado"| S
   S --> L
-</MermaidDiagram>
+`} />
 
 Esto encaja en la taxonomía canónica de "Building Effective Agents", que separa *workflows* (rutas predefinidas: prompt chaining, routing, parallelization, orquestador-worker, evaluator-optimizer) de *agents* (el LLM dirige su propio proceso). La regla de oro de ese paper es la disciplina que sostiene todo este tema: empieza con lo más simple, y añade agencia o agentes solo cuando el problema lo justifique.
 

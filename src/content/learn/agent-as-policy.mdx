@@ -62,7 +62,7 @@ Partial observability explains the classic failures with one cause instead of a 
 
 The most misread distinction in the field isn't "does it use an LLM?" It's **who decides the trajectory.** In a workflow, the paths are predefined in code: you fix the flow, and the LLM fills slots inside branches you already drew. In an agent, the LLM directs its own steps and tool use at runtime.
 
-<MermaidDiagram title="Workflow vs agent: where the control flow lives">
+<MermaidDiagram title="Workflow vs agent: where the control flow lives" chart={`
 graph TB
   subgraph W["Workflow"]
     direction LR
@@ -72,7 +72,7 @@ graph TB
     direction LR
     B1[LLM picks action] --> B2[tool] --> B3[observe] --> B1
   end
-</MermaidDiagram>
+`} />
 
 Most of the production systems people called "agentic" in 2025 were workflows with an LLM as a component. That's not an insult, it's the recommendation. Anthropic names five workflow patterns that cover most cases before you need a full agent: prompt chaining (sequential), routing (classify and dispatch), parallelization (sectioning/voting), orchestrator-workers (a lead delegates dynamically), and evaluator-optimizer (generate and critique in a loop). Confusing workflow with agent produces the archetypal over-engineering: a reasoning loop where a 10ms API call would have done.
 

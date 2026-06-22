@@ -62,7 +62,7 @@ La observabilidad parcial explica los fallos clásicos con una causa, en vez de 
 
 La distinción más malinterpretada del campo no es "¿usa un LLM?". Es **quién decide la trayectoria.** En un workflow, los caminos están predefinidos en código: tú fijas el flujo y el LLM rellena huecos dentro de ramas que ya dibujaste. En un agente, el LLM dirige sus propios pasos y uso de tools en runtime.
 
-<MermaidDiagram title="Workflow vs agente: dónde vive el control de flujo">
+<MermaidDiagram title="Workflow vs agente: dónde vive el control de flujo" chart={`
 graph TB
   subgraph W["Workflow"]
     direction LR
@@ -72,7 +72,7 @@ graph TB
     direction LR
     B1[LLM elige acción] --> B2[tool] --> B3[observa] --> B1
   end
-</MermaidDiagram>
+`} />
 
 La mayoría de los sistemas "agénticos" de producción que ganaron en 2025 eran workflows con un LLM como componente. No es un insulto, es la recomendación. Anthropic nombra cinco patrones de workflow que cubren la mayoría de casos antes de necesitar un agente full: prompt chaining (secuencial), routing (clasifica y deriva), parallelization (sectioning/voting), orchestrator-workers (un líder delega dinámicamente) y evaluator-optimizer (genera y critica en bucle). Confundir workflow con agente produce la sobre-ingeniería arquetípica: un loop de razonamiento donde bastaba una llamada API de 10 ms.
 

@@ -20,6 +20,7 @@ sources:
   - { grade: "B", title: "Safe Observability: Automated PII Redaction from LLM Prompts in OpenTelemetry Pipelines", author: "IJCJournal / ResearchGate", year: 2025, url: "https://ijcjournal.org/InternationalJournalOfComputer/article/download/2458/919/6203" }
   - { grade: "B", title: "DoVer: Intervention-Driven Auto Debugging for LLM Multi-Agent Systems", author: "Microsoft Research, arXiv 2512.06749", year: 2025, url: "https://arxiv.org/pdf/2512.06749" }
   - { grade: "C", title: "The Good, The Bad, and The Greedy (variance at temp=0)", author: "arXiv 2407.10457", year: 2024, url: "https://arxiv.org/abs/2407.10457" }
+  - { grade: "B", title: "Non-Determinism of \"Deterministic\" LLM Settings (best-vs-worst configuration gap)", author: "arXiv 2408.04667", year: 2024, url: "https://arxiv.org/abs/2408.04667" }
 ---
 
 import Callout from '../../components/blog/Callout.astro';
@@ -39,7 +40,7 @@ A failure almost never lives in a single generation. It lives in the *trajectory
 
 The right unit is the turn trace, a tree of spans. A root `invoke_agent`, `chat` children (each generation, with its tokens and `finish_reason`), and `execute_tool` children (each tool, with its args, duration, and result).
 
-<MermaidDiagram title="A turn trace is a tree of spans">
+<MermaidDiagram title="A turn trace is a tree of spans" chart={`
 graph TD
   A["invoke_agent (turn · 4.2s · $0.011)"] --> B["chat #1 (1.37s · 3.1k tok)"]
   B --> C["execute_tool · search (350ms · ok)"]
@@ -47,7 +48,7 @@ graph TD
   A --> E["chat #2 (1.3s · 4.8k tok)"]
   E --> F["execute_tool · create_event (130ms · denied at gate)"]
   A --> G["channel.send (330ms)"]
-</MermaidDiagram>
+`} />
 
 Without this hierarchy you can't measure latency per step, attribute cost to a sub-goal, or see the wrong decision. The analogy I keep: the turn trace is the *flight data recorder*, not the pilot's report after landing. The report (the output) says "there was turbulence." The black box gives you every sensor reading and every decision in temporal order. That's the only thing that lets you reconstruct an accident you can't reproduce by flying again.
 
@@ -66,7 +67,7 @@ So design the agent to emit its prompt, its state, and its tool-args at each ste
 The most expensive belief a novice debugger holds is that `temperature=0` gives reproducibility. It's false. Thinking Machines showed in 2025 that LLM inference non-determinism doesn't come from sampling. It comes from the lack of *batch-invariance* in GPU kernels (matmul, RMSNorm, attention). Your request's output changes with the *batch size*, which changes with the server's concurrent traffic. The same input can give two different outputs at temperature 0 simply because another user was hitting the server at the same moment.
 
 <Callout type="warning" title="Antipattern: debugging by re-running">
-Re-running the same input in a loop hoping to reproduce the failure is wasted time. Determinism at `temp=0` is an infrastructure illusion. Studies measure accuracy variance of ~5 points typically, and up to ~15-16 points on specialized models, at temperature 0. Those are conservative figures. The inflated "70% best-vs-worst" claim you'll see around doesn't hold up in the sources I could check.
+Re-running the same input in a loop hoping to reproduce the failure is wasted time. Determinism at `temp=0` is an infrastructure illusion. Studies measure accuracy variance of ~5 points typically, and up to ~15-16 points on specialized models, at temperature 0. Those are conservative figures. The "70% best-vs-worst" figure you'll see around is real (arXiv:2408.04667), but it measures a different thing: the gap between the best- and worst-achievable *configuration*, not run-to-run spread at fixed settings.
 </Callout>
 
 The design consequence is **replay over recorded tool-responses**. You capture a production trace (messages, tool calls, and the real tool results) and re-run the agent feeding it the recorded responses as fixtures, instead of calling tools live.

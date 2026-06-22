@@ -118,7 +118,7 @@ Raw errors (stack traces, verbose tool failures) are poison for the context wind
 
 When to stop is a first-order problem most tutorials ignore. There are two symmetric failures: **non-termination** (infinite loop, burned tokens) and **early-stopping** (the model declares "done" before it is). You need several conditions at once.
 
-<MermaidDiagram title="Termination needs several conditions, not one">
+<MermaidDiagram title="Termination needs several conditions, not one" chart={`
 graph TD
   A[Each turn] --> B[max-turns hit?]
   B -->|yes| Z[stop]
@@ -129,7 +129,7 @@ graph TD
   D -->|no| E[termination tool called?]
   E -->|yes| Z
   E -->|no| A
-</MermaidDiagram>
+`} />
 
 A hard max-turns and a token budget are the easy two. The one people skip is the **no-progress loop guard**: hash the last N tool calls (name plus normalized args) and cut, or force a strategy change, when the same call repeats. Without it, an agent can burn a whole budget spinning before any coarse cap saves it. And a termination tool, an explicit "I'm done" or "escalate to a human" action, gives the model a clean way to stop instead of trailing off.
 

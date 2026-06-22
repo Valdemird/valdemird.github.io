@@ -61,7 +61,7 @@ Writing evals a priori *feels* like serious engineering. But you're optimizing a
 
 Here's the statistical distinction that's most expensive to ignore. **pass@1** measures mean performance: the probability that *one* attempt passes. It's what a benchmark advertises because it's the highest number. **pass^k** = pᵏ measures the probability that *all k attempts pass*, which is the real reliability.
 
-The gap decays exponentially. An agent at 90% pass@1 drops to 0.9⁸ ≈ 57% at k=8. τ-bench shows it with data: GPT-4o gets 61% pass@1 but only 25% pass^8 in the retail domain. Translated to your business: one in four times, the same appointment confirmation fails non-deterministically. Nobody in a multi-tenant SaaS accepts that.
+The gap decays exponentially. An agent at 90% pass@1 drops to 0.9⁸ ≈ 43% at k=8. τ-bench shows it with data: GPT-4o gets 61% pass@1 but only 25% pass^8 in the retail domain. Translated to your business: one in four times, the same appointment confirmation fails non-deterministically. Nobody in a multi-tenant SaaS accepts that.
 
 <Callout type="warning" title="Declaring 'ready' on pass@1 is the antipattern">
 Reporting pass@1 and calling the agent production-ready hides the non-deterministic fragility: you're measuring the best case, not reliability. For any scenario with an irreversible action (a write behind confirmation, a booking), pass^k with k≥5 is not a vanity metric. It's a release gate.
@@ -73,14 +73,14 @@ Why does this bite so hard in agents? Errors compose. If each step fails indepen
 
 An agent can give the *correct* answer having called useless tools, with wrong parameters, repeating steps, or skipping a confirmation. An outcome-only eval tells you *that* something failed, never *where* or *why*. For an agent with confirmation gates and dangerous writes, trajectory isn't optional.
 
-<MermaidDiagram title="Outcome-only is blind to method">
+<MermaidDiagram title="Outcome-only is blind to method" chart={`
 graph LR
   R["Real traces"] --> E["Error analysis<br/>(open / axial)"]
   E --> G["Derived graders"]
   G --> K["pass^k<br/>+ trajectory"]
   K --> C["CI gate /<br/>online eval"]
   C -.feeds.-> R
-</MermaidDiagram>
+`} />
 
 You capture the trajectory by intercepting tool calls *before* they execute: the pre-tool-use hook records every attempted call before the permission gate decides. That enables graders impossible with outcome-only: did it ask for confirmation before writing, and did it *restrain* from calling a tool when it shouldn't have. Both are pure trajectory graders.
 

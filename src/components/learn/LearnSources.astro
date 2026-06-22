@@ -1,5 +1,6 @@
 ---
 import { GRADE_LABEL, type Lang } from '../../lib/learn';
+import { getSourceNote } from '../../lib/learn-source-notes';
 
 interface Source {
 	grade: 'A' | 'B' | 'C' | 'D';
@@ -12,9 +13,11 @@ interface Source {
 interface Props {
 	sources?: Source[];
 	lang: Lang;
+	/** Module slug, used to look up per-source relevance notes. */
+	slug?: string;
 }
 
-const { sources, lang } = Astro.props;
+const { sources, lang, slug } = Astro.props;
 const es = lang === 'es';
 ---
 
@@ -27,25 +30,42 @@ const es = lang === 'es';
 				: 'Each source carries a credibility grade: A high-confidence primary · B solid · C emerging · D author inference, unverified.'}
 		</p>
 		<ul class="sources-list">
-			{sources.map((s) => (
-				<li>
-					<span class:list={['grade', `grade-${s.grade.toLowerCase()}`]} title={GRADE_LABEL[s.grade][lang]}>
-						{s.grade}
-					</span>
-					<span class="src-body">
-						{s.url ? (
-							<a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a>
-						) : (
-							<span>{s.title}</span>
-						)}
-						{(s.author || s.year) && (
-							<span class="src-meta">
-								{[s.author, s.year].filter(Boolean).join(', ')}
+			{sources.map((s) => {
+				const note = slug ? getSourceNote(slug, s.url ?? s.title) : undefined;
+				return (
+					<li>
+						<span class:list={['grade', `grade-${s.grade.toLowerCase()}`]} title={GRADE_LABEL[s.grade][lang]}>
+							{s.grade}
+						</span>
+						<span class="src-body">
+							<span class="src-line">
+								{s.url ? (
+									<a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a>
+								) : (
+									<span>{s.title}</span>
+								)}
 							</span>
-						)}
-					</span>
-				</li>
-			))}
+							{(s.author || s.year) && (
+								<span class="src-meta">
+									{[s.author, s.year].filter(Boolean).join(', ')}
+								</span>
+							)}
+							{note && (
+								<details class="src-why">
+									<summary>
+										<span class="src-why-q">{es ? '¿Por qué esta fuente?' : 'Why this source?'}</span>
+										<svg class="src-why-chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+									</summary>
+									<p class="src-why-lead">{note.why[lang]}</p>
+									<ul class="src-why-reasons">
+										{note.reasons[lang].map((r) => <li>{r}</li>)}
+									</ul>
+								</details>
+							)}
+						</span>
+					</li>
+				);
+			})}
 		</ul>
 	</section>
 )}
@@ -105,4 +125,38 @@ const es = lang === 'es';
 		font-size: 0.72rem;
 		color: var(--color-text-secondary);
 	}
+
+	.src-why { margin-top: 0.3em; }
+	.src-why summary {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3em;
+		cursor: pointer;
+		list-style: none;
+		width: fit-content;
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-accent);
+	}
+	.src-why summary::-webkit-details-marker { display: none; }
+	.src-why-chev { transition: transform 0.2s var(--ease-spring); }
+	.src-why[open] .src-why-chev { transform: rotate(90deg); }
+	.src-why-lead {
+		margin: 0.55em 0 0.4em;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-text-secondary);
+		max-width: 62ch;
+	}
+	.src-why-reasons {
+		margin: 0;
+		padding: 0 0 0 1.1em;
+		font-size: 0.82rem;
+		line-height: 1.5;
+		color: var(--color-text-secondary);
+		max-width: 62ch;
+	}
+	.src-why-reasons li { margin: 0 0 0.3em; }
 </style>

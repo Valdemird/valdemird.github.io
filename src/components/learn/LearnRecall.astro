@@ -1,0 +1,105 @@
+---
+import type { Lang } from '../../lib/learn';
+
+interface Props {
+	tldr?: string[];
+	lang: Lang;
+}
+
+const { tldr, lang } = Astro.props;
+const es = lang === 'es';
+const items = tldr ?? [];
+---
+
+{items.length > 0 && (
+	<section class="recall" aria-label={es ? 'Repaso activo' : 'Active recall'}>
+		<p class="recall-eyebrow">{es ? 'Repaso activo' : 'Recall check'}</p>
+		<p class="recall-intro">
+			{es
+				? 'Antes de seguir, intenta enunciar de memoria cada idea de carga del módulo. Luego revela para comprobar. Recuperar cuesta más que releer — y por eso fija mejor.'
+				: 'Before you move on, try to state each load-bearing idea from memory, then reveal to check. Retrieving is harder than rereading — which is exactly why it sticks.'}
+		</p>
+		<ol class="recall-list">
+			{items.map((item, i) => (
+				<li>
+					<details class="recall-item">
+						<summary>
+							<span class="recall-num">{String(i + 1).padStart(2, '0')}</span>
+							<span class="recall-cue">{es ? 'Idea clave' : 'Key idea'}</span>
+							<span class="recall-reveal">{es ? 'revelar' : 'reveal'}</span>
+							<svg class="recall-chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+						</summary>
+						<p>{item}</p>
+					</details>
+				</li>
+			))}
+		</ol>
+	</section>
+)}
+
+<style>
+	.recall {
+		margin-top: var(--space-2xl);
+		padding: var(--space-lg);
+		border-radius: var(--radius-md);
+		/* Tinted wash + eyebrow mark the block — no left accent bar (design rule). */
+		background: oklch(from var(--color-accent) l c h / 0.04);
+		border: 1px solid var(--color-border);
+	}
+	.recall-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 0.5em;
+	}
+	.recall-intro {
+		font-size: 0.98rem;
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+		margin: 0 0 var(--space-md);
+		max-width: 64ch;
+	}
+
+	.recall-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: 0.5rem;
+	}
+
+	.recall-item {
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-sm);
+		background: var(--color-bg);
+	}
+	.recall-item summary {
+		display: flex;
+		align-items: center;
+		gap: 0.6em;
+		padding: 0.7em 0.9em;
+		cursor: pointer;
+		list-style: none;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-text-secondary);
+	}
+	.recall-item summary::-webkit-details-marker { display: none; }
+	.recall-num { color: var(--color-accent); font-weight: 600; }
+	.recall-cue { color: var(--color-text); }
+	.recall-reveal { margin-left: auto; opacity: 0.7; }
+	.recall-chev { transition: transform 0.2s var(--ease-spring); flex: none; }
+	.recall-item[open] .recall-chev { transform: rotate(90deg); }
+	.recall-item[open] .recall-reveal { display: none; }
+	.recall-item p {
+		margin: 0;
+		padding: 0 0.95em 0.85em;
+		font-size: 1rem;
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+	}
+</style>

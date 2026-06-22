@@ -47,12 +47,12 @@ La consecuencia operativa es un giro de 180 grados. Deja de invertir en detectar
 
 Simon Willison destiló el riesgo en un modelo mental de una línea. Un agente se vuelve una herramienta de exfiltración garantizada cuando reúne tres capacidades a la vez: acceso a datos privados, exposición a contenido no confiable y un canal para comunicarse al exterior.
 
-<MermaidDiagram title="La lethal trifecta">
+<MermaidDiagram title="La lethal trifecta" chart={`
 graph LR
   A["Datos privados"] --> X["Exfiltración garantizada<br/>con un prompt inyectado"]
   B["Contenido no confiable"] --> X
   C["Canal externo"] --> X
-</MermaidDiagram>
+`} />
 
 La potencia de este marco es que te obliga a auditar agentes por capacidades, no por intenciones. No importa cuán bien escrito esté tu system prompt: si las tres están presentes, un solo prompt inyectado en el contenido no confiable convierte al agente en exfiltrador. Y la inversa es liberadora: rompe cualquiera de los tres vértices y la cadena de ataque se corta. El vértice más barato de eliminar suele ser el tercero. Una egress allowlist que limite las conexiones salientes a una lista cerrada de destinos hace que, aunque el agente esté comprometido, no tenga por dónde sacar los datos.
 

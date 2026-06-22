@@ -41,12 +41,12 @@ METR's measurement is the credible number. The task length agents can finish at 
 
 To anchor the scale: a model like o3 sustains a horizon around 110 minutes at 50% reliability. That's the kind of number to design against. Not "is the model smart" but "where does *mine* fall over."
 
-<MermaidDiagram title="Time-horizon: a doubling, not a ceiling">
+<MermaidDiagram title="Time-horizon: a doubling, not a ceiling" chart={`
 graph LR
   A["~minutes<br/>(2023 models)"] --> B["~tens of minutes<br/>(2024)"]
   B --> C["~1-2 hours<br/>(2025)"]
   C --> D["? hours<br/>(extrapolation,<br/>uncertain)"]
-</MermaidDiagram>
+`} />
 
 The interesting part isn't the headline. It's *why* the horizon is finite at all. Reliability collapses when a task moves from minutes to hours, not because the model got dumber per step, but because it can't hold coherence across the sequence.
 

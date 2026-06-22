@@ -1,0 +1,224 @@
+---
+import BaseHead from '../BaseHead.astro';
+import Header from '../Header.astro';
+import Footer from '../Footer.astro';
+import { GLOSSARY, glossaryHref } from '../../lib/learn-glossary';
+import { courseHomeHref, learnHomeHref, type Lang } from '../../lib/learn';
+import { UI_STRINGS, PERSON } from '../../consts';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const es = lang === 'es';
+
+const terms = [...GLOSSARY].sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
+const courseName = es ? 'Sistemas agénticos' : 'Agentic systems';
+
+const title = es ? 'Glosario' : 'Glossary';
+const description = es
+	? `Los ${terms.length} términos del campo de los sistemas agénticos, definidos en una frase: de la ventana de contexto a la lethal trifecta, de GRPO al horizonte temporal de tarea.`
+	: `The ${terms.length} terms of the agentic-systems field, each defined in one sentence: from the context window to the lethal trifecta, from GRPO to task time-horizon.`;
+
+const alternates = [
+	{ hreflang: 'en', href: `https://valdemird.com${glossaryHref('en')}` },
+	{ hreflang: 'es', href: `https://valdemird.com${glossaryHref('es')}` },
+];
+
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'DefinedTermSet',
+	name: es ? 'Glosario · Ingeniería de sistemas agénticos' : 'Glossary · Engineering agentic systems',
+	description,
+	inLanguage: lang,
+	author: PERSON,
+	url: `https://valdemird.com${glossaryHref(lang)}`,
+	hasDefinedTerm: terms.map((t) => ({
+		'@type': 'DefinedTerm',
+		name: t.term,
+		description: t.def[lang],
+		url: `https://valdemird.com${glossaryHref(lang)}#${t.slug}`,
+	})),
+};
+---
+
+<html lang={lang}>
+	<head>
+		<BaseHead title={`${title} · ${courseName}`} description={description} lang={lang} alternates={alternates} jsonLd={jsonLd} />
+	</head>
+	<body>
+		<a class="skip-link" href="#main-content">{UI_STRINGS[lang].nav.skipToContent}</a>
+		<Header />
+		<main id="main-content">
+			<div class="wrap">
+				<nav class="crumbs" aria-label={es ? 'Migas de pan' : 'Breadcrumb'}>
+					<a href={learnHomeHref(lang)}>Learn</a>
+					<span aria-hidden="true">/</span>
+					<a href={courseHomeHref(lang)}>{courseName}</a>
+					<span aria-hidden="true">/</span>
+					<span>{title}</span>
+				</nav>
+
+				<header class="hero">
+					<p class="eyebrow">{es ? 'Referencia' : 'Reference'}</p>
+					<h1>{title}</h1>
+					<p class="lead">{description}</p>
+					<div class="search">
+						<input
+							type="search"
+							id="gloss-search"
+							placeholder={es ? 'Filtrar términos…' : 'Filter terms…'}
+							aria-label={es ? 'Filtrar términos del glosario' : 'Filter glossary terms'}
+							autocomplete="off"
+						/>
+						<p class="search-count" id="gloss-count" aria-live="polite">{terms.length} {es ? 'términos' : 'terms'}</p>
+					</div>
+				</header>
+
+				<dl class="glossary" id="glossary-list">
+					{terms.map((t) => (
+						<div class="g-entry" id={t.slug} data-term={t.term.toLowerCase()} data-def={t.def[lang].toLowerCase()}>
+							<dt>{t.term}</dt>
+							<dd>{t.def[lang]}</dd>
+						</div>
+					))}
+				</dl>
+				<p class="no-results" id="gloss-empty" hidden>{es ? 'Sin coincidencias.' : 'No matches.'}</p>
+			</div>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<script>
+	function initGlossarySearch() {
+		const input = document.getElementById('gloss-search') as HTMLInputElement | null;
+		const list = document.getElementById('glossary-list');
+		const count = document.getElementById('gloss-count');
+		const empty = document.getElementById('gloss-empty');
+		if (!input || !list) return;
+		const entries = Array.from(list.querySelectorAll<HTMLElement>('.g-entry'));
+		const total = entries.length;
+		const totalLabel = count?.textContent ?? '';
+		const filter = () => {
+			const q = input.value.trim().toLowerCase();
+			let shown = 0;
+			for (const el of entries) {
+				const hit = !q || (el.dataset.term?.includes(q) || el.dataset.def?.includes(q));
+				el.hidden = !hit;
+				if (hit) shown++;
+			}
+			if (empty) empty.hidden = shown !== 0;
+			if (count) count.textContent = q ? `${shown}` : totalLabel;
+		};
+		input.addEventListener('input', filter);
+		// Deep-link: if arriving with a #hash, briefly highlight that entry.
+		const id = decodeURIComponent(location.hash.slice(1));
+		if (id) document.getElementById(id)?.classList.add('flash');
+	}
+	initGlossarySearch();
+	document.addEventListener('astro:after-swap', initGlossarySearch);
+</script>
+
+<style>
+	main { padding-top: var(--space-xl); }
+	.wrap { max-width: var(--content-width); margin: 0 auto; padding: var(--space-lg); }
+
+	.crumbs {
+		display: flex;
+		gap: 0.5em;
+		align-items: center;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-secondary);
+		margin-bottom: var(--space-lg);
+	}
+	.crumbs a { color: var(--color-text-secondary); text-decoration: none; }
+	.crumbs a:hover { color: var(--color-accent); }
+
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.16em;
+		color: var(--color-accent);
+		margin: 0 0 0.6em;
+	}
+	.hero { margin-bottom: var(--space-2xl); }
+	.hero h1 {
+		font-size: clamp(2rem, 5vw, 2.8rem);
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+		margin: 0 0 0.35em;
+	}
+	.hero .lead {
+		font-size: 1.12rem;
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+		margin: 0 0 var(--space-lg);
+		max-width: 64ch;
+	}
+
+	.search { display: flex; align-items: baseline; gap: var(--space-md); flex-wrap: wrap; }
+	#gloss-search {
+		flex: 1;
+		min-width: 14rem;
+		padding: 0.6em 0.9em;
+		font: inherit;
+		font-size: 0.98rem;
+		color: var(--color-text);
+		background: var(--color-bg);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		transition: border-color 0.2s var(--ease-spring);
+	}
+	#gloss-search:focus { outline: none; border-color: var(--color-accent); }
+	.search-count {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+		margin: 0;
+	}
+
+	.glossary { margin: 0; }
+	.g-entry {
+		padding: var(--space-md) 0;
+		border-bottom: 1px solid var(--color-border);
+		scroll-margin-top: 5.5rem;
+	}
+	.g-entry dt {
+		font-family: var(--font-serif);
+		font-size: 1.12rem;
+		color: var(--color-text);
+		margin: 0 0 0.25em;
+		letter-spacing: -0.01em;
+	}
+	.g-entry dd {
+		margin: 0;
+		font-size: 1rem;
+		line-height: 1.6;
+		color: var(--color-text-secondary);
+	}
+	.g-entry.flash { animation: flash 1.6s var(--ease-smooth); }
+	@keyframes flash {
+		0%, 30% { background: oklch(from var(--color-accent) l c h / 0.1); }
+		100% { background: transparent; }
+	}
+	.no-results {
+		padding: var(--space-lg) 0;
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.g-entry.flash { animation: none; }
+	}
+</style>

@@ -20,6 +20,7 @@ sources:
   - { grade: "B", title: "Safe Observability: Automated PII Redaction from LLM Prompts in OpenTelemetry Pipelines", author: "IJCJournal / ResearchGate", year: 2025, url: "https://ijcjournal.org/InternationalJournalOfComputer/article/download/2458/919/6203" }
   - { grade: "B", title: "DoVer: Intervention-Driven Auto Debugging for LLM Multi-Agent Systems", author: "Microsoft Research, arXiv 2512.06749", year: 2025, url: "https://arxiv.org/pdf/2512.06749" }
   - { grade: "C", title: "The Good, The Bad, and The Greedy (varianza a temp=0)", author: "arXiv 2407.10457", year: 2024, url: "https://arxiv.org/abs/2407.10457" }
+  - { grade: "B", title: "Non-Determinism of \"Deterministic\" LLM Settings (brecha best-vs-worst de configuración)", author: "arXiv 2408.04667", year: 2024, url: "https://arxiv.org/abs/2408.04667" }
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
@@ -39,7 +40,7 @@ Un fallo casi nunca vive en una sola generación. Vive en la *trayectoria*: las 
 
 La unidad correcta es la traza de turno, un árbol de spans. Una raíz `invoke_agent`, hijos `chat` (cada generación, con sus tokens y `finish_reason`) e hijos `execute_tool` (cada herramienta, con sus args, duración y resultado).
 
-<MermaidDiagram title="Una traza de turno es un árbol de spans">
+<MermaidDiagram title="Una traza de turno es un árbol de spans" chart={`
 graph TD
   A["invoke_agent (turno · 4.2s · $0.011)"] --> B["chat #1 (1.37s · 3.1k tok)"]
   B --> C["execute_tool · search (350ms · ok)"]
@@ -47,7 +48,7 @@ graph TD
   A --> E["chat #2 (1.3s · 4.8k tok)"]
   E --> F["execute_tool · create_event (130ms · denegado en gate)"]
   A --> G["channel.send (330ms)"]
-</MermaidDiagram>
+`} />
 
 Sin esta jerarquía no puedes medir latencia por paso, atribuir costo a un sub-objetivo ni ver la decisión equivocada. La analogía a la que vuelvo: la traza de turno es la *caja negra del avión*, no el reporte del piloto al aterrizar. El reporte (el output) dice "hubo turbulencia". La caja negra te da cada lectura de sensor y cada decisión en orden temporal. Eso es lo único que permite reconstruir un accidente que no puedes reproducir volando otra vez.
 
@@ -66,7 +67,7 @@ Así que diseña el agente para que emita su prompt, su estado y sus tool-args e
 La creencia más cara que sostiene un depurador novato es que `temperature=0` da reproducibilidad. Es falso. Thinking Machines demostró en 2025 que el no-determinismo de la inferencia LLM no viene del muestreo. Viene de la falta de *batch-invariance* en los kernels GPU (matmul, RMSNorm, attention). El output de tu petición cambia con el *batch size*, que a su vez cambia con el tráfico concurrente del servidor. El mismo input puede dar dos outputs distintos a temperatura 0 simplemente porque otro usuario estaba pegándole al servidor en ese momento.
 
 <Callout type="warning" title="Antipatrón: depurar re-ejecutando">
-Re-ejecutar el mismo input en bucle esperando reproducir el fallo es perder el tiempo. El determinismo a `temp=0` es una ilusión de infraestructura. Los estudios miden varianzas de accuracy de ~5 puntos típicas, y hasta ~15-16 puntos en modelos especializados, a temperatura 0. Son cifras conservadoras. El "70% best-vs-worst" que verás por ahí no se sostiene en las fuentes que pude revisar.
+Re-ejecutar el mismo input en bucle esperando reproducir el fallo es perder el tiempo. El determinismo a `temp=0` es una ilusión de infraestructura. Los estudios miden varianzas de accuracy de ~5 puntos típicas, y hasta ~15-16 puntos en modelos especializados, a temperatura 0. Son cifras conservadoras. La cifra "70% best-vs-worst" que verás por ahí es real (arXiv:2408.04667), pero mide otra cosa: la brecha entre la *configuración* mejor y peor alcanzable, no la varianza entre corridas a ajustes fijos.
 </Callout>
 
 La consecuencia de diseño es el **replay sobre tool-responses grabadas**. Capturas una traza de producción (mensajes, tool calls y las respuestas reales de las tools) y re-ejecutas el agente alimentándole las respuestas grabadas como fixtures, en vez de llamar a las tools en vivo.

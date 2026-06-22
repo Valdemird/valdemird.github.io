@@ -63,13 +63,13 @@ This is the line almost nobody states out loud, and it unifies both camps: paral
 
 Parallelizing read-only agents (search, read files, answer questions) is safe because they produce no conflicting decisions. There's no shared mutable state. Parallelizing writes shares mutable state and creates a race of decisions. That's why the exact exception Cognition admits (read-only sub-agents) lines up perfectly with the pattern Claude Code uses and with the cases where Anthropic says multi-agent helps.
 
-<MermaidDiagram title="Read parallelizes; write serializes">
+<MermaidDiagram title="Read parallelizes; write serializes" chart={`
 graph TD
   R["READ — parallelize"] --> R1["search N docs, N guardrail checks,<br/>breadth-first explore"]
   R1 --> R2["no shared state → no conflict<br/>fan-out cuts latency, keeps main thread clean"]
   W["WRITE — serialize"] --> W1["generate one artifact, edit state,<br/>answer a customer"]
   W1 --> W2["shared mutable state → decision race<br/>one linear thread, one decision at a time"]
-</MermaidDiagram>
+`} />
 
 The same asymmetry maps straight onto human-in-the-loop: reads auto-execute (parallelizable, no conflict risk), writes serialize behind a gate. If you've already built that for safety reasons, you've already built the orchestration principle. You just hadn't named it.
 
@@ -107,7 +107,7 @@ Switching to a better model does not fix a badly designed multi-agent system. If
 
 Anthropic's winning pattern isn't "spawn agents freely." It's a lead that dictates an effort budget per subtask: for a simple fact, one agent with 3-10 tool calls; for a comparison, 2-4 sub-agents with 10-15 calls each. Without those limits, agents duplicate work or over-research. Orchestrating well is teaching the lead to delegate with limits, not just to decompose.
 
-<MermaidDiagram title="Orchestrator-worker with bounded delegation">
+<MermaidDiagram title="Orchestrator-worker with bounded delegation" chart={`
 graph TD
   L["Lead / orchestrator"] -->|"goal + format + tool allowlist + effort budget"| W1["Worker (read-only)"]
   L -->|"goal + format + tool allowlist + effort budget"| W2["Worker (read-only)"]
@@ -116,7 +116,7 @@ graph TD
   W2 -->|"distillate only"| S
   W3 -->|"distillate only"| S
   S --> L
-</MermaidDiagram>
+`} />
 
 This sits inside the canonical taxonomy from "Building Effective Agents," which separates *workflows* (predefined paths: prompt chaining, routing, parallelization, orchestrator-worker, evaluator-optimizer) from *agents* (the LLM directs its own process). The golden rule of that paper is the discipline that holds up this entire topic: start with the simplest thing, and add agency or agents only when the problem justifies it.
 

@@ -54,11 +54,11 @@ It's a repeated myth that R1 needed "10-100× more tokens" than o1. There's no p
 
 The operational consequence: there's an accuracy-vs-tokens curve with an elbow. Below the elbow you get *underthinking* (the model gives up early). Above it, *overthinking*: it burns tokens without gaining accuracy, and can even degrade. More thinking is not monotonically better. That's why the elite practice is to measure the curve per task type, not to flip on max effort "just in case."
 
-<MermaidDiagram title="Accuracy vs thinking budget: underthink, elbow, overthink">
+<MermaidDiagram title="Accuracy vs thinking budget: underthink, elbow, overthink" chart={`
 graph LR
   A["Low budget<br/>(underthinking)"] --> B["Elbow<br/>(compute-optimal)"]
   B --> C["High budget<br/>(overthinking:<br/>flat or worse)"]
-</MermaidDiagram>
+`} />
 
 On the newest models this is what `effort` controls. Adaptive and interleaved thinking let the model assign its own budget and reason between tool calls; the old fixed `budget_tokens` is the wrong abstraction here.
 

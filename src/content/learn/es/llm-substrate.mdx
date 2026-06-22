@@ -25,8 +25,9 @@ import Callout from '../../../components/blog/Callout.astro';
 import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
+import Term from '../../../components/learn/Term.astro';
 
-Antes de escribir una línea de tu harness, tienes que saber qué es realmente el motor. No es "un asistente con memoria". No es "una máquina de razonar". Un LLM es una función estocástica y stateless que predice el siguiente token sobre una ventana de contexto finita. Nada más. Casi todo lo que vas a construir como ingeniero de agentes (sesiones, memoria, human-in-the-loop, evals, presupuestos de tokens) existe para compensar esas tres propiedades. Las internalizas y dejas de pelear contra el modelo: empiezas a diseñar el andamiaje correcto a su alrededor.
+Antes de escribir una línea de tu harness, tienes que saber qué es realmente el motor. No es "un asistente con memoria". No es "una máquina de razonar". Un LLM es una función estocástica y stateless que predice el siguiente token sobre una <Term name="Context window" lang="es">ventana de contexto finita</Term>. Nada más. Casi todo lo que vas a construir como ingeniero de agentes (sesiones, memoria, human-in-the-loop, evals, presupuestos de tokens) existe para compensar esas tres propiedades. Las internalizas y dejas de pelear contra el modelo: empiezas a diseñar el andamiaje correcto a su alrededor.
 
 <Callout type="important" title="El único modelo mental">
 Reduce el LLM a tres hechos y el resto del campo se deriva de ellos. Es **estocástico** (la salida se muestrea de una distribución de probabilidad). Es **stateless** (no recuerda nada entre llamadas). Corre sobre una **ventana finita** cuya atención cuesta O(n²) y cuyo recall se degrada antes incluso de llenarse.
@@ -38,12 +39,12 @@ No necesitas implementar atención, gradientes ni un tokenizador para enviar un 
 
 El movimiento útil es de traducción: cuando el agente se porta mal, no preguntes "¿por qué el modelo es tonto?". Pregunta "¿cuál de las tres propiedades estoy ignorando?".
 
-<MermaidDiagram title="Cada propiedad fuerza una categoría de ingeniería">
+<MermaidDiagram title="Cada propiedad fuerza una categoría de ingeniería" chart={`
 graph LR
   A[Estocástico] --> A1["evals pass^k<br/>(una corrida verde ≠ fiable)"]
   B[Stateless] --> B1["memoria, sesiones,<br/>recap, persistencia"]
   C["Ventana finita + O(n²)"] --> C1["presupuesto de atención,<br/>compaction, retrieval"]
-</MermaidDiagram>
+`} />
 
 ¿Olvidaste un dato del turno 3? Statelessness mal gestionado. ¿Sumó mal dos números? Tokenización. ¿Pasó el eval ayer y hoy falla? Estocasticidad. Ese reflejo de traducir síntoma a causa es la habilidad que separa a un ingeniero de agentes de un usuario de chatbots.
 
@@ -72,12 +73,12 @@ El principiante mete todo el historial porque "cabe en 1M". El experto sabe que 
 El modelo no recuerda nada entre requests. La API es stateless. Una "conversación" es algo que tú fabricas reenviando el historial en cada llamada. Por eso la persistencia, las sesiones y el resume no son detalles de implementación: son la arquitectura central que sustituye a la memoria que el modelo no tiene.
 
 <Callout type="note" title="'Reenviar todo' vs 'reprocesar a precio completo'">
-El modelo mental por defecto (cada turno reenvías todo el historial) es correcto para entender el statelessness, pero ya no es literalmente cierto en coste. Con prompt caching, el prefijo estable se sirve a ~0.1× en vez de reprocesarse. El statelessness del modelo se mantiene; lo que cambia es cuánto pagas por reconstruir la conversación.
+El modelo mental por defecto (cada turno reenvías todo el historial) es correcto para entender el statelessness, pero ya no es literalmente cierto en coste. Con <Term name="Prompt caching" lang="es">prompt caching</Term>, el prefijo estable se sirve a ~0.1× en vez de reprocesarse. El statelessness del modelo se mantiene; lo que cambia es cuánto pagas por reconstruir la conversación.
 </Callout>
 
 ## El in-context learning sale de las induction heads, no de "entender"
 
-Aquí está la desmitificación más útil del prompting. La capacidad de aprender de ejemplos en el prompt (few-shot, seguir un formato, copiar un patrón de tool-call) no surge de que el modelo "entienda tus instrucciones". Surge de un mecanismo concreto: las induction heads, pares de cabezas de atención que detectan "vi A→B antes; ahora veo A, así que predigo B". Este circuito aparece en un cambio de fase abrupto durante el entrenamiento, y es el motor del in-context learning.
+Aquí está la desmitificación más útil del prompting. La capacidad de aprender de ejemplos en el prompt (few-shot, seguir un formato, copiar un patrón de tool-call) no surge de que el modelo "entienda tus instrucciones". Surge de un mecanismo concreto: las <Term name="Induction head" lang="es">induction heads</Term>, pares de cabezas de atención que detectan "vi A→B antes; ahora veo A, así que predigo B". Este circuito aparece en un cambio de fase abrupto durante el entrenamiento, y es el motor del in-context learning.
 
 La implicación de diseño es directa: los ejemplos canónicos funcionan porque activan un mecanismo aprendido de copia y generalización, no porque el modelo razone sobre tus reglas.
 

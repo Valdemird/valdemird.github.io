@@ -31,7 +31,7 @@ import TabPanel from '../../components/blog/TabPanel.astro';
 
 The demo worked. You typed a request, the agent looped through three tools, returned a clean answer, and you shipped it. Then it met real traffic and fell over. This is the gap nobody warns you about: the move from demo to production isn't writing more code around the model. It's recognizing that the thing you built is a distributed workflow, long-running and non-deterministic, where every step has effects that cost money (tokens) and effects you can't take back (business writes).
 
-Hold that frame. In the [loop module](/learn/agent-loop) the agent's control flow lived in code: call the model, run the tool it asked for, feed the result back, repeat. That loop is correct. The problem is that the loop runs on a machine that crashes, behind a queue that retries, against a model that returns something different every time. The engineering of production is making that loop survive all three.
+Hold that frame. In the [loop module](/learn/agentic-systems/agent-loop) the agent's control flow lived in code: call the model, run the tool it asked for, feed the result back, repeat. That loop is correct. The problem is that the loop runs on a machine that crashes, behind a queue that retries, against a model that returns something different every time. The engineering of production is making that loop survive all three.
 
 <Callout type="important" title="The one mental model">
 A production agent is a **durable distributed workflow**. Slow (the model is the bottleneck), expensive (every turn spends tokens), and probabilistic (the same input gives a different trajectory). Once you accept that, the whole field of distributed systems shows up to help you, and the whole field of distributed systems' failures shows up to bite you.
@@ -55,7 +55,7 @@ The first structural decision, and the one beginners get wrong, is *where the LL
 
 The fix is a clean split. The edge (stateless, fast) only validates, persists, and enqueues. The worker (durable, slow) does the model call and the tools.
 
-<MermaidDiagram title="The edge never calls the model">
+<MermaidDiagram title="The edge never calls the model" chart={`
 sequenceDiagram
   participant U as Client
   participant E as Edge (stateless)
@@ -74,7 +74,7 @@ sequenceDiagram
     W->>DB: checkpoint step result
   end
   W-->>U: stream tokens
-</MermaidDiagram>
+`} />
 
 Now durability, backpressure, and scaling all live in the worker tier, decoupled from the request. The user gets an instant acknowledgment; the slow part happens behind the queue where it can be retried, drained, and observed.
 

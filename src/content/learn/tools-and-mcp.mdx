@@ -106,13 +106,13 @@ Progressive disclosure: load name and description first, instructions when the t
 
 Code execution with MCP goes further: present the servers as navigable code and let the model write a program that calls tools in a sandbox.
 
-<MermaidDiagram title="Why code execution saves the token budget">
+<MermaidDiagram title="Why code execution saves the token budget" chart={`
 graph TD
   A["Chain of tool calls"] --> B["Every intermediate result<br/>flows back through the model"]
   B --> C["2h transcript passes<br/>the context twice"]
   D["Code execution in sandbox"] --> E["Intermediates stay in the sandbox;<br/>only the final result returns"]
   E --> F["PII can be tokenized<br/>before it ever reaches the model"]
-</MermaidDiagram>
+`} />
 
 Anthropic's headline figure is a workflow dropping from ~150K to ~2K tokens (98.7%) by keeping intermediate data out of the model. Loops, conditionals and error handling resolve in code instead of costing a model inference each.
 

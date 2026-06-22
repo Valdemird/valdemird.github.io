@@ -106,13 +106,13 @@ Progressive disclosure: cargar nombre y descripción primero, las instrucciones 
 
 El code execution con MCP va más lejos: presentar los servidores como código navegable y dejar que el modelo escriba un programa que llama tools en un sandbox.
 
-<MermaidDiagram title="Por qué el code execution ahorra presupuesto de tokens">
+<MermaidDiagram title="Por qué el code execution ahorra presupuesto de tokens" chart={`
 graph TD
   A["Cadena de tool calls"] --> B["Cada resultado intermedio<br/>vuelve a pasar por el modelo"]
   B --> C["Un transcript de 2h pasa<br/>el contexto dos veces"]
   D["Code execution en sandbox"] --> E["Los intermedios se quedan en el sandbox;<br/>solo vuelve el resultado final"]
   E --> F["El PII puede tokenizarse<br/>antes de tocar el modelo"]
-</MermaidDiagram>
+`} />
 
 La cifra de portada de Anthropic es un workflow que cae de ~150K a ~2K tokens (98.7%) al mantener los datos intermedios fuera del modelo. Loops, condicionales y manejo de errores se resuelven en código en vez de costar una inferencia del modelo cada uno.
 
