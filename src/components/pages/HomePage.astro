@@ -11,7 +11,7 @@ type LabGitOp =
 	| { op: 'commit'; branch: string; label?: string }
 	| { op: 'branch'; name: string; from: string; label?: string }
 	| { op: 'merge'; from: string; into: string; label?: string };
-import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, PERSON_ID, personWithProperties, webPropertyNodes, UI_STRINGS } from '../../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, personWithProperties, webPropertyNodes, UI_STRINGS } from '../../consts';
 import { getCollection } from 'astro:content';
 
 interface Props {
@@ -61,7 +61,7 @@ const homeJsonLd = {
 			url: 'https://valdemird.com',
 			description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
 			inLanguage: lang === 'es' ? ['es', 'en'] : ['en', 'es'],
-			publisher: { '@id': PERSON_ID },
+			publisher: { '@id': ORGANIZATION_ID },
 			potentialAction: {
 				'@type': 'SearchAction',
 				target: { '@type': 'EntryPoint', urlTemplate: `https://valdemird.com${blogIndexPath}?q={search_term_string}` },
@@ -69,6 +69,7 @@ const homeJsonLd = {
 			},
 		},
 		personWithProperties(),
+		ORGANIZATION,
 		...webPropertyNodes(),
 	],
 };

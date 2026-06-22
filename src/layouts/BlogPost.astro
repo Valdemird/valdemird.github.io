@@ -11,7 +11,7 @@ import FreshnessLine from '../components/blog/FreshnessLine.astro';
 import Comments from '../components/blog/Comments.astro';
 import PostPreview from '../components/PostPreview.astro';
 import { cleanMdxBody, countWords, extractTldr } from '../lib/mdx-plaintext';
-import { PERSON, PERSON_REF, UI_STRINGS } from '../consts';
+import { PERSON, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, UI_STRINGS } from '../consts';
 
 type Props = CollectionEntry<'blog'>['data'];
 
@@ -45,40 +45,82 @@ const articleSection = tags?.[0]
 	? tags[0].split('-').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
 	: undefined;
 
-// Build JSON-LD BlogPosting structured data
-const blogPostingJsonLd: Record<string, unknown> = {
-	'@context': 'https://schema.org',
+// Linked structured-data graph for this post. One @graph so WebSite, Person,
+// Organization, the article, its WebPage, the image, and the breadcrumb all
+// cross-reference by @id instead of shipping as disconnected islands. BaseHead
+// emits a page-supplied jsonLd verbatim, so the full graph is built here.
+const blogIndexPath = lang === 'es' ? '/es/blog/' : '/blog/';
+const homePath = lang === 'es' ? '/es/' : '/';
+
+const postUrl = `https://valdemird.com${currentPath}`;
+const articleId = `${postUrl}#article`;
+const webPageId = `${postUrl}#webpage`;
+const imageId = `${postUrl}#primaryimage`;
+const breadcrumbId = `${postUrl}#breadcrumb`;
+
+// Image is always present: heroImage when set, otherwise the build-time OG image
+// (/og/<slug>.png). Dimensions are only asserted for the known 1200x630 OG file.
+const imageNode = {
+	'@type': 'ImageObject',
+	'@id': imageId,
+	url: `https://valdemird.com${ogImage}`,
+	...(heroImage ? {} : { width: 1200, height: 630 }),
+};
+
+const webSiteNode = {
+	'@type': 'WebSite',
+	'@id': 'https://valdemird.com/#website',
+	name: SITE_TITLE,
+	url: 'https://valdemird.com',
+	description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
+	inLanguage: lang === 'es' ? ['es', 'en'] : ['en', 'es'],
+	publisher: { '@id': ORGANIZATION_ID },
+};
+
+const webPageNode = {
+	'@type': 'WebPage',
+	'@id': webPageId,
+	url: postUrl,
+	name: title,
+	isPartOf: { '@id': 'https://valdemird.com/#website' },
+	primaryImageOfPage: { '@id': imageId },
+	breadcrumb: { '@id': breadcrumbId },
+	inLanguage: lang,
+};
+
+const articleNode: Record<string, unknown> = {
 	'@type': 'BlogPosting',
+	'@id': articleId,
 	headline: title,
 	description,
 	...(abstract && { abstract }),
 	datePublished: pubDate.toISOString(),
 	...(effectiveDateModified && { dateModified: effectiveDateModified.toISOString() }),
 	...(isArchivedStatus && { creativeWorkStatus: 'Archived' }),
-	author: PERSON,
-	publisher: PERSON_REF,
-	mainEntityOfPage: {
-		'@type': 'WebPage',
-		'@id': `https://valdemird.com${currentPath}`,
-	},
+	author: { '@id': PERSON_ID },
+	publisher: { '@id': ORGANIZATION_ID },
+	image: { '@id': imageId },
+	mainEntityOfPage: { '@id': webPageId },
+	isPartOf: { '@id': webPageId },
 	inLanguage: lang,
-	...(heroImage && { image: `https://valdemird.com${heroImage}` }),
 	...(tags && tags.length > 0 && { keywords: tags.join(', ') }),
 	...(articleSection && { articleSection }),
 	...(wordCount && wordCount > 0 && { wordCount }),
 };
 
-// BreadcrumbList: Home > Blog > Post
-const blogIndexPath = lang === 'es' ? '/es/blog/' : '/blog/';
-const homePath = lang === 'es' ? '/es/' : '/';
-const breadcrumbJsonLd: Record<string, unknown> = {
-	'@context': 'https://schema.org',
+const breadcrumbNode = {
 	'@type': 'BreadcrumbList',
+	'@id': breadcrumbId,
 	itemListElement: [
 		{ '@type': 'ListItem', position: 1, name: lang === 'es' ? 'Inicio' : 'Home', item: `https://valdemird.com${homePath}` },
 		{ '@type': 'ListItem', position: 2, name: 'Blog', item: `https://valdemird.com${blogIndexPath}` },
-		{ '@type': 'ListItem', position: 3, name: title, item: `https://valdemird.com${currentPath}` },
+		{ '@type': 'ListItem', position: 3, name: title, item: postUrl },
 	],
+};
+
+const blogPostingJsonLd = {
+	'@context': 'https://schema.org',
+	'@graph': [webSiteNode, PERSON, ORGANIZATION, imageNode, webPageNode, articleNode, breadcrumbNode],
 };
 
 const alternates: { hreflang: string; href: string }[] = [];
@@ -121,7 +163,7 @@ const relatedPosts = allPosts
 
 <html lang={lang}>
 	<head>
-		<BaseHead title={title} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} extraJsonLd={[breadcrumbJsonLd]} publishedTime={pubDate} modifiedTime={effectiveDateModified} tags={tags} markdownAlternate={markdownAlternate} />
+		<BaseHead title={title} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} publishedTime={pubDate} modifiedTime={effectiveDateModified} tags={tags} markdownAlternate={markdownAlternate} />
 	</head>
 
 	<body>
