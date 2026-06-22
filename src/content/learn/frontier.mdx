@@ -1,0 +1,123 @@
+---
+title: "The frontier: task time-horizon, self-improvement, and where this goes"
+description: "The credible frontier metric isn't model IQ — it's the task time-horizon METR measures, doubling roughly every seven months. Self-improvement works only when bolted to a verifiable grader. The rest is speculation, marked as such."
+phase: 8
+order: 16
+tier: frontera
+durability: efimero
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "The honest frontier metric is task time-horizon: the length of task an agent finishes at ~50% reliability, which METR measures doubling roughly every seven months."
+  - "Self-improvement (Darwin-Gödel-Machine style) works because each change is graded against a verifiable benchmark — the same eval↔reward↔grader isomorphism from earlier modules. The grader is the ceiling."
+  - "Most claims past the time-horizon trend are low-credibility (C/D). This module ages the fastest of the whole course; treat it as a compass, not a map."
+sources:
+  - { grade: "A", title: "Measuring AI Ability to Complete Long Tasks (Time Horizon) + Time Horizon 1.1", author: "METR", year: 2026, url: "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/" }
+  - { grade: "A", title: "Effective context engineering for AI agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
+  - { grade: "A", title: "Darwin Gödel Machine: Open-Ended Evolution of Self-Improving Agents", author: "Zhang et al. (Sakana AI, UBC, Vector Institute)", year: 2025, url: "https://arxiv.org/abs/2505.22954" }
+  - { grade: "B", title: "A Survey of Agent Interoperability Protocols (MCP, ACP, A2A, ANP)", author: "arXiv 2505.02279", year: 2025, url: "https://arxiv.org/html/2505.02279v1" }
+  - { grade: "C", title: "Gartner: over 40% of agentic AI projects will be canceled by end of 2027", author: "Gartner press release", year: 2025, url: "https://www.gartner.com/en/newsroom/press-releases/2025-06-25-gartner-predicts-over-40-percent-of-agentic-ai-projects-will-be-canceled-by-end-of-2027" }
+  - { grade: "C", title: "Genie 3 world model (foundation/model-based)", author: "Google DeepMind", year: 2025, url: "https://techcrunch.com/2025/08/05/deepmind-thinks-genie-3-world-model-presents-stepping-stone-towards-agi/" }
+  - { grade: "D", title: "Reliability composition (geometric decay, 0.95^n)", author: "course synthesis", year: 2026, url: "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+
+This is the last module, and it's the one I trust least. Everything before it was foundations (properties of the engine, the agent loop, evals, memory, security) and most of it will still be true in five years. What follows ages fast. So read it as a compass, not a map, and watch the credibility grades: the one quantitative trend here is solid, and almost everything else is me telling you where I think the ground is moving and admitting I might be wrong.
+
+The right question at the frontier isn't "how smart is the model." It's "how long can it stay on task before it drifts." Computer use, lifelong learning, agent-to-agent economies, self-improvement: they all reduce to the same bet. Turn a single-turn next-token function into a system that holds state, pulls the right context, and doesn't derail across a long horizon.
+
+## Task time-horizon: the one metric worth extrapolating
+
+The beginner reads single-turn benchmarks (MMLU, GPQA) and infers agentic ability. Those tell you almost nothing about a long horizon. The metric that does is METR's **task time-horizon**: the length of task, measured in human time, that an agent completes at roughly 50% reliability.
+
+<Callout type="important" title="The trend, stated honestly">
+METR's measurement is the credible number. The task length agents can finish at ~50% reliability has been **doubling roughly every seven months** (~188 days historically). The recent slope is steeper: around four months if you fit from 2023, and as fast as ~three months (≈10× per year) on 2024-2025 models per the Time Horizon 1.1 update. The measurement is real. The extrapolation is not guaranteed. A doubling that held for a few years can bend.
+</Callout>
+
+To anchor the scale: a model like o3 sustains a horizon around 110 minutes at 50% reliability. That's the kind of number to design against. Not "is the model smart" but "where does *mine* fall over."
+
+<MermaidDiagram title="Time-horizon: a doubling, not a ceiling" chart={`
+graph LR
+  A["~minutes<br/>(2023 models)"] --> B["~tens of minutes<br/>(2024)"]
+  B --> C["~1-2 hours<br/>(2025)"]
+  C --> D["? hours<br/>(extrapolation,<br/>uncertain)"]
+`} />
+
+The interesting part isn't the headline. It's *why* the horizon is finite at all. Reliability collapses when a task moves from minutes to hours, not because the model got dumber per step, but because it can't hold coherence across the sequence.
+
+## Reliability composes geometrically
+
+Here's the math that governs every autonomy claim. If an agent succeeds at each step with probability `p`, finishing a chain of `n` independent steps is `p^n`, and that decays fast. At 95% per step: ten steps lands near 0.60, twenty steps near 0.36. An agent that's "nearly perfect" per step is mediocre over a long horizon.
+
+| Per-step | 5 steps | 10 steps | 20 steps |
+|---|---|---|---|
+| 0.99 | 0.95 | 0.90 | 0.82 |
+| 0.95 | 0.77 | **0.60** | **0.36** |
+| 0.90 | 0.59 | 0.35 | 0.12 |
+
+This is the real reason most agent projects never ship. Cite the failure rate carefully: industry blogs throw around ~88%, but that number's provenance is weak; sturdier sources land elsewhere, and Gartner projects over 40% of agentic projects canceled by end of 2027. The design conclusion doesn't come from the statistic. It comes from the arithmetic: agents that scale have bounded scope, a defined toolset, and explicit refusal outside their limits.
+
+<Callout type="important" title="This is the mathematical case for human-in-the-loop">
+Reliability composition *is* the reason HITL, checkpoints, and sub-task decomposition exist. A checkpoint resets the chain. It turns one catastrophic `p^20` into two `p^10` segments with a verification in the middle that restores probability to ~1. You don't fix a 15-step agent by buying a smarter model. You shorten the critical chain or you put a gate in it.
+</Callout>
+
+## Self-improvement: the grader is the ceiling
+
+The version of self-improvement people fear is the theoretical Gödel machine rewriting itself toward superintelligence. The version that actually works is mundane and far more useful.
+
+The **Darwin Gödel Machine** (Zhang et al., 2025) is a coding agent that rewrites its own codebase and validates every change empirically against benchmarks, keeping a diverse archive of variants so it doesn't get stuck in a local optimum. The results are concrete and modest at once: SWE-bench 20% → 50%, Polyglot 14.2% → 30.7%. The pattern isn't "unbounded recursive rewriting." It's **generate a variant → measure → archive the best**.
+
+<Callout type="important" title="The isomorphism closes here">
+Notice what makes it work: a fitness function. Self-improvement succeeds only when bolted to an external, *verifiable* grader, not to self-judgment. That's the same eval↔reward↔grader equivalence from the evaluation and reward modules, now running the optimizer. The reward that shapes a policy, the grader that scores an eval, and the fitness that selects a variant are the same object wearing three hats. The ceiling of self-improvement is the quality of that grader.
+</Callout>
+
+This is the most underrated point in the whole field. A weak grader means the agent optimizes the metric instead of the task. Goodhart, applied to your own evaluator, amplified by the optimization loop. Which is why everything you built earlier (code-based graders plus an LLM judge, scored on trajectory, run pass^k) isn't just QA. It's the substrate any future self-improvement would stand on.
+
+<Collapsible title="Profundizar: why the 'boring' optimizer beats the recursive one">
+The seductive story is a model that improves itself with no human in the loop, compounding without bound. The empirical story is slower and bounded: DGM is restricted to coding tasks with a verifiable eval, scales with compute gradually, and is only as good as its benchmark. The "Gödel machine that rewrites itself without limit" stays theoretical. Treating DGM as imminent recursive AGI is hype. Treating it as a powerful offline optimizer for your harness (evolve the persona, the toolset, the allowlist against your eval suite) is correct and useful today. The difference between those two readings is whether you have a trustworthy grader.
+</Collapsible>
+
+## Where this is heading (lower credibility, marked as such)
+
+Past the time-horizon trend, I'm extrapolating. Grades drop to C/D here on purpose.
+
+<Tabs labels={["World models", "Memory as infra", "Agent protocols"]}>
+<TabPanel>
+Pure LLMs imitate text and hit a ceiling on physical and dynamic planning. **World models** are the bet for agents that plan with "what-if" in a latent state and learn from *simulated* trial-and-error instead of text. Genie 3 (DeepMind, 2025) is an interactive real-time world model proposed as a substrate for training agents; DreamerV3 shows one model-based RL algorithm solving many tasks via imagined rollouts. For GUI/web agents this points at UI simulators where you train a policy without touching production. Today it's outside the stack of a text SaaS. As a direction, it's the bridge to agents that understand a dynamics, not just a vocabulary. [C]
+</TabPanel>
+<TabPanel>
+In 2025-26, memory stopped being an academic topic and became an infrastructure concern. The distinction beginners miss: *personalized* memory (user preferences) versus *self-improving* memory (distilling skills from experience). The counterintuitive part is that the boring version wins. Useful memory today is almost always structured note-taking in files: write-through, auditable, not weight updates or exotic graph stores. The exotic options exist; they rarely earn their complexity. [C]
+</TabPanel>
+<TabPanel>
+Two interoperability standards are forming. MCP standardizes agent↔tool (vertical). A2A standardizes agent↔agent (horizontal) via Agent Cards, JSON-RPC, SSE. They're complementary, like HTTP and DNS. A survey of the protocol space (arXiv 2505.02279) maps the discovery and trust models and warns that fragmentation is itself an adoption risk. The frontier lesson is a security one: every new trust boundary is a new vector (fake agent advertisement, authority re-delegation, tool poisoning in transit). Treat each protocol as attack surface, not just integration. [B]
+</TabPanel>
+</Tabs>
+
+The thread under all three is the security failure that doesn't go away as systems get more autonomous: the **confused deputy**. An LLM trusts any convincing token, so a privileged agent can be steered by untrusted content to act for an attacker. In multi-agent setups it amplifies: a compromised agent injects the next.
+
+<Callout type="warning" title="Prompt-level spotlighting is not the fix">
+The real security frontier is privilege, not instructions. Default-deny, row-level isolation, capabilities scoped per task. Spotlighting (declaring documents as data, not instructions) helps, but it's a behavioral patch where an architectural boundary is needed. People reach for the prompt because the prompt is cheap. The boundary is what holds.
+</Callout>
+
+## What the consensus overrates, and what it ignores
+
+The hype is autonomy demos with no per-step reliability and no cost-per-attempt. The signal is architecture (compaction, sub-agents, external memory, HITL on writes, bounded scope) and evals that measure trajectory.
+
+<Callout type="note" title="The cheap heuristics to carry forward">
+Overrated: fully autonomous agents as a product; pure pixel-level computer use when an API exists behind the GUI; RAG as the default answer to "memory" for bounded corpora; single-turn benchmarks as a measure of agentic ability. Underrated: that reliability composes geometrically; that the grader is the limit of self-improvement; that determinism at the edge (keep the control plane out of the non-deterministic agent loop) buys you replay and reliability; that cost-per-attempt becomes the dominant metric as the horizon grows.
+</Callout>
+
+Context engineering ties it together. If sustained coherence is the bottleneck, the real work isn't writing the perfect prompt. It's curating which high-signal tokens enter a finite attention budget over time: compaction, structured note-taking, sub-agents with clean context. Without that scaffolding, your time-horizon is capped by window size, not by model capability.
+
+## The end of the course
+
+You came in wanting to build agents. You leave knowing the engine is a stochastic, stateless, finite-window next-token function, and that nearly everything else (the loop, memory, evals, HITL, security, this whole frontier) is scaffolding to make that function reliable across a horizon it was never built to hold.
+
+There's no neat bow to tie. The horizon keeps doubling, the graders keep being the ceiling, and the gap between "responds" and "responds correctly and stops on time" is where all the real engineering lives. The field will hand you a more capable model every few months. It will not hand you a system. That part is still yours to build, and the people who build it well will be the ones who measured the horizon instead of trusting the demo.
+
+Go measure where your agent falls over. Then put a gate there.

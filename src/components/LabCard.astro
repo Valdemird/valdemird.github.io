@@ -1,0 +1,161 @@
+---
+import { buildEntries, groupByCategory } from './lab/registry';
+
+interface Props {
+	lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const es = lang === 'es';
+
+const modules = import.meta.glob('./lab/demos/*.demo.astro', { eager: true });
+const entries = buildEntries(modules);
+const categories = groupByCategory(entries, lang).length;
+const stable = entries.filter((e) => e.meta.status !== 'experimental').length;
+
+const href = es ? '/es/lab/' : '/lab/';
+const title = es ? 'Cada componente, corriendo de verdad' : 'Every component, running for real';
+const description = es
+	? 'No son capturas: es la galería viva de cada pieza interactiva del blog —gráficas que recorres, diagramas que se reproducen, mini-simuladores— corriendo en su entorno real, cada una con la razón por la que existe.'
+	: 'Not screenshots: the live gallery of every interactive piece on the blog — charts you scrub, diagrams that play, small simulators — running in their real environment, each with the reason it was built.';
+
+const metrics: { value: string; label: string }[] = [
+	{ value: String(entries.length), label: es ? 'componentes' : 'components' },
+	{ value: String(categories), label: es ? 'categorías' : 'categories' },
+	{ value: String(stable), label: es ? 'estables' : 'stable' },
+	{ value: es ? '100%' : '100%', label: es ? 'en vivo' : 'live' },
+];
+---
+
+<a href={href} class="lab-card-feature animate-fade-in delay-1">
+	<div class="lab-inner">
+		<p class="eyebrow">{es ? 'Componentes vivos · lab' : 'Live components · lab'}</p>
+		<h2>{title}</h2>
+		<p class="desc">{description}</p>
+		<dl class="metrics" aria-label={es ? 'Cuántos componentes contiene' : 'How many components it contains'}>
+			{metrics.map((m) => (
+				<div class="metric">
+					<dt>{m.value}</dt>
+					<dd>{m.label}</dd>
+				</div>
+			))}
+		</dl>
+		<span class="read-arrow">
+			{es ? 'Abrir el lab' : 'Open the lab'}
+			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<line x1="5" y1="12" x2="19" y2="12"></line>
+				<polyline points="12 5 19 12 12 19"></polyline>
+			</svg>
+		</span>
+	</div>
+</a>
+
+<style>
+	.lab-card-feature {
+		position: relative;
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+		/* Tinted wash marks this as a special block — no left accent bar. */
+		background: oklch(from var(--color-accent) l c h / 0.045);
+		margin-bottom: 3rem;
+		transition: box-shadow var(--duration-normal) var(--ease-smooth),
+			transform var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+
+	.lab-card-feature:hover {
+		box-shadow: var(--shadow-lg);
+		transform: translateY(-3px);
+		border-color: var(--color-accent);
+	}
+
+	.lab-inner {
+		padding: 2rem 2.5rem;
+	}
+
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 0.9rem;
+	}
+
+	.lab-inner h2 {
+		font-size: clamp(1.5rem, 3vw, 2rem);
+		margin: 0 0 0.55em;
+		line-height: 1.2;
+		letter-spacing: -0.015em;
+	}
+
+	.desc {
+		font-size: 1.05rem;
+		color: var(--color-text-secondary);
+		line-height: 1.65;
+		margin: 0 0 1.6em;
+		max-width: 62ch;
+	}
+
+	.metrics {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.6rem 2.2rem;
+		margin: 0 0 1.6em;
+		padding: 1.1rem 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.metric dt {
+		font-family: var(--font-mono);
+		font-size: 1.35rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+	}
+
+	.metric dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
+
+	.read-arrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--color-accent);
+	}
+
+	.read-arrow svg {
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+
+	.lab-card-feature:hover .read-arrow svg {
+		transform: translateX(4px);
+	}
+
+	@media (max-width: 640px) {
+		.lab-inner { padding: 1.5rem; }
+		.metrics { gap: 1.1rem 1.6rem; }
+		.metric dt { font-size: 1.15rem; }
+	}
+</style>

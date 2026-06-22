@@ -1,0 +1,480 @@
+---
+import { getVideosForModule, type Lang } from '../../lib/learn-videos';
+
+interface Props {
+	slug: string;
+	lang: Lang;
+}
+
+const { slug, lang } = Astro.props;
+const es = lang === 'es';
+const videos = getVideosForModule(slug);
+
+const tierLabel: Record<string, { en: string; es: string }> = {
+	essential: { en: 'Essential watch', es: 'Imprescindible' },
+	recommended: { en: 'Recommended', es: 'Recomendado' },
+	optional: { en: 'Optional', es: 'Opcional' },
+};
+
+// Friendly host name for non-YouTube sources (rendered as a link-out card).
+function hostLabel(url: string): string {
+	try {
+		const h = new URL(url).hostname.replace(/^www\./, '');
+		if (h.includes('media.ccc.de')) return 'media.ccc.de';
+		if (h.includes('infoq.com')) return 'InfoQ';
+		return h;
+	} catch {
+		return 'video';
+	}
+}
+---
+
+{videos.length > 0 && (
+	<section class="learn-videos" aria-label={es ? 'Videos de referencia' : 'Reference videos'}>
+		<p class="lv-eyebrow">{es ? 'Míralo de quienes lo construyen' : 'Watch the people building it'}</p>
+		<ul class="lv-list">
+			{videos.map((v) => (
+				<li class="lv-card">
+					<div class="lv-media">
+						{v.youtubeId ? (
+							<button
+								type="button"
+								class="lv-facade"
+								data-yt={v.youtubeId}
+								aria-label={`${es ? 'Reproducir' : 'Play'}: ${v.title}`}
+								style={`background-image:url(https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg)`}
+							>
+								<span class="lv-play" aria-hidden="true">
+									<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+								</span>
+							</button>
+						) : (
+							<a class="lv-extlink" href={v.url} target="_blank" rel="noopener noreferrer" aria-label={`${es ? 'Ver en' : 'Watch on'} ${hostLabel(v.url)}: ${v.title}`}>
+								<span class="lv-play" aria-hidden="true">
+									<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+								</span>
+								<span class="lv-host">{hostLabel(v.url)}</span>
+							</a>
+						)}
+					</div>
+
+					<div class="lv-body">
+						<p class="lv-tier">{tierLabel[v.tier]?.[lang] ?? v.tier}</p>
+						<h3 class="lv-title">
+							<a href={v.url} target="_blank" rel="noopener noreferrer">{v.title}</a>
+						</h3>
+						<p class="lv-author">{v.author}</p>
+						<p class="lv-why">{v.why[lang]}</p>
+
+						<details class="lv-relevance">
+							<summary>
+								<span class="lv-rel-q">{es ? '¿Por qué es relevante?' : 'Why is this relevant?'}</span>
+								<svg class="lv-chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+							</summary>
+							<ul class="lv-reasons">
+								{v.reasons[lang].map((r) => <li>{r}</li>)}
+							</ul>
+						</details>
+					</div>
+				</li>
+			))}
+		</ul>
+
+		<dialog class="lv-modal" aria-label={es ? 'Reproductor de video' : 'Video player'}>
+			<button type="button" class="lv-modal-close" aria-label={es ? 'Cerrar' : 'Close'}>
+				<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+			</button>
+			<div class="lv-modal-frame"></div>
+		</dialog>
+	</section>
+)}
+
+<script>
+	// Click-to-load YouTube in a modal overlay: nothing contacts YouTube until the
+	// reader clicks play (privacy + performance), and playback happens in a
+	// centered lightbox over the page. Uses youtube-nocookie + native <dialog> for
+	// ESC, focus handling, and backdrop. Re-inits on Astro view transitions.
+	function initLearnVideos() {
+		const modal = document.querySelector<HTMLDialogElement>('.lv-modal');
+		if (!modal) return;
+		const frame = modal.querySelector<HTMLElement>('.lv-modal-frame');
+		const closeBtn = modal.querySelector<HTMLButtonElement>('.lv-modal-close');
+		if (!frame || !closeBtn) return;
+
+		const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+		let originBtn: HTMLElement | null = null;
+		let closing = false;
+
+		function makePoster(btn: HTMLElement | null) {
+			const poster = document.createElement('div');
+			poster.className = 'lv-poster';
+			if (btn) poster.style.backgroundImage = getComputedStyle(btn).backgroundImage;
+			return poster;
+		}
+
+		function makeIframe(id: string, label: string) {
+			const iframe = document.createElement('iframe');
+			iframe.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
+			iframe.title = label || 'YouTube video';
+			iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+			iframe.allowFullscreen = true;
+			return iframe;
+		}
+
+		// FLIP: build the transform that maps the modal frame onto the thumbnail
+		// rect, so we can grow out of it (and shrink back into it on close).
+		function flipFromOrigin() {
+			if (!originBtn) return null;
+			const first = originBtn.getBoundingClientRect();
+			const last = frame!.getBoundingClientRect();
+			if (!last.width || !last.height) return null;
+			return `translate(${first.left - last.left}px, ${first.top - last.top}px) scale(${first.width / last.width}, ${first.height / last.height})`;
+		}
+
+		function openVideo(btn: HTMLElement, id: string, label: string) {
+			originBtn = btn;
+			closing = false;
+			frame!.innerHTML = '';
+			// Load the player immediately (underneath) so it's ready by the time the
+			// grow finishes; keep the thumbnail as a poster on top until then.
+			const iframe = makeIframe(id, label);
+			const poster = makePoster(btn);
+			frame!.append(iframe, poster);
+			if (typeof modal!.showModal === 'function') modal!.showModal();
+			else modal!.setAttribute('open', '');
+			document.body.style.overflow = 'hidden';
+
+			if (reduceMotion) {
+				poster.remove();
+				return;
+			}
+			const from = flipFromOrigin();
+			if (!from) {
+				poster.remove();
+				return;
+			}
+			const anim = frame!.animate(
+				[{ transform: from }, { transform: 'translate(0, 0) scale(1, 1)' }],
+				{ duration: 360, easing: EASE },
+			);
+			// Reveal the video only once the grow AND the iframe have settled, so the
+			// crossfade lands on a painted player rather than a black flash.
+			const iframeReady = new Promise<void>((resolve) => {
+				iframe.addEventListener('load', () => resolve(), { once: true });
+				setTimeout(resolve, 1200); // fallback so it never hangs
+			});
+			Promise.all([anim.finished, iframeReady])
+				.then(() => {
+					if (closing || !poster.isConnected) return;
+					poster.classList.add('is-hidden');
+					poster.addEventListener('transitionend', () => poster.remove(), { once: true });
+				})
+				.catch(() => poster.remove());
+		}
+
+		function requestClose() {
+			if (closing) return;
+			const to = reduceMotion ? null : flipFromOrigin();
+			if (!to) {
+				modal!.close();
+				return;
+			}
+			closing = true;
+			modal!.classList.add('is-closing');
+			// Swap the player for the thumbnail so we shrink the image cleanly.
+			frame!.innerHTML = '';
+			frame!.appendChild(makePoster(originBtn));
+			const anim = frame!.animate(
+				[{ transform: 'translate(0, 0) scale(1, 1)' }, { transform: to }],
+				{ duration: 300, easing: EASE },
+			);
+			anim.finished.then(() => modal!.close()).catch(() => modal!.close());
+		}
+
+		// Reset state once the dialog actually closes (stops audio, restores scroll).
+		modal.addEventListener('close', () => {
+			frame.innerHTML = '';
+			document.body.style.overflow = '';
+			modal.classList.remove('is-closing');
+			closing = false;
+		});
+		closeBtn.addEventListener('click', requestClose);
+		// Click outside the video (on the backdrop) closes.
+		modal.addEventListener('click', (e) => {
+			if (e.target === modal) requestClose();
+		});
+		// Intercept ESC so it plays the shrink-back animation too.
+		modal.addEventListener('cancel', (e) => {
+			e.preventDefault();
+			requestClose();
+		});
+
+		document.querySelectorAll<HTMLButtonElement>('.lv-facade').forEach((btn) => {
+			if (btn.dataset.bound) return;
+			btn.dataset.bound = '1';
+			btn.addEventListener('click', () => {
+				const id = btn.dataset.yt;
+				if (!id) return;
+				openVideo(btn, id, btn.getAttribute('aria-label') || '');
+			});
+		});
+	}
+	initLearnVideos();
+	document.addEventListener('astro:after-swap', initLearnVideos);
+</script>
+
+<style>
+	.learn-videos {
+		margin-top: var(--space-2xl);
+		padding-top: var(--space-lg);
+		border-top: 1px solid var(--color-border);
+	}
+	.lv-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 var(--space-md);
+	}
+
+	.lv-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		gap: var(--space-md);
+	}
+
+	.lv-card {
+		display: grid;
+		grid-template-columns: 200px minmax(0, 1fr);
+		gap: var(--space-md) var(--space-lg);
+		align-items: start;
+		padding: var(--space-md);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: oklch(from var(--color-accent) l c h / 0.03);
+		transition: border-color 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring);
+	}
+	.lv-card:hover { border-color: var(--color-accent); box-shadow: var(--shadow-sm); }
+
+	.lv-media { position: relative; }
+	.lv-facade,
+	.lv-extlink {
+		display: block;
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		border: 0;
+		border-radius: var(--radius-sm);
+		overflow: hidden;
+	}
+	.lv-facade {
+		position: relative;
+		cursor: pointer;
+		background-size: cover;
+		background-position: center;
+		background-color: var(--color-surface);
+		padding: 0;
+	}
+	.lv-facade::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: linear-gradient(180deg, transparent 40%, oklch(0% 0 0 / 0.35));
+		transition: background 0.2s var(--ease-smooth);
+	}
+	.lv-facade:hover::after { background: oklch(0% 0 0 / 0.2); }
+
+	.lv-extlink {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		text-decoration: none;
+		color: var(--color-text-secondary);
+		background: var(--color-surface);
+		border: 1px solid var(--color-border);
+	}
+	.lv-host {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+	}
+
+	.lv-play {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		z-index: 1;
+		display: grid;
+		place-items: center;
+		width: 3rem;
+		height: 3rem;
+		border-radius: 50%;
+		background: oklch(from var(--color-accent) l c h / 0.92);
+		color: #fff;
+		padding-left: 2px;
+		transition: transform 0.2s var(--ease-spring);
+	}
+	.lv-extlink .lv-play { position: static; transform: none; }
+	.lv-facade:hover .lv-play { transform: translate(-50%, -50%) scale(1.08); }
+
+	.lv-tier {
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-muted);
+		margin: 0 0 0.4em;
+	}
+	.lv-title {
+		font-family: var(--font-serif);
+		font-size: 1.08rem;
+		line-height: 1.3;
+		margin: 0 0 0.25em;
+	}
+	.lv-title a { color: var(--color-text); text-decoration: none; }
+	.lv-title a:hover { color: var(--color-accent); }
+	.lv-author {
+		font-size: 0.82rem;
+		color: var(--color-text-secondary);
+		margin: 0 0 0.7em;
+	}
+	.lv-why {
+		font-size: 0.95rem;
+		line-height: 1.55;
+		color: var(--color-text-secondary);
+		margin: 0 0 0.7em;
+	}
+
+	.lv-relevance { margin-top: 0.2em; }
+	.lv-relevance summary {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35em;
+		cursor: pointer;
+		list-style: none;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--color-accent);
+		width: fit-content;
+	}
+	.lv-relevance summary::-webkit-details-marker { display: none; }
+	.lv-chev { transition: transform 0.2s var(--ease-spring); }
+	.lv-relevance[open] .lv-chev { transform: rotate(90deg); }
+	.lv-reasons {
+		margin: 0.7em 0 0;
+		padding: 0 0 0 1.1em;
+		font-size: 0.9rem;
+		line-height: 1.55;
+		color: var(--color-text-secondary);
+	}
+	.lv-reasons li { margin: 0 0 0.4em; }
+
+	/* Video modal / lightbox */
+	.lv-modal {
+		max-width: min(960px, 92vw);
+		width: 100%;
+		padding: 0;
+		border: 0;
+		background: transparent;
+		overflow: visible;
+		color: #fff;
+	}
+	.lv-modal::backdrop {
+		background: oklch(0% 0 0 / 0.72);
+		backdrop-filter: blur(4px);
+	}
+	.lv-modal[open]::backdrop {
+		animation: lv-backdrop-in 0.36s ease forwards;
+	}
+	.lv-modal.is-closing::backdrop {
+		animation: lv-backdrop-out 0.3s ease forwards;
+	}
+	.lv-modal-frame {
+		position: relative;
+		width: 100%;
+		aspect-ratio: 16 / 9;
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		background: #000;
+		box-shadow: var(--shadow-lg, 0 24px 60px oklch(0% 0 0 / 0.5));
+		transform-origin: top left;
+		will-change: transform;
+	}
+	.lv-modal-frame :global(iframe) {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		border: 0;
+	}
+	.lv-modal-frame :global(.lv-poster) {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		background: center / cover no-repeat;
+		opacity: 1;
+		transition: opacity 0.3s ease;
+	}
+	.lv-modal-frame :global(.lv-poster.is-hidden) {
+		opacity: 0;
+	}
+	.lv-modal-close {
+		position: absolute;
+		top: -2.85rem;
+		right: 0;
+		display: grid;
+		place-items: center;
+		width: 2.25rem;
+		height: 2.25rem;
+		padding: 0;
+		border: 1px solid oklch(100% 0 0 / 0.25);
+		border-radius: 50%;
+		background: oklch(0% 0 0 / 0.4);
+		color: #fff;
+		cursor: pointer;
+		transition: background 0.2s var(--ease-spring), border-color 0.2s var(--ease-spring), transform 0.2s var(--ease-spring);
+	}
+	.lv-modal-close:hover {
+		background: oklch(0% 0 0 / 0.65);
+		border-color: oklch(100% 0 0 / 0.5);
+		transform: scale(1.08);
+	}
+	.lv-modal[open] .lv-modal-close {
+		animation: lv-fade-in 0.4s ease both;
+	}
+	.lv-modal.is-closing .lv-modal-close {
+		opacity: 0;
+		transition: opacity 0.2s ease;
+	}
+	@keyframes lv-backdrop-in {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+	@keyframes lv-backdrop-out {
+		from { opacity: 1; }
+		to { opacity: 0; }
+	}
+	@keyframes lv-fade-in {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.lv-modal[open]::backdrop,
+		.lv-modal.is-closing::backdrop,
+		.lv-modal[open] .lv-modal-close { animation: none; }
+	}
+	@media (max-width: 620px) {
+		.lv-card { grid-template-columns: minmax(0, 1fr); }
+		.lv-media { max-width: 320px; }
+		.lv-modal-close { top: -2.6rem; }
+	}
+</style>

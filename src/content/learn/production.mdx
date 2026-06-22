@@ -1,0 +1,182 @@
+---
+title: "Production agents are durable distributed workflows"
+description: "A demo agent is a function call. A production agent is a long-running, non-deterministic distributed workflow where every step has costly and irreversible side effects. Durability, idempotency, and a database as source of truth are what make it operable."
+phase: 7
+order: 13
+tier: produccion
+durability: duradero
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "A production agent isn't 'more code around the LLM'. It's a long-running distributed workflow whose steps are slow, expensive, and probabilistic."
+  - "Durable execution (persist state, resume after a crash) plus idempotency is what keeps a retry from re-charging tokens and double-executing writes."
+  - "Reliability composes multiplicatively: a 20-step agent at 98% per step is ~67% reliable. The database, not the agent's claim, is the source of truth."
+sources:
+  - { grade: "A", title: "Building Effective Agents", author: "Anthropic Engineering", year: 2024, url: "https://www.anthropic.com/research/building-effective-agents" }
+  - { grade: "A", title: "Demystifying evals for AI agents", author: "Anthropic Engineering", year: 2026, url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents" }
+  - { grade: "A", title: "Code execution with MCP: building more efficient AI agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/code-execution-with-mcp" }
+  - { grade: "B", title: "Durable Execution: The Key to Harnessing AI Agents in Production", author: "Inngest", year: 2025, url: "https://www.inngest.com/blog/durable-execution-key-to-harnessing-ai-agents" }
+  - { grade: "B", title: "Architecting Resilient LLM Agents: A Guide to Secure Plan-then-Execute Implementations", author: "Del Rosario et al.", year: 2025, url: "https://arxiv.org/pdf/2509.08646" }
+  - { grade: "C", title: "ALAS: Transactional and Dynamic Multi-Agent LLM Planning", author: "Geng & Chang, Stanford", year: 2025, url: "https://arxiv.org/pdf/2511.03094" }
+  - { grade: "C", title: "Don't Break the Cache: An Evaluation of Prompt Caching for Long-Horizon Agentic Tasks", author: "PwC (arXiv 2601.06007)", year: 2026, url: "https://arxiv.org/pdf/2601.06007" }
+  - { grade: "D", title: "Public postmortem: multi-agent pipeline burned ~$47k in 11 days (blog, anecdotal)", author: "DEV.to / Medium", year: 2025, url: "https://dev.to" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+
+The demo worked. You typed a request, the agent looped through three tools, returned a clean answer, and you shipped it. Then it met real traffic and fell over. This is the gap nobody warns you about: the move from demo to production isn't writing more code around the model. It's recognizing that the thing you built is a distributed workflow, long-running and non-deterministic, where every step has effects that cost money (tokens) and effects you can't take back (business writes).
+
+Hold that frame. In the [loop module](/learn/agentic-systems/agent-loop) the agent's control flow lived in code: call the model, run the tool it asked for, feed the result back, repeat. That loop is correct. The problem is that the loop runs on a machine that crashes, behind a queue that retries, against a model that returns something different every time. The engineering of production is making that loop survive all three.
+
+<Callout type="important" title="The one mental model">
+A production agent is a **durable distributed workflow**. Slow (the model is the bottleneck), expensive (every turn spends tokens), and probabilistic (the same input gives a different trajectory). Once you accept that, the whole field of distributed systems shows up to help you, and the whole field of distributed systems' failures shows up to bite you.
+</Callout>
+
+## Reliability composes, and the math is brutal
+
+Start with the number that reframes everything. Chain steps and their reliabilities multiply. An agent of 20 steps where each step works 98% of the time is `0.98^20 ≈ 0.67`. Two thirds. Your "98% reliable" component shipped a coin-flip-and-a-bit.
+
+This is why the demo lies. In a demo you run the happy path once and it's green. The metric that captures that is pass@k: at least one success in k tries, which trends toward 100% and tells you nothing. What the user actually lives is pass^k: all k tries succeed. At 75% per attempt, pass^3 is `0.75^3 ≈ 0.42`. You design customer-facing agents for pass^k, not for the cherry-picked demo run.
+
+<Callout type="note" title="pass@k flatters, pass^k reports">
+pass@k answers "could the agent ever do this?" pass^k answers "will it do this every time a user asks?" The first is a capability question, useful in research. The second is a reliability question, the only one production cares about. If your evals report pass@k, you are measuring the demo.
+</Callout>
+
+The consequence: every step must be cheap to re-run and safe to re-run. Cheap, so a retry doesn't re-spend tokens. Safe, so a retry doesn't double-book the room. Those two requirements are durability and idempotency, and they're the spine of the rest of this module.
+
+## Separate the control plane from the execution plane
+
+The first structural decision, and the one beginners get wrong, is *where the LLM call happens*. The instinct is to call it inside the HTTP handler: request comes in, await the model, return the answer. That fails in four ways at once. The model is slower than any sane HTTP timeout. The client retries on timeout and you get duplicate turns. You can't drain in-flight work to deploy. And the user's latency is now welded to the model's.
+
+The fix is a clean split. The edge (stateless, fast) only validates, persists, and enqueues. The worker (durable, slow) does the model call and the tools.
+
+<MermaidDiagram title="The edge never calls the model" chart={`
+sequenceDiagram
+  participant U as Client
+  participant E as Edge (stateless)
+  participant DB as Database (source of truth)
+  participant Q as Queue
+  participant W as Worker (durable)
+  participant M as Model + Tools
+  U->>E: POST message
+  E->>DB: persist turn
+  E->>Q: enqueue job
+  E-->>U: 202 Accepted (stream opens)
+  Q->>W: deliver job
+  W->>DB: load state
+  loop agent loop
+    W->>M: call model / run tool
+    W->>DB: checkpoint step result
+  end
+  W-->>U: stream tokens
+`} />
+
+Now durability, backpressure, and scaling all live in the worker tier, decoupled from the request. The user gets an instant acknowledgment; the slow part happens behind the queue where it can be retried, drained, and observed.
+
+## Durable execution: persist the state, resume from the checkpoint
+
+Here's the pattern that makes long-running agents tractable. It's an industry pattern, embodied by durable workflow engines (Temporal, Inngest, Restate, DBOS), not anyone's proprietary trick. The idea: the engine persists the result of every completed step. When the worker crashes mid-workflow, on restart it doesn't re-run from zero. It replays the already-completed steps from their stored results and resumes from the last checkpoint.
+
+<CodeBlock filename="worker.ts" lang="typescript">
+```ts
+// Each step.run is memoized. On a crash + retry, the engine
+// reads completed steps from storage instead of re-executing them.
+async function handleTurn({ event, step }) {
+  // Replayed from cache on retry — the model is NOT called again.
+  const plan = await step.run("plan", () =>
+    callModel(event.data.history)
+  );
+
+  // Each tool call is its own durable checkpoint.
+  for (const call of plan.toolCalls) {
+    await step.run(\`tool:\${call.id}\`, () => runTool(call));
+  }
+
+  // Suspends the worker for hours without holding resources.
+  const approval = await step.waitForEvent("approval", {
+    timeout: "24h",
+  });
+
+  return step.run("finalize", () => callModel(/* ... */));
+}
+```
+</CodeBlock>
+
+Why this matters more for agents than for ordinary jobs: re-running a completed step doesn't just waste a few CPU cycles. Re-running the model step costs tokens *and* returns a different answer, because the model is probabilistic. Memoizing the step result is the only way a retry stays both cheap and consistent.
+
+<Callout type="warning" title="'Retries with backoff' is not a reliability strategy on its own">
+Retry-on-failure is necessary and nowhere near sufficient. Without memoization and idempotency, every retry re-charges tokens and re-executes writes. A naive retry loop on a 20-step agent is a cost bomb and a double-booking bomb at the same time. Durability is what makes retries safe.
+</Callout>
+
+## Idempotency: because retries plus non-determinism mean steps run more than once
+
+Durable execution memoizes the *model* steps. But the moment a tool reaches outside your system, charges a card, books a reservation, sends an email, memoization isn't enough, because the side effect already happened in the outside world. You need the external operation itself to be idempotent: running it twice has the same effect as running it once.
+
+The reason you can't avoid this: in a distributed system, delivery is at-least-once. A worker can finish a write, then die before recording that it finished; the queue redelivers; the step runs again. Add the model's non-determinism on top and the same logical step can produce two different attempts. So you derive a deterministic idempotency key from `(workflow_id, step_id)` and hand it to every side-effecting call. The payment processor, the booking API, your own writes all dedupe on that key.
+
+<Callout type="tip" title="Make the database the source of truth, not the agent">
+Never trust the agent's claim that it did something. The agent can say "I booked the room" without having booked it. Verify the real state: query the database. This is also how you grade agent evals correctly, you check the row that should exist, not the sentence the model emitted.
+</Callout>
+
+## The database as source of truth, and the dual-write that bites
+
+The edge does two things on every message: persist the turn and enqueue the job. The trap is doing them as two separate operations. Commit to Postgres, then push to the queue. If the process dies between them, you get a phantom turn (persisted, never executed) or a lost one (executed against state that didn't commit). This is the dual-write problem, and it's silent until it isn't.
+
+The fix is the transactional outbox: write the "enqueue this job" event into an outbox table inside the *same* database transaction as the state change. A separate relay reads the outbox and publishes to the queue. Now the persist-and-enqueue is atomic, because it's one commit.
+
+<Collapsible title="Why not just enqueue first, then persist?">
+Flipping the order doesn't fix it, it moves the failure window. Enqueue then persist, and a crash in between gives you a job that runs against state the database never recorded. There's no ordering of two independent writes that's atomic. The outbox works because it collapses both into a single transaction, and the relay's job is at-least-once delivery, which idempotency already handles downstream. If you're on a queue tightly coupled to Postgres, some engines give you this transactionally out of the box.
+</Collapsible>
+
+## Human-in-the-loop is a durable pause, not an `if` in memory
+
+A "confirm this action" approval can take hours. A human is asleep, in a meeting, gone for the weekend. Modeling that as a blocking wait in a live worker is how you exhaust your worker pool. The right model is a durable suspend: persist the prepared action, release the worker, and wait for an external signal. When the approval arrives, the engine resumes the workflow from exactly where it paused. No worker held, no tokens spent while waiting.
+
+One subtle requirement people miss: persist the *normalized input* at the moment you ask for approval. The user approves what they were shown. If, between approval and execution, the agent regenerates the action, you get drift, the user confirmed booking room A and the agent books room B. Freeze the action at approval time so executed equals shown.
+
+## Cost and latency budgets belong in the infrastructure
+
+Runaway loops are real incidents. One public postmortem (a multi-agent pipeline, blog-reported and anecdotal, not an audited corporate report) describes ~$47k burned over 11 days because two agents ping-ponged with no spend cap and no kill switch. [D] Treat the exact figure as illustrative, but the failure mode is real and common.
+
+The lesson isn't "add a limit to the system prompt." A prompt-level limit is a suggestion the agent can ignore or reason its way around. The hard limits, max iterations per turn, token budget per tenant per day, a circuit breaker that trips when spend velocity spikes above the moving average, live in infrastructure, outside the agent's control, checked *before* the model call.
+
+<Tabs labels={["Limit in the prompt (wrong)", "Limit in infra (right)"]}>
+<TabPanel>
+
+```text
+System prompt:
+"Do not use more than 10 tool calls.
+Stop if the task seems too expensive."
+```
+
+The agent can rationalize past this. "This task is important, so 12 calls is justified." There's no enforcement. When it loops, nothing stops it but your billing alert, which arrives after the money is gone.
+
+</TabPanel>
+<TabPanel>
+
+```typescript
+// Checked before every model call, agent can't bypass it.
+if (turn.iterations >= MAX_ITERS) throw new IterationCapExceeded();
+if (await tenantSpendToday(tenant) >= DAILY_BUDGET) throw new BudgetExceeded();
+if (runCost > MOVING_AVG * SPIKE_FACTOR) breaker.trip();
+```
+
+The agent has no path around this. The cap is enforced by the harness, not requested of the model.
+
+</TabPanel>
+</Tabs>
+
+Billing alerts are not a cost control. They tell you about money already spent. The control is an active breaker that refuses the next call.
+
+## What the consensus gets wrong
+
+A few patterns are overrated in this space. WebSocket as the default for streaming responses, most token streaming is one-directional and SSE with `Last-Event-ID` reconnection is simpler, cheaper, and resumes after a dropped connection. WebSocket earns its complexity only when you need real bidirectional interaction, like interrupting a turn mid-flight. Heavy event-sourcing or Kafka in an early-stage agent SaaS, Postgres plus an outbox plus a solid queue covers it until you genuinely have fan-out at scale.
+
+And one tension that's underrated: prompt caching versus context compaction. A stable prefix gets cached and served far cheaper. But compacting the conversation to manage memory edits earlier turns, which invalidates the cache and spikes cost. They pull against each other. You don't get to optimize both blindly; you balance them, and you measure cache hit-rate as a first-class cost metric.
+
+There's plenty here I've simplified. When exactly-once is "effective" rather than literal, how sagas and compensation handle multi-step rollback, what graceful queue drain looks like with stateful workers. Each is its own rabbit hole. The frame to keep: the agent is the easy part. The workflow around it is the system.

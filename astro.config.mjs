@@ -1,7 +1,31 @@
 import { defineConfig } from 'astro/config';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
+import remarkGfm from 'remark-gfm';
+import { visit } from 'unist-util-visit';
 import { readdirSync, readFileSync } from 'node:fs';
+
+// Wrap every <table> in a horizontally-scrollable div so wide tables scroll
+// instead of being clipped by the page-level `overflow-x: hidden` on mobile.
+function rehypeWrapTables() {
+	return (tree) => {
+		visit(tree, 'element', (node, index, parent) => {
+			if (
+				node.tagName === 'table' &&
+				parent &&
+				index !== null &&
+				!(parent.tagName === 'div' && parent.properties?.className?.includes?.('table-scroll'))
+			) {
+				parent.children[index] = {
+					type: 'element',
+					tagName: 'div',
+					properties: { className: ['table-scroll'] },
+					children: [node],
+				};
+			}
+		});
+	};
+}
 import { fileURLToPath } from 'node:url';
 
 // Build a URL -> lastmod (ISO date) map from real blog frontmatter so the
@@ -62,6 +86,10 @@ export default defineConfig({
 		},
 	},
 	markdown: {
+		// GFM enables markdown tables (and strikethrough/autolinks). The MDX
+		// integration extends this config, so tables in .mdx render too.
+		remarkPlugins: [remarkGfm],
+		rehypePlugins: [rehypeWrapTables],
 		shikiConfig: {
 			themes: {
 				light: 'github-light',

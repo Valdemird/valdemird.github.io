@@ -1,0 +1,324 @@
+---
+import BaseHead from '../BaseHead.astro';
+import Header from '../Header.astro';
+import Footer from '../Footer.astro';
+import { getLearnModules, groupByPhase, getLearnStats, moduleHref, courseHomeHref, baseSlug, TIER_LABEL, type Lang } from '../../lib/learn';
+import { GLOSSARY, glossaryHref } from '../../lib/learn-glossary';
+import { UI_STRINGS, PERSON, PERSON_REF } from '../../consts';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const es = lang === 'es';
+const modules = await getLearnModules(lang);
+const phases = groupByPhase(modules);
+const stats = await getLearnStats(lang);
+
+const readLabel =
+	stats.readingMinutes >= 60 ? `${Math.round(stats.readingMinutes / 60)}h` : `${stats.readingMinutes} min`;
+const heroMetrics: { value: string; label: string }[] = [
+	{ value: String(stats.modules), label: es ? 'módulos' : 'modules' },
+	{ value: String(stats.phases), label: es ? 'fases' : 'phases' },
+	{ value: `~${Math.round(stats.words / 1000)}k`, label: es ? 'palabras' : 'words' },
+	{ value: `~${readLabel}`, label: es ? 'de lectura' : 'read' },
+	{ value: String(stats.sources), label: es ? 'fuentes' : 'sources' },
+];
+
+const title = es ? 'Aprende: ingeniería de sistemas agénticos' : 'Learn: engineering agentic systems';
+const description = es
+	? 'Un curso-wiki bilingüe para construir agentes de IA de verdad: del sustrato (qué es un LLM, qué es un agente) a la frontera. 16 módulos, cada afirmación con fuente y grado de credibilidad.'
+	: 'A bilingual course-wiki for building real AI agents: from the substrate (what an LLM is, what an agent is) to the frontier. 16 modules, every claim sourced and graded for credibility.';
+
+const path = courseHomeHref(lang);
+const alternates = [
+	{ hreflang: 'en', href: `https://valdemird.com${courseHomeHref('en')}` },
+	{ hreflang: 'es', href: `https://valdemird.com${courseHomeHref('es')}` },
+];
+
+const metaInsights: { en: string; es: string }[] = [
+	{
+		en: 'The whole field derives from three substrate properties. An LLM is stochastic, stateless, and runs on a finite window. Memory exists because it forgets; evals run pass^k because it is stochastic; context engineering exists because the window is finite. Learn the root and sixteen topics collapse into one tree.',
+		es: 'Todo el campo deriva de tres propiedades del sustrato. Un LLM es estocástico, stateless y corre sobre una ventana finita. La memoria existe porque olvida; los evals usan pass^k porque es estocástico; la ingeniería de contexto existe porque la ventana es finita. Aprendes la raíz y dieciséis temas se vuelven un solo árbol.',
+	},
+	{
+		en: 'Eval, reward, and grader are the same function wearing three hats. The verifiable function that scores a training rollout is the same one that grades your evals and shapes self-improvement. Master writing un-hackable verifiers and you master training, evaluation, and self-improvement at once.',
+		es: 'Eval, reward y grader son la misma función con tres sombreros. La función verificable que puntúa un rollout de entrenamiento es la misma que califica tus evals y guía la auto-mejora. Domina escribir verificadores no-hackeables y dominas entrenamiento, evaluación y auto-mejora a la vez.',
+	},
+	{
+		en: 'Security and human-in-the-loop are not a separate pillar. They fall straight out of compounding error and partial observability. Prompt injection has no clean fix, so the trust boundary has to live in deterministic code, not in the prompt.',
+		es: 'La seguridad y el human-in-the-loop no son un pilar aparte. Salen directos de la composición de error y la observabilidad parcial. La inyección de prompts no tiene cura limpia, así que la frontera de confianza vive en código determinista, no en el prompt.',
+	},
+	{
+		en: 'Memory is coupled to security more tightly than to context. The write-path is where untrusted input becomes trusted knowledge. A poisoned memory is a persistent, multi-session attack — strictly worse than a one-turn injection.',
+		es: 'La memoria está más acoplada a la seguridad que al contexto. El write-path es donde el input no confiable se vuelve conocimiento confiable. Una memoria envenenada es un ataque persistente multisesión, peor que una inyección de un turno.',
+	},
+	{
+		en: 'Teach reasoning after the loop and evals, not before. Chain-of-thought is not faithful to the internal computation, so it is no audit trail and no injection defense. That lesson only lands once you already understand graders and architectural defense.',
+		es: 'El razonamiento se enseña después del loop y los evals, no antes. El chain-of-thought no es fiel a la computación interna, así que no sirve de auditoría ni de defensa contra inyección. Esa lección solo cae cuando ya entiendes graders y defensa arquitectónica.',
+	},
+	{
+		en: 'The return is in five decisions, not sixteen pillars equally. Do I even need an agent. Does control flow live in code or get delegated to the model. Is reversibility the gate for human review. Did error analysis come before writing evals. Is the defense architectural or behavioral. These five carry most of the reliability ROI.',
+		es: 'El retorno está en cinco decisiones, no en dieciséis pilares por igual. ¿Necesito siquiera un agente? ¿El control de flujo vive en código o se delega al modelo? ¿Es la reversibilidad el gate del control humano? ¿Hubo error analysis antes de escribir evals? ¿La defensa es arquitectónica o conductual? Esas cinco concentran casi todo el ROI de fiabilidad.',
+	},
+	{
+		en: 'Start from the mental model and the raw API, not from a framework. Heavy agent frameworks hide the loop and the policy and quietly push you toward over-engineering. Understand the POMDP first and you can reason about any framework instead of being trapped in one.',
+		es: 'Empieza por el modelo mental y la API directa, no por un framework. Los frameworks pesados ocultan el loop y la política y te empujan a sobre-ingeniería. Entiende primero el POMDP y podrás razonar sobre cualquier framework en vez de quedar atrapado en uno.',
+	},
+	{
+		en: 'You learn security by breaking things, not by reading about them. A system whose weak spots you have exploited and then patched teaches the principle far better than a clean example that was never wrong.',
+		es: 'La seguridad se aprende rompiendo, no leyendo. Un sistema cuyos puntos débiles ya explotaste y luego reparaste enseña el principio mucho mejor que un ejemplo correcto que nunca estuvo mal.',
+	},
+	{
+		en: 'Retrieval, memory, and context are one triangle. Three ways to manage the finite belief state of the POMDP: retrieval loads knowledge on demand, memory persists state across turns, context curates what enters the window now. Traditional teaching fragments them into RAG, memory, and prompting silos.',
+		es: 'Recuperación, memoria y contexto son un solo triángulo. Tres formas de gestionar el belief state finito del POMDP: recuperación carga conocimiento bajo demanda, memoria persiste estado entre turnos, contexto cura qué entra en la ventana ahora. La enseñanza tradicional los fragmenta en silos de RAG, memoria y prompting.',
+	},
+];
+
+const courseJsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'Course',
+	name: title,
+	description,
+	inLanguage: lang,
+	provider: PERSON_REF,
+	author: PERSON,
+	url: `https://valdemird.com${path}`,
+	hasPart: modules.map((m) => ({
+		'@type': 'TechArticle',
+		name: m.data.title,
+		url: `https://valdemird.com${moduleHref(baseSlug(m.id), lang)}`,
+	})),
+};
+---
+
+<html lang={lang}>
+	<head>
+		<BaseHead title={title} description={description} lang={lang} alternates={alternates} jsonLd={courseJsonLd} />
+	</head>
+	<body>
+		<a class="skip-link" href="#main-content">{UI_STRINGS[lang].nav.skipToContent}</a>
+		<Header />
+		<main id="main-content">
+			<div class="wrap">
+				<header class="hero">
+					<p class="eyebrow">{es ? 'Deep dive · curso-wiki · bilingüe' : 'Deep dive · course-wiki · bilingual'}</p>
+					<h1>{es ? 'Cómo construir sistemas agénticos de verdad' : 'How to build agentic systems for real'}</h1>
+					<p class="lead">
+						{es
+							? 'Monté un pipeline multiagente que leyó el estado del arte de agentes de IA (2025–2026), lo verificó contra las fuentes primarias y lo organizó en 16 módulos. Esto es esa investigación, reescrita en mi voz y comprobada de nuevo. Ninguna afirmación aparece sin fuente y sin un grado de credibilidad honesto.'
+							: 'I ran a multi-agent pipeline that read the state of the art on AI agents (2025–2026), checked it against the primary sources, and organized it into 16 modules. This is that research, rewritten in my voice and fact-checked again. No claim appears without a source and an honest credibility grade.'}
+					</p>
+					<dl class="hero-metrics" aria-label={es ? 'Cuánta información contiene' : 'How much it contains'}>
+						{heroMetrics.map((m) => (
+							<div class="hm">
+								<dt>{m.value}</dt>
+								<dd>{m.label}</dd>
+							</div>
+						))}
+					</dl>
+					<div class="grades">
+						<span class="g g-a">A</span><span class="gl">{es ? 'primaria alta' : 'high-confidence primary'}</span>
+						<span class="g g-b">B</span><span class="gl">{es ? 'sólida' : 'solid'}</span>
+						<span class="g g-c">C</span><span class="gl">{es ? 'emergente' : 'emerging'}</span>
+						<span class="g g-d">D</span><span class="gl">{es ? 'inferencia, sin verificar' : 'inference, unverified'}</span>
+					</div>
+					<p class="hero-resources">
+						<a href={glossaryHref(lang)}>{es ? 'Glosario' : 'Glossary'} · {GLOSSARY.length} {es ? 'términos' : 'terms'} →</a>
+					</p>
+				</header>
+
+				<section class="path" aria-label={es ? 'Ruta de aprendizaje' : 'Learning path'}>
+					{phases.map((p) => (
+						<div class="phase-block">
+							<div class="phase-head">
+								<span class="pn">{String(p.phase).padStart(2, '0')}</span>
+								<h2>{p.title[lang]}</h2>
+							</div>
+							<ul class="mods">
+								{p.modules.map((m) => (
+									<li>
+										<a href={moduleHref(baseSlug(m.id), lang)}>
+											<span class="m-title">{m.data.title}</span>
+											<span class="m-desc">{m.data.description}</span>
+											<span class="m-tier">{TIER_LABEL[m.data.tier][lang]}</span>
+										</a>
+									</li>
+								))}
+							</ul>
+						</div>
+					))}
+				</section>
+
+				<section class="insights">
+					<p class="eyebrow">{es ? 'Nueve ideas que reordenan el campo' : 'Nine ideas that reorganize the field'}</p>
+					<p class="insights-intro">
+						{es
+							? 'Si solo te llevas algo de aquí, que sea esto. Son las conexiones que el orden tradicional (empezar por frameworks o por "cómo llamar una tool") esconde.'
+							: 'If you take only one thing from here, take these. They are the connections the traditional order (start with frameworks, or with "how to call a tool") hides.'}
+					</p>
+					<ol class="insight-list">
+						{metaInsights.map((mi, i) => (
+							<li>
+								<span class="i-num">{String(i + 1).padStart(2, '0')}</span>
+								<p>{mi[lang]}</p>
+							</li>
+						))}
+					</ol>
+				</section>
+
+				<p class="start-cta">
+					{es ? 'Empieza por el principio: ' : 'Start at the beginning: '}
+					{modules[0] && <a href={moduleHref(baseSlug(modules[0].id), lang)}>{modules[0].data.title} →</a>}
+				</p>
+			</div>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<style>
+	main { padding-top: var(--space-xl); }
+	.wrap { max-width: var(--wide-width); margin: 0 auto; padding: var(--space-lg); }
+
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.16em;
+		color: var(--color-accent);
+		margin: 0 0 0.6em;
+	}
+
+	.hero { max-width: var(--content-width); margin: 0 auto var(--space-2xl); text-align: center; }
+	.hero h1 {
+		font-size: clamp(2.2rem, 5.5vw, 3.2rem);
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+		margin: 0 0 0.4em;
+	}
+	.hero .lead {
+		font-size: 1.18rem;
+		line-height: 1.65;
+		color: var(--color-text-secondary);
+		margin: 0 auto;
+		max-width: 60ch;
+	}
+	.hero .eyebrow { text-align: center; }
+	.hero-resources {
+		margin: var(--space-md) 0 0;
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+	}
+	.hero-resources a { color: var(--color-accent); text-decoration: none; }
+	.hero-resources a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+	.hero-metrics {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 1.4rem 2.2rem;
+		margin: var(--space-lg) auto 0;
+		padding: 1.1rem 0;
+		max-width: 52ch;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+	.hm { display: flex; flex-direction: column; gap: 0.15rem; }
+	.hm dt {
+		font-family: var(--font-mono);
+		font-size: 1.4rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+	}
+	.hm dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
+
+	.grades {
+		display: inline-flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		align-items: center;
+		gap: 0.4em 0.5em;
+		margin-top: var(--space-lg);
+		font-size: 0.8rem;
+		color: var(--color-text-secondary);
+	}
+	.g {
+		display: inline-grid; place-items: center;
+		width: 1.5em; height: 1.5em;
+		border-radius: var(--radius-sm);
+		font-family: var(--font-mono); font-size: 0.72rem; font-weight: 700;
+		color: oklch(0.21 0.03 265);
+	}
+	.gl { margin-right: 0.7em; }
+	.g-a { background: oklch(0.74 0.13 150); }
+	.g-b { background: oklch(0.74 0.12 235); }
+	.g-c { background: oklch(0.80 0.13 75); }
+	.g-d { background: oklch(0.74 0.02 265); }
+
+	.path { display: grid; gap: var(--space-xl); }
+	.phase-block { }
+	.phase-head { display: flex; align-items: baseline; gap: 0.6em; margin-bottom: var(--space-md); }
+	.pn { font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; color: var(--color-accent); }
+	.phase-head h2 { font-family: var(--font-serif); font-size: 1.4rem; margin: 0; letter-spacing: -0.01em; }
+
+	.mods {
+		list-style: none; margin: 0; padding: 0;
+		display: grid; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+		gap: var(--space-md);
+	}
+	.mods a {
+		display: flex; flex-direction: column; gap: 0.35em;
+		height: 100%;
+		padding: var(--space-md);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		text-decoration: none;
+		transition: transform 0.2s var(--ease-spring), border-color 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring);
+	}
+	.mods a:hover { transform: translateY(-3px); border-color: var(--color-accent); box-shadow: var(--shadow-md); }
+	.m-title { color: var(--color-text); font-weight: 600; font-size: 1.02rem; line-height: 1.3; }
+	.m-desc { color: var(--color-text-secondary); font-size: 0.88rem; line-height: 1.5; }
+	.m-tier {
+		margin-top: auto;
+		font-family: var(--font-mono); font-size: 0.64rem;
+		text-transform: uppercase; letter-spacing: 0.1em;
+		color: var(--color-accent);
+	}
+
+	.insights {
+		margin: var(--space-2xl) auto 0;
+		max-width: var(--content-width);
+		padding: var(--space-xl) 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+	.insights-intro { color: var(--color-text-secondary); font-size: 1.05rem; line-height: 1.7; margin: 0 0 var(--space-lg); }
+	.insight-list { list-style: none; margin: 0; padding: 0; counter-reset: none; }
+	.insight-list li {
+		display: grid; grid-template-columns: 2.2rem 1fr; gap: 1em;
+		padding: var(--space-lg) 0;
+	}
+	.insight-list li + li { border-top: 1px solid var(--color-border); }
+	.i-num { font-family: var(--font-mono); font-size: 0.85rem; color: var(--color-accent); padding-top: 0.2em; }
+	.insight-list p { margin: 0; line-height: 1.7; color: var(--color-text-secondary); }
+
+	.start-cta { text-align: center; margin-top: var(--space-2xl); font-size: 1.1rem; }
+	.start-cta a { color: var(--color-accent); font-weight: 600; }
+
+	@media (max-width: 600px) {
+		.mods { grid-template-columns: 1fr; }
+	}
+</style>

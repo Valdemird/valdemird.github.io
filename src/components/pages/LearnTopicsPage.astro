@@ -1,0 +1,243 @@
+---
+import BaseHead from '../BaseHead.astro';
+import Header from '../Header.astro';
+import Footer from '../Footer.astro';
+import { getLearnStats, courseHomeHref, learnHomeHref, type Lang } from '../../lib/learn';
+import { UI_STRINGS, PERSON } from '../../consts';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const es = lang === 'es';
+
+// Each entry is one learning track. Today there is one (agentic systems);
+// the directory exists so future tracks slot in without re-homing this one.
+const agenticStats = await getLearnStats(lang);
+const agenticReadLabel =
+	agenticStats.readingMinutes >= 60
+		? `${Math.round(agenticStats.readingMinutes / 60)}h`
+		: `${agenticStats.readingMinutes} min`;
+
+const tracks = [
+	{
+		href: courseHomeHref(lang),
+		eyebrow: es ? 'Curso-wiki · bilingüe' : 'Course-wiki · bilingual',
+		title: es ? 'Ingeniería de sistemas agénticos' : 'Engineering agentic systems',
+		description: es
+			? 'Del sustrato (qué es un LLM, qué es un agente) a la frontera. 16 módulos, cada afirmación citada y graduada por credibilidad, con videos de referencia de quienes construyen el campo.'
+			: 'From the substrate (what an LLM is, what an agent is) to the frontier. 16 modules, every claim sourced and graded for credibility, with reference videos from the people building the field.',
+		metrics: [
+			{ value: String(agenticStats.modules), label: es ? 'módulos' : 'modules' },
+			{ value: String(agenticStats.phases), label: es ? 'fases' : 'phases' },
+			{ value: `~${Math.round(agenticStats.words / 1000)}k`, label: es ? 'palabras' : 'words' },
+			{ value: `~${agenticReadLabel}`, label: es ? 'de lectura' : 'read' },
+			{ value: String(agenticStats.sources), label: es ? 'fuentes' : 'sources' },
+		],
+		cta: es ? 'Abrir el curso' : 'Open the course',
+	},
+];
+
+const title = es ? 'Aprende' : 'Learn';
+const description = es
+	? 'Cursos-wiki en profundidad sobre temas difíciles de ingeniería: cada afirmación citada, graduada por credibilidad y comprobada. Elige una ruta.'
+	: 'In-depth course-wikis on hard engineering topics: every claim sourced, graded for credibility, and fact-checked. Pick a track.';
+
+const alternates = [
+	{ hreflang: 'en', href: `https://valdemird.com${learnHomeHref('en')}` },
+	{ hreflang: 'es', href: `https://valdemird.com${learnHomeHref('es')}` },
+];
+
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'CollectionPage',
+	name: title,
+	description,
+	inLanguage: lang,
+	author: PERSON,
+	url: `https://valdemird.com${learnHomeHref(lang)}`,
+	hasPart: tracks.map((t) => ({
+		'@type': 'Course',
+		name: t.title,
+		url: `https://valdemird.com${t.href}`,
+	})),
+};
+---
+
+<html lang={lang}>
+	<head>
+		<BaseHead title={`${title} · valdemird`} description={description} lang={lang} alternates={alternates} jsonLd={jsonLd} />
+	</head>
+	<body>
+		<a class="skip-link" href="#main-content">{UI_STRINGS[lang].nav.skipToContent}</a>
+		<Header />
+		<main id="main-content">
+			<div class="wrap">
+				<header class="hero">
+					<p class="eyebrow">{es ? 'Aprende · directorio' : 'Learn · directory'}</p>
+					<h1>{title}</h1>
+					<p class="lead">{description}</p>
+				</header>
+
+				<section class="tracks" aria-label={es ? 'Rutas de aprendizaje' : 'Learning tracks'}>
+					{tracks.map((t) => (
+						<a class="track" href={t.href}>
+							<p class="t-eyebrow">{t.eyebrow}</p>
+							<h2>{t.title}</h2>
+							<p class="t-desc">{t.description}</p>
+							<dl class="t-metrics" aria-label={es ? 'Cuánta información contiene' : 'How much it contains'}>
+								{t.metrics.map((m) => (
+									<div class="tm">
+										<dt>{m.value}</dt>
+										<dd>{m.label}</dd>
+									</div>
+								))}
+							</dl>
+							<span class="t-cta">
+								{t.cta}
+								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<line x1="5" y1="12" x2="19" y2="12"></line>
+									<polyline points="12 5 19 12 12 19"></polyline>
+								</svg>
+							</span>
+						</a>
+					))}
+				</section>
+
+				<p class="more">{es ? 'Más rutas en camino.' : 'More tracks on the way.'}</p>
+			</div>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<style>
+	main { padding-top: var(--space-xl); }
+	.wrap { max-width: var(--wide-width); margin: 0 auto; padding: var(--space-lg); }
+
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.16em;
+		color: var(--color-accent);
+		margin: 0 0 0.6em;
+	}
+
+	.hero { max-width: var(--content-width); margin: 0 auto var(--space-2xl); text-align: center; }
+	.hero h1 {
+		font-size: clamp(2.2rem, 5.5vw, 3.2rem);
+		line-height: 1.1;
+		letter-spacing: -0.02em;
+		margin: 0 0 0.4em;
+	}
+	.hero .lead {
+		font-size: 1.18rem;
+		line-height: 1.65;
+		color: var(--color-text-secondary);
+		margin: 0 auto;
+		max-width: 60ch;
+	}
+
+	.tracks {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
+		gap: var(--space-lg);
+		max-width: var(--content-width);
+		margin: 0 auto;
+	}
+
+	.track {
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-lg);
+		/* Tinted wash marks the card — no left accent bar (design rule). */
+		background: oklch(from var(--color-accent) l c h / 0.045);
+		padding: 2rem 2.25rem;
+		transition: box-shadow var(--duration-normal) var(--ease-smooth),
+			transform var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+	.track:hover {
+		box-shadow: var(--shadow-lg);
+		transform: translateY(-3px);
+		border-color: var(--color-accent);
+	}
+
+	.t-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 0.8rem;
+	}
+	.track h2 {
+		font-size: clamp(1.4rem, 3vw, 1.85rem);
+		margin: 0 0 0.5em;
+		line-height: 1.2;
+		letter-spacing: -0.015em;
+	}
+	.t-desc {
+		font-size: 1.02rem;
+		color: var(--color-text-secondary);
+		line-height: 1.65;
+		margin: 0 0 1.5em;
+	}
+
+	.t-metrics {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.3rem 2rem;
+		margin: 0 0 1.5em;
+		padding: 1rem 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+	.tm { display: flex; flex-direction: column; gap: 0.15rem; }
+	.tm dt {
+		font-family: var(--font-mono);
+		font-size: 1.3rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+	}
+	.tm dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
+
+	.t-cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--color-accent);
+	}
+	.t-cta svg { transition: transform var(--duration-normal) var(--ease-spring); }
+	.track:hover .t-cta svg { transform: translateX(4px); }
+
+	.more {
+		text-align: center;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-muted);
+		margin: var(--space-2xl) 0 0;
+	}
+
+	@media (max-width: 640px) {
+		.track { padding: 1.5rem; }
+	}
+</style>

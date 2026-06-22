@@ -1,0 +1,104 @@
+---
+title: "Recuperación: búsqueda agéntica vs RAG como decisión de coste asimétrico"
+description: "La recuperación no es un componente que se instala. Es una elección de arquitectura entre dos paradigmas con costes opuestos. Para corpus navegables y acotados, la búsqueda agéntica gana en frescura y exactitud. Los embeddings dejaron de ser el default."
+phase: 3
+order: 6
+tier: core
+durability: duradero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "RAG (chunk → embed → index → top-k) es recuperación de una pasada contra una query congelada en t=0. La búsqueda agéntica (grep/read en bucle) reformula la query con cada lectura. Ese único hecho reordena tu intuición sobre por qué falla la recuperación."
+  - "La primera pregunta de diseño es la del tamaño: si el corpus cabe bajo ~200k tokens, no construyas RAG. Mételo en el prompt con caching. El umbral crece con la ventana."
+  - "La búsqueda agéntica no es gratis: gasta 3-10x más tokens y es mucho más sensible a la latencia. RAG sigue ganando en corpus enormes que no caben y en FAQ de alto volumen y baja latencia."
+sources:
+  - { grade: "A", title: "Introducing Contextual Retrieval", author: "Anthropic", year: 2024, url: "https://www.anthropic.com/news/contextual-retrieval" }
+  - { grade: "A", title: "Claude Code: por qué la búsqueda agéntica reemplazó a RAG + vector DB", author: "Boris Cherny, Anthropic", year: 2025, url: "https://x.com/bcherny/status/2017824286489383315" }
+  - { grade: "A", title: "From Local to Global: A GraphRAG Approach to Query-Focused Summarization", author: "Microsoft Research", year: 2024, url: "https://arxiv.org/abs/2404.16130" }
+  - { grade: "A", title: "LazyGraphRAG: setting a new standard for quality and cost", author: "Microsoft Research", year: 2025, url: "https://www.microsoft.com/en-us/research/blog/lazygraphrag-setting-a-new-standard-for-quality-and-cost/" }
+  - { grade: "B", title: "Fishing for Answers: One-shot vs. Iterative Retrieval Strategies for RAG", author: "arXiv 2509.04820", year: 2025, url: "https://arxiv.org/pdf/2509.04820" }
+  - { grade: "B", title: "Demystifying and Enhancing the Efficiency of LLM-Based Search Agents", author: "arXiv 2505.12065", year: 2025, url: "https://arxiv.org/pdf/2505.12065" }
+  - { grade: "B", title: "ColBERTv2: Effective and Efficient Retrieval via Lightweight Late Interaction", author: "Santhanam et al., Stanford", year: 2022, url: "https://arxiv.org/pdf/2112.01488" }
+  - { grade: "C", title: "RAGAS: Automated Evaluation of Retrieval Augmented Generation", author: "Es et al.", year: 2023, url: "https://arxiv.org/abs/2309.15217" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+
+Tu agente no falla porque elegiste mal el modelo de embeddings. Falla porque alguien decidió, por reflejo, que "recuperación = vector DB" y nadie volvió a hacerse la pregunta. La recuperación no es un componente que se instala. Es una elección de arquitectura entre dos paradigmas con costes opuestos, y elegir mal te condena a un índice que se desincroniza, que filtra datos entre tenants y que en producción multiplica tu latencia hasta volverla inviable. Haz la elección con números, no con dogma.
+
+## Dos paradigmas, no un componente
+
+El RAG clásico y la búsqueda agéntica no son dos implementaciones del mismo problema. Son dos contratos económicos opuestos. RAG (chunk → embed → index → retrieve top-k → rerank) precomputa una representación comprimida del corpus y responde en una sola pasada: barato, de baja latencia, pero crea un índice que se desincroniza, que vive en algún sitio, que rompe la semántica al trocear y cuyo recall se mide offline contra una query congelada en t=0. La búsqueda agéntica invierte cada término del trade-off. Cero indexación. El modelo navega el corpus en runtime con herramientas (grep/glob/read, SQL, APIs) y reformula la búsqueda con cada lectura hasta tener contexto suficiente.
+
+<Callout type="important" title="La mayoría de los fallos de RAG no son fallos de embedding">
+Son fallos de "no pude reformular la query con lo que acababa de leer". RAG es recuperación de una pasada con la pregunta fija; la búsqueda agéntica es recuperación multi-paso. Ese solo hecho reordena toda tu intuición sobre por qué se rompe la recuperación.
+</Callout>
+
+La analogía a la que vuelvo: RAG es un archivador con fichas. Alguien leyó todo el corpus una vez, escribió una ficha resumen por cajón y las ordenó por tema. Buscar es instantáneo y barato. Pero si editas un documento, la ficha miente hasta que vuelvas a fichar todo. Y para responder "compara el caso A con el caso C" tienes que confiar en que las fichas, escritas sin saber tu pregunta, capturaron lo que necesitas. La búsqueda agéntica es un investigador con acceso al archivo entero: no hay fichas que mantener, lee los documentos actuales, y tras leer el primero decide cuál abrir después. Es más lento y consume más "horas de trabajo" (tokens), pero nunca trabaja sobre información obsoleta y puede encadenar pistas.
+
+<MermaidDiagram title="Una pasada vs el bucle" chart={`
+graph TD
+  subgraph RAG["RAG: una pasada, query fija en t=0"]
+    A[corpus] --> B[chunk + embed] --> C["ÍNDICE (vive, se desincroniza)"] --> D[top-k] --> E[respuesta]
+  end
+  subgraph Agentico["Agéntico: bucle, query reformulada con la evidencia previa"]
+    F[LLM] --> G["grep/read (bytes actuales)"] --> H[LLM reformula] --> I[grep/read] --> J[respuesta]
+  end
+`} />
+
+El insight que un principiante no tiene: para corpus que caben (o casi) en la ventana, y para datos donde el matching exacto importa (código, IDs, errores, nombres propios), la búsqueda agéntica o el simple "mete todo en el prompt con cache" gana en exactitud y operabilidad. RAG vectorial gana en FAQ de alto volumen, baja latencia y corpus enormes que no caben. El embedding no está muerto. Dejó de ser el default arquitectónico que fue en 2023-2024.
+
+## El índice es un pasivo
+
+Un principiante razona en `recall@k`. Un experto pregunta quién es dueño del índice y cuándo miente. El índice es un activo que se posee: se desincroniza (editas un archivo y miente hasta re-indexar, el index lag), vive en algún sitio (a menudo un tercero, una copia más que filtrar) y es una superficie de ataque. La razón real por la que Anthropic quitó embeddings de Claude Code no fue el recall. Fue que la búsqueda agéntica "funciona mejor, más simple, sin los problemas de seguridad, privacidad, staleness y reliability", y que su propio codebase era demasiado sensible para subirlo a un índice de terceros. La búsqueda agéntica lee los bytes actuales en runtime: cero index lag, cero copia que custodiar.
+
+<Collapsible title="Por qué el caso multi-tenant es estructural, no de conveniencia">
+Con datos por empresa, un índice por tenant es un artefacto físico que puede filtrar datos entre tenants si se olvida un `WHERE org_id` en la capa de recuperación. Sin índice, no hay artefacto que filtre. Eliminar la posibilidad de un fallo es más fuerte que mitigarlo. Esto es principio general, no una afirmación sobre ningún despliegue concreto. [D]
+</Collapsible>
+
+## El léxico le gana al semántico en dominios de identificadores
+
+Los embeddings comprimen significado y pierden precisión en tokens raros. Un código de error como `TS-999`, un nombre propio, un ID de cliente, un símbolo de código, un número de cita: ahí es justo donde el espacio vectorial difumina lo que necesitas exacto. BM25/grep hacen match literal. El hybrid search (denso + disperso, fusionado con RRF) existe precisamente porque ningún espacio vectorial captura bien lo léxico. En código y datos estructurados el léxico domina, por eso ripgrep gana y por eso es el sustrato natural de la búsqueda agéntica.
+
+<Callout type="note" title="Denso vs léxico, cuándo se gana cada uno su lugar">
+Los **embeddings densos** capturan paráfrasis y sinónimos ("agendar" ≈ "reservar"); difuminan `TS-999`, `cliente_8842`, nombres propios; buenos para FAQ semántica. **BM25 / grep** hacen match exacto de identificadores, códigos y símbolos; sin staleness; baratos y auditables; sufren con sinónimos puros. En código e IDs el léxico domina. La late-interaction multi-vector (ColBERTv2) es el punto medio frontier cuando sí mantienes índice.
+</Callout>
+
+## El umbral de ~200k tokens es la primera pregunta, no la última
+
+Anthropic lo recomienda explícitamente: si el corpus cabe bajo ~200k tokens (~500 páginas), no construyas RAG. Mételo todo en el prompt con prompt caching. RAG solo gana cuando el corpus excede la ventana. Montar un pipeline de embeddings para 50 documentos es over-engineering caro de mantener. El prompt caching es lo que hace viable la estrategia "todo en contexto": amortiza el corpus repetido y baja el preproceso de Contextual Retrieval a $1.02/M tokens. Esta es tu primera pregunta de diseño, y su frontera crece con las ventanas de 1M+.
+
+<Callout type="tip" title="El just-in-time retrieval es la misma idea, generalizada">
+El encuadre de context engineering de Anthropic: no vuelques todo de antemano. Mantén identificadores ligeros (paths, queries) y carga datos bajo demanda con herramientas. La búsqueda agéntica es el just-in-time retrieval llevado a su conclusión. El corpus es el filesystem, el cargador es grep/read.
+</Callout>
+
+## Contextual Retrieval: el chunk perdió su contexto, no el embedding
+
+Trocear rompe correferencias. Un chunk que dice "el margen creció 3%" no sabe de qué empresa ni de qué trimestre. La técnica de Anthropic antepone a cada chunk un contexto generado por LLM que lo sitúa en el documento, antes de embeber e indexar con BM25. Reduce el fallo de recuperación top-20 un **49%** (de 5.7% a 2.9%), y un **67%** (a 1.9%) si además le sumas rerank. La lección estructural: el problema nunca fue el modelo de embeddings, fue que el chunk perdió su contexto. La búsqueda agéntica lo evita de raíz leyendo el documento entero a demanda. Y el truco funciona también fuera de embeddings. Persistir un resumen-contexto por documento ayuda a un agente a decidir qué leer.
+
+Si mantienes RAG, el rerank es casi siempre la mejor mejora coste/beneficio antes de tocar el modelo de embeddings: recuperas top-150 candidatos baratos (denso + BM25), reordenas con un cross-encoder que ve query y documento juntos, devuelves top-20. Es el salto de 49% a 67%. El cuidado es la latencia añadida, que es la restricción dominante en producción.
+
+## La latencia se amplifica 83x, así que la velocidad de la herramienta es viabilidad
+
+Lo más contraintuitivo y lo más crítico para producción: en agentes de búsqueda, la latencia end-to-end se amplifica hasta **83x** cuando la latencia media de recuperación sube de 0.6s a 4.4s, porque cada paso lento se multiplica por el número de iteraciones. En RAG, con sus ~4 llamadas fijas, la latencia es estable. La implicación de diseño: una herramienta de búsqueda lenta no es "lenta", es sistémicamente inviable en un bucle agéntico. El ripgrep local no es una optimización, es un requisito de viabilidad. Presupuesta latencia por iteración y acota el número de pasos.
+
+<Callout type="warning" title="'Sin embeddings = barato' es la intuición equivocada">
+La búsqueda agéntica mueve el coste de "precisión del retriever" (CAPEX, el índice que construyes y mantienes) a "tokens por turno" (OPEX). Puede gastar 3-10x más tokens. Mide coste por turno y latencia por iteración de forma explícita. No asumas que el camino agéntico es gratis solo porque no hay una vector DB en la factura.
+</Callout>
+
+## GraphRAG: una capacidad real detrás de un acantilado de coste
+
+GraphRAG responde un tipo de query que el RAG vectorial no puede: las globales ("¿cuáles son los temas o riesgos principales de todo el corpus?"), construyendo un grafo de entidades-relaciones y resúmenes jerárquicos por comunidad mediante detección de comunidades Leiden. El coste es la construcción: pasa cada documento por un LLM. Como cifra ilustrativa, un análisis de terceros estimó ~$33.000 para un dataset legal concreto de 5GB. No es el coste canónico de GraphRAG, depende fuertemente del corpus. Variantes posteriores lo derribaron, pero con cifras distintas que conviene no conflacionar: LazyGraphRAG baja el coste de indexación a ~0.1% del GraphRAG completo (~1000x); el ~6000x que circula por ahí pertenece específicamente a la eficiencia de tokens en la actualización incremental de LightRAG. Técnicas distintas, números distintos.
+
+## Cómo decides en la práctica
+
+Empieza siempre por la pregunta del tamaño. ¿Cabe en la ventana con caching? No construyas RAG. ¿No cabe y el matching exacto importa? Búsqueda agéntica con herramientas rápidas y acotadas. ¿No cabe, alto volumen, baja latencia, semántico? RAG vectorial, pero hybrid (denso + BM25) más rerank, nunca embeddings solos, y añade Contextual Retrieval si el volumen de consultas amortiza el preproceso. ¿Mezcla de dificultad? Enruta por ella: one-shot para lookups directos, el bucle agéntico solo para multi-hop o ambiguas, para no pagar el impuesto de 3-10x tokens en cada pregunta trivial.
+
+<Callout type="warning" title="Trata los documentos recuperados como input no confiable">
+Sea cual sea el paradigma, el corpus que recuperas no es confiable. Un documento puede llevar instrucciones de prompt injection. Con búsqueda agéntica el modelo decide qué leer, así que un doc malicioso podría intentar dirigir lecturas o escrituras. Delimita el contenido recuperado, mantén al humano en el loop sobre las escrituras y valida cualquier cosa que la recuperación alimente a una tool call. Esto pesa más, no menos, cuando el modelo navega el filesystem por sí mismo.
+</Callout>
+
+Una nota sobre las cifras de benchmark para que no sobregeneralices. Los resultados de búsqueda agéntica con RL (Search-R1 y su linaje) muestran ganancias sobre el RAG estático en benchmarks de QA específicamente. Es un resultado acotado a esas tareas, no una ley universal de "lo agéntico siempre le gana a RAG". Y cuando evalúes tu propia recuperación, mídela end-to-end (faithfulness, estilo RAGAS, más graders de trayectoria sobre qué abrió el agente de verdad), no solo con `recall@k` offline contra una query congelada. La relevancia de contexto es la dimensión más ruidosa para un juez LLM, así que no te apoyes solo en ella. El resumen honesto es que el default se invirtió, y el tamaño de tu corpus te dice casi todo lo que necesitas antes de escribir una línea.

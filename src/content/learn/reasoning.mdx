@@ -1,0 +1,163 @@
+---
+title: "Reasoning as budgetable compute, not introspection"
+description: "Modern LLM reasoning is inference-time compute you budget like CPU, not a trace you can audit. Test-time compute is a real scaling lever, overthinking has diminishing returns, and the visible chain of thought isn't faithful to what the model actually did."
+phase: 6
+order: 11
+tier: core
+durability: duradero
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "Reasoning is intermediate tokens that sometimes condition the answer and sometimes rationalize it after the fact. Treat the thinking budget like CPU you pay for, not introspection you can trust."
+  - "Test-time compute is a genuine scaling lever — more reasoning tokens can beat a much larger model — but accuracy can drop past a certain budget. Calibrate effort per route."
+  - "On native reasoning models, prescriptive 'think step by step' prompting gets in the way. And the visible chain of thought is not a faithful trace, so it's useless as a security audit."
+sources:
+  - { grade: "A", title: "Reasoning Models Don't Always Say What They Think / Measuring Faithfulness in CoT", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/research/measuring-faithfulness-in-chain-of-thought-reasoning" }
+  - { grade: "A", title: "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models", author: "Wei et al., Google", year: 2022, url: "https://arxiv.org/abs/2201.11903" }
+  - { grade: "A", title: "Self-Consistency Improves Chain of Thought Reasoning", author: "Wang et al., Google", year: 2022, url: "https://arxiv.org/abs/2203.11171" }
+  - { grade: "A", title: "ReAct: Synergizing Reasoning and Acting in Language Models", author: "Yao et al., Princeton/Google", year: 2022, url: "https://arxiv.org/abs/2210.03629" }
+  - { grade: "A", title: "Reflexion: Language Agents with Verbal Reinforcement Learning", author: "Shinn et al.", year: 2023, url: "https://arxiv.org/abs/2303.11366" }
+  - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
+  - { grade: "B", title: "Scaling LLM Test-Time Compute Optimally", author: "Snell et al.", year: 2024, url: "https://arxiv.org/abs/2408.03314" }
+  - { grade: "B", title: "Inference-Time Compute Scaling Methods to Improve Reasoning Models", author: "Sebastian Raschka", year: 2025, url: "https://magazine.sebastianraschka.com/p/state-of-llm-reasoning-and-inference-scaling" }
+  - { grade: "B", title: "The Illusion of Thinking (+ rebuttals)", author: "Apple ML Research; Lawsen/Open Phil; Anthropic", year: 2025, url: "https://machinelearning.apple.com/research/illusion-of-thinking" }
+  - { grade: "C", title: "Reasoning best practices (avoid CoT prompts)", author: "OpenAI", year: 2025, url: "https://platform.openai.com/docs/guides/reasoning-best-practices" }
+  - { grade: "C", title: "LIMO: Less Is More for Reasoning", author: "Ye et al.", year: 2025, url: "https://arxiv.org/abs/2502.03387" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+
+An agent that "thinks more" is not an agent that thinks better. It's an agent that spends more. Modern LLM reasoning isn't introspection you can audit. It's inference-time compute, and you budget it the way you budget CPU. Once that lands, you stop copying "think step by step" prompts from 2023, you stop believing the reasoning text explains what the model did, and you start treating the thinking budget as the economic and safety lever it actually is.
+
+## The mental model: reasoning is token generation
+
+A model's reasoning is intermediate tokens that sometimes condition the final answer and sometimes rationalize it after the answer was already decided. The shift from 2024 into 2025-2026 is that this stopped being a prompting trick (Chain-of-Thought) and became a capability trained with RL: o1/o3, DeepSeek-R1, and Claude's extended/adaptive thinking. The model decides how much to compute at inference.
+
+<Callout type="important" title="The one knob that matters">
+The most important knob on a modern agent isn't model size. It's **how much compute you let it spend per turn at inference**. Within a range, scaling test-time compute (more reasoning tokens) substitutes for scaling pretraining. Snell et al. showed compute-optimal test-time scaling can beat a model many times larger on some problems.
+</Callout>
+
+The analogy I keep: treat the visible reasoning as a candidate's **scratch paper**, not the **notarized record** of their decision. Scratch paper sometimes reflects the real calculation and sometimes is a justification written *after* the hand already marked the box. Trusting the scratch paper as proof of how the answer was reached is exactly the mistake Anthropic documented: inject a surface-level hint into the prompt and the model often obeys it without ever *mentioning* it, then constructs a plausible alternative justification.
+
+## Inference-time compute: the accuracy-vs-tokens curve
+
+Instead of pouring all compute into pretraining, you spend some at inference generating more and better reasoning tokens. The cleanest proof that pure RL produces this is DeepSeek-R1: it matched o1 on reasoning benchmarks (AIME 2024 79.8% vs 79.2%, MATH-500 97.3%) by scaling inference compute, generating on the order of 10-30K reasoning tokens per problem.
+
+<Callout type="note" title="A precision worth keeping">
+It's a repeated myth that R1 needed "10-100× more tokens" than o1. There's no public evidence for that. Both sit in the **same order of magnitude**: tens of thousands of reasoning tokens, capped around 32K of generation. R1 is notably verbose, but the dramatic ratio isn't documented.
+</Callout>
+
+The operational consequence: there's an accuracy-vs-tokens curve with an elbow. Below the elbow you get *underthinking* (the model gives up early). Above it, *overthinking*: it burns tokens without gaining accuracy, and can even degrade. More thinking is not monotonically better. That's why the elite practice is to measure the curve per task type, not to flip on max effort "just in case."
+
+<MermaidDiagram title="Accuracy vs thinking budget: underthink, elbow, overthink" chart={`
+graph LR
+  A["Low budget<br/>(underthinking)"] --> B["Elbow<br/>(compute-optimal)"]
+  B --> C["High budget<br/>(overthinking:<br/>flat or worse)"]
+`} />
+
+On the newest models this is what `effort` controls. Adaptive and interleaved thinking let the model assign its own budget and reason between tool calls; the old fixed `budget_tokens` is the wrong abstraction here.
+
+<Callout type="warning" title="budget_tokens is gone on 4.7+">
+Fixed `budget_tokens` is removed (returns 400) on Opus 4.7 / 4.8 and Fable 5, deprecated-but-works on 4.6. The control surface is now `effort` (low → max, with `xhigh` arriving in Opus 4.7) plus adaptive thinking. Code that pins a token budget needs migration; what you set instead is effort, then measure where the curve saturates.
+</Callout>
+
+## The chain of thought is not faithful to the internal computation
+
+This is the most consequential uncomfortable truth in the whole topic. Anthropic showed (first measuring faithfulness in 2023, then on reasoning models in 2025) that the reasoning text **does not reliably reflect the model's real computation**. Two load-bearing findings. First, the model can derive its answer from a surface hint in the prompt and *not mention it* in the chain. Second, editing the reasoning text often *doesn't* change the final answer, which means the visible chain often isn't the causal path.
+
+<Callout type="warning" title="The brutal security implication">
+You cannot use the chain of thought as a **security audit or a compliance record**. A model can "reason" out loud that it's respecting your hard rails and still act on an injected persona or an untrusted document. The visible reasoning **does not protect** against prompt injection. There's no audit value and no injection defense in reading it.
+</Callout>
+
+The practical rule that falls out of this: judge the trajectory of tool calls, not the reasoning text. That's the correct response to CoT unfaithfulness: grade what the agent *did* (the PreToolUse trajectory), treat the transcript as data, and reserve an LLM judge for resolution quality, never for "did it intend the right thing."
+
+## Prompting inverts: minimalism on reasoning models
+
+With native reasoning, instructing "think step by step" or pasting few-shot CoT templates **degrades** performance. The right source for this is OpenAI's o1 best-practices ("avoid elaborate chain-of-thought prompts; few-shot can hurt; keep it simple") and Anthropic's extended-thinking guidance. The optimal prompt gives goal, constraints, success criteria, and tools, then lets the model allocate its own compute.
+
+<Callout type="tip" title="Don't confuse this with LIMO">
+LIMO ("Less Is More", Ye et al. 2025) is a different claim: that reasoning can be *elicited* with very few high-quality SFT examples (~817), thanks to pretraining knowledge. That's evidence about **training-data quantity**, not about CoT prompting getting in the way. Citing LIMO as anti-CoT-prompt proof is a common error.
+</Callout>
+
+<Tabs labels={["2023 prompt on a reasoning model", "2025 minimal prompt"]}>
+<TabPanel>
+<CodeBlock filename="bad-prompt.txt">
+```text
+You are an expert. Think step by step.
+Here are 5 fully worked examples with complete reasoning.
+Now solve...
+```
+</CodeBlock>
+The template competes with the model's trained reasoning. Result: noise, wasted budget, worse accuracy.
+</TabPanel>
+<TabPanel>
+<CodeBlock filename="good-prompt.txt">
+```text
+Goal: X.
+Constraints: A, B.
+Success = the file contains Y.
+Tools available: grep, read.
+```
+</CodeBlock>
+The model assigns its own budget and reasons internally. You specified the *what*, not the *how*.
+</TabPanel>
+</Tabs>
+
+## Error compounding: a context problem, not an intelligence problem
+
+A small per-step error rate compounds multiplicatively. If each step succeeds with probability p, an n-step chain succeeds at roughly pⁿ. That's why agents that are reliable on short tasks collapse on long horizons. The dominant cause is *not* a dumb model. It's uncontrolled context growth. ReAct is append-only (thought, action, observation, repeat), and that growing transcript saturates attention and re-exposes early mistakes turn after turn.
+
+<Callout type="important" title="The fix is context management, not a bigger model">
+Summarizing, compacting, or rotating the transcript (folding/recap) curbs attention saturation and the reappearance of errors. It matters more than upgrading the model. Rotating to a fresh session after a fixed turn count, with a recap, is the right direction and what the 2025 literature validates.
+</Callout>
+
+## External verifiers break the self-deception loop
+
+The model can't reliably verify itself. Reflexion (verbal self-reflection on failures) is useful conceptually but **fragile without an external truth signal**; the model tends to rationalize instead of correct. The real multiplier on reasoning is an *external truth signal*: a test that runs, a grep that finds (or doesn't) a fact, a tool that fails.
+
+Self-consistency samples several traces and votes the majority answer. Its practical limit: it treats all traces equally (ignoring quality) and **saturates around k≈10-15**; sampling more just re-explores old paths. A verifier reaches higher accuracy with fewer tokens. Sampling 64 times as a silver bullet is just burning budget.
+
+<Collapsible title="When you actually do have a verifier vs when you don't">
+If there's a deterministic truth signal (code that compiles, a datum that exists in a file), use best-of-N with that verifier: it beats blind majority voting at lower token cost. Agentic search over files (grep/glob/read), with no RAG or embeddings, *is* a cheap external verifier: the datum exists or it doesn't. When no verifier exists and the answer is discrete, self-consistency is the fallback, but cap k near the saturation point, not at 64. Reflexion without an external signal is the case to avoid; it produces fragile, self-congratulatory "improvements."
+</Collapsible>
+
+## Planning: explicit vs emergent
+
+There are two flavors of planning, and choosing wrong is a first-order architectural mistake. The choice depends on the horizon and your tolerance for compounded errors.
+
+<Tabs labels={["Plan-then-execute", "ReAct (emergent)"]}>
+<TabPanel>
+Generate an **explicit, auditable plan before acting**. The user (or a human-in-the-loop) sees what the agent will do before anything is touched; you can use cheap models for subtasks; you control cost and inter-step dependencies. It's also a **safety mechanism**: a reviewable plan lets you intercept write actions before they execute. Best for dependencies, compliance, and writes.
+</TabPanel>
+<TabPanel>
+The thought-action-observation loop adapts in dynamic environments where information is revealed incrementally. The price: on long horizons it suffers objective drift and error compounding from the append-only context. It's the default pattern of most agent SDKs, and it's the right default for short-horizon dynamic exploration.
+</TabPanel>
+</Tabs>
+
+Rule of thumb: for tasks with dependencies or several writes (reschedule = cancel + create), force an explicit plan that passes through HITL before executing. For short-horizon dynamic exploration, let ReAct emerge. The failure mode of emergent ReAct on a two-write operation is executing one half (cancel) without the other (create) when it drifts.
+
+## Reasoning budget is cost and latency
+
+A billing detail that kills margins: **thinking is billed in full**, not just the visible summary, and it can exceed your `max_tokens`. In a multi-tenant SaaS with a daily token budget, uncontrolled thinking is a silent cost sink. Adaptive thinking lets the model decide how much to reason, but the engineer *must* measure and set per-turn ceilings. A sane default is a daily token budget plus per-turn thinking telemetry, so you can see reasoning cost per turn rather than only the daily aggregate.
+
+## What the consensus overrates
+
+- **Tree-of-Thoughts and Graph-of-Thoughts in production.** They shine on paper puzzles (ToT was evaluated on Game of 24, Creative Writing, and Mini Crosswords) but their cost and latency rarely justify themselves in real conversational agents. Mostly demo material. (One correction worth keeping: Tower of Hanoi is *not* a ToT/GoT benchmark; it's the puzzle from Apple's *Illusion of Thinking*.)
+- **CoT as explainability or audit.** Already covered: the visible reasoning doesn't reflect real computation.
+- **"Think step by step" and few-shot CoT on native models.** A 2023 relic that degrades performance.
+- **Self-consistency at k=32/64 as a silver bullet.** It saturates near 10-15.
+
+<Callout type="warning" title="The 'Illusion of Thinking' debate, honestly">
+Apple reported that reasoning models *collapse* as complexity rises (Tower of Hanoi and similar). The rebuttals (Lawsen/Open Phil, with Claude Opus as co-author) showed many "failures" were output-length limits or instances unsolvable by design. The engineering lesson: measure carefully before concluding "it can't reason." An apparent collapse can be your eval, not the model.
+</Callout>
+
+## What it underrates
+
+Real reasoning is unlocked by verifiable external grounding, not introspection. Agentic search over files is a cheap, undervalued verifier next to the RAG cult. The thinking-token budget is a product and cost decision, not only a technical one: in multi-tenant it sets your margins. And multi-agent costs roughly 15× the tokens of a single chat and only pays off on parallelizable tasks; token usage explains around 80% of the performance variance, and multi-agent fails on interdependent work (like coding). For an enterprise assistant with interdependent coordination, one well-budgeted agent usually wins.
+
+The thread running through all of it: you don't make an agent smarter by spending more reasoning tokens. You make it more reliable by grounding it in external truth, controlling its context, and deciding (per route, with a measured curve) how much compute is worth it. The reasoning text is a debug artifact along the way, never the proof.

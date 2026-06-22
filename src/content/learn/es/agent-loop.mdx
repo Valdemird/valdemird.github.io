@@ -1,0 +1,148 @@
+---
+title: "El control loop: Agente = Modelo + Harness"
+description: "Un agente es un modelo más un harness. El control de flujo vive en código determinista, el modelo es un reducer stateless que decide una tool por turno, y cada iteración solo se justifica si inyecta ground truth del entorno."
+phase: 3
+order: 5
+tier: core
+durability: atemporal
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "Agente = Modelo + Harness. La distancia entre un demo y un sistema en producción es casi toda gap de harness, no de modelo."
+  - "Sé dueño de tu control de flujo: el outer loop vive en código determinista; el modelo solo decide qué tool llamar dentro del turno. Trata al modelo como un reducer stateless con todo el estado durable fuera de él."
+  - "Cada iteración del loop se gana su lugar solo si inyecta ground truth: el resultado real de una tool, un test, un error concreto. La auto-corrección sin verificador externo no mejora el razonamiento y puede degradarlo."
+sources:
+  - { grade: "A", title: "ReAct: Synergizing Reasoning and Acting in Language Models", author: "Yao et al., Princeton/Google", year: 2022, url: "https://arxiv.org/abs/2210.03629" }
+  - { grade: "A", title: "Large Language Models Cannot Self-Correct Reasoning Yet", author: "Huang et al., Google DeepMind (ICLR 2024)", year: 2024, url: "https://arxiv.org/abs/2310.01798" }
+  - { grade: "A", title: "Building Effective Agents", author: "Schluntz & Zhang, Anthropic", year: 2024, url: "https://www.anthropic.com/engineering/building-effective-agents" }
+  - { grade: "A", title: "Reflexion: Language Agents with Verbal Reinforcement Learning", author: "Shinn, Cassano et al.", year: 2023, url: "https://arxiv.org/abs/2303.11366" }
+  - { grade: "A", title: "How the agent loop works (Agent SDK)", author: "Anthropic", year: 2025, url: "https://code.claude.com/docs/en/agent-sdk/agent-loop" }
+  - { grade: "A", title: "τ-bench: A Benchmark for Tool-Agent-User Interaction", author: "Yao et al., Sierra Research", year: 2024, url: "https://arxiv.org/abs/2406.12045" }
+  - { grade: "B", title: "12-Factor Agents", author: "Dexter Horthy, HumanLayer", year: 2025, url: "https://github.com/humanlayer/12-factor-agents" }
+  - { grade: "D", title: "Síntesis y analogías del autor", author: "Sebastián CJ", year: 2026, url: "" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+La mayoría de los agentes que mueren en producción no mueren porque el modelo sea malo. Mueren porque el código que envuelve al modelo, el harness, no sabe cuándo parar, repite el mismo error veinte veces, duplica una escritura tras un retry, o le pide al propio modelo que se autocalifique. Este módulo entrena el ojo para esa frontera. El diagnóstico que separa a quien shippea de quien hace demos es una sola pregunta: *¿falló el modelo, o falló el harness?*
+
+<Callout type="important" title="El único modelo mental">
+Un agente es **Modelo + Harness**. El harness es todo el código, configuración y lógica de ejecución que no es el modelo. La distancia entre un demo impresionante y un sistema que sobrevive a producción es casi toda gap de harness. Un modelo decente con un gran harness le gana a un gran modelo con un mal harness: es una heurística, no una medición, pero es lo correcto que apostar.
+</Callout>
+
+No es un encuadre marginal. "Building Effective Agents" de Anthropic describe a los agentes como LLMs que usan tools en un loop, y dedica casi todo su consejo al loop, no al modelo. El ciclo `think → act → observe` que popularizó ReAct no es la arquitectura. Es el mecanismo de iteración. Lo que de verdad decide si tu agente funciona son dos cosas: cada paso tiene que inyectar **ground truth** del entorno (el resultado real de una tool, no una autoevaluación), y el **control de flujo tiene que vivir en un lugar que poseas**.
+
+## El modelo es un reducer stateless
+
+Trata al modelo como una función casi pura: `(estado, observación) → think + tool_call`. No guarda estado durable propio. El harness es la máquina de estados que lo envuelve: lo invoca, ejecuta sus tool calls, persiste el estado fuera de él y decide cuándo cortar.
+
+Los "12-Factor Agents" de HumanLayer nombran aquí dos ideas distintas que se confunden a cada rato. El **Factor 12, "Make your agent a stateless reducer"**, es la forma del modelo: una reducción pura de estado a próxima acción. El **Factor 8, "Own your control flow"**, es un factor aparte sobre *quién maneja el loop*: tú escribes el outer loop, tú te quedas con el kill-switch. Mismo espíritu, dos afirmaciones. No las fusiones.
+
+<CodeBlock filename="turn.ts">
+```ts
+// El modelo es el reducer. El harness es todo lo demás.
+async function runTurn(state) {
+  let s = state;                       // el estado durable vive FUERA del modelo
+  for (let i = 0; i < MAX_TURNS; i++) {
+    const step = await model.reduce(s); // (estado) -> think + tool_call  (Factor 12)
+    if (step.done) return finish(s);
+
+    const obs = await harness.execute(step.tool_call); // ground truth, no auto-juicio
+    s = persist(apply(s, step, obs));    // checkpoint tras cada paso significativo
+    if (loopGuard(s) || overBudget(s)) return stop(s);
+  }
+  return stop(s);                        // terminar es una decisión de primer orden
+}
+```
+</CodeBlock>
+
+El modelo solo vive en una línea: `model.reduce`. Todo lo demás es código determinista que tú escribes, testeás e instrumentás. Esa es la frontera que defiende el resto del módulo.
+
+## La analogía: el modelo es el motor, el harness es el auto
+
+El modelo es un motor de combustión brutal pero ciego. Convierte combustible (contexto) en empuje (un tool call). No tiene frenos, ni volante, ni tablero, ni cinturón. El harness es el auto entero: el chasis que sobrevive al choque (estado durable), los frenos (stopping conditions), el volante (control de flujo determinista), el tablero (observabilidad), el airbag (human-in-the-loop). Nadie compra un motor. Compras un auto. Y aun así casi todos los tutoriales te venden el motor y le llaman agente.
+
+## Control de flujo: código determinista vs delegado al modelo
+
+Esta es la decisión arquitectónica más importante del módulo. No le entregás todo el flujo al modelo. Vos escribís el outer loop y le delegás al modelo **solo** las decisiones locales que no podés hardcodear de antemano. Anthropic enmarca el mismo corte como workflows vs agents: los workflows siguen paths predefinidos en código, los agents dirigen su propio proceso, y el consejo de producción es preferir lo más simple y delegar lo mínimo.
+
+<Tabs labels={["Código determinista", "Delegado al modelo"]}>
+<TabPanel>
+
+Lo que SÍ podés predecir: persistir, encolar, tomar el lock, agrupar mensajes entrantes, enrutar aprobaciones, contar turnos, imponer un budget, cortar. Testeable, instrumentable, con kill-switch. Es el grueso de un agente serio, y la mayoría es software aburrido bien hecho.
+
+</TabPanel>
+<TabPanel>
+
+Lo que NO podés hardcodear: qué tool llamar ante un mensaje ambiguo, qué redactar, qué buscar. Probabilístico, no determinista, y por eso justamente lo acotás con tools y verificación externa.
+
+</TabPanel>
+</Tabs>
+
+Un patrón que vale la pena robar: mantené tonto el edge síncrono. El edge HTTP que recibe un mensaje nunca debería llamar al modelo. Persiste y encola, y punto. Un worker toma el job, agarra un lock por conversación para que dos turnos no compitan, y solo entonces corre el modelo. Esa frontera edge/worker es una de las decisiones de control de flujo más infravaloradas que existen, y casi nunca se enseña: separa el plano determinista barato del estocástico caro.
+
+## El ground truth le gana a la auto-reflexión
+
+Hay un culto seductor a la auto-corrección: la idea de que el modelo puede revisar su propio razonamiento y mejorarlo. Reflexion lo popularizó como memoria episódica verbal de fallos pasados. La evidencia es más cruda que el hype. Huang et al. (DeepMind, ICLR 2024) encontró que los LLMs no auto-corrigen razonamiento de forma fiable sin una señal externa, y que la auto-corrección intrínseca puede *degradar* la salida, porque el evaluador comparte los blind spots del generador.
+
+<Callout type="important" title="La regla de oro del loop">
+Una iteración solo agrega valor si inyecta **ground truth observable**: el resultado real de una tool, un test que pasa o falla, un error concreto. Reflexion es útil, pero solo con un verificador externo confiable (un compilador, un test, un grader). Nunca como auto-juicio puro.
+</Callout>
+
+La consecuencia de diseño es directa. Construí tu verificación *fuera* del modelo. Que el agente observe resultados reales del filesystem o de la base de datos en vez de preguntarle si encontró algo. Calificá con chequeos code-based que confirmen el efecto real, más un juez LLM si necesitás matiz, pero la afirmación de éxito del propio modelo no es evidencia.
+
+<Collapsible title="Reward hacking y graders no-gameables">
+Si tu verificación externa es débil, el agente puede "ganarla" sin resolver la tarea: sobrescribir el test, terminar el programa prematuramente para que la suite pase. MONA, de DeepMind, documenta y mitiga este reward hacking de horizonte largo. La implicación: un grader debe verificar el *efecto real* (el registro efectivamente escrito en la base de datos) en vez de la *afirmación* del modelo de que lo escribió. Verificá el mundo, no la narración.
+</Collapsible>
+
+## El estado durable vive fuera del modelo
+
+Como el modelo no guarda estado, todo el estado durable (historial, checkpoints, business state) vive fuera, en infraestructura que sobrevive a un crash. Esto es lo que te permite lanzar, pausar y reanudar una corrida, y lo que hace que un turno sea replay-safe: si el modelo no tiene estado oculto, podés reconstruir cualquier turno desde la store externa.
+
+Una separación limpia se ve así: una base de datos como fuente de verdad (un puntero a la sesión más un contador de turnos), un log de sesión como registro local del worker, y un directorio de trabajo materializado como cache descartable por turno. Si el worker explota, el cache se regenera y la sesión se reanuda. Nada importante vivió jamás solo en memoria.
+
+<Callout type="note" title="La durable execution es un patrón de la industria, no terminología de un vendor">
+"Checkpointeá tras cada paso, grabá los efectos no-deterministas, y reusalos en replay en vez de re-ejecutarlos" es la idea de durable execution que vas a reconocer de motores tipo Temporal. Es un patrón general de sistemas distribuidos. No es terminología de Anthropic, así que no se la atribuyas: tomá la garantía, no la marca.
+</Callout>
+
+## Compactá los errores antes de re-inyectarlos
+
+Los errores crudos (stack traces, fallos verbosos de tools) son veneno para la ventana de contexto. Ahogan la señal y disparan loops repetitivos: el modelo ve ruido, no entiende la causa, reintenta lo mismo. El harness no debe ser un pass-through de errores. Debe ser un traductor que destila el fallo en una línea compacta y accionable, y a veces resetea el contexto en vez de acumularlo. El patrón práctico en los hooks es "silent success, verbose failure": cuando algo funciona, callate; cuando falla, decí exactamente qué se rompió y cómo arreglarlo.
+
+## Terminar es diseño, no accidente
+
+Cuándo parar es un problema de primer orden que la mayoría de los tutoriales ignora. Hay dos fallos simétricos: **non-termination** (loop infinito, tokens quemados) y **early-stopping** (el modelo declara "listo" antes de estarlo). Necesitás varias condiciones a la vez.
+
+<MermaidDiagram title="La terminación necesita varias condiciones, no una" chart={`
+graph TD
+  A[Cada turno] --> B[max-turns alcanzado?]
+  B -->|si| Z[parar]
+  B -->|no| C[budget excedido?]
+  C -->|si| Z
+  C -->|no| D[loop sin progreso?]
+  D -->|si| Z
+  D -->|no| E[tool de terminacion?]
+  E -->|si| Z
+  E -->|no| A
+`} />
+
+Un max-turns duro y un budget de tokens son los dos fáciles. El que la gente saltea es el **loop-guard de no-progreso**: hashear los últimos N tool calls (nombre más args normalizados) y cortar, o forzar un cambio de estrategia, cuando el mismo call se repite. Sin él, un agente puede quemar un budget entero girando en falso antes de que algún cap grueso lo salve. Y una tool de terminación (una acción explícita de "terminé" o "escalá a un humano") le da al modelo una forma limpia de parar en vez de irse apagando.
+
+<Callout type="warning" title="pass@1 te va a mentir">
+Para sistemas estocásticos multiturno, una corrida verde no significa casi nada. τ-bench introdujo un usuario simulado, una tool de terminación y la métrica **pass^k** precisamente porque lo que importa es la consistencia a lo largo de k corridas, no un pass@1 aislado. Si medís con pass@1 y cantás victoria, estás midiendo suerte.
+</Callout>
+
+## El human-in-the-loop es solo otra tool call
+
+Contactar a un humano no es un caso especial atornillado al costado del loop. Es otra tool que pausa el reducer y espera input. Esto unifica aprobaciones, clarificaciones y escalado bajo un solo mecanismo. Una forma común: las lecturas auto-ejecutan, las escrituras se interceptan y disparan un prompt de Confirmar/Declinar. Un detalle de élite que vale la pena copiar: antes de mostrar la confirmación, validá y persistí el input *normalizado*, y hacé que el gate devuelva un deny para que el modelo pare. Cuando el humano confirma, ejecutás ese mismo input persistido. Eso cierra un TOCTOU semántico donde el modelo podría "cambiar de opinión" entre el prompt y el tap. Lo confirmado es igual a lo que corre.
+
+## Idempotencia: el fallo del que nadie habla
+
+Los agentes tienen muchos puntos de fallo (orquestación, un modelo probabilístico, tool calls externos, pausas de HITL) que el retry tradicional no maneja. La escritura que crashea a mitad es el caso clásico. Si un worker muere mid-write y la cola reintenta el job, sin una idempotency key por acción confirmada el retry duplica el efecto: dos registros donde debería haber uno. Los locks y los logs de sesión reducen el radio de daño pero no garantizan esto. Adjuntá una idempotency key a cada tool call con efecto externo y el retry se vuelve seguro.
+
+El hilo que atraviesa todo es el mismo. Mantené al modelo en su única línea, haciendo lo único que hace bien: decidir la próxima acción dado el estado. Empujá todo lo demás, el software durable y aburrido, a un harness que puedas leer, testear y detener. La fiabilidad que shippeás es casi toda la calidad de esa frontera, y no hay un punto limpio en el que esté terminada: cada incidente de producción es una regla más que el harness debió haber tenido.

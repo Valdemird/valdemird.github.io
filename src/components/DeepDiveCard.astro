@@ -1,0 +1,165 @@
+---
+import { getLearnStats, courseHomeHref, type Lang } from '../lib/learn';
+
+interface Props {
+	lang: Lang;
+}
+
+const { lang } = Astro.props;
+const es = lang === 'es';
+const stats = await getLearnStats(lang);
+const href = courseHomeHref(lang);
+
+const wordsK = Math.round(stats.words / 1000);
+const readLabel =
+	stats.readingMinutes >= 60
+		? `${Math.round(stats.readingMinutes / 60)}h`
+		: `${stats.readingMinutes} min`;
+
+// Reuse the hub's authored voice — this is a special, content-heavy "deep dive" entry.
+const title = es ? 'Cómo construir sistemas agénticos de verdad' : 'How to build agentic systems for real';
+const description = es
+	? 'No es un post: es un curso-wiki de 16 módulos, del sustrato a la frontera, con cada afirmación citada y graduada por credibilidad. Léelo de corrido o entra por donde te interese.'
+	: 'Not a post: a 16-module course-wiki, from the substrate to the frontier, every claim sourced and graded for credibility. Read it end to end or drop into any topic.';
+
+const metrics: { value: string; label: string }[] = [
+	{ value: String(stats.modules), label: es ? 'módulos' : 'modules' },
+	{ value: String(stats.phases), label: es ? 'fases' : 'phases' },
+	{ value: `~${wordsK}k`, label: es ? 'palabras' : 'words' },
+	{ value: `~${readLabel}`, label: es ? 'de lectura' : 'read' },
+	{ value: String(stats.sources), label: es ? 'fuentes' : 'sources' },
+];
+---
+
+<a href={href} class="deep-card animate-fade-in delay-1">
+	<div class="deep-inner">
+		<p class="eyebrow">{es ? 'Deep dive · wiki' : 'Deep dive · wiki'}</p>
+		<h2>{title}</h2>
+		<p class="desc">{description}</p>
+		<dl class="metrics" aria-label={es ? 'Cuánta información contiene' : 'How much it contains'}>
+			{metrics.map((m) => (
+				<div class="metric">
+					<dt>{m.value}</dt>
+					<dd>{m.label}</dd>
+				</div>
+			))}
+		</dl>
+		<span class="read-arrow">
+			{es ? 'Abrir el wiki' : 'Open the wiki'}
+			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<line x1="5" y1="12" x2="19" y2="12"></line>
+				<polyline points="12 5 19 12 12 19"></polyline>
+			</svg>
+		</span>
+	</div>
+</a>
+
+<style>
+	.deep-card {
+		position: relative;
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+		/* Tinted wash marks this as a special block — no left accent bar. */
+		background: oklch(from var(--color-accent) l c h / 0.045);
+		margin-bottom: 3rem;
+		transition: box-shadow var(--duration-normal) var(--ease-smooth),
+			transform var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+
+	.deep-card:hover {
+		box-shadow: var(--shadow-lg);
+		transform: translateY(-3px);
+		border-color: var(--color-accent);
+	}
+
+	.deep-inner {
+		padding: 2rem 2.5rem;
+	}
+
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 0.9rem;
+	}
+
+	.deep-inner h2 {
+		font-size: clamp(1.5rem, 3vw, 2rem);
+		margin: 0 0 0.55em;
+		line-height: 1.2;
+		letter-spacing: -0.015em;
+	}
+
+	.desc {
+		font-size: 1.05rem;
+		color: var(--color-text-secondary);
+		line-height: 1.65;
+		margin: 0 0 1.6em;
+		max-width: 62ch;
+	}
+
+	.metrics {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.6rem 2.2rem;
+		margin: 0 0 1.6em;
+		padding: 1.1rem 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.metric dt {
+		font-family: var(--font-mono);
+		font-size: 1.35rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+	}
+
+	.metric dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
+
+	.read-arrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--color-accent);
+	}
+
+	.read-arrow svg {
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+
+	.deep-card:hover .read-arrow svg {
+		transform: translateX(4px);
+	}
+
+	@media (max-width: 640px) {
+		.deep-inner { padding: 1.5rem; }
+		.metrics { gap: 1.1rem 1.6rem; }
+		.metric dt { font-size: 1.15rem; }
+	}
+</style>

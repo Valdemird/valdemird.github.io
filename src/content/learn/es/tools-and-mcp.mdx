@@ -1,0 +1,159 @@
+---
+title: "Una tool es UX para un LLM, no un wrapper de API"
+description: "Una tool es el espacio de acciones del POMDP del agente, diseñado para un lector estocástico, stateless y con presupuesto de tokens. La calidad del esquema y del naming moldea la política; la metadata de la tool es superficie de ataque."
+phase: 2
+order: 4
+tier: core
+durability: duradero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "Una tool es una interfaz de usuario cuyo usuario es un LLM: contexto finito, sin memoria entre turnos, propenso a errores semánticos. Diseña para ese lector, no para tu esquema de base de datos."
+  - "Esquema, nombres, forma del retorno y wording de los errores no son cosmética. Son el espacio de acciones del POMDP del agente, y moldean la política que el modelo puede expresar."
+  - "MCP es un estándar abierto, no solo un protocolo. La descripción de una tool entra al contexto antes de que la tool se ejecute, así que la metadata de terceros es input no confiable: una clase de ataque real, con CVEs."
+sources:
+  - { grade: "A", title: "Writing effective tools for agents — with agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/writing-tools-for-agents" }
+  - { grade: "A", title: "Code execution with MCP: building more efficient agents", author: "Anthropic (Jones, Kelly)", year: 2025, url: "https://www.anthropic.com/engineering/code-execution-with-mcp" }
+  - { grade: "A", title: "Introducing advanced tool use on the Claude Developer Platform", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/advanced-tool-use" }
+  - { grade: "A", title: "The Berkeley Function Calling Leaderboard (BFCL)", author: "Patil et al., UC Berkeley (Gorilla)", year: 2025, url: "https://gorilla.cs.berkeley.edu/leaderboard.html" }
+  - { grade: "B", title: "MCPTox: A Benchmark for Tool Poisoning Attack on Real-World MCP Servers", author: "arXiv 2508.14925", year: 2025, url: "https://arxiv.org/pdf/2508.14925" }
+  - { grade: "B", title: "From REST to MCP: An Empirical Study of API Wrapping", author: "arXiv 2507.16044", year: 2025, url: "https://arxiv.org/pdf/2507.16044" }
+  - { grade: "B", title: "MCP Specification 2025-06-18", author: "Model Context Protocol", year: 2025, url: "https://modelcontextprotocol.info/specification/" }
+  - { grade: "C", title: "ETDI: Mitigating Tool Squatting and Rug Pull Attacks in MCP", author: "arXiv 2506.01333", year: 2025, url: "https://arxiv.org/html/2506.01333v1" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+El instinto de todo ingeniero de backend que construye tools para un agente es el mismo, y está equivocado. Miras tu base de datos, ves `users`, `events`, `appointments`, y expones una tool por tabla por operación: `list_users`, `get_event`, `create_event`, `cancel_event`. Eso refleja tu esquema a la perfección. También empeora al agente.
+
+Una tool no es un endpoint que le pasaste al modelo. Es una interfaz de usuario cuyo usuario resulta ser un LLM, y ese usuario tiene las tres propiedades del módulo del sustrato. Tiene una ventana de contexto finita. No recuerda nada entre turnos. Comete errores semánticos, no lógicos. En cuanto diseñas para *ese* lector en vez de para tu modelo de datos, casi toda decisión se invierte.
+
+<Callout type="important" title="El único reencuadre">
+El conjunto de tools que expones es el **espacio de acciones del POMDP del agente**. El modelo solo puede actuar a través de lo que definiste, y elige entre ellas razonando sobre los nombres, esquemas y descripciones que escribiste. Así que esas cadenas no son documentación: son la superficie de la política. Mal esquema, mala política. No hay otro lugar aparte donde viva "la lógica de verdad".
+</Callout>
+
+## Consolida por workflow, no por endpoint
+
+La pregunta de granularidad tiene una respuesta limpia: la unidad correcta es un workflow que el agente completa, no un endpoint que tu API cubre. La guía de Anthropic es explícita en colapsar `list_users` + `list_events` + `create_event` en un único `schedule_event`. El agente tenía que hacer tres llamadas correctas, sostener dos resultados intermedios en contexto y no perder el hilo entre ellas. Ahora hace una.
+
+Hay peso empírico detrás. Un estudio de 2025 sobre envolver automáticamente APIs REST en servidores MCP encontró que las tools generadas son de baja calidad para agentes precisamente porque la granularidad y las descripciones se heredan del API, no del workflow. El auto-wrapping sirve para un prototipo y es peligroso como estrategia de diseño.
+
+Cuando sí expongas varias tools del mismo dominio, prefíjalas (`asana_search`, `asana_projects_search`) para que el modelo no esté eligiendo entre nombres que colisionan semánticamente.
+
+## Devuelve semántica, no filas crudas
+
+El modelo razona sobre lo que le devuelves. Dale un UUID y un MIME type y no tiene con qué razonar; dale un nombre y un tipo de archivo y sí. El cambio es trivial (devolver `name` en vez de `user_id`, `"image/png"` mostrado como `"imagen PNG"`) y su impacto en el razonamiento posterior del modelo es desproporcionadamente grande frente al esfuerzo.
+
+Acompáñalo con un control de verbosidad. Un enum `response_format` de `concise | detailed` deja que el agente pida cerca de un tercio de los tokens cuando no necesita el objeto completo, y el objeto entero cuando sí. Combínalo con defaults sensatos de paginación y truncamiento. Claude Code corta las respuestas de tools a 25K tokens por defecto, y eso es una decisión de diseño sobre el presupuesto de tokens, no un accidente de infraestructura.
+
+<Callout type="tip" title="La salida también es parte del espacio de acciones">
+Una tool que devuelve 8.000 tokens de JSON no "tuvo éxito": tuvo éxito y luego envenenó los siguientes turnos de razonamiento con ruido. Trata la *forma y el tamaño* del valor de retorno como parte del diseño de la tool, con el mismo cuidado que le darías a su esquema de entrada.
+</Callout>
+
+Aquí está el contraste en un solo esquema. Misma capacidad, dos granularidades.
+
+<CodeBlock filename="schedule_event.tool.ts">
+```ts
+// ❌ Espejo CRUD: 3 tools, el agente orquesta
+// list_users(query) -> [{ user_id: "u_8f3a..." }]
+// list_events(user_id, range) -> [{ event_id, start_iso }]
+// create_event(user_id, start_iso, title) -> { event_id }
+
+// ✅ Tool de workflow: una llamada, retorno semántico, control de formato
+{
+  name: "schedule_event",
+  description:
+    "Agenda un evento para una persona por su nombre. Resuelve a la " +
+    "persona, verifica su disponibilidad en la ventana dada y crea el " +
+    "evento. Usa esto en vez de buscar usuarios y eventos por separado.",
+  input_schema: {
+    type: "object",
+    properties: {
+      attendee_name: { type: "string", description: "Nombre completo, p.ej. 'Ana Ríos'" },
+      window:        { type: "string", description: "Intervalo ISO-8601, p.ej. 2026-06-20/2026-06-21" },
+      title:         { type: "string" },
+      response_format: { enum: ["concise", "detailed"], default: "concise" },
+      idempotency_key: { type: "string", description: "Estable por reserva pretendida; reúsala en el retry" }
+    },
+    required: ["attendee_name", "window", "title", "idempotency_key"]
+  }
+}
+// Devuelve: { event: "Sync con Ana Ríos, 20 jun 3:00pm", status: "booked" }
+// no:       { event_id: "evt_2a91...", attendee: "u_8f3a...", ts: 1750... }
+```
+</CodeBlock>
+
+## Más tools no es más capaz
+
+El folklore dice que una caja de herramientas más grande es un agente más fuerte. La medición dice lo contrario. La precisión de selección de tool se degrada al crecer el catálogo: la cifra que se cita es una caída del 7-85%, y la selección tipo retrieval empieza a fallar incluso en recuperar la tool correcta. Cinco servidores MCP conectados pueden costar unos 55K tokens de definiciones antes del primer mensaje del usuario; añade un servidor de Jira y cruzas los 100K.
+
+<Callout type="warning" title="Lee con cuidado la cifra del 7-85%">
+Ese rango es un efecto reportado real, no una línea limpia de un único benchmark. La caída depende muchísimo del modelo, del catálogo y de qué tan parecidos sean los nombres de las tools. Lo que se sostiene es la *dirección* (más tools, peor selección), no una ley precisa que puedas citar con dos cifras significativas. [D] Trátalo como "mide tu propia degradación", no como dogma.
+</Callout>
+
+Esta es la justificación de tres cosas que parecen optimizaciones pero que son requisitos de fiabilidad cuando un catálogo se vuelve real: namespacing, una allowlist por contexto para que solo las tools relevantes sean visibles cada turno, y descubrimiento dinámico en vez de cargarlo todo de antemano.
+
+## Progressive disclosure y code execution
+
+El giro de 2025-2026 va de "el modelo elige entre N tools cargadas de antemano" a "el modelo descubre tools bajo demanda y las orquesta en código". Dos patrones lo llevan.
+
+Progressive disclosure: cargar nombre y descripción primero, las instrucciones cuando la tool se vuelve relevante, los materiales completos solo en ejecución. El Tool Search Tool implementa justo esto: `defer_loading` marca tools que se encuentran por búsqueda en vez de precargarse, y Anthropic reporta cerca de -85% de tokens con la precisión de selección *subiendo*, no bajando (Opus 4.5: 79.5% → 88.1%). No rompe el prompt caching. La misma forma alimenta los Agent Skills (un `SKILL.md` que revela profundidad bajo demanda), adoptados como patrón abierto en varios labs a lo largo de finales de 2025 y dentro de 2026. [D] La cronología exacta es más difusa de lo que afirman algunos textos, así que no la fijo a un solo mes.
+
+El code execution con MCP va más lejos: presentar los servidores como código navegable y dejar que el modelo escriba un programa que llama tools en un sandbox.
+
+<MermaidDiagram title="Por qué el code execution ahorra presupuesto de tokens" chart={`
+graph TD
+  A["Cadena de tool calls"] --> B["Cada resultado intermedio<br/>vuelve a pasar por el modelo"]
+  B --> C["Un transcript de 2h pasa<br/>el contexto dos veces"]
+  D["Code execution en sandbox"] --> E["Los intermedios se quedan en el sandbox;<br/>solo vuelve el resultado final"]
+  E --> F["El PII puede tokenizarse<br/>antes de tocar el modelo"]
+`} />
+
+La cifra de portada de Anthropic es un workflow que cae de ~150K a ~2K tokens (98.7%) al mantener los datos intermedios fuera del modelo. Loops, condicionales y manejo de errores se resuelven en código en vez de costar una inferencia del modelo cada uno.
+
+<Callout type="warning" title="El tradeoff honesto">
+El code execution requiere un sandbox seguro con límites de recursos. Ahora estás corriendo código escrito por el modelo contra tus tools. El ahorro de tokens es real y grande; el coste operativo y de seguridad de un sandbox también es real. No lo adoptes para un workflow de tres pasos que un par de tool calls resuelven sin problema.
+</Callout>
+
+## Los errores son un prompt en runtime
+
+El modelo no debuggea. Reacciona al texto. Un `422` no le enseña nada; "usa ISO-8601 para `start_time`; enviaste `5pm`" le permite regenerar el argumento correcto en el siguiente turno. El wording exacto de un mensaje de error cambia la tasa de auto-corrección, lo que convierte al texto del error en una superficie de prompt-engineering, no en un fallo que tragarse. La validación estructurada por campo (estilo Pydantic) mejora de forma medible la regeneración de argumentos. Un error es parte de la API.
+
+## Las escrituras necesitan idempotencia
+
+Los agentes reintentan. Reintentan por timeout, por debounce, por reanudación de sesión, por fallo transitorio. Una tool de escritura sin clave de idempotencia duplica la cita, el email, el cobro en cada retry. La disciplina es la aburrida de los sistemas distribuidos: contrato explícito, clave de idempotencia por operación pretendida, una máquina de estados para el trabajo de larga duración. Falta en casi toda demo y no es negociable en producción. (Fíjate en el `idempotency_key` del esquema de arriba: por eso es `required`.)
+
+## MCP es un grafo de confianza, y la metadata es la superficie de ataque
+
+MCP es un estándar abierto introducido por Anthropic en noviembre de 2024 para conectar agentes con tools y datos. Es genuinamente útil para interoperar con tools de terceros. Tampoco es gratis, y el coste que se minimiza es la seguridad.
+
+Este es el mecanismo. La descripción de una tool se carga en el contexto del modelo *antes* de que la tool se llame siquiera. Así que una descripción maliciosa puede inyectar instrucciones que corren durante el razonamiento del agente, por delante de cualquier invocación. Es una clase reconocida (tool poisoning, line jumping, rug pulls) con CVEs reales detrás.
+
+<Tabs labels={["Tool poisoning", "Rug pulls / squatting", "Inyección → ejecución"]}>
+<TabPanel>
+Instrucciones ocultas embebidas en la metadata de una tool. El benchmark MCPTox inyectó instrucciones maliciosas en la metadata de tools de 45 servidores MCP reales (353 tools, 1.312 casos) y midió con qué frecuencia el *agente* terminaba manipulado: éxito de ataque hasta ~72%, con el alineamiento de seguridad actual ofreciendo poca protección pre-ejecución. Ojo con lo que mide: la susceptibilidad del agente cuando la metadata está envenenada, no qué tan comunes son los servidores envenenados en la naturaleza.
+</TabPanel>
+<TabPanel>
+Un servidor que aprobaste cambia silenciosamente la definición de una tool después del hecho. **CVE-2025-54136 ("MCPoison")** es exactamente esto: un rug pull demostrado contra Cursor, donde una config MCP aprobada se reemplazó después. La defensa es vincular la confianza al *contenido* firmado, no al nombre de la tool.
+</TabPanel>
+<TabPanel>
+**CVE-2025-54135 ("CurXecute")** y la entrada más amplia de OWASP sobre inyección de prompts vía descripciones de tools cubren el camino de una descripción envenenada a ejecución real de comandos. La lección: la descripción de una tool de terceros es input no confiable, punto.
+</TabPanel>
+</Tabs>
+
+<Callout type="note" title="Lo que la spec ya hace por ti">
+La MCP Specification 2025-06-18 añadió structured tool output, elicitation (un servidor pidiéndole datos al usuario a mitad de operación) y, relevante aquí, un OAuth Resource Server obligatorio con Resource Indicators (RFC 8707) para defender contra ataques de confused-deputy y fuga de tokens. El protocolo se está endureciendo; trátalo como un piso, no como un techo.
+</Callout>
+
+La postura de diseño que se deriva: trata las descripciones de tools de terceros como input no confiable. Fija versiones, re-aprueba ante cualquier cambio en una descripción, y si adoptas code execution, córrelo en un sandbox. El spotlighting solo por prompt no basta sin verificación de origen.
+
+<Collapsible title="Profundizar: lo que el consenso todavía ignora">
+Algunas cosas infravaloradas respecto a cuánto muerden en producción. **Tool restraint**: medir cuándo el agente *no* debe llamar una tool es tan importante como la precisión de llamada, y la mayoría de equipos lo omite. BFCL cubre la detección de irrelevancia desde V2 (sus novedades de V4 son el eje agéntico: web search multi-hop, memoria, sensibilidad de formato), así que constrúyelo dentro de tus evals. **Path jails default-deny**: una allowlist fija de claves de input se evade en cuanto sale una tool nueva con un parámetro `path`; centraliza el guard como un único choke-point default-deny aplicado a *toda* tool, no por clave. **El JSON Schema no basta** para expresar patrones de uso (qué opcionales incluir, qué combinaciones son válidas). Por eso existen los `input_examples`, que subieron la precisión en parámetros complejos del 72% al 90% en las pruebas de Anthropic. Y desarrolla tools como afinarías un prompt: corre evals multi-paso realistas, lee los transcripts, refina las descripciones contra impacto medido en vez de a ojo.
+</Collapsible>
+
+Nada de esto está cerrado, y la frontera se sigue moviendo a medida que la API absorbe patrones que el año pasado eran código del harness. El hilo que sobrevive a cada giro es el reencuadre del principio: no estás exponiendo funciones a un programa. Estás diseñando una interfaz para un lector que piensa en tokens, olvida entre turnos y confía en las cadenas que escribiste.

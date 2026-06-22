@@ -1,0 +1,177 @@
+---
+title: "The agent is a policy over a POMDP, not 'an LLM with tools'"
+description: "One mental model unifies RAG, memory, HITL, and evals: the agent is a stochastic policy acting on a partially observed world. Workflow vs agent is a control-flow choice, and compounding error is what forces the architecture."
+phase: 1
+order: 2
+tier: fundamento
+durability: atemporal
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "An agent is a policy π(action | observation, history) acting on a POMDP. The context is the belief state, the tools are the action space, the harness is the transition dynamics."
+  - "Workflow vs agent isn't 'does it use an LLM?' — it's who controls the trajectory. Code does, or the model does at runtime."
+  - "Per-step error compounds. Reliability per step beats raw model capability on long horizons, and that math forces verify-steps and HITL — they aren't optional polish."
+sources:
+  - { grade: "A", title: "Building Effective Agents", author: "Anthropic (Schluntz, Zhang)", year: 2024, url: "https://www.anthropic.com/research/building-effective-agents" }
+  - { grade: "A", title: "The Landscape of Agentic Reinforcement Learning for LLMs: A Survey", author: "arXiv 2509.02547", year: 2025, url: "https://arxiv.org/html/2509.02547v5" }
+  - { grade: "A", title: "Effective Context Engineering for AI Agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
+  - { grade: "A", title: "The Illusion of Diminishing Returns: Measuring Long Horizon Execution in LLMs", author: "arXiv 2509.09677", year: 2025, url: "https://arxiv.org/pdf/2509.09677" }
+  - { grade: "A", title: "A Reduction of Imitation Learning and Structured Prediction (DAgger)", author: "Ross, Gordon & Bagnell", year: 2011, url: "https://arxiv.org/abs/1011.0686" }
+  - { grade: "A", title: "Levels of Autonomy for AI Agents", author: "Feng et al. (Knight First Amendment Institute / arXiv 2506.12469)", year: 2025, url: "https://arxiv.org/pdf/2506.12469" }
+  - { grade: "B", title: "Don't Build Multi-Agents", author: "Cognition (Walden Yan)", year: 2025, url: "https://cognition.ai/blog/dont-build-multi-agents" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+
+The difference between an agent that survives production and one that collapses is rarely in the model. It's in whether you designed it as what it actually is: a policy acting on a partially observed system, picking the next action from an incomplete belief about a state it never sees whole. "LLM + tools" is the toy schematic. The POMDP is the engineering blueprint. Once you look at the agent through this lens, decisions that felt ad-hoc (what to put in context, when to verify, which tool to expose, when to ask permission) collapse into the same three questions every time. What belief am I acting on, what transition do I cause, what reward am I chasing?
+
+<Callout type="important" title="The one mental model">
+An agent is a policy **π(action | observation, history)**. The LLM-reasoner *is* π: it maps (system prompt + observation-action history) → action. The harness runs that action against an environment, and the resulting observation (the real ground truth, not the model's prediction) feeds the next step. Everything else (RAG, memory, HITL, evals) derives from this.
+</Callout>
+
+The formal statement, LLM agent as a policy over a POMDP versus the degenerate one-shot MDP of a single API call, comes from the 2025 agentic-RL survey. You don't need the formalism to build. You need the decomposition, because it renames problems you already have into problems you can reason about.
+
+## POMDP, in the words you already use
+
+The letters look academic. They aren't. Each one is a question you ask on every feature.
+
+| POMDP symbol | In an LLM agent | The engineering question you were already asking |
+| --- | --- | --- |
+| **S**, hidden state | The real state of the world (e.g. the actual rows in the database) | (the agent never sees this directly) |
+| **O**, observation | What the agent sees: messages, documents read, tool results | What do I put in context? |
+| **b**, belief state | The context window: the agent's estimate of S | What do I keep, compact, or externalize? |
+| **A**, action space | The set of available tools | Which tools do I expose? |
+| **T**, transition | The harness: worker, DB, locks, persistence | How does the effect execute and persist? |
+| **R**, reward | The task-success eval | How do I know it did the job? |
+| **π**, policy | The LLM conditioned by the system prompt | How does it pick the next action? |
+
+<Callout type="important" title="The context IS the belief state">
+The context isn't "the prompt." It's the finite belief the policy operates on. Curating it, deciding what enters, what gets compacted, what gets externalized, is not a prompting detail. It's deciding **which reality your agent acts on.**
+</Callout>
+
+The analogy I keep using: an ER doctor at 3am never sees directly inside the patient (the hidden state S). They get partial observations (what the patient says, a blood panel, a monitor), form a *belief* about the diagnosis, take an action (order a test, give a drug), and then wait for the real result before the next decision. They don't act on what they *think* the test will say. They act on what it *does* say. An agent that trusts its own prediction instead of executing and observing is a doctor prescribing off a blood panel they only imagined. [That last bit is my framing, not a cited result.]
+
+Partial observability explains the classic failures with one cause instead of a shrug at "the model being dumb." The agent **hallucinates** (it filled unobserved S with a false belief), **repeats actions** (its belief never recorded that it already acted), or **gets lost** (the belief degraded when the window overflowed). All three are pathologies of the belief state.
+
+## Workflow vs agent: who controls the trajectory
+
+The most misread distinction in the field isn't "does it use an LLM?" It's **who decides the trajectory.** In a workflow, the paths are predefined in code: you fix the flow, and the LLM fills slots inside branches you already drew. In an agent, the LLM directs its own steps and tool use at runtime.
+
+<MermaidDiagram title="Workflow vs agent: where the control flow lives" chart={`
+graph TB
+  subgraph W["Workflow"]
+    direction LR
+    A1[code] --> A2[LLM] --> A3[code] --> A4[branch]
+  end
+  subgraph G["Agent"]
+    direction LR
+    B1[LLM picks action] --> B2[tool] --> B3[observe] --> B1
+  end
+`} />
+
+Most of the production systems people called "agentic" in 2025 were workflows with an LLM as a component. That's not an insult, it's the recommendation. Anthropic names five workflow patterns that cover most cases before you need a full agent: prompt chaining (sequential), routing (classify and dispatch), parallelization (sectioning/voting), orchestrator-workers (a lead delegates dynamically), and evaluator-optimizer (generate and critique in a loop). Confusing workflow with agent produces the archetypal over-engineering: a reasoning loop where a 10ms API call would have done.
+
+<Callout type="note" title="The atom underneath both">
+The base unit isn't the raw LLM. It's the **augmented LLM** = LLM + retrieval + tools + memory, each with its own interface. This matters because it stops you treating RAG, memory, and tools as loose features. They're the three ways to extend the belief state beyond the context window. Workflows and agents are *molecules* built on this atom.
+</Callout>
+
+## The loop is a control loop, not a long thought
+
+The control loop is `gather context → take action → verify → repeat`. What separates an agent from a long chain-of-thought is that every step receives a **real observation from the environment**, not a prediction from the model. The verify step, comparing against ground truth each iteration, is what stops the error from compounding. Treating the model's output as truth instead of executing the action and observing is chain-of-thought wearing an agent costume, and it's the number-one failure mode.
+
+<Callout type="warning" title="No verify step, no agent">
+Without verification against ground truth, even high per-step accuracy decays over a long horizon. Verification isn't a quality extra. It's the only thing that breaks the error cascade we're about to quantify.
+</Callout>
+
+## The arithmetic that governs the architecture
+
+Here's the click moment. Model each step as succeeding independently with probability `p`. Then a `t`-step task succeeds with probability `p^t`. Linear intuition betrays you hard:
+
+| Per-step accuracy (p) | Steps (t) | Task success (p^t) |
+| --- | --- | --- |
+| 90% | 10 | **≈ 35%** (0.90¹⁰ = 0.3487) |
+| 99% | 100 | **≈ 37%** (cumulative failure ≈ 63%) |
+| 99.9% | 100 | ≈ 90% |
+
+An agent that nails 90% of its steps fails two out of three ten-step tasks.
+
+<Callout type="warning" title="Read p^t as a heuristic, not a theorem">
+The `p^t` model assumes independent, identically reliable steps, which agents are not: steps correlate, error recovers, the harness intervenes. So `p^t` is a back-of-envelope reliability gauge, useful for the shape of the problem, not a proof. The established imitation-learning result is stronger and different: compounding error grows **quadratically** with the horizon (on the order of εT², from Ross & Bagnell's DAgger analysis), because a small per-step error rate ε pushes the policy into states it never trained on, where it errs more. Cite p^t for intuition. Cite εT² when you need the real theory.
+</Callout>
+
+<Callout type="warning" title="The '63%' number needs a horizon">
+You'll see "1% per-step error → 63% failure." That's only true at **t = 100 steps** (1 − 0.99¹⁰⁰ ≈ 0.634). Without fixing t the claim is mathematically undefined. Always state the horizon when you quote it.
+</Callout>
+
+The 2025 finding that matters: near `p ≈ 1`, tiny improvements in step accuracy produce huge jumps in the reachable horizon. That's why **reliability per step dominates raw capability** on long-horizon tasks. Going from 99% to 99.9% per step (by engineering reliability: solid tools, verification, poka-yoke) buys you more, over a long horizon, than swapping in a "smarter" model.
+
+<Collapsible title="Why this forces architecture instead of suggesting it">
+HITL on writes, checkpoints, an explicit verify step, shorter horizons, task decomposition: none of these are style preferences. They're direct consequences of compounding error. If you can't push p higher, you shorten t. If you can't shorten t, you insert a human or a verifier to reset the effective error each step. The math doesn't care about your taste; it tells you the only three levers you have: raise p, lower t, or break the chain.
+</Collapsible>
+
+## Autonomy is a spectrum, set per action
+
+Autonomy isn't a binary, and it isn't an L1–L5 capability ladder. It's a spectrum defined by the **role the human takes**: operator (directs each action) → collaborator (approves each decision, HITL) → consultant (the agent proposes, the human decides) → approver → observer (the agent acts alone). More autonomy isn't better. You grade it by **reversibility and stakes.**
+
+<Callout type="tip" title="Set the spectrum per action, not per system">
+Reads can live at "observer": they auto-execute. Irreversible writes belong at "approver": they get a confirmation gate. Almost nobody designs autonomy at the level of the individual tool, which is exactly where HITL actually lives. You map the spectrum onto your action space.
+</Callout>
+
+Which loops back to the highest-leverage question in the whole field. It's almost never "which agent framework?" It's "do I even need an agent, or does a workflow or a single LLM call solve this cheaper, faster, more predictably?" The decision ladder:
+
+1. **Rules engine**, if every valid output is enumerable in tests. Microseconds, zero cost, no plausible-but-wrong.
+2. **One LLM call** (+ in-context examples), you need language understanding but the flow is fixed.
+3. **Workflow**, there are known branches; draw them as a flowchart in code.
+4. **Agent**, only if the action space is open, the horizon variable, and the trajectory unpredictable.
+
+The default is the simplest thing that works. The agent earns its place only when its performance gain pays for the latency, cost, and compounding error it brings.
+
+## Tools are the action space
+
+The agent's action space *is* its tool set, and the quality of that set shapes the policy as much as the model does. Designing the Agent-Computer Interface is designing the action space of the POMDP: obvious names, examples, documented edge cases, error-proof formats (poka-yoke), and, this one gets skipped, **restricting the set** to cut the policy's variance.
+
+<CodeBlock filename="tool-restraint.ts" lang="typescript">
+```ts
+// A wide-open tool set is high policy variance + a bigger attack surface.
+// Fewer, sharper tools make a modest model reliable.
+const DISALLOWED = ['Bash', 'Write', 'Edit', 'WebFetch', 'Task'];
+
+// The action space is a security and reliability lever,
+// not just a capability list. Default-deny, then add what the
+// task actually needs, never the reverse.
+```
+</CodeBlock>
+
+A bad ACI degrades any model. A good one makes a modest model dependable. The action space is an underrated reliability lever next to the endless debate over which model to pick.
+
+## What the consensus over- and under-weights
+
+<Tabs labels={["Overrated", "Underrated"]}>
+<TabPanel>
+
+- **"More agentic = better."** False. In 2025 the deterministic workflows won production.
+- **Multi-agent by default.** It only wins on parallelizable, read-heavy work; on shared state it produces conflicting decisions.
+- **Heavy frameworks as a starting point.** They hide the loop. Direct API calls first: most patterns are a few lines.
+- **"Agent = LLM + tools."** Incomplete. It ignores the loop, the environment, and partial observability, the things that actually define an agent.
+
+</TabPanel>
+<TabPanel>
+
+- **Computing the error budget before designing the horizon.** Almost nobody does it; it's why verify-steps and HITL aren't optional.
+- **Reliability per step ≫ capability.** Near p ≈ 1, engineering reliability beats swapping models.
+- **The context IS the belief state.** Curating it is first-order architecture, not a prompting detail.
+- **The environment is part of the agent.** The harness, locks, and persistence *are* the transition dynamics T.
+
+</TabPanel>
+</Tabs>
+
+<Collapsible title="The Anthropic vs Cognition tension on multi-agent">
+This isn't a settled consensus, it's a real disagreement between two serious labs. Anthropic reports an orchestrator-worker system (an Opus lead plus Sonnet subagents) beating the single agent by 90.2% on its internal research eval: multi-agent wins on *read-heavy, parallelizable* tasks where each subagent explores an independent branch. Cognition argues the opposite for *shared-state* tasks: parallel subagents make independent decisions that conflict on recomposition, and they advocate single-threaded plus a compressor LLM. They don't contradict each other so much as bound the domain. Parallelize independent reads; stay single-threaded when there's writing or shared state. (One precision note: Cognition popularizes and defines "context engineering" but didn't coin it; that's usually credited to Tobi Lütke and Andrej Karpathy, mid-2025.)
+</Collapsible>
+
+The point of the lens isn't elegance. It's that once the agent is a policy on a POMDP, the rest of the path stops being a list of disconnected techniques. Context engineering is curating the belief. RAG and agentic search are ways to extend it. HITL and safety are grading autonomy per action. Evals measure the policy, not the answer. They were one thing the whole time.

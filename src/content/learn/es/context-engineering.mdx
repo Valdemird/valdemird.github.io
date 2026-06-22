@@ -1,0 +1,165 @@
+---
+title: "Context engineering: curar el estado de creencias en cada turno"
+description: "El contexto no es un cubo que llenas, es un presupuesto de atención finito que gastas cada turno. Just-in-time retrieval, compaction y las cuatro patologías que vuelven tonto a tu agente conforme crece la conversación."
+phase: 2
+order: 3
+tier: core
+durability: duradero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "El contexto es un presupuesto de atención finito, no almacenamiento. La meta es el mínimo conjunto de tokens de alta señal que maximiza la probabilidad del resultado correcto, no '¿cabe en la ventana?'."
+  - "Más contexto degrada la precisión (context rot), no solo el coste. El fallo es no-uniforme: peor en tareas semánticas, con distractores y lejos del inicio y el final de la ventana."
+  - "Just-in-time retrieval, la compaction como operación con pérdida y la memoria externalizada le ganan a volcarlo todo de antemano. El aislamiento con sub-agentes solo funciona para trabajo read-only."
+sources:
+  - { grade: "A", title: "Effective context engineering for AI agents", author: "Anthropic (Applied AI)", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
+  - { grade: "A", title: "Context Rot: Evaluating LLM Performance Degradation with Increasing Input Tokens", author: "Chroma Research", year: 2025, url: "https://www.trychroma.com/research/context-rot" }
+  - { grade: "A", title: "Effective harnesses for long-running agents", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents" }
+  - { grade: "A", title: "Don't Build Multi-Agents", author: "Cognition (Walden Yan)", year: 2025, url: "https://cognition.ai/blog/dont-build-multi-agents" }
+  - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
+  - { grade: "A", title: "MemGPT: Towards LLMs as Operating Systems", author: "Packer et al. (UC Berkeley)", year: 2023, url: "https://arxiv.org/abs/2310.08560" }
+  - { grade: "A", title: "Gemini 2.5 technical report (context poisoning, agente Pokémon)", author: "Google DeepMind", year: 2025, url: "https://arxiv.org/abs/2507.06261" }
+  - { grade: "B", title: "How Long Contexts Fail (How to Fix Your Context)", author: "Drew Breunig", year: 2025, url: "https://www.dbreunig.com/2025/06/22/how-contexts-fail-and-how-to-fix-them.html" }
+  - { grade: "B", title: "Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory", author: "Mem0", year: 2025, url: "https://arxiv.org/pdf/2504.19413" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+El principiante cree que la ventana de 200K o 1M tokens es un cubo que se va llenando: cuanto más metes, más sabe el agente. La realidad es lo contrario. El contexto es un recurso finito, no-uniforme y degradable que tienes que curar en cada turno. Cada token irrelevante que añades no solo cuesta dinero y latencia. Cuesta precisión. Este módulo va de pensar el contexto como un sistema operativo administra la RAM, y de tener el vocabulario preciso para diagnosticar por qué tu agente "se vuelve tonto" conforme avanza la conversación.
+
+## El contexto se cura cada turno
+
+La línea entre prompt engineering y context engineering es temporal. El prompt engineering optimiza una cosa estática que escribes una vez: el system prompt. El context engineering gestiona el flujo completo de tokens (historial, resultados de tools, memoria, ficheros) que cambia a cada paso del loop agéntico. El system prompt sigue importando, pero tratado como un artefacto aislado es un subconjunto del problema, no el problema.
+
+El principio rector cabe en una frase de Anthropic: *"find the smallest set of high-signal tokens that maximize the likelihood of your desired outcome."* Eso convierte el diseño de contexto en una optimización con restricción, no en acumulación. La razón física: la atención del transformer es por pares, así que es O(n²), y los modelos tienen una cantidad limitada de parámetros entrenados para dependencias de largo alcance, de modo que la fiabilidad de recuperación se degrada conforme crece la longitud.
+
+<Callout type="important" title="El presupuesto de atención">
+No preguntes "¿cabe en la ventana?". Pregunta "¿cuál es el mínimo conjunto de tokens de alta señal que maximiza la probabilidad del resultado correcto?". Todo lo demás se aísla, se comprime o se externaliza. La capacidad de la ventana no es la métrica que importa. Lo es la densidad de señal.
+</Callout>
+
+El marco más útil viene de MemGPT: trata la ventana de contexto como working memory limitada (RAM) y el almacenamiento externo como memoria de largo plazo (disco), con el LLM haciendo el paginado, decidiendo qué cargar y qué descargar, igual que un SO mueve páginas entre RAM y swap. La extensión pedagógica es mía: pensar el context bloat como *thrashing* (cuando un SO pasa más tiempo paginando que computando) explica por qué un agente con la ventana llena de basura razona peor aunque "todo quepa". [D]
+
+<MermaidDiagram title="La ventana es RAM, no un buffer infinito" chart={`
+graph LR
+  A["Working memory<br/>(ventana de contexto)"] --- B["Long-term store<br/>(notes.md, DB, ficheros)"]
+  A -.->|el LLM decide el paginado:<br/>cargar / descargar / compactar| B
+`} />
+
+## Context rot: el hallazgo que rompe la intuición
+
+La evidencia empírica central es el estudio *Context Rot* de Chroma, que evaluó 18 modelos frontera (Claude Opus 4, GPT-4.1, Gemini 2.5 y Qwen3 entre ellos) y mostró que los modelos no usan su contexto de forma uniforme: el rendimiento se vuelve crecientemente poco fiable conforme aumenta la longitud de entrada.
+
+<Callout type="warning" title="No exageres el hallazgo">
+Es incorrecto decir que "todos los modelos degradan a cada incremento de longitud". El estudio muestra degradación no-uniforme y dependiente de tarea y modelo, con curvas no-lineales. Es mucho peor en tareas **semánticas** (no léxicas), con **distractores** y con **baja similitud pregunta-respuesta**. No es monotónica en cada paso ni ocurre solo cerca del límite de la ventana.
+</Callout>
+
+Por eso el clásico needle-in-a-haystack (NIAH) léxico engaña como prueba de capacidad long-context: da ~100% y oculta la degradación real, porque buscar una cadena exacta es trivial al lado de razonar semánticamente sobre el contenido. Para medir algo real hacen falta benchmarks multi-paso como LongMemEval o LOCOMO.
+
+Dos resultados contra-intuitivos de Chroma que casi nadie aplica. Primero, la precisión es más alta cerca del inicio del contexto que en el medio (el viejo "lost in the middle"), así que poner lo crítico (instrucciones, reglas HITL) al frente es una palanca barata. Segundo, barajar el haystack (romper la coherencia local del relleno) a veces *mejora* el rendimiento: la estructura lógica del relleno puede confundir a la atención, lo que implica que "ordenar bonito" el contexto no siempre ayuda.
+
+## Las cuatro patologías: un vocabulario de diagnóstico
+
+"Context rot" describe *que* el contexto largo falla. Drew Breunig da la taxonomía de *por qué*, que es lo que te entrega un vocabulario para depurar: cuando tu agente se atonta, ¿es poisoning o distraction?
+
+<Callout type="note" title="Los cuatro modos de fallo de Breunig">
+- **Poisoning**: una alucinación o un dato hostil entra al contexto y se cita repetidamente, auto-reforzándose. El agente persigue un objetivo imposible o "recuerda" algo falso. Remedio: quarantine, validar lo que entra a memoria.
+- **Distraction**: el historial acumulado eclipsa las instrucciones del system prompt. El agente ignora reglas que antes seguía. Remedio: compaction, pruning.
+- **Confusion**: tools o contenido superfluo influyen en respuestas donde no debían. Selección de tool errónea. Remedio: reducir el set de tools, hacerlas no-ambiguas.
+- **Clash**: información contradictoria apilada en el contexto. El agente duda u oscila. Remedio: podar el conflicto, offloading.
+</Callout>
+
+El caso canónico de poisoning lo documenta Google DeepMind: en su agente que jugaba Pokémon con Gemini 2.5, una alucinación entró al contexto y se reforzó al citarse en turnos posteriores, desviando la estrategia. Esto conecta directo con seguridad: el poisoning es primo del prompt injection, porque un dato hostil inyectado vía conversación puede contaminar todos los turnos futuros. [D]
+
+## Just-in-time retrieval: el agente explora, tú no precargas
+
+En vez de precargar todos los datos en la ventana (estilo RAG de embeddings que inyecta un blob), el agente mantiene identificadores ligeros (paths, queries, links) y carga datos bajo demanda con tools, descubriendo relevancia progresivamente: el tamaño de un fichero insinúa complejidad, los nombres insinúan propósito, los timestamps insinúan recencia. El centro de gravedad pasa de "pipeline de recuperación" a "agente que explora".
+
+<Tabs labels={["Pre-loading (RAG de embeddings)", "Just-in-time (búsqueda agéntica)"]}>
+<TabPanel>
+Indexas todo el corpus, recuperas top-k por similitud, inyectas el blob en la ventana. Pagas el pipeline, la indexación y el drift, y el agente recibe lo que el retriever decidió. Sigue siendo la opción correcta para corpus enormes y heterogéneos.
+</TabPanel>
+<TabPanel>
+El agente usa grep/glob/read sobre ficheros y decide qué leer turno a turno. Sin embeddings, sin indexación. Para corpus acotados iguala o supera a RAG, y esquiva por completo el problema del drift del índice. El criterio del retriever lo reemplaza el del agente. [C]
+</TabPanel>
+</Tabs>
+
+El trade-off es real: just-in-time significa exploración más lenta en runtime y más turnos navegando. Para un conjunto pequeño de documentos que cambia seguido, es un buen trato. Para un millón de PDFs heterogéneos no lo es, y un híbrido (pre-indexar lo obvio, explorar el resto) suele ganar.
+
+## Compaction y memoria: descartar sin perder lo crítico
+
+Compaction no es "resumir". Es una operación con pérdida donde eliges qué tirar, con el riesgo de tirar contexto sutil pero crítico (una decisión de arquitectura, un bug sin resolver). La recomendación de Anthropic es maximizar recall primero, preservar de más, y luego iterar sobre la precisión eliminando lo superfluo.
+
+<Callout type="tip" title="Tool-result clearing">
+La forma de compaction de menor riesgo: borrar los outputs crudos de tools antiguas (lecturas de ficheros, búsquedas) una vez cumplido su propósito, conservando la decisión destilada. Bajo riesgo porque no toca el razonamiento, solo el contenido literal que ya no hace falta.
+</Callout>
+
+Pero compaction sola no basta en horizontes muy largos. Anthropic lo dice sin rodeos: incluso un modelo frontera como Opus 4.5 se queda corto en tareas de larguísimo horizonte solo con compaction. La complementas con memoria en filesystem (ficheros como `claude-progress.txt`, `feature_list.json`, git) más verification loops. Eso es structured note-taking: memoria long-term write-through que sobrevive a los resets de contexto.
+
+La distinción arquitectónica clave es short-term vs long-term. La memoria de corto plazo es el turno o la sesión (el transcript de la sesión). La de largo plazo cruza sesiones (un fichero de notas por usuario). Frameworks como Mem0 van más allá de la memoria "plana": añaden extracción y consolidación para recuperación selectiva, en vez de recargar el fichero entero cada vez.
+
+<Collapsible title="Profundizar: cómo aproxima la compaction un harness real">
+Un harness no necesita un paso explícito de compaction-LLM para sacar casi todo el beneficio. Un patrón común: rotar a una sesión nueva tras N turnos, persistir solo un puntero más el conteo de turnos, y reanudar con un fallback de recap si el resume del SDK falla (distinguiendo el abort por timeout de un error real). La memoria long-term es entonces un save write-through: la base de datos es la fuente de verdad, el fichero de notas local es la cache del turno. El transcript de la sesión es memoria de corto plazo; el fichero de notas es de largo plazo. Nada de esto es compaction "de verdad", pero la combinación de rotación más notas externalizadas cubre el mismo fallo que pretende prevenir: la ventana llenándose de turnos viejos.
+</Collapsible>
+
+## La tensión ignorada: pruning vs prompt caching
+
+Aquí está el conocimiento de producción que casi todos pasan por alto: comprimir o podar el historial invalida los prefijos cacheados. El prefix caching (el KV cache) exige prefijos estables. Si rotas o recortas el principio del prompt, el cache se rompe y vuelves a pagar el prefijo entero.
+
+<Callout type="warning" title="Cifras de caching: atribuye con cuidado">
+La cifra atribuible a fuente primaria: los tokens cacheados cuestan alrededor del 10% del precio de input (hasta ~90% de reducción de coste sobre el prefijo cacheado, más o menos 0.1x) y mejoran el time-to-first-token. Verás por ahí cifras como "5-12x de reducción" o "hit-rates del 60-85%": son estimaciones de práctica plausibles, no datos oficiales. Preséntalas como tales. [D]
+</Callout>
+
+El remedio es el layout cache-aware (dynamic-content-at-the-end): pon los prefijos estables (system prompt, definiciones de tools, persona) al **inicio** para maximizar el cache, y mueve lo que cambia cada request (timestamps, session ids, input del usuario) al **final**.
+
+<CodeBlock filename="prompt-layout.txt">
+```text
+[ system prompt ]   prefijo estable, cacheable (~0.1x en hits)
+[ defs de tools ]   prefijo estable
+[ persona       ]   prefijo estable
+[ historial     ]   semi-estable
+[ timestamp, session_id, input del usuario ]   volátil, va AL FINAL
+```
+</CodeBlock>
+
+El conflicto es real y es una decisión de arquitectura, no un detalle: gestión agresiva de contexto (pruning, compaction) contra hit rate del cache. El experto elige el trade-off coste-precisión-latencia de forma deliberada. Un matiz de durabilidad: este conocimiento de caching es efímero (las APIs cambian sus mecanismos), mientras que el presupuesto de atención es atemporal. [D]
+
+## Aislamiento vía sub-agentes, y su contra-tesis
+
+Un sub-agente con ventana limpia puede explorar con decenas de miles de tokens y devolver solo 1-2K tokens destilados al coordinador, manteniéndolo sin contaminar. Es aislamiento de contexto puro. Pero hay un debate genuino que un ingeniero serio tiene que saber arbitrar.
+
+<Tabs labels={["Anthropic: multi-agente sí", "Cognition: no lo hagas"]}>
+<TabPanel>
+Para investigación read-heavy y paralela con tareas self-contained, los sub-agentes funcionan: cada uno trae su hallazgo condensado y no coordinan a mitad de tarea. El régimen donde el multi-agente se gana su sitio es la investigación paralela, intensiva en lectura.
+</TabPanel>
+<TabPanel>
+Las acciones llevan decisiones implícitas; los sub-agentes paralelos toman decisiones conflictivas que no se reconcilian. El ejemplo: pides un Flappy Bird y sale algo medio Super Mario. El argumento es single-threaded más un LLM de compresión dedicado.
+</TabPanel>
+</Tabs>
+
+<Callout type="important" title="La regla que reconcilia el debate">
+Aísla contexto con sub-agentes solo para tareas read-only / sin estado compartido (investigación, búsqueda, resumen). Nunca para trabajo write que requiere decisiones coherentes. La pericia está en saber cuándo *no* usar multi-agente. [D]
+</Callout>
+
+## Lo que el consenso sobrevalora y lo que ignora
+
+Sobrevalorado: la obsesión con ventanas más grandes (1M tokens) como solución; el context rot demuestra que llenar la ventana degrada la precisión, lo que importa es la densidad de señal, no la capacidad. El prompt engineering como disciplina autónoma; es un subconjunto del context engineering. El NIAH léxico como prueba de capacidad. El multi-agente "por defecto porque escala". El RAG de embeddings como respuesta automática a "no cabe".
+
+Ignorado o subutilizado: la degradación depende de la posición, así que poner instrucciones y reglas HITL al inicio es una palanca casi gratis que casi nadie aplica a propósito. Las tools también son contexto: definiciones bloated o ambiguas causan confusion, así que reducir y desambiguar el set de tools es context engineering, no solo diseño de API. La memoria sin verificación es deuda: una memoria write-through sin gate de calidad puede persistir datos envenenados que contaminan todos los turnos futuros. Y la estructura ayuda: headers Markdown o XML y secciones mejoran el seguimiento de instrucciones frente a "todo en un blob".
+
+## Errores comunes
+
+<Callout type="warning" title="Anti-patrones de gestión de contexto">
+- **"Más contexto = mejor"**: precargar todo ignora el context rot y quema coste sin comprar precisión.
+- **Compactar agresivamente sin recall-first**: pierdes decisiones de arquitectura y bugs sutiles que el agente luego ignora.
+- **Multi-agente por defecto para escrituras compartidas**: el síndrome Flappy-Bird-que-sale-Mario.
+- **Timestamps e ids en el prefijo**: rompe el KV cache en cada request y multiplica coste y latencia.
+- **Confiar ciegamente en la memoria long-term**: un dato malo persiste y envenena cada turno posterior.
+- **Medir solo con NIAH léxico**: y declararte seguro cuando las tareas reales son semánticas y multi-paso.
+</Callout>
+
+El hilo conductor es un reflejo. Cuando el agente se degrada en una corrida larga, no busques una ventana más grande. Nombra la patología, encuentra los tokens viejos y decide qué descartar: ese es el loop sobre el que corre todo este campo.

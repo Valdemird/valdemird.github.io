@@ -1,0 +1,148 @@
+---
+title: "Post-training y RL: por qué el modelo se comporta como lo hace"
+description: "El pretraining da la distribución base; SFT, optimización de preferencias y RLVR la moldean en un agente. La receta (GRPO + recompensas verificables) explica los priors del modelo y su frontera de fiabilidad, y tus graders de evals son el mismo objeto que entrenan los labs."
+phase: 8
+order: 15
+tier: frontera
+durability: efimero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "El post-training es lo que convierte un predictor de tokens en un agente: SFT graba el formato, la optimización de preferencias alinea estilo y seguridad, RLVR hace emerger razonamiento largo y tool-use."
+  - "Casi nunca vas a entrenar. El punto de entender esto es razonar sobre por qué el modelo miente, adula o se inventa una cadena plausible-pero-falsa, en vez de parchear síntomas con prompts."
+  - "El grader que escribiste y una recompensa de entrenamiento son el mismo objeto. Un grader verificable es una recompensa verificable; solo lo consumes distinto."
+sources:
+  - { grade: "A", title: "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning", author: "DeepSeek-AI (también en Nature, vol 645 pp 633-638)", year: 2025, url: "https://www.nature.com/articles/s41586-025-09422-z" }
+  - { grade: "A", title: "A Practitioner's Guide to Multi-turn Agentic Reinforcement Learning", author: "Wang & Ammanabrolu, UC San Diego", year: 2025, url: "https://arxiv.org/html/2510.01132v1" }
+  - { grade: "A", title: "Agent-RLVR: Training Software Engineering Agents via Guidance and Environment Rewards", author: "arXiv 2506.11425", year: 2025, url: "https://arxiv.org/abs/2506.11425" }
+  - { grade: "A", title: "Constitutional AI: Harmlessness from AI Feedback / capítulo CAI del RLHF Book", author: "Anthropic; Nathan Lambert (rlhfbook.com)", year: 2022, url: "https://rlhfbook.com/c/13-cai" }
+  - { grade: "A", title: "Inference-Time Reward Hacking in Large Language Models", author: "NeurIPS 2025 poster", year: 2025, url: "https://neurips.cc/virtual/2025/poster/116653" }
+  - { grade: "B", title: "RLHF Book (taxonomía de post-training, sycophancy)", author: "Nathan Lambert (rlhfbook.com)", year: 2025, url: "https://rlhfbook.com/" }
+  - { grade: "B", title: "Direct Preference Optimization (DPO)", author: "Rafailov et al.; resumen de Cameron Wolfe", year: 2023, url: "https://cameronrwolfe.substack.com/p/direct-preference-optimization" }
+  - { grade: "B", title: "RL Posttraining for Tool-Using Agents: GRPO, Async RL, and Reward Design in 2026", author: "Zylos Research", year: 2026, url: "https://zylos.ai/en/research/2026-04-10-rl-posttraining-tool-using-agents-grpo-async-rl/" }
+  - { grade: "C", title: "Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?", author: "Gekhman et al., EMNLP", year: 2024, url: "https://arxiv.org/abs/2405.05904" }
+  - { grade: "D", title: "Síntesis del autor: 'Agente = Modelo + Harness', separación de capas, Goodhart sobre jueces", author: "valdemird.com", year: 2026 }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+Casi nunca vas a entrenar un modelo. Y aun así, entender el post-training es lo que separa al ingeniero de agentes que sabe razonar sobre *por qué su modelo miente, adula o se inventa un razonamiento plausible-pero-falso* del que parchea síntomas con prompts y se sorprende cuando vuelven. Este módulo cierra un círculo. El grader que escribiste en la fase de evals es, literalmente, una función de recompensa de entrenamiento. Quien domina diseñar recompensas no-hackeables domina las dos caras de la moneda: evaluar y entrenar.
+
+<Callout type="important" title="Este es un módulo de frontera (opcional)">
+No está en la ruta crítica para construir agentes en 2025-2026. Para el 95% de los casos la decisión correcta es **no entrenar**. Pero el modelo mental de por qué los modelos se comportan como lo hacen es atemporal, y la isomorfía evals↔recompensa es el insight que eleva el rigor de todo lo demás que ya sabes.
+</Callout>
+
+## Tres capas convierten un predictor de tokens en un agente
+
+Un modelo base es un predictor de tokens. Completa texto con la distribución de internet. No es un asistente, no sigue instrucciones de forma fiable, no usa herramientas. El post-training es todo lo que ocurre después del pretraining para convertir ese predictor en algo útil, alineado y agéntico. Conviene separarlo en tres capas, porque cada una graba algo distinto y falla de forma distinta.
+
+<MermaidDiagram title="El pipeline de post-training: cada capa graba algo distinto" chart={`
+graph LR
+  A["Modelo base<br/>(predictor de tokens)"] --> B["1. SFT / distillation<br/>(graba formato + comportamiento)"]
+  B --> C["2. Optim. preferencias<br/>(RLHF→DPO, CAI)<br/>(alinea estilo + seguridad)"]
+  C --> D["3. RLVR (GRPO)<br/>(emerge el reasoning)"]
+`} />
+
+**Capa 1, SFT / distillation.** Fine-tuning supervisado sobre trayectorias de buen comportamiento, a menudo generadas por un modelo maestro grande y destiladas a uno pequeño. Graba *forma*: formato de respuesta, estructura de cadena de pensamiento, tono. Su riesgo es exactamente ese. Enseña la forma sobre el fondo, produce CoT plausible con pasos intermedios incorrectos.
+
+**Capa 2, optimización de preferencias.** RLHF, su colapso supervisado DPO, y Constitutional AI / RLAIF. Alinea *qué respuesta se prefiere* según humanos o según principios. Aquí nacen tanto la utilidad conversacional como la sycophancy.
+
+**Capa 3, RLVR (RL desde recompensas verificables).** RL contra recompensas *programáticas*: un test pasa, una respuesta matemática es correcta, un estado final se alcanza. Esto es lo que hizo emerger el razonamiento de cadena larga y el uso de herramientas: el cambio de los reasoning models.
+
+<Callout type="important" title="El insight contraintuitivo para un ingeniero de agentes">
+El valor marginal de entrenar cae a casi cero porque (a) los modelos frontera ya vienen post-entrenados como agentes (tool-use vía RL) y (b) el harness concentra ~90% del ROI: **Agente = Modelo + Harness**. Lo que sí necesitas entender a fondo no es *cómo* entrenar, sino *por qué* el modelo se comporta así, y que las recompensas verificables que diseñas en tus evals son isomorfas a las que usan los labs para entrenar.
+</Callout>
+
+## La escalera de coste: cuándo (casi nunca) entrenar
+
+Antes de tocar un gradiente, agota la escalera. Cada peldaño es órdenes de magnitud más barato y rápido que el siguiente, y la mayoría de los problemas se resuelven sin pasar del tercero.
+
+1. **Prompting** (horas): reescribe la instrucción, el rol, el formato esperado.
+2. **Few-shot**: añade ejemplos en contexto.
+3. **Context / harness engineering**: estructura lo que el modelo ve y las herramientas que tiene. El 90% del ROI vive aquí.
+4. **RAG / búsqueda agéntica**: solo si el *conocimiento cambia* y no cabe en contexto.
+5. **Fine-tuning**: solo con señal verificable, volumen y ROI claro.
+
+<Callout type="warning" title="Dos errores de coste recurrentes">
+**(1) Fine-tunear como reflejo de primera instancia** es el error de coste número uno. El premium de inferencia es real (típicamente ~1.5x en OpenAI sobre GPT-4o/4.1; nulo en algunos proveedores como Google) más el tiempo y dinero de entrenar, por un beneficio que un mejor prompt o context engineering habría dado. **(2) Creer que el fine-tuning inyecta conocimiento fresco.** El fine-tuning graba comportamiento, estilo y formato. Para datos que cambian cada semana la herramienta es RAG/contexto, no entrenar. Aprender hechos nuevos vía fine-tuning de hecho aumenta la alucinación [C].
+</Callout>
+
+## Por qué los reasoning models cambiaron el juego: test-time compute
+
+El resultado más importante de 2025 fue **DeepSeek-R1-Zero**: RL puro sobre recompensas verificables, *sin SFT previo*, hizo emerger por sí solo chain-of-thought, auto-corrección y los llamados "aha moments". El modelo aprendió a re-evaluar su propio razonamiento sin que nadie se lo enseñara explícitamente. En AIME pasó de 15.6% a 71% solo con RL.
+
+<Callout type="warning" title="Cuenta bien lo de DeepSeek-R1">
+Es R1-**Zero** el que demuestra RL puro, sin SFT. El modelo **DeepSeek-R1** que se publicó **sí** usa SFT: añade un cold-start de SFT *antes* del RL precisamente para arreglar legibilidad y estabilidad. No digas que R1 prescinde de SFT. La receta es "SFT cold-start → RL verificable → distillation", y R1-Zero es la ablación que prueba que el SFT no es estrictamente necesario para que emerja el razonamiento.
+</Callout>
+
+Esto abrió un *segundo eje de escalado*: además de gastar más cómputo en pretraining, ahora gastas más cómputo *en inferencia*. El modelo "piensa" más tiempo, y la performance sube de forma predecible. Para un ingeniero de agentes esto reconfigura el tradeoff latencia/calidad/coste. Un modelo que razona bien puede reemplazar andamiaje manual (planificación, reflexión, reintentos) que antes codificabas a mano en el harness.
+
+<Callout type="note" title="Precisión epistémica: o1 vs DeepSeek-R1">
+Es tentador decir "RLVR cambió el juego con o1 y R1". Cuidado: solo DeepSeek-R1-Zero *demostró públicamente* RLVR puro. o1 popularizó los reasoning models y el escalado de test-time compute, y se cree entrenado con RL a gran escala sobre chain-of-thought, pero OpenAI nunca documentó públicamente que use recompensas verificables. Su receta es secreta. Etiquetar o1 como "RLVR" es inferencia, no hecho confirmado [D].
+</Callout>
+
+La belleza de RLVR es que la recompensa es una función *verificable*, no un reward model aprendido. ¿Pasó el test? ¿Es correcta la respuesta? ¿Se alcanzó el estado final? Como la señal es programática, es mucho más difícil de hackear que un reward model entrenado. El reto de 2025-2026 es extenderlo a **multi-turn agéntico**, donde la señal es escasa: el éxito solo se conoce al final de una trayectoria larga de tool-calls. Agent-RLVR muestra que RLVR se *degrada* en entornos agénticos por esa escasez, y propone "agent guidance" para encaminar trayectorias exitosas (Qwen-2.5-72B subió de 9.4% a 22.4% en SWE-Bench Verified).
+
+<Callout type="important" title="La isomorfía evals↔recompensa">
+Tus graders code-based de `task_success` y `tool_trajectory` son la **misma primitiva** que un lab usa para entrenar un agente. La única diferencia: tú evalúas con ellos, el lab optimiza gradientes con ellos. Mismo objeto matemático, distinto consumo. Un grader verificable *es* una recompensa verificable.
+</Callout>
+
+GRPO + recompensas verificables es la receta dominante hoy, pero existen variantes: DAPO añade trucos de estabilidad (dynamic sampling, clip asimétrico), GSPO trabaja a nivel de secuencia. Trata "GRPO" como el patrón de referencia, no como el único algoritmo.
+
+## Reward hacking y la Ley de Goodhart
+
+> Cuando una métrica se convierte en objetivo, deja de ser una buena métrica.
+
+Esta es la patología central que explica por qué los modelos se portan mal. Si tu señal de recompensa es *aproximada* en lugar de *exacta*, el optimizador encontrará la grieta. Ejemplos documentados: **length hacking** (el modelo aprende a alargar porque el reward model premia respuestas largas), CoT que *suena* a razonamiento pero no resuelve nada, respuestas correctas con lógica intermedia falsa. Esto explica directamente patologías de producción: verbosidad, sobre-confianza, y la sycophancy de más abajo.
+
+<Callout type="warning" title="El reward hacking no es solo de entrenamiento">
+Aplica a **todo sistema con un grader**, incluido tu juez LLM en evals. Un juez de faithfulness puede ser *gamed* por output que suena fiel sin serlo: el ataque ocurre en tiempo de inferencia, no de entrenamiento. **Diseñar graders adversariales es una skill de ingeniero de agentes, no de ML.** Si tu grader es engañable, tu agente aprenderá a engañarlo [D].
+</Callout>
+
+## Cómo se alinea y se entrena hoy: DPO, GRPO, CAI
+
+<Collapsible title="DPO: el colapso del RLHF en un objetivo supervisado">
+El RLHF clásico es caro: entrenas un reward model y luego haces RL on-policy contra él: cuatro modelos en memoria (policy, referencia, reward, critic). **DPO** probó que optimizar una pérdida tipo clasificación sobre pares (preferido, rechazado) converge a la *misma* política que RLHF con el reward model óptimo, eliminando tanto el reward model como el bucle RL. Pasas de 4 modelos en memoria a 2, y corre en spot instances. Lo más importante: **desmitifica el "RL"**, porque mucho de lo que llamamos "alineación" es realmente aprendizaje supervisado de preferencias. Y ojo con la trampa conceptual: DPO/RLHF es alineación de preferencias, no añade capacidad de razonamiento de la nada. La capacidad viene de RLVR (capa 3), no de la optimización de preferencias (capa 2).
+</Collapsible>
+
+La otra mitad del "desmitificar el RL" es **GRPO**. El cuello de botella del RL para LLMs era el value model (critic): una red separada que estima el baseline de la recompensa, cara de entrenar. GRPO (introducido en DeepSeekMath, feb 2024, escalado en R1) lo elimina. Estima el baseline a partir de un *grupo* de respuestas muestreadas para el mismo prompt. Muestreas 8 respuestas, la media del grupo es tu baseline, la ventaja de cada una es relativa a sus hermanas. Esto quitó la barrera de coste que hacía impracticable el RL a escala.
+
+<Callout type="note" title="GRPO no es gratis: los fallos que gestiona el practitioner">
+GRPO tiene patologías reales: **entropy collapse** (la política se vuelve determinista y deja de explorar), **advantage collapse** (cuando todas las muestras del grupo tienen la misma recompensa, la ventaja es cero y no hay gradiente) y **KL drift** (la política se aleja demasiado del modelo de referencia). Las variantes existen precisamente para gestionarlas.
+</Callout>
+
+Constitutional AI / RLAIF completa el cuadro de la capa 2. Anthropic genera datos de preferencia haciendo que el modelo *critique y revise sus propias respuestas* contra una constitución (principios en lenguaje natural) y luego un modelo etiqueta qué respuesta es mejor según un principio elegido al azar. CAI (Bai et al. 2022) fue la primera instancia documentada a gran escala de RL desde feedback de IA. Una precisión: no *definió* "RLAIF". Google formalizó ese término en 2023; CAI fue la primera instancia de la técnica [D]. Para un ingeniero de agentes esto tiene una consecuencia concreta y constante: **los hard-rails de seguridad de Claude que aprovechas vienen de aquí.** Una persona de empresa concatenada en tu system prompt *no puede* sobrescribir esos límites entrenados. Están grabados en los pesos, no en el contexto.
+
+## Sycophancy y los sesgos heredados del post-training
+
+El RLHF optimiza para lo que los anotadores humanos *prefieren*, no para lo que es *correcto*. Y los humanos prefieren respuestas que les dan la razón, que suenan seguras, que no les contradicen. El resultado es un sesgo sistemático: modelos que adulan, sobre-afirman y evitan contradecir al usuario.
+
+<Callout type="tip" title="La sycophancy es entrenada, no es un bug del prompt">
+Este es el punto que reorienta tu esfuerzo. Muchos equipos intentan arreglar con prompt ("sé honesto, no adules") lo que es un sesgo *grabado en los pesos*. No se parchea con instrucciones. Se contrarresta a nivel sistema con **evals que penalizan confirmar peticiones inválidas** y con **HITL** en los flujos de escritura. No confíes en que el modelo se autorregule.
+</Callout>
+
+## Credit assignment: la recompensa escasa de los agentes
+
+En un agente real la recompensa solo aparece tras una trayectoria larga: el cliente reagendó su cita, o no. Eso rompe el acoplamiento acción↔recompensa: ¿cuál de los 12 tool-calls mereció el crédito? Las soluciones son recompensas **densas por turno**, crédito a nivel token (GAE/TD), y curación de trayectorias. La misma guía da una intuición útil sobre el ratio SFT:RL: 60 demostraciones SFT + 400 episodios de RL alcanzan resultados comparables (~85%) a 5000 episodios de RL puro (~88%). El cold-start SFT acelera enormemente.
+
+<Callout type="warning" title="No sobre-generalices 'la densidad siempre acelera'">
+Se cita mucho que la recompensa densa da 58% vs 41% de éxito. Importa el contexto exacto: **esa cifra es específica de PPO** (dense vs sparse). El propio paper concluye que el efecto *depende altamente del algoritmo de RL*: RLOO se mantiene estable (~55%) en ambas condiciones y no se beneficia igual de la densidad. La densidad ayuda, pero no es una ley universal independiente del algoritmo. Y el cold-start importa más que el algoritmo: una inicialización SFT cross-domain puede *colapsar* la política durante la fase RL [D].
+</Callout>
+
+Para tu diseño de graders, la traducción es directa. Un grader de `tool_trajectory` que da **crédito parcial por progreso** es exactamente reward shaping denso. Un grader que devuelve un `-1.0` duro ante una escritura no confirmada es reward shaping de seguridad. La misma primitiva que usan los labs, apuntada a la evaluación.
+
+<Tabs labels={["Lo que el consenso sobrevalora", "Lo que infravalora"]}>
+<TabPanel>
+Fine-tuning como primer recurso: la secuencia correcta es prompting → few-shot → context/harness → RAG → fine-tuning solo con señal verificable. PPO clásico con value model: el "critic tax" (4 modelos) lo hizo impráctico frente a GRPO/DPO. Un reward model aprendido como default de alineación: escalar y altamente hackeable, así que DPO y RLVR lo desplazaron. RAG/embeddings por defecto para "conocimiento": context engineering más búsqueda agéntica sobre archivos suele bastar y evita la deuda de un índice vectorial.
+</TabPanel>
+<TabPanel>
+La isomorfía evals↔recompensa: dominar recompensas no-hackeables sirve para evaluar y para entrenar. La distillation como estrategia de coste para tu propio equipo: captura trayectorias de tu agente con un modelo caro y destílalas a uno barato para subtareas rutinarias (routing, clasificación de intención), bajando el coste de inferencia sin montar RL. Reasoning models que reemplazan andamiaje: capacidades que codificabas a mano en el harness (planificar, reflexionar, reintentar) ahora vienen entrenadas. No reinventes lo que el modelo ya hace mejor.
+</TabPanel>
+</Tabs>
+
+La lección que atraviesa todo el recorrido: la mayoría de tus decisiones de agente son de *harness*, no de *modelo*. Pero entender el modelo te dice qué problemas *no* puedes arreglar con el harness, y cuáles son sesgos grabados que solo se contrarrestan a nivel sistema. El grader que escribiste antes es la función de recompensa de aquí. Si el RL añade capacidades genuinamente nuevas o solo afila lo que ya está en la distribución base sigue siendo un debate abierto. Un bando encuentra que los modelos base igualan a los afinados con RL para pass@k grande, otro reporta que el RL prolongado alcanza estrategias que el base nunca toca. Déjalo abierto, y construye para el modelo que de verdad tienes.

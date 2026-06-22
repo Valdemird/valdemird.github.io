@@ -1,0 +1,104 @@
+---
+title: "Retrieval: agentic search vs RAG as an asymmetric-cost decision"
+description: "Retrieval isn't a component you install. It's an architectural choice between two paradigms with opposite cost structures. For navigable, bounded corpora, agentic search wins on freshness and exactness. Embeddings stopped being the default."
+phase: 3
+order: 6
+tier: core
+durability: duradero
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "RAG (chunk → embed → index → top-k) is one-shot retrieval against a query frozen at t=0. Agentic search (grep/read in a loop) reformulates the query with each read. That single difference reorders your intuition about why retrieval fails."
+  - "The first design question is the size one: if the corpus fits under ~200k tokens, don't build RAG. Put it in the prompt with caching. The threshold grows with the window."
+  - "Agentic search is not free. It spends 3-10x more tokens and is far more latency-sensitive. RAG still wins for huge corpora that don't fit and high-volume, low-latency FAQ."
+sources:
+  - { grade: "A", title: "Introducing Contextual Retrieval", author: "Anthropic", year: 2024, url: "https://www.anthropic.com/news/contextual-retrieval" }
+  - { grade: "A", title: "Claude Code: why agentic search replaced RAG + vector DB", author: "Boris Cherny, Anthropic", year: 2025, url: "https://x.com/bcherny/status/2017824286489383315" }
+  - { grade: "A", title: "From Local to Global: A GraphRAG Approach to Query-Focused Summarization", author: "Microsoft Research", year: 2024, url: "https://arxiv.org/abs/2404.16130" }
+  - { grade: "A", title: "LazyGraphRAG: setting a new standard for quality and cost", author: "Microsoft Research", year: 2025, url: "https://www.microsoft.com/en-us/research/blog/lazygraphrag-setting-a-new-standard-for-quality-and-cost/" }
+  - { grade: "B", title: "Fishing for Answers: One-shot vs. Iterative Retrieval Strategies for RAG", author: "arXiv 2509.04820", year: 2025, url: "https://arxiv.org/pdf/2509.04820" }
+  - { grade: "B", title: "Demystifying and Enhancing the Efficiency of LLM-Based Search Agents", author: "arXiv 2505.12065", year: 2025, url: "https://arxiv.org/pdf/2505.12065" }
+  - { grade: "B", title: "ColBERTv2: Effective and Efficient Retrieval via Lightweight Late Interaction", author: "Santhanam et al., Stanford", year: 2022, url: "https://arxiv.org/pdf/2112.01488" }
+  - { grade: "C", title: "RAGAS: Automated Evaluation of Retrieval Augmented Generation", author: "Es et al.", year: 2023, url: "https://arxiv.org/abs/2309.15217" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+
+Your agent isn't failing because you picked the wrong embedding model. It's failing because someone decided, by reflex, that "retrieval = vector DB" and nobody asked the question again. Retrieval is not a component you install. It's an architectural choice between two paradigms with opposite cost structures, and choosing wrong sentences you to an index that desynchronizes, that leaks data across tenants, and that in production multiplies your latency until it's no longer viable. Make the choice with numbers, not dogma.
+
+## Two paradigms, not one component
+
+Classic RAG and agentic search aren't two implementations of the same problem. They're two opposite economic contracts. RAG (chunk → embed → index → retrieve top-k → rerank) precomputes a compressed representation of the corpus and answers in a single pass: cheap, low-latency, but it creates an index that goes stale, that lives somewhere, that breaks semantics when it chunks, and whose recall is measured offline against a query frozen at t=0. Agentic search inverts every term of the trade-off. Zero indexing. The model navigates the corpus at runtime with tools (grep/glob/read, SQL, APIs) and reformulates the search with each read until it has enough context.
+
+<Callout type="important" title="Most RAG failures aren't embedding failures">
+They're "I couldn't reformulate the query with what I just read" failures. RAG is one-shot retrieval with the question fixed; agentic search is multi-step retrieval. That single fact reorders your whole intuition about why retrieval breaks.
+</Callout>
+
+The analogy I keep using: RAG is an indexed filing cabinet. Someone read the whole corpus once, wrote a summary card per drawer, sorted them by topic. Lookup is instant and cheap. But edit a document and the card lies until you re-file everything. And to answer "compare case A with case C" you have to trust that the cards, written without knowing your question, captured what you need. Agentic search is an investigator with access to the entire archive: no cards to maintain, reads the current documents, and after reading the first decides which to open next. Slower, more "labor hours" (tokens), but never working off stale information and able to chain leads.
+
+<MermaidDiagram title="One-shot vs the loop" chart={`
+graph TD
+  subgraph RAG["RAG: one pass, query fixed at t=0"]
+    A[corpus] --> B[chunk + embed] --> C["INDEX (lives, goes stale)"] --> D[top-k] --> E[answer]
+  end
+  subgraph Agentic["Agentic: loop, query reformulated with prior evidence"]
+    F[LLM] --> G["grep/read (current bytes)"] --> H[LLM reformulates] --> I[grep/read] --> J[answer]
+  end
+`} />
+
+The insight a beginner doesn't have: for corpora that fit (or nearly fit) in the window, and for data where exact matching matters (code, IDs, error strings, proper nouns), agentic search or simply "put everything in the prompt with caching" wins on accuracy and operability. Vector RAG wins on high-volume FAQ, low latency, and enormous corpora that don't fit. The embedding isn't dead. It stopped being the architectural default it was in 2023-2024.
+
+## The index is a liability
+
+A beginner reasons in `recall@k`. An expert asks who owns the index and when it lies. The index is an asset you possess: it desynchronizes (edit a file and it lies until re-indexing, the index lag), it lives somewhere (often a third party, one more copy to leak), and it's an attack surface. The real reason Anthropic pulled embeddings from Claude Code wasn't recall. It was that agentic search "works better, simpler, without the security, privacy, staleness and reliability problems," and that their own codebase was too sensitive to upload to a third-party index. Agentic search reads current bytes at runtime: zero index lag, zero copy to guard.
+
+<Collapsible title="Why the multi-tenant case is structural, not convenience">
+With per-tenant data, an index per company is a physical artifact that can leak across tenants if a `WHERE org_id` is forgotten in the retrieval layer. No index, no artifact to leak. Eliminating the possibility of a failure is stronger than mitigating it. This is general principle, not a claim about any specific deployment. [D]
+</Collapsible>
+
+## Lexical beats semantic in identifier domains
+
+Embeddings compress meaning and lose precision on rare tokens. An error code like `TS-999`, a proper noun, a customer ID, a code symbol, a citation number: those are exactly where the vector space blurs what you need exact. BM25/grep match literally. Hybrid search (dense + sparse, fused with RRF) exists precisely because no vector space captures the lexical well. In code and structured data the lexical dominates, which is why ripgrep wins and why it's the natural substrate of agentic search.
+
+<Callout type="note" title="Dense vs lexical, when each one earns its place">
+**Dense embeddings** capture paraphrase and synonyms ("schedule" ≈ "book"); they blur `TS-999`, `customer_8842`, proper nouns; good for semantic FAQ. **BM25 / grep** match identifiers, codes, symbols exactly; no staleness; cheap and auditable; struggle with pure synonyms. In code and IDs, lexical dominates. Late-interaction multi-vector (ColBERTv2) is the frontier middle ground when you do keep an index.
+</Callout>
+
+## The ~200k-token threshold is the first question, not the last
+
+Anthropic recommends it explicitly: if the corpus fits under ~200k tokens (~500 pages), don't build RAG. Put it all in the prompt with prompt caching. RAG only wins when the corpus exceeds the window. Building an embedding pipeline for 50 documents is expensive over-engineering. Prompt caching is what makes the "everything in context" strategy viable. It amortizes the repeated corpus and brings Contextual Retrieval preprocessing down to $1.02/M tokens. This is your first design question, and the frontier grows with 1M+ windows.
+
+<Callout type="tip" title="Just-in-time retrieval is the same idea, generalized">
+Anthropic's context-engineering framing: don't dump everything up front. Keep lightweight identifiers (paths, queries) and load data on demand with tools. Agentic search is just-in-time retrieval taken to its conclusion. The corpus is the filesystem, the loader is grep/read.
+</Callout>
+
+## Contextual Retrieval: the chunk lost its context, not the embedding
+
+Chunking breaks coreference. A chunk saying "margin grew 3%" doesn't know which company or which quarter. Anthropic's technique prepends to each chunk an LLM-generated context that situates it in the document, before embedding and indexing with BM25. It cuts top-20 retrieval failure by **49%** (from 5.7% to 2.9%), and **67%** (to 1.9%) if you add reranking on top. The structural lesson: the problem was never the embedding model, it was that the chunk lost its context. Agentic search avoids it at the root by reading the whole document on demand. And the trick works outside embeddings too. Persisting a context summary per document helps an agent decide what to read.
+
+If you do keep RAG, reranking is almost always the best cost/benefit improvement before you touch the embedding model: retrieve top-150 cheap candidates (dense + BM25), reorder with a cross-encoder that sees query and document together, return top-20. That's the jump from 49% to 67%. The catch is added latency, which is the dominant constraint in production.
+
+## Latency amplifies 83x, so tool speed is viability
+
+The most counterintuitive and most production-critical fact: in search agents, end-to-end latency amplifies up to **83x** when mean retrieval latency rises from 0.6s to 4.4s, because each slow step multiplies by the number of iterations. In RAG, with its ~4 fixed calls, latency is stable. The design implication: a slow search tool isn't "slow," it's systemically unviable in an agentic loop. Local ripgrep isn't an optimization, it's a viability requirement. Budget latency per iteration and cap the number of steps.
+
+<Callout type="warning" title="'No embeddings = cheap' is the wrong intuition">
+Agentic search moves the cost from "retriever precision" (CAPEX, the index you build and maintain) to "tokens per turn" (OPEX). It can spend 3-10x more tokens. Measure cost per turn and latency per iteration explicitly. Don't assume the agentic path is free just because there's no vector DB on the bill.
+</Callout>
+
+## GraphRAG: a real capability behind a build-cost cliff
+
+GraphRAG answers a query type vector RAG can't: the global ones ("what are the main themes or risks across the whole corpus?"), by building an entity-relation graph and hierarchical community summaries via Leiden community detection. The cost is construction: it runs every document through an LLM. As an illustrative figure, a third-party analysis estimated ~$33,000 for one specific 5GB legal dataset. That's not GraphRAG's canonical cost, it depends heavily on the corpus. Later variants knocked that down, but with distinct numbers worth not conflating: LazyGraphRAG cuts indexing cost to ~0.1% of full GraphRAG (~1000x); the ~6000x figure that floats around belongs specifically to LightRAG's incremental-update token efficiency. Different techniques, different numbers.
+
+## How to actually decide
+
+Start every time with the size question. Fits under the window with caching? Don't build RAG. Doesn't fit, and exact matching matters? Agentic search with fast, bounded tools. Doesn't fit, high-volume, low-latency, semantic? Vector RAG, but hybrid (dense + BM25) plus rerank, never embeddings alone, and add Contextual Retrieval if query volume amortizes the preprocessing. Mixed query difficulty? Route by it: one-shot for direct lookups, the agentic loop only for multi-hop or ambiguous, so you don't pay the 3-10x token tax on every trivial question.
+
+<Callout type="warning" title="Treat retrieved documents as untrusted input">
+Whatever paradigm you pick, the corpus you pull is untrusted. A document can carry prompt-injection instructions. With agentic search the model chooses what to read, so a malicious doc could try to steer reads or writes. Delimit retrieved content, keep humans in the loop on writes, and validate anything that retrieval feeds into a tool call. This matters more, not less, as the model navigates the filesystem itself.
+</Callout>
+
+A note on the benchmark claims so you don't overgeneralize. Agentic-RL search results (Search-R1 and its lineage) show gains over static RAG on QA benchmarks specifically. That's a scoped result on those tasks, not a universal "agentic always beats RAG" law. And when you evaluate your own retrieval, score it end-to-end (faithfulness, RAGAS-style, plus trajectory graders for what the agent actually opened), not just offline `recall@k` against a frozen query. Context relevance is the noisiest dimension for an LLM judge, so don't lean on it alone. The honest summary is that the default flipped, and the size of your corpus tells you most of what you need before you write a line.

@@ -1,0 +1,544 @@
+---
+import BaseHead from '../components/BaseHead.astro';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import ReadingProgress from '../components/blog/ReadingProgress.astro';
+import HeadingAnchors from '../components/blog/HeadingAnchors.astro';
+import LearnSidebar from '../components/learn/LearnSidebar.astro';
+import LearnSources from '../components/learn/LearnSources.astro';
+import LearnVideos from '../components/learn/LearnVideos.astro';
+import LearnRecall from '../components/learn/LearnRecall.astro';
+import FormattedDate from '../components/FormattedDate.astro';
+import {
+	getLearnModules,
+	getPrevNext,
+	moduleHref,
+	learnHomeHref,
+	courseHomeHref,
+	baseSlug,
+	TIER_LABEL,
+	DURABILITY_LABEL,
+	type Lang,
+} from '../lib/learn';
+import { PERSON, PERSON_REF, UI_STRINGS } from '../consts';
+
+interface Source {
+	grade: 'A' | 'B' | 'C' | 'D';
+	title: string;
+	author?: string;
+	year?: string | number;
+	url?: string;
+}
+
+interface Heading {
+	depth: number;
+	slug: string;
+	text: string;
+}
+
+interface Props {
+	title: string;
+	description: string;
+	slug: string;
+	lang: Lang;
+	phase: number;
+	tier: keyof typeof TIER_LABEL;
+	durability?: string;
+	updatedDate?: Date;
+	readingTime?: number;
+	sources?: Source[];
+	headings?: Heading[];
+	tldr?: string[];
+}
+
+const { title, description, slug, lang, phase, tier, durability, updatedDate, readingTime, sources, headings, tldr } = Astro.props;
+const es = lang === 'es';
+
+// Sections of this module (h2) — drives the mobile-only "On this page" jump nav.
+const sections = (headings ?? []).filter((h) => h.depth === 2);
+
+const modules = await getLearnModules(lang);
+const { prev, next } = getPrevNext(modules, slug);
+const moduleIndex = modules.findIndex((m) => baseSlug(m.id) === slug);
+const moduleNum = moduleIndex >= 0 ? moduleIndex + 1 : 0;
+const moduleTotal = modules.length;
+
+const currentPath = Astro.url.pathname;
+const homePath = es ? '/es/' : '/';
+const learnHome = learnHomeHref(lang);
+const courseHome = courseHomeHref(lang);
+const courseName = es ? 'Sistemas agénticos' : 'Agentic systems';
+
+// hreflang: EN/ES share the slug.
+const alternates = [
+	{ hreflang: 'en', href: `https://valdemird.com${moduleHref(slug, 'en')}` },
+	{ hreflang: 'es', href: `https://valdemird.com${moduleHref(slug, 'es')}` },
+];
+
+const ogImage = `/og/learn-${slug}.png`;
+
+const articleJsonLd: Record<string, unknown> = {
+	'@context': 'https://schema.org',
+	'@type': 'TechArticle',
+	headline: title,
+	description,
+	author: PERSON,
+	publisher: PERSON_REF,
+	inLanguage: lang,
+	isPartOf: {
+		'@type': 'Course',
+		name: es ? 'Ingeniería de sistemas agénticos' : 'Engineering agentic systems',
+		url: `https://valdemird.com${courseHome}`,
+	},
+	mainEntityOfPage: { '@type': 'WebPage', '@id': `https://valdemird.com${currentPath}` },
+	...(updatedDate && { dateModified: updatedDate.toISOString() }),
+	...(sources && sources.length > 0 && {
+		citation: sources.map((s) => ({
+			'@type': 'CreativeWork',
+			name: s.title,
+			...(s.author && { author: s.author }),
+			...(s.url && { url: s.url }),
+		})),
+	}),
+};
+
+const breadcrumbJsonLd = {
+	'@context': 'https://schema.org',
+	'@type': 'BreadcrumbList',
+	itemListElement: [
+		{ '@type': 'ListItem', position: 1, name: es ? 'Inicio' : 'Home', item: `https://valdemird.com${homePath}` },
+		{ '@type': 'ListItem', position: 2, name: 'Learn', item: `https://valdemird.com${learnHome}` },
+		{ '@type': 'ListItem', position: 3, name: courseName, item: `https://valdemird.com${courseHome}` },
+		{ '@type': 'ListItem', position: 4, name: title, item: `https://valdemird.com${currentPath}` },
+	],
+};
+---
+
+<html lang={lang}>
+	<head>
+		<BaseHead title={`${title} · Learn`} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={articleJsonLd} extraJsonLd={[breadcrumbJsonLd]} />
+	</head>
+	<body>
+		<a class="skip-link" href="#main-content">{UI_STRINGS[lang].nav.skipToContent}</a>
+		<ReadingProgress />
+		<HeadingAnchors lang={lang} />
+		<Header />
+		<main id="main-content">
+			<div class="learn-layout">
+				<aside class="sidebar-col">
+					<details class="sidebar-details" open>
+						<summary class="sidebar-summary">
+							<svg class="chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+							{es ? 'Índice del curso' : 'Course map'}
+						</summary>
+						<div class="sidebar-inner">
+							<LearnSidebar lang={lang} currentSlug={slug} currentHeadings={headings} />
+						</div>
+					</details>
+				</aside>
+				<article class="content-col">
+					<nav class="crumbs" aria-label={es ? 'Migas de pan' : 'Breadcrumb'}>
+						<a href={learnHome}>Learn</a>
+						<span aria-hidden="true">/</span>
+						<a href={courseHome}>{courseName}</a>
+						<span aria-hidden="true">/</span>
+						<span class="crumb-phase">{es ? 'Fase' : 'Phase'} {String(phase).padStart(2, '0')} · {TIER_LABEL[tier][lang]}</span>
+					</nav>
+
+					<header class="module-header">
+						<p class="module-eyebrow">
+							<span class="phase-num">{String(phase).padStart(2, '0')}</span>
+							{TIER_LABEL[tier][lang]}
+							{durability && DURABILITY_LABEL[durability] && <span class="dur">· {DURABILITY_LABEL[durability][lang]}</span>}
+						</p>
+						<h1>{title}</h1>
+						<p class="lead">{description}</p>
+						<p class="module-meta">
+							{readingTime && (
+								<span class="meta-read">
+									<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
+									{readingTime} {es ? 'min de lectura' : 'min read'}
+								</span>
+							)}
+							{updatedDate && (
+								<span class="meta-updated">
+									{es ? 'Actualizado' : 'Updated'} <FormattedDate date={updatedDate} locale={lang} />
+								</span>
+							)}
+							{moduleNum > 0 && (
+								<span class="meta-progress" title={es ? 'Posición en el curso' : 'Position in the course'}>
+									{es ? `Módulo ${moduleNum} de ${moduleTotal}` : `Module ${moduleNum} of ${moduleTotal}`}
+									<span class="prog-track" aria-hidden="true"><span class="prog-fill" style={`width:${Math.round((moduleNum / moduleTotal) * 100)}%`}></span></span>
+								</span>
+							)}
+						</p>
+						<hr />
+					</header>
+
+					{sections.length > 1 && (
+						<details class="page-toc">
+							<summary>
+								<svg class="toc-chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+								{es ? 'En esta página' : 'On this page'}
+								<span class="toc-count">{sections.length}</span>
+							</summary>
+							<ol class="page-toc-list">
+								{sections.map((s) => (
+									<li><a href={`#${s.slug}`}>{s.text}</a></li>
+								))}
+							</ol>
+						</details>
+					)}
+
+					<div class="article-body">
+						<slot />
+					</div>
+
+					<LearnRecall tldr={tldr} lang={lang} />
+
+					<LearnVideos slug={slug} lang={lang} />
+
+					<LearnSources sources={sources} lang={lang} slug={slug} />
+
+					<nav class="pager" aria-label={es ? 'Navegación entre módulos' : 'Module navigation'}>
+						{prev ? (
+							<a class="pager-link prev" href={moduleHref(baseSlug(prev.id), lang)}>
+								<span class="pager-dir">{es ? '← Anterior' : '← Previous'}</span>
+								<span class="pager-title">{prev.data.title}</span>
+							</a>
+						) : <span />}
+						{next ? (
+							<a class="pager-link next" href={moduleHref(baseSlug(next.id), lang)}>
+								<span class="pager-dir">{es ? 'Siguiente →' : 'Next →'}</span>
+								<span class="pager-title">{next.data.title}</span>
+							</a>
+						) : <span />}
+					</nav>
+				</article>
+			</div>
+		</main>
+		<Footer />
+		<script>
+			import { initScrollReveals, cleanupAll, isReducedMotion } from '../lib/animations';
+
+			// The course map is <details open> by default (desktop = always-open
+			// sticky rail). Collapse it on mobile so the article isn't buried, but
+			// don't fight a tap the reader just made.
+			const mq = window.matchMedia('(max-width: 900px)');
+			function syncCourseMap(userInitiated = false) {
+				const d = document.querySelector('details.sidebar-details');
+				if (!d) return;
+				if (mq.matches) { if (!userInitiated) d.removeAttribute('open'); }
+				else d.setAttribute('open', '');
+			}
+			function init() {
+				syncCourseMap();
+				if (isReducedMotion()) return;
+				initScrollReveals('.article-body h2, .article-body h3');
+				document.addEventListener('astro:before-swap', cleanupAll, { once: true });
+			}
+			mq.addEventListener('change', () => syncCourseMap());
+			init();
+			document.addEventListener('astro:after-swap', init);
+		</script>
+	</body>
+</html>
+
+<style>
+	main { max-width: 100%; margin: 0; padding: 0; }
+
+	.learn-layout {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: var(--space-lg);
+		display: grid;
+		grid-template-columns: 16rem minmax(0, 1fr);
+		gap: var(--space-2xl);
+		align-items: start;
+	}
+
+	.sidebar-col {
+		position: sticky;
+		top: 5.5rem;
+		max-height: calc(100vh - 7rem);
+		overflow-y: auto;
+		padding-right: var(--space-sm);
+	}
+
+	/* The course map is a collapsed <details> on mobile (so the article is
+	   reachable without scrolling past 16 modules) and a forced-open rail on
+	   desktop (the summary toggle is hidden). */
+	.sidebar-summary {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		padding: 0.7em 0;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		list-style: none;
+	}
+	.sidebar-summary::-webkit-details-marker { display: none; }
+	.sidebar-summary .chev {
+		transition: transform 0.2s var(--ease-spring);
+	}
+	.sidebar-details[open] .sidebar-summary .chev { transform: rotate(90deg); }
+
+	@media (min-width: 901px) {
+		/* Desktop: always-open rail, no toggle (JS keeps the details open). */
+		.sidebar-summary { display: none; }
+	}
+
+	.content-col { max-width: var(--content-width); }
+
+	.crumbs {
+		display: flex;
+		gap: 0.5em;
+		align-items: center;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-secondary);
+		margin-bottom: var(--space-lg);
+	}
+	.crumbs a { color: var(--color-text-secondary); text-decoration: none; }
+	.crumbs a:hover { color: var(--color-accent); }
+	.crumb-phase { color: var(--color-text); }
+
+	.module-header { margin-bottom: var(--space-xl); }
+	.module-eyebrow {
+		display: flex;
+		align-items: baseline;
+		gap: 0.5em;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-secondary);
+		margin: 0 0 0.6em;
+	}
+	.phase-num { color: var(--color-accent); font-weight: 600; }
+	.dur { opacity: 0.75; }
+
+	.module-header h1 {
+		margin: 0 0 0.3em;
+		font-size: clamp(2rem, 4.5vw, 2.6rem);
+		line-height: 1.15;
+		letter-spacing: -0.02em;
+	}
+	.lead {
+		font-size: 1.2rem;
+		color: var(--color-text-secondary);
+		line-height: 1.6;
+		margin: 0;
+	}
+	.module-meta {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5em 1.1em;
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		color: var(--color-text-secondary);
+		margin: 1em 0 0;
+	}
+	.meta-read {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45em;
+		color: var(--color-text);
+	}
+	.meta-read svg { color: var(--color-accent); }
+	.meta-progress {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.6em;
+	}
+	.prog-track {
+		width: 3.5rem;
+		height: 3px;
+		border-radius: 2px;
+		background: var(--color-border);
+		overflow: hidden;
+	}
+	.prog-fill {
+		display: block;
+		height: 100%;
+		border-radius: 2px;
+		background: var(--color-accent);
+	}
+	.module-header hr { margin-top: var(--space-lg); }
+
+	/* "On this page" jump nav — mobile only; desktop shows sections in the rail. */
+	.page-toc {
+		display: none;
+		margin: 0 0 var(--space-xl);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: oklch(from var(--color-accent) l c h / 0.03);
+	}
+	.page-toc summary {
+		display: flex;
+		align-items: center;
+		gap: 0.5em;
+		padding: 0.8em 1em;
+		cursor: pointer;
+		list-style: none;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text);
+	}
+	.page-toc summary::-webkit-details-marker { display: none; }
+	.toc-chev { transition: transform 0.2s var(--ease-spring); color: var(--color-accent); flex: none; }
+	.page-toc[open] .toc-chev { transform: rotate(90deg); }
+	.toc-count {
+		margin-left: auto;
+		color: var(--color-accent);
+		font-weight: 600;
+	}
+	.page-toc-list {
+		list-style: none;
+		margin: 0;
+		padding: 0 0.6em 0.6em;
+		counter-reset: toc;
+	}
+	.page-toc-list li { counter-increment: toc; margin: 0; }
+	.page-toc-list a {
+		display: flex;
+		gap: 0.7em;
+		align-items: baseline;
+		padding: 0.6em 0.8em;
+		min-height: 44px;
+		box-sizing: border-box;
+		border-radius: var(--radius-sm);
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		line-height: 1.4;
+	}
+	.page-toc-list a::before {
+		content: counter(toc, decimal-leading-zero);
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		color: var(--color-accent);
+		flex: none;
+	}
+	.page-toc-list a:hover { background: var(--color-accent-subtle); color: var(--color-text); }
+
+	.article-body {
+		font-size: 1.08rem;
+		line-height: 1.7;
+		color: var(--color-reading);
+	}
+	.article-body :global(h2) {
+		font-family: var(--font-serif);
+		font-size: 1.55rem;
+		margin-top: 2.3em;
+		margin-bottom: 0.5em;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+		scroll-margin-top: 5.5rem;
+	}
+	.article-body :global(h3) {
+		font-family: var(--font-serif);
+		font-size: 1.25rem;
+		margin-top: 1.8em;
+		margin-bottom: 0.45em;
+		color: var(--color-text);
+		scroll-margin-top: 5.5rem;
+	}
+	.article-body :global(h2:target), .article-body :global(h3:target) {
+		opacity: 1 !important; transform: none !important;
+	}
+	.article-body :global(p) { margin-bottom: 1.7em; }
+	.article-body :global(ul), .article-body :global(ol) { padding-left: 1.25em; margin-bottom: 1.5em; }
+	.article-body :global(li) { margin-bottom: 0.4em; }
+	.article-body :global(blockquote:not(.pullquote-body)) {
+		padding: 0.25em 0 0.25em 1.75em;
+		margin: 2em 0;
+		font-style: italic;
+		color: var(--color-text-secondary);
+	}
+	.article-body :global(a) {
+		text-decoration-color: var(--color-accent);
+		text-decoration-thickness: 1px;
+		text-underline-offset: 3px;
+	}
+	.article-body :global(strong) { color: var(--color-text); }
+	.article-body :global(code) { font-size: 0.88em; }
+	.article-body :global(pre) { font-size: 0.86rem; margin: 1.6em 0; }
+
+	/* Markdown tables (GFM). Top-aligned cells, comfortable density; shrink on
+	   mobile and let cells wrap so a 3-column table doesn't overflow. */
+	.article-body :global(table) { font-size: 0.95rem; margin: 1.9em 0; }
+	.article-body :global(th),
+	.article-body :global(td) { vertical-align: top; overflow-wrap: anywhere; }
+	.article-body :global(thead th) {
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+		color: var(--color-text-secondary);
+	}
+	@media (max-width: 768px) {
+		.article-body :global(table) { font-size: 0.84rem; }
+		.article-body :global(th), .article-body :global(td) { padding: var(--space-xs) var(--space-sm); }
+	}
+
+	.pager {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-md);
+		margin-top: var(--space-2xl);
+		padding-top: var(--space-lg);
+		border-top: 1px solid var(--color-border);
+	}
+	.pager-link {
+		display: flex;
+		flex-direction: column;
+		gap: 0.3em;
+		padding: var(--space-md);
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		text-decoration: none;
+		transition: transform 0.2s var(--ease-spring), border-color 0.2s var(--ease-spring), box-shadow 0.2s var(--ease-spring);
+	}
+	.pager-link:hover {
+		transform: translateY(-2px);
+		border-color: var(--color-accent);
+		box-shadow: var(--shadow-md);
+	}
+	.pager-link.next { text-align: right; }
+	.pager-dir {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-accent);
+	}
+	.pager-title { color: var(--color-text); font-weight: 500; line-height: 1.3; }
+
+	@media (max-width: 900px) {
+		.learn-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
+		.sidebar-col {
+			position: static;
+			max-height: none;
+			overflow: visible;
+			padding: var(--space-md);
+			border: 1px solid var(--color-border);
+			border-radius: var(--radius-md);
+		}
+		.page-toc { display: block; }
+	}
+	@media (max-width: 768px) {
+		.article-body { font-size: 1.02rem; line-height: 1.65; }
+		.lead { font-size: 1.1rem; }
+		.pager { grid-template-columns: 1fr; }
+		.pager-link.next { text-align: left; }
+	}
+</style>

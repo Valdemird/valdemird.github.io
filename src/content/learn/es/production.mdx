@@ -1,0 +1,182 @@
+---
+title: "Un agente en producción es un workflow distribuido durable"
+description: "Un agente de demo es una llamada a función. Un agente en producción es un workflow distribuido, de larga duración y no determinista, donde cada paso tiene efectos costosos (tokens) e irreversibles (escrituras de negocio). Durabilidad, idempotencia y una base de datos como fuente de verdad son lo que lo vuelve operable."
+phase: 7
+order: 13
+tier: produccion
+durability: duradero
+updatedDate: 2026-06-19
+lang: es
+tldr:
+  - "Un agente en producción no es 'más código alrededor del LLM'. Es un workflow distribuido de larga duración cuyos pasos son lentos, caros y probabilísticos."
+  - "La durable execution (persistir estado, reanudar tras un crash) más la idempotencia es lo que evita que un reintento re-cobre tokens y duplique escrituras."
+  - "La fiabilidad se compone de forma multiplicativa: un agente de 20 pasos al 98% por paso es ~67% fiable. La base de datos, no la afirmación del agente, es la fuente de verdad."
+sources:
+  - { grade: "A", title: "Building Effective Agents", author: "Anthropic Engineering", year: 2024, url: "https://www.anthropic.com/research/building-effective-agents" }
+  - { grade: "A", title: "Demystifying evals for AI agents", author: "Anthropic Engineering", year: 2026, url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents" }
+  - { grade: "A", title: "Code execution with MCP: building more efficient AI agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/code-execution-with-mcp" }
+  - { grade: "B", title: "Durable Execution: The Key to Harnessing AI Agents in Production", author: "Inngest", year: 2025, url: "https://www.inngest.com/blog/durable-execution-key-to-harnessing-ai-agents" }
+  - { grade: "B", title: "Architecting Resilient LLM Agents: A Guide to Secure Plan-then-Execute Implementations", author: "Del Rosario et al.", year: 2025, url: "https://arxiv.org/pdf/2509.08646" }
+  - { grade: "C", title: "ALAS: Transactional and Dynamic Multi-Agent LLM Planning", author: "Geng & Chang, Stanford", year: 2025, url: "https://arxiv.org/pdf/2511.03094" }
+  - { grade: "C", title: "Don't Break the Cache: An Evaluation of Prompt Caching for Long-Horizon Agentic Tasks", author: "PwC (arXiv 2601.06007)", year: 2026, url: "https://arxiv.org/pdf/2601.06007" }
+  - { grade: "D", title: "Postmortem público: un pipeline multi-agente quemó ~$47k en 11 días (blog, anecdótico)", author: "DEV.to / Medium", year: 2025, url: "https://dev.to" }
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+
+La demo funcionó. Escribiste una petición, el agente recorrió tres herramientas, devolvió una respuesta limpia y la enviaste. Después se topó con tráfico real y se cayó. Esta es la brecha de la que nadie te avisa: el salto de demo a producción no es escribir más código alrededor del modelo. Es reconocer que lo que construiste es un workflow distribuido, de larga duración y no determinista, donde cada paso tiene efectos que cuestan dinero (tokens) y efectos que no puedes deshacer (escrituras de negocio).
+
+Quédate con esa idea. En el [módulo del loop](/es/learn/agentic-systems/agent-loop) el control de flujo del agente vivía en el código: llamar al modelo, ejecutar la herramienta que pidió, devolverle el resultado, repetir. Ese loop es correcto. El problema es que corre sobre una máquina que se cae, detrás de una cola que reintenta, contra un modelo que devuelve algo distinto cada vez. La ingeniería de producción consiste en hacer que ese loop sobreviva a las tres cosas.
+
+<Callout type="important" title="El único modelo mental">
+Un agente en producción es un **workflow distribuido durable**. Lento (el modelo es el cuello de botella), caro (cada turno gasta tokens) y probabilístico (la misma entrada da una trayectoria diferente). Cuando aceptas eso, todo el campo de los sistemas distribuidos aparece para ayudarte, y todos los fallos de los sistemas distribuidos aparecen para morderte.
+</Callout>
+
+## La fiabilidad se compone, y la cuenta es brutal
+
+Empieza por el número que reencuadra todo. Encadena pasos y sus fiabilidades se multiplican. Un agente de 20 pasos donde cada paso funciona el 98% de las veces es `0.98^20 ≈ 0.67`. Dos tercios. Tu componente "98% fiable" envió un volado-y-pico.
+
+Por eso la demo miente. En una demo corres el camino feliz una vez y sale verde. La métrica que captura eso es pass@k: al menos un éxito en k intentos, que tiende al 100% y no te dice nada. Lo que el usuario vive de verdad es pass^k: que los k intentos tengan éxito. Al 75% por intento, pass^3 es `0.75^3 ≈ 0.42`. Los agentes de cara al cliente se diseñan para pass^k, no para la corrida elegida a dedo de la demo.
+
+<Callout type="note" title="pass@k adula, pass^k reporta">
+pass@k responde "¿podría el agente hacer esto alguna vez?". pass^k responde "¿lo hará cada vez que un usuario lo pida?". La primera es una pregunta de capacidad, útil en investigación. La segunda es de fiabilidad, la única que le importa a producción. Si tus evals reportan pass@k, estás midiendo la demo.
+</Callout>
+
+La consecuencia: cada paso tiene que ser barato de re-ejecutar y seguro de re-ejecutar. Barato, para que un reintento no vuelva a gastar tokens. Seguro, para que un reintento no reserve dos veces la misma sala. Esos dos requisitos son durabilidad e idempotencia, y son la columna vertebral del resto del módulo.
+
+## Separa el plano de control del plano de ejecución
+
+La primera decisión estructural, y la que los principiantes hacen mal, es *dónde ocurre la llamada al LLM*. El instinto es llamarlo dentro del handler HTTP: llega la petición, esperas al modelo, devuelves la respuesta. Eso falla de cuatro maneras a la vez. El modelo es más lento que cualquier timeout HTTP razonable. El cliente reintenta al timeout y obtienes turnos duplicados. No puedes drenar el trabajo en vuelo para hacer un deploy. Y la latencia del usuario queda soldada a la del modelo.
+
+El arreglo es una separación limpia. El edge (stateless, rápido) solo valida, persiste y encola. El worker (durable, lento) hace la llamada al modelo y las herramientas.
+
+<MermaidDiagram title="El edge nunca llama al modelo" chart={`
+sequenceDiagram
+  participant U as Cliente
+  participant E as Edge (stateless)
+  participant DB as Base de datos (fuente de verdad)
+  participant Q as Cola
+  participant W as Worker (durable)
+  participant M as Modelo + Herramientas
+  U->>E: POST mensaje
+  E->>DB: persiste turno
+  E->>Q: encola job
+  E-->>U: 202 Accepted (abre stream)
+  Q->>W: entrega job
+  W->>DB: carga estado
+  loop loop del agente
+    W->>M: llama modelo / corre herramienta
+    W->>DB: checkpoint del paso
+  end
+  W-->>U: stream de tokens
+`} />
+
+Ahora la durabilidad, el backpressure y el escalado viven en la capa de workers, desacoplados de la petición. El usuario recibe un acuse instantáneo; la parte lenta ocurre detrás de la cola, donde se puede reintentar, drenar y observar.
+
+## Durable execution: persistir el estado, reanudar desde el checkpoint
+
+Aquí está el patrón que vuelve manejables los agentes de larga duración. Es un patrón de industria, encarnado por motores de workflow durable (Temporal, Inngest, Restate, DBOS), no el truco propietario de nadie. La idea: el motor persiste el resultado de cada paso completado. Cuando el worker se cae a mitad del workflow, al reiniciar no re-ejecuta desde cero. Reproduce los pasos ya completados desde sus resultados guardados y reanuda desde el último checkpoint.
+
+<CodeBlock filename="worker.ts" lang="typescript">
+```ts
+// Cada step.run se memoiza. Ante un crash + retry, el motor lee
+// los pasos completados del almacenamiento en vez de re-ejecutarlos.
+async function handleTurn({ event, step }) {
+  // Se reproduce desde cache en el retry — el modelo NO se vuelve a llamar.
+  const plan = await step.run("plan", () =>
+    callModel(event.data.history)
+  );
+
+  // Cada tool call es su propio checkpoint durable.
+  for (const call of plan.toolCalls) {
+    await step.run(\`tool:\${call.id}\`, () => runTool(call));
+  }
+
+  // Suspende el worker durante horas sin retener recursos.
+  const approval = await step.waitForEvent("approval", {
+    timeout: "24h",
+  });
+
+  return step.run("finalize", () => callModel(/* ... */));
+}
+```
+</CodeBlock>
+
+Por qué esto importa más para agentes que para jobs corrientes: re-ejecutar un paso completado no solo desperdicia unos ciclos de CPU. Re-ejecutar el paso del modelo cuesta tokens *y* devuelve una respuesta distinta, porque el modelo es probabilístico. Memoizar el resultado del paso es la única forma de que un reintento se mantenga barato y consistente.
+
+<Callout type="warning" title="'Reintentos con backoff' no es por sí solo una estrategia de fiabilidad">
+El reintento ante fallo es necesario y ni de lejos suficiente. Sin memoización ni idempotencia, cada reintento re-cobra tokens y re-ejecuta escrituras. Un loop de reintento ingenuo sobre un agente de 20 pasos es a la vez una bomba de coste y una bomba de doble-booking. La durabilidad es lo que vuelve seguros los reintentos.
+</Callout>
+
+## Idempotencia: porque reintentos más no-determinismo significan que los pasos corren más de una vez
+
+La durable execution memoiza los pasos del *modelo*. Pero en el momento en que una herramienta toca el exterior de tu sistema, cobra una tarjeta, reserva, envía un correo, la memoización no basta, porque el efecto ya ocurrió afuera. Necesitas que la propia operación externa sea idempotente: ejecutarla dos veces tiene el mismo efecto que ejecutarla una.
+
+La razón de que no puedas evitarlo: en un sistema distribuido la entrega es at-least-once. Un worker puede terminar una escritura y morir antes de registrar que terminó; la cola la reentrega; el paso corre de nuevo. Súmale el no-determinismo del modelo y el mismo paso lógico produce dos intentos distintos. Así que derivas una clave de idempotencia determinista de `(workflow_id, step_id)` y se la pasas a toda llamada con efecto. El procesador de pagos, la API de reservas, tus propias escrituras, todos deduplican con esa clave.
+
+<Callout type="tip" title="Haz que la base de datos sea la fuente de verdad, no el agente">
+Nunca creas la afirmación del agente de que hizo algo. El agente puede decir "reservé la sala" sin haberla reservado. Verifica el estado real: consulta la base de datos. Así también gradúas bien los evals del agente, revisas la fila que debería existir, no la frase que emitió el modelo.
+</Callout>
+
+## La base de datos como fuente de verdad, y el dual-write que muerde
+
+El edge hace dos cosas en cada mensaje: persistir el turno y encolar el job. La trampa es hacerlas como dos operaciones separadas. Commit en Postgres, luego push a la cola. Si el proceso muere entremedio, te queda un turno fantasma (persistido, nunca ejecutado) o uno perdido (ejecutado contra un estado que no commiteó). Este es el problema del dual-write, y es silencioso hasta que deja de serlo.
+
+El arreglo es el transactional outbox: escribir el evento "encola este job" en una tabla outbox dentro de la *misma* transacción de base de datos que el cambio de estado. Un relay aparte lee el outbox y publica a la cola. Ahora el persistir-y-encolar es atómico, porque es un solo commit.
+
+<Collapsible title="¿Por qué no encolar primero y persistir después?">
+Invertir el orden no lo arregla, mueve la ventana de fallo. Encola y luego persiste, y un crash entremedio te da un job que corre contra un estado que la base de datos nunca registró. No hay orden de dos escrituras independientes que sea atómico. El outbox funciona porque colapsa ambas en una sola transacción, y el trabajo del relay es entrega at-least-once, que la idempotencia ya maneja aguas abajo. Si usas una cola fuertemente acoplada a Postgres, algunos motores te dan esto transaccional de fábrica.
+</Collapsible>
+
+## El human-in-the-loop es una pausa durable, no un `if` en memoria
+
+Una aprobación del tipo "confirma esta acción" puede tardar horas. Un humano está dormido, en una reunión, fuera el fin de semana. Modelar eso como una espera bloqueante en un worker vivo es como agotas tu pool de workers. El modelo correcto es un suspend durable: persiste la acción preparada, libera el worker y espera una señal externa. Cuando llega la aprobación, el motor reanuda el workflow exactamente donde pausó. Sin worker retenido, sin tokens gastados mientras espera.
+
+Un requisito sutil que muchos pasan por alto: persiste la *entrada normalizada* en el momento en que pides la aprobación. El usuario aprueba lo que se le mostró. Si, entre la aprobación y la ejecución, el agente regenera la acción, aparece el drift, el usuario confirmó reservar la sala A y el agente reserva la sala B. Congela la acción en el momento de aprobar para que lo ejecutado sea igual a lo mostrado.
+
+## Los presupuestos de coste y latencia van en la infraestructura
+
+Los runaway loops son incidentes reales. Un postmortem público (un pipeline multi-agente, reportado en blog y anecdótico, no un informe corporativo auditado) describe ~$47k quemados en 11 días porque dos agentes hicieron ping-pong sin tope de gasto ni kill switch. [D] Toma la cifra exacta como ilustrativa, pero el modo de fallo es real y común.
+
+La lección no es "añade un límite al system prompt". Un límite a nivel de prompt es una sugerencia que el agente puede ignorar o razonar para sortear. Los límites duros, máximo de iteraciones por turno, presupuesto de tokens por tenant y por día, un circuit breaker que se dispara cuando la velocidad de gasto supera la media móvil, viven en infraestructura, fuera del control del agente, chequeados *antes* de la llamada al modelo.
+
+<Tabs labels={["Límite en el prompt (mal)", "Límite en infra (bien)"]}>
+<TabPanel>
+
+```text
+System prompt:
+"No uses más de 10 tool calls.
+Detente si la tarea parece demasiado cara."
+```
+
+El agente puede racionalizar para saltárselo. "Esta tarea es importante, así que 12 llamadas se justifican." No hay enforcement. Cuando entra en loop, nada lo detiene salvo tu alerta de facturación, que llega cuando el dinero ya se fue.
+
+</TabPanel>
+<TabPanel>
+
+```typescript
+// Chequeado antes de cada llamada al modelo, el agente no lo evade.
+if (turn.iterations >= MAX_ITERS) throw new IterationCapExceeded();
+if (await tenantSpendToday(tenant) >= DAILY_BUDGET) throw new BudgetExceeded();
+if (runCost > MOVING_AVG * SPIKE_FACTOR) breaker.trip();
+```
+
+El agente no tiene camino para esquivarlo. El tope lo impone el harness, no se le pide al modelo.
+
+</TabPanel>
+</Tabs>
+
+Las alertas de facturación no son un control de coste. Te avisan de dinero ya gastado. El control es un breaker activo que rechaza la siguiente llamada.
+
+## Lo que el consenso se equivoca
+
+Hay patrones sobrevalorados en este espacio. WebSocket como default para responder por streaming, la mayoría del streaming de tokens es unidireccional y SSE con reconexión por `Last-Event-ID` es más simple, más barato y reanuda tras una desconexión. WebSocket se gana su complejidad solo cuando necesitas interacción bidireccional real, como interrumpir un turno en vuelo. Event-sourcing pesado o Kafka en un SaaS de agentes en etapa temprana, Postgres más un outbox más una cola sólida lo cubren hasta que de verdad tengas fan-out a escala.
+
+Y una tensión que está infravalorada: prompt caching contra context compaction. Un prefijo estable se cachea y se sirve mucho más barato. Pero compactar la conversación para gestionar memoria edita turnos anteriores, lo cual invalida el cache y dispara el coste. Tiran en direcciones opuestas. No puedes optimizar ambos a ciegas; los balanceas, y mides el hit-rate del cache como métrica de coste de primera clase.
+
+Hay mucho aquí que simplifiqué. Cuándo el exactly-once es "efectivo" y no literal, cómo las sagas y la compensación manejan el rollback multi-paso, cómo se ve un drenado limpio de colas con workers stateful. Cada uno es su propia madriguera. La idea con la que quedarte: el agente es la parte fácil. El workflow a su alrededor es el sistema.

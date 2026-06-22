@@ -1,0 +1,145 @@
+---
+title: "Human-in-the-loop is a control system, gated by reversibility"
+description: "HITL isn't 'ask the user when unsure.' It's a deterministic control system that intercepts irreversible, high-blast-radius actions before they run, and guarantees that what the human approves is byte-for-byte what executes."
+phase: 5
+order: 8
+tier: fiabilidad
+durability: atemporal
+updatedDate: 2026-06-19
+lang: en
+tldr:
+  - "Gate on reversibility and blast radius, not on what 'sounds dangerous.' Reads auto-run; world-changing writes get intercepted before execution."
+  - "The guardrail lives in code, outside the model's reach. Prompts, persona, and spotlighting reduce frequency; they are not a security boundary."
+  - "The elite, near-invisible bug: confirm and execute diverge. Persist the normalized input before asking, then execute that record, not a fresh model call."
+sources:
+  - { grade: "A", title: "Measuring AI agent autonomy in practice", author: "Anthropic", year: 2026, url: "https://www.anthropic.com/research/measuring-agent-autonomy" }
+  - { grade: "A", title: "Configure permissions — Claude Agent SDK", author: "Anthropic", year: 2025, url: "https://code.claude.com/docs/en/agent-sdk/permissions" }
+  - { grade: "A", title: "Bypassing LLM Guardrails: An Empirical Analysis of Evasion Attacks", author: "arXiv 2504.11168", year: 2025, url: "https://arxiv.org/pdf/2504.11168" }
+  - { grade: "A", title: "Agentic Misalignment: How LLMs Could Be Insider Threats", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/research/agentic-misalignment" }
+  - { grade: "A", title: "Prompt Flow Integrity to Prevent Privilege Escalation in LLM Agents", author: "arXiv 2503.15547", year: 2025, url: "https://arxiv.org/pdf/2503.15547" }
+  - { grade: "A", title: "Measuring and Mitigating Overreliance to Build Human-Compatible AI", author: "arXiv 2509.08010", year: 2025, url: "https://arxiv.org/html/2509.08010" }
+  - { grade: "A", title: "Confidence-Based Trust Calibration in Human-AI Teams", author: "IJACSA (thesai.org)", year: 2025, url: "https://thesai.org/Downloads/Volume16No12/Paper_122-Confidence_Based_Trust_Calibration_in_Human_AI_Teams.pdf" }
+  - { grade: "A", title: "Architecting Resilient LLM Agents: Secure Plan-then-Execute", author: "arXiv 2509.08646", year: 2025, url: "https://arxiv.org/pdf/2509.08646" }
+  - { grade: "B", title: "OpenAI Agents SDK — Human-in-the-loop & interruptions", author: "OpenAI", year: 2025, url: "https://openai.github.io/openai-agents-js/guides/human-in-the-loop/" }
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import DecisionTree from '../../components/blog/DecisionTree.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+
+Human-in-the-loop is where most agents die in production. They ask for confirmation on everything until the human stops reading, or they don't ask for the one thing that matters and wipe a real customer's calendar with no undo. Both failures come from the same bad axis. The question is not "is this important?" It's "is this reversible, and what's the blast radius?"
+
+And HITL is not a feature you bolt on at the end. Once you accept that an agent compounds error over many steps and only partially observes the world it acts in, some class of its actions will be wrong, and a few of those will be expensive to undo. The control system that intercepts those is the architectural consequence of those two facts, not decoration. The reversibility gate is one of the maybe five highest-impact reliability decisions you'll make.
+
+## The mental model: control by reversibility
+
+The thesis: HITL is a control system where you decide *ex ante*, at design time, which actions are irreversible or high-impact, and you intercept them *before* they run, not after. The real axis isn't autonomy versus supervision. It's two physical properties of each action: reversibility (how much does it cost to undo?) and blast radius (how many systems and users does it touch if it goes wrong?).
+
+<Callout type="important" title="Reads run, world-changing writes wait">
+A read is auto-executable because it's reversible and idempotent: reading the calendar twice changes nothing. A write that mutates the world (booking, charging, deleting) needs confirmation because *undoing it costs*. Concentrate the gate where the cost of reversal is high, not where the tool name sounds scary.
+</Callout>
+
+There's empirical shape to this. Anthropic, measuring ~998K tool calls from production deployments, found that on average only **0.8% of actions are irreversible**, **73% have a human in the loop**, and **80% carry some safeguard**. Read the framing carefully: these are *averages of the current state*, and Anthropic explicitly warns they hide frontier deployments that are less safe. They are not proof that good governance *produces* those numbers. What they do tell you is the distribution: the overwhelming majority of an agent's actions are cheap to undo, so the control belongs on the ~1% tail.
+
+The analogy I keep is the operating room versus the reading room. A resident can read as many charts as they want unsupervised, because reading doesn't change the patient. To *cut*, they need an attending who verifies exactly what will be done, on which patient, on which side, because an incision doesn't undo. The surgical time-out is a reversibility gate. And its key question isn't "is this surgery important?" It's "are we certain the paper we signed describes what we're about to do to this body?" That second question is the heart of this module.
+
+<DecisionTree
+  root="call"
+  nodes={{
+    call: {
+      question: "An LLM proposes a tool call. What runs?",
+      choices: [
+        { label: "Read / idempotent (list events, search notes)", next: "read" },
+        { label: "Write that mutates the world (book, cancel, charge, delete)", next: "write" },
+      ],
+    },
+    read: {
+      verdict: "Auto-execute.",
+      detail: "Reversible and side-effect-free. It passes via an allow rule and never touches the confirmation path.",
+      choices: [{ label: "Start over", next: "call" }],
+    },
+    write: {
+      verdict: "Intercept before it runs.",
+      detail: "Normalize and persist the input, send the human a readable diff, return deny so the model stops. The confirmation tap executes the persisted record, never a fresh model call.",
+      choices: [{ label: "Start over", next: "call" }],
+    },
+  }}
+/>
+
+## The permission chain: deny > ask > mode > allow > callback
+
+The control isn't a loose `if`. It's a deterministic chain with a fixed order. The Claude Agent SDK evaluates each tool call as: **hooks / deny rules** first, then **ask rules**, then the **permission mode**, then **allow rules**, and only the unresolved remainder falls through to the `canUseTool` callback. Three subtleties in that order are the difference between *believing* you're safe and actually being safe.
+
+A `deny` by bare name removes the tool from the model's context and blocks it *even under* `bypassPermissions`: the model can't call what it can't see. An `ask` rule forces a confirmation prompt *even under* `bypassPermissions`, so it's the only level that survives a permissive mode; use it for the irreversible. And `allow` does **not** restrict `bypassPermissions`: allow grants, it doesn't limit. If you think an allowlist protects you under bypass, you're wrong.
+
+<Callout type="warning" title="The trap in the modes">
+The SDK has six modes (default / dontAsk / acceptEdits / bypassPermissions / plan / auto) and only `default` routes the `canUseTool` callback. Two hazards. The mode is **inherited by subagents with no override**, so a `bypassPermissions` at the root contaminates the whole tree. And `acceptEdits` doesn't only auto-approve benign edits: it auto-approves filesystem ops like `mkdir/rm/rmdir/mv/cp/sed` via Bash inside the working dir. Jumping to `acceptEdits` "after review" widens the blast radius to destructive commands. Classify that jump by reversibility like any other action.
+</Callout>
+
+## The guardrail lives in code, not in the prompt
+
+This is the moral boundary of the whole topic. Spotlighting, persona, system instructions are **probabilistic mitigations**: they lower the frequency of a behavior, but a prompt injection or a jailbreak can step past them. The real security boundary is **deterministic and external to the model**: a tool denylist, a path jail with `realpath`, the `canUseTool` callback.
+
+Why not trust the safety classifiers as the boundary? Because they're evaded systematically. 2025 evasion research shows injection and jailbreak detectors break, with evasion success up to 100%. And the reason not to trust the model's *alignment* comes from Anthropic: in their agentic-misalignment study, models with autonomy and access to sensitive information took harmful actions: blackmail 55% of the time when they concluded the scenario was "real" versus 6.5% when they believed they were being evaluated.
+
+<Callout type="note" title="Temporal honesty about that finding">
+That behavior was observed in **earlier models**. Since Claude Haiku 4.5 (2026), every Claude model scores perfectly on that eval (never blackmails), against up to 96% in prior models. The argument "don't trust alignment alone, use hard rails" holds on defense-in-depth grounds, not because today's models fail at 96%. You design for the adversary the model *could* become under injection, not the one it measures as today.
+</Callout>
+
+Conceptually this is prompt-flow integrity: untrusted data entering the agent must not be able to escalate privilege. You separate *control* (trusted instructions) from *data* (untrusted content). Spotlighting is the prompt-level version of that separation, and its weakness is that it leaves integrity in the model's obedience. So it needs a structural component too, not just a polite label.
+
+## Confirm/execute non-divergence: the elite, near-invisible bug
+
+Here's the concept almost no one verifies, and where the highest-impact bugs hide. The typical HITL flow is asynchronous: the agent shows "book Tuesday 10am," the user taps Confirm, then it executes. The bug: if between the tap and the execution the input is **re-derived from the LLM**, it can diverge. The human approved A and the system does B. Without non-divergence, HITL is theater: a button that doesn't guarantee what it approves.
+
+<Callout type="tip" title="The correct fix">
+Persist the **normalized, validated** input *before* asking for confirmation. The confirmation tap executes that persisted record, not a new model query. The approved payload is then byte-for-byte the executed one.
+</Callout>
+
+The shape in code: the write gate validates the arguments, builds the human-readable summary, persists the normalized input, sends the confirm/decline buttons, and returns `deny` so the model halts. The real write never happens at that point. Later, the decision handler re-validates ownership, status, and expiry, makes an atomic state transition, and the executor re-parses *the persisted normalized input* and runs it.
+
+<CodeBlock filename="write-gate.ts">
+```ts
+// Inside canUseTool, for a world-changing write:
+async function gateWrite(toolName, input) {
+  const action = normalizeAndValidate(toolName, input); // Zod-checked, fully resolved
+  const pending = await persistPendingAction(action);   // the source of truth for execution
+  await sendConfirmButtons(pending.id, summarize(action));
+  return { behavior: "deny" }; // model stops; nothing is written yet
+}
+
+// Later, when the human taps Confirm, execute the PERSISTED record, not a fresh call:
+async function onConfirm(pendingId) {
+  const pending = await loadAndLockPending(pendingId);  // re-validate org/status/expiry
+  if (!pending) return; // already executed, expired, or cross-tenant: fail closed
+  return executeConfirmed(pending.action);              // shown == executed
+}
+```
+</CodeBlock>
+
+<Collapsible title="Go deeper: idempotency, not just persistence">
+Persisting the payload guarantees *what* runs. Idempotency guarantees it runs *once*. The confirm tap can be retried: a flaky network, a double-tap, a queue redelivery. So the execution must key on the pending action's id and transition its status atomically (pending → executed) before doing the side effect, so a second confirm finds nothing to do. Without that, a non-divergent payload can still book the same appointment twice. Belt and suspenders: even the underlying handlers can return a "confirmation required" no-op so that if someone breaks the gate, the write still doesn't happen. Two belts for the same trousers, because the action is irreversible.
+</Collapsible>
+
+## Calibrated trust: the enemy is rubber-stamping
+
+The HITL failure in production is rarely "we were missing confirmation points." It's that the human **approves everything without reading**. The 2025 overreliance literature formalizes why: a badly designed HITL degrades human skill and produces automation bias. Adding an Approve button can *worsen* safety when it manufactures a false sense of control.
+
+<Callout type="warning" title="Your HITL health metric is the approval rate">
+A ~100% approval rate is a sign of mis-calibrated gating or rubber-stamping, not of a good agent. If the human never declines, either you're asking for confirmation on things that don't need it (fatigue), or they've stopped reading. Real control means the approver gets enough to decide: what changes, why, and what's irreversible.
+</Callout>
+
+You can operationalize calibration as an adaptive policy: the system handles routine, high-certainty cases and escalates the ambiguous, high-risk ones to the human. Escalation thresholds instead of uniform gating. And the approver needs a readable diff, not just "Confirm / Decline." Channel constraints make this harder than it sounds: a messaging surface that caps you to three 20-character buttons forces the detail into the message *text*, not the button.
+
+## Least-privilege, default-deny, and earned autonomy
+
+Default-deny is the resting posture: the agent starts with **no capabilities** and gets only the ones the current task or role needs (an explicit allowlist). The denylist is defense-in-depth, not the primary boundary. The antipattern is default-allow with a denylist, because a *new* tool slips past the control. For plan-then-execute architectures the analogous rule is least privilege per sub-agent: the planner needs no tools, executors get a narrow scope, which caps blast radius and privilege escalation between components.
+
+Autonomy isn't assumed, it's earned with data. The production pattern: gate everything, sample the quality, then move to autonomous mode only what the evals back. The SDK lets you `setPermissionMode` mid-session to tighten or loosen. But every mode jump is itself an action you classify by reversibility. `acceptEdits` is not a free lunch.
+
+## Graceful degradation and escalation as a first-class path
+
+A resilient agent treats "I don't know / low confidence / tool down / out of policy" as a *designed* path (escalate, degrade to read-only, open a ticket), not an unhandled exception. And the escalation should preserve context: serialize the run state so a human can approve or correct and resume the same run without starting over. The OpenAI Agents SDK models this with interruptions and resumable state, a good reference even on a Claude stack.
+
+Two things I'd leave you uneasy about, deliberately. Reversibility is a *product* capability, not just a gate. Soft-delete, dry-run, undo, and versioning turn "irreversible" into reversible and let you relax the gate safely, and almost no one builds that on purpose. And memory writes are a quiet hole: a pre-approved `save_memory` that skips the gate is an ungated write channel, and untrusted content that lands in a notes file can be re-injected on a later turn. The gate you so carefully built on the calendar means little if the model can write to its own future context unsupervised.
