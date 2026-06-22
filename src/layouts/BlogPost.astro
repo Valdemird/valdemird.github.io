@@ -151,7 +151,7 @@ if (lang === 'en') {
 // related posts instead of dead-ending after the body.
 const currentTags = new Set(tags ?? []);
 const relatedPosts = allPosts
-	.filter((p) => p.id !== slug && (p.data.lang ?? 'en') === lang)
+	.filter((p) => p.id !== slug && (p.data.lang ?? 'en') === lang && !p.data.draft)
 	.map((p) => ({
 		post: p,
 		overlap: (p.data.tags ?? []).filter((t: string) => currentTags.has(t)).length,

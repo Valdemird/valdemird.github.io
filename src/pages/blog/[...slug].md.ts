@@ -3,7 +3,7 @@ import { getCollection } from 'astro:content';
 import { cleanMdxBody } from '../../lib/mdx-plaintext';
 
 export async function getStaticPaths() {
-	const posts = await getCollection('blog');
+	const posts = (await getCollection('blog')).filter((post) => !post.data.draft);
 	return posts.map((post) => ({
 		params: { slug: post.id },
 		props: { post },

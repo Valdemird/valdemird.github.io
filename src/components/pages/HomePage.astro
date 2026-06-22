@@ -25,7 +25,7 @@ const strings = UI_STRINGS[lang];
 // homepage link as newer posts publish), then fill the remaining slots by
 // recency. Total stays at 3.
 const postsByRecency = (await getCollection('blog'))
-	.filter((p) => p.data.lang === lang)
+	.filter((p) => p.data.lang === lang && !p.data.draft)
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 const recentPosts = [
 	...postsByRecency.filter((p) => p.data.featured),
@@ -36,6 +36,12 @@ const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma
 
 const blogIndexPath = lang === 'es' ? '/es/blog/' : '/blog/';
 const labPath = lang === 'es' ? '/es/lab/' : '/lab/';
+
+// Descriptive, branded homepage title. The bare site name ("valdemird") said
+// nothing to a searcher; this names what the site is while keeping the brand.
+const homeTitle = lang === 'es'
+	? 'valdemird — Ingeniero de software y herramientas para devs'
+	: 'valdemird — Software engineer building developer tools';
 
 // "From the lab" embed — the branching story from the worktrees post, live.
 const labOps: LabGitOp[] = [
@@ -78,7 +84,7 @@ const homeJsonLd = {
 <!doctype html>
 <html lang={lang}>
 	<head>
-		<BaseHead title={SITE_TITLE} description={strings.home.metaDescription} image={lang === 'es' ? '/og/default-es.png' : undefined} lang={lang} jsonLd={homeJsonLd} alternates={[
+		<BaseHead title={homeTitle} description={strings.home.metaDescription} image={lang === 'es' ? '/og/default-es.png' : undefined} lang={lang} jsonLd={homeJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/' },
 		]} />

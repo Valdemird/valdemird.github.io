@@ -11,7 +11,7 @@ import { getCollection } from 'astro:content';
 
 const strings = t(Astro.url);
 const posts = (await getCollection('blog'))
-	.filter((p) => p.data.lang === 'es')
+	.filter((p) => p.data.lang === 'es' && !p.data.draft)
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 const featuredPost = posts[0];
 const otherPosts = posts.filter((p) => p !== featuredPost);

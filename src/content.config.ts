@@ -16,6 +16,8 @@ const blog = defineCollection({
 		/** Skimmer bullets — also surfaced as the JSON-LD `abstract`. */
 		tldr: z.array(z.string()).optional(),
 		featured: z.boolean().optional(),
+		/** Work-in-progress: excluded from routes, listings, RSS and the .md feed. */
+		draft: z.boolean().default(false),
 		lang: z.enum(['en', 'es']).default('en'),
 	}),
 });
