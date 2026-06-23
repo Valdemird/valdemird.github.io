@@ -4,7 +4,7 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
 import { ClientRouter } from 'astro:transitions';
-import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PERSON, PERSON_ID } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PERSON, PERSON_ID, ORGANIZATION, ORGANIZATION_ID } from '../consts';
 
 interface Alternate {
 	hreflang: string;
@@ -47,7 +47,7 @@ const defaultJsonLd = {
 			url: 'https://valdemird.com',
 			description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
 			inLanguage: ['en', 'es'],
-			publisher: { '@id': PERSON_ID },
+			publisher: { '@id': ORGANIZATION_ID },
 			potentialAction: {
 				'@type': 'SearchAction',
 				target: {
@@ -58,6 +58,7 @@ const defaultJsonLd = {
 			},
 		},
 		PERSON,
+		ORGANIZATION,
 	],
 };
 

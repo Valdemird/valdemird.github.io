@@ -4,7 +4,7 @@ import Header from '../Header.astro';
 import Footer from '../Footer.astro';
 import ProjectCard from '../ProjectCard.astro';
 import PostPreview from '../PostPreview.astro';
-import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, PERSON_ID, personWithProperties, webPropertyNodes, UI_STRINGS } from '../../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, personWithProperties, webPropertyNodes, UI_STRINGS } from '../../consts';
 import { getCollection } from 'astro:content';
 
 interface Props {
@@ -14,14 +14,25 @@ interface Props {
 const { lang } = Astro.props;
 const strings = UI_STRINGS[lang];
 
-const recentPosts = (await getCollection('blog'))
-	.filter((p) => p.data.lang === lang)
-	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf())
-	.slice(0, 3);
+// Pin any `featured` post first (so the breakout post keeps its high-authority
+// homepage link as newer posts publish), then fill the remaining slots by
+// recency. Total stays at 3.
+const postsByRecency = (await getCollection('blog'))
+	.filter((p) => p.data.lang === lang && !p.data.draft)
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const recentPosts = [
+	...postsByRecency.filter((p) => p.data.featured),
+	...postsByRecency.filter((p) => !p.data.featured),
+].slice(0, 3);
 
 const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma', 'Tailwind CSS', 'PostgreSQL', 'Vercel AI SDK', 'Claude Code'];
 
 const blogIndexPath = lang === 'es' ? '/es/blog/' : '/blog/';
+// Descriptive, branded homepage title. The bare site name ("valdemird") said
+// nothing to a searcher; this names what the site is while keeping the brand.
+const homeTitle = lang === 'es'
+	? 'valdemird — Ingeniero de software y herramientas para devs'
+	: 'valdemird — Software engineer building developer tools';
 
 // Entity graph: WebSite + canonical Person (owning the subdomains) + each owned
 // web property. Ties valdemird.com and its subdomains to one creator entity.
@@ -35,7 +46,7 @@ const homeJsonLd = {
 			url: 'https://valdemird.com',
 			description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
 			inLanguage: lang === 'es' ? ['es', 'en'] : ['en', 'es'],
-			publisher: { '@id': PERSON_ID },
+			publisher: { '@id': ORGANIZATION_ID },
 			potentialAction: {
 				'@type': 'SearchAction',
 				target: { '@type': 'EntryPoint', urlTemplate: `https://valdemird.com${blogIndexPath}?q={search_term_string}` },
@@ -43,6 +54,7 @@ const homeJsonLd = {
 			},
 		},
 		personWithProperties(),
+		ORGANIZATION,
 		...webPropertyNodes(),
 	],
 };
@@ -51,7 +63,7 @@ const homeJsonLd = {
 <!doctype html>
 <html lang={lang}>
 	<head>
-		<BaseHead title={SITE_TITLE} description={strings.home.metaDescription} image={lang === 'es' ? '/og/default-es.png' : undefined} lang={lang} jsonLd={homeJsonLd} alternates={[
+		<BaseHead title={homeTitle} description={strings.home.metaDescription} image={lang === 'es' ? '/og/default-es.png' : undefined} lang={lang} jsonLd={homeJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/' },
 		]} />

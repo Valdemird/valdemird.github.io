@@ -4,7 +4,7 @@ import Header from '../Header.astro';
 import Footer from '../Footer.astro';
 import { getLearnModules, groupByPhase, getLearnStats, moduleHref, courseHomeHref, baseSlug, TIER_LABEL, type Lang } from '../../lib/learn';
 import { GLOSSARY, glossaryHref } from '../../lib/learn-glossary';
-import { UI_STRINGS, PERSON, PERSON_REF } from '../../consts';
+import { UI_STRINGS, PERSON, ORGANIZATION_REF } from '../../consts';
 
 interface Props {
 	lang: Lang;
@@ -82,11 +82,12 @@ const courseJsonLd = {
 	name: title,
 	description,
 	inLanguage: lang,
-	provider: PERSON_REF,
+	provider: ORGANIZATION_REF,
 	author: PERSON,
 	url: `https://valdemird.com${path}`,
-	hasPart: modules.map((m) => ({
+	hasPart: modules.map((m, i) => ({
 		'@type': 'TechArticle',
+		position: i + 1,
 		name: m.data.title,
 		url: `https://valdemird.com${moduleHref(baseSlug(m.id), lang)}`,
 	})),

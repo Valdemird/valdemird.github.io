@@ -15,12 +15,15 @@ const subMessage = isEs
 	: 'It may have been moved, or the link might be incorrect.';
 const buttonText = isEs ? 'Ir al inicio' : 'Go home';
 const homePath = isEs ? '/es/' : '/';
+const description = isEs
+	? 'No encontramos esta página. Puede que haya cambiado de lugar o el enlace esté roto. Vuelve al inicio para seguir explorando.'
+	: 'We couldn’t find this page. It may have moved or the link may be broken. Head back home to keep exploring.';
 ---
 
 <!doctype html>
 <html lang={locale}>
 	<head>
-		<BaseHead title={`${title} — ${SITE_TITLE}`} description={title} />
+		<BaseHead title={`${title} — ${SITE_TITLE}`} description={description} noindex />
 	</head>
 	<body>
 		<a id="nf-skip" class="skip-link" href="#main-content">{UI_STRINGS[locale].nav.skipToContent}</a>

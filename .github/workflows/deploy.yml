@@ -36,3 +36,26 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # IndexNow tells Bing/Yandex about fresh URLs on every deploy (Google ignores
+      # it — GSC URL Inspection remains the Google path). GitHub Pages has no server
+      # to push from, so this CI step reads the just-deployed sitemap and submits the
+      # URL list. Best-effort: a discovery hiccup must never fail the deploy.
+      - name: Ping IndexNow (Bing/Yandex)
+        continue-on-error: true
+        run: |
+          KEY=2d520ffa726b86e13f761e672383aabd
+          HOST=valdemird.com
+          urls=$(curl -s "https://$HOST/sitemap-index.xml" \
+            | grep -oE '<loc>[^<]+</loc>' | sed -E 's#</?loc>##g' \
+            | while read -r sm; do curl -s "$sm"; done \
+            | grep -oE '<loc>[^<]+</loc>' | sed -E 's#</?loc>##g')
+          count=$(printf '%s\n' "$urls" | grep -c . || true)
+          echo "Submitting $count URLs to IndexNow"
+          [ "$count" -gt 0 ] || exit 0
+          payload=$(printf '%s\n' "$urls" | grep . | jq -R . | jq -s \
+            --arg host "$HOST" --arg key "$KEY" \
+            '{host:$host, key:$key, keyLocation:("https://"+$host+"/"+$key+".txt"), urlList:.}')
+          curl -s -X POST 'https://api.indexnow.org/IndexNow' \
+            -H 'Content-Type: application/json; charset=utf-8' \
+            --data "$payload" -o /dev/null -w 'IndexNow HTTP %{http_code}\n'

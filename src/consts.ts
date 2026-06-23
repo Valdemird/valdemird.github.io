@@ -25,10 +25,29 @@ export const PERSON = {
 	jobTitle: 'Senior Software Engineer & Consultant',
 	knowsAbout: ['Software Engineering', 'Developer Tools', 'AI-assisted development', 'Astro', 'React', 'Web Performance'],
 	sameAs: [SOCIAL_LINKS.github, SOCIAL_LINKS.linkedin, SOCIAL_LINKS.devto],
+	image: 'https://valdemird.com/images/about/sebastian.webp',
 } as const;
 
 // Lightweight reference: link to the canonical Person by @id without re-inlining.
 export const PERSON_REF = { '@id': PERSON_ID } as const;
+
+// --- Publisher entity ---
+// Article/BlogPosting structured data expects an Organization publisher with a
+// logo. For this one-person brand the Organization is the site itself; the
+// Person is its founder/author. One stable @id so it resolves to a single node.
+export const ORGANIZATION_ID = 'https://valdemird.com/#organization';
+
+export const ORGANIZATION = {
+	'@type': 'Organization',
+	'@id': ORGANIZATION_ID,
+	name: SITE_TITLE,
+	url: 'https://valdemird.com',
+	logo: { '@type': 'ImageObject', url: 'https://valdemird.com/favicon.svg' },
+	founder: { '@id': PERSON_ID },
+	sameAs: [SOCIAL_LINKS.github, SOCIAL_LINKS.linkedin, SOCIAL_LINKS.devto],
+} as const;
+
+export const ORGANIZATION_REF = { '@id': ORGANIZATION_ID } as const;
 
 type Project = {
 	readonly title: string;
