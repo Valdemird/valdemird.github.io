@@ -1,6 +1,6 @@
 ---
 title: "Game feel on the web: squash, shake, and the art of juice"
-description: "A button that just works is dead. I spent an evening teaching a side-project to punch back, and these are the six techniques that did it. Each one playable, dependency-free, and respectful of your settings."
+description: "Game feel on the web: how squash & stretch, hitstop, screen shake, particles and synthesized audio make web UI animation feel alive — built with plain CSS and the Web Audio API, no libraries, every demo playable."
 pubDate: 2026-06-03
 tags: ["game-feel", "animation", "web-audio", "frontend", "interaction-design"]
 featured: true
@@ -18,6 +18,7 @@ import PullQuote from '../../components/blog/PullQuote.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import Sidenote from '../../components/blog/Sidenote.astro';
 import EasingExplorer from '../../components/blog/EasingExplorer.astro';
+import TLDR from '../../components/blog/TLDR.astro';
 
 <GameFeelHero
   eyebrow="Interactive"
@@ -32,6 +33,11 @@ import EasingExplorer from '../../components/blog/EasingExplorer.astro';
     { label: "escalating celebration", href: "#escalating-celebration" },
   ]}
 />
+
+<TLDR bullets={[
+  "Game feel is the response, not the graphics: the same click handler can feel like submitting a form or like landing a punch, depending only on what the interface does in the ~400ms after you act.",
+  "Six techniques from game design — squash & stretch, hitstop, screen shake, particles, synthesized audio, and escalating feedback — ported to the web with plain CSS and the Web Audio API. No libraries, and every one respects reduced-motion and sound settings.",
+]} />
 
 Last month I was building a small multiplayer party game at `games.valdemird.com`. One of the modes is a number hunt: a grid of cells, you tap the right ones before your rival does. It worked on the first try. Tapping a cell flipped it on, the score went up, the round ended. Correct, and completely dead.
 
@@ -136,7 +142,7 @@ More is more. If it looks good with a little screen shake, it'll probably look b
 
 He's mostly right, with one caveat the talk doesn't dwell on: shaking the whole viewport on the web is a motion-sickness trigger for some people. The `if (reduced()) return` at the top of that function isn't decoration. It's the difference between juice and an accessibility complaint.
 
-<h2 id="particles">Particles</h2>
+<h2 id="particles">Particles without canvas</h2>
 
 Particles are the [*Juice it or lose it*](https://www.youtube.com/watch?v=Fy0aCDmgnxg) signature. In that 2012 talk, Martin Jonasson and Petri Purho take a gray Breakout clone and, effect by effect, bury it in colored debris until it's gleeful. Their version is [playable in the browser](http://grapefrukt.com/f/games/juicy-breakout/) with a slider for every effect, which is the closest thing the field has to a canonical demo. Bricks explode into dozens of bits. The screen fills with motion that means nothing mechanically and everything emotionally.
 
@@ -172,7 +178,7 @@ Distributing the base angle evenly around the circle (`2π · i / count`) and th
 For a few dozen short-lived particles, DOM elements with CSS animations are simpler than a canvas render loop and cost nothing once they're spawned. The compositor handles them. Reach for canvas when you're drawing hundreds at sustained 60fps. Below that, this is less code and survives `prefers-reduced-motion` for free.
 </Callout>
 
-<h2 id="synthesized-audio">Synthesized audio</h2>
+<h2 id="synthesized-audio">Synthesized audio with the Web Audio API</h2>
 
 This is the one that surprises people. There are no sound files in the game. Not one `.mp3`, not one `.wav`. Every sound is generated in the browser with the [Web Audio API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API): an oscillator, a gain envelope, and a few numbers.
 

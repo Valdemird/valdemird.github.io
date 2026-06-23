@@ -16,6 +16,12 @@ import Collapsible from '../../components/blog/Collapsible.astro';
 import Tabs from '../../components/blog/Tabs.astro';
 import TabPanel from '../../components/blog/TabPanel.astro';
 import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+import TLDR from '../../components/blog/TLDR.astro';
+
+<TLDR bullets={[
+  "Encode the instructions you repeat to your AI coding assistant as custom slash commands — plain markdown files — instead of retyping prompts. No SDK, no API, no plugins.",
+  "Six commands chain into a spec-driven pipeline (create, audit, review, plan, implement) that turns the assistant from a code generator into a structured co-architect.",
+]} />
 
 Every AI coding tool lets you write natural language prompts. Very few let you build *structured workflows* on top of them. That's the gap most developers miss, and the reason their AI-generated code keeps needing rewrites.
 

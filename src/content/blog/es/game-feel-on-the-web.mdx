@@ -1,6 +1,6 @@
 ---
 title: "Game feel en la web: squash, shake y el arte del juice"
-description: "Un botón que solo funciona está muerto. Pasé una noche enseñándole a un proyecto paralelo a devolver el golpe, y estas son las seis técnicas que lo lograron. Cada una jugable, sin librerías y respetando tus preferencias."
+description: "Game feel en la web: cómo squash & stretch, hitstop, screen shake, partículas y audio sintetizado hacen que la animación de UI web se sienta viva — con CSS puro y la Web Audio API, sin librerías y con cada demo jugable."
 pubDate: 2026-06-03
 tags: ["game-feel", "animation", "web-audio", "frontend", "interaction-design"]
 featured: true
@@ -18,6 +18,7 @@ import PullQuote from '../../../components/blog/PullQuote.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Sidenote from '../../../components/blog/Sidenote.astro';
 import EasingExplorer from '../../../components/blog/EasingExplorer.astro';
+import TLDR from '../../../components/blog/TLDR.astro';
 
 <GameFeelHero
   eyebrow="Interactivo"
@@ -32,6 +33,11 @@ import EasingExplorer from '../../../components/blog/EasingExplorer.astro';
     { label: "celebración escalada", href: "#escalating-celebration" },
   ]}
 />
+
+<TLDR lang="es" bullets={[
+  "El game feel es la respuesta, no los gráficos: el mismo manejador de clic puede sentirse como enviar un formulario o como conectar un golpe, y lo único que cambia es lo que hace la interfaz en los ~400 ms después de que actúas.",
+  "Seis técnicas del diseño de videojuegos — squash & stretch, hitstop, screen shake, partículas, audio sintetizado y feedback que escala — llevadas a la web con CSS puro y la Web Audio API. Sin librerías, y todas respetan tus preferencias de movimiento y sonido.",
+]} />
 
 El mes pasado estaba construyendo un pequeño juego multijugador en `games.valdemird.com`. Uno de los modos es una caza de números: una cuadrícula de casillas y tú marcas las correctas antes que tu rival. Funcionó a la primera. Tocabas una casilla, se encendía, el puntaje subía, la ronda terminaba. Correcto, y completamente muerto.
 
@@ -137,7 +143,7 @@ Más es más. Si se ve bien con un poco de screen shake, probablemente se vea me
 
 Tiene razón casi siempre, con un matiz en el que la charla no se detiene: sacudir todo el viewport en la web es un disparador de mareo para algunas personas. El `if (reduced()) return` al inicio de esa función no es decoración. Es la diferencia entre tener juice y tener una queja de accesibilidad.
 
-<h2 id="particles">Partículas</h2>
+<h2 id="particles">Partículas sin canvas</h2>
 
 Las partículas son la firma de [*Juice it or lose it*](https://www.youtube.com/watch?v=Fy0aCDmgnxg). En esa charla de 2012, Martin Jonasson y Petri Purho toman un clon gris de Breakout y, efecto a efecto, lo entierran en escombros de colores hasta dejarlo eufórico. Su versión es [jugable en el navegador](http://grapefrukt.com/f/games/juicy-breakout/) con un deslizador por cada efecto, que es lo más parecido a una demo canónica que tiene el campo. Los ladrillos explotan en decenas de pedazos. La pantalla se llena de movimiento que no significa nada mecánicamente y todo emocionalmente.
 
@@ -173,7 +179,7 @@ Repartir el ángulo base de forma pareja alrededor del círculo (`2π · i / cou
 Para unas pocas decenas de partículas de vida corta, los elementos del DOM con animaciones CSS son más simples que un bucle de render en canvas y no cuestan nada una vez creados: el compositor se encarga. Recurre a canvas cuando dibujes cientos a 60fps sostenidos. Por debajo de eso, esto es menos código y sobrevive a `prefers-reduced-motion` gratis.
 </Callout>
 
-<h2 id="synthesized-audio">Audio sintetizado</h2>
+<h2 id="synthesized-audio">Audio sintetizado con la Web Audio API</h2>
 
 Esta es la que sorprende a la gente. No hay archivos de sonido en el juego. Ni un `.mp3`, ni un `.wav`. Cada sonido se genera en el navegador con la [Web Audio API](https://developer.mozilla.org/es/docs/Web/API/Web_Audio_API): un oscilador, una envolvente de ganancia y unos cuantos números.
 
