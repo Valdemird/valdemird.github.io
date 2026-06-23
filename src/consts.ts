@@ -111,9 +111,6 @@ export const UI_STRINGS = {
 			recentPostsTitle: 'Recent Posts',
 			viewAllPosts: 'View all posts',
 			terminalTitle: '~/projects',
-			fromLabTitle: 'From the lab',
-			fromLabBlurb: 'Every diagram on this blog is a live component, not a screenshot. This one steps through the branching workflow from the worktrees post.',
-			fromLabLink: 'Browse all components →',
 		},
 		projects: {
 			previewOf: 'Preview of',
@@ -155,9 +152,6 @@ export const UI_STRINGS = {
 			recentPostsTitle: 'Posts recientes',
 			viewAllPosts: 'Ver todos los posts',
 			terminalTitle: '~/proyectos',
-			fromLabTitle: 'Del lab',
-			fromLabBlurb: 'Cada diagrama de este blog es un componente vivo, no una captura. Este recorre el flujo de ramas del post sobre worktrees.',
-			fromLabLink: 'Ver todos los componentes →',
 		},
 		projects: {
 			previewOf: 'Vista previa de',

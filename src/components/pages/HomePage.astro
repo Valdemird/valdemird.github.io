@@ -4,13 +4,6 @@ import Header from '../Header.astro';
 import Footer from '../Footer.astro';
 import ProjectCard from '../ProjectCard.astro';
 import PostPreview from '../PostPreview.astro';
-import GitGraph from '../blog/GitGraph.astro';
-
-// Mirrors GitGraph's GitOp union (types can't be imported from .astro frontmatter).
-type LabGitOp =
-	| { op: 'commit'; branch: string; label?: string }
-	| { op: 'branch'; name: string; from: string; label?: string }
-	| { op: 'merge'; from: string; into: string; label?: string };
 import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, personWithProperties, webPropertyNodes, UI_STRINGS } from '../../consts';
 import { getCollection } from 'astro:content';
 
@@ -35,25 +28,11 @@ const recentPosts = [
 const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma', 'Tailwind CSS', 'PostgreSQL', 'Vercel AI SDK', 'Claude Code'];
 
 const blogIndexPath = lang === 'es' ? '/es/blog/' : '/blog/';
-const labPath = lang === 'es' ? '/es/lab/' : '/lab/';
-
 // Descriptive, branded homepage title. The bare site name ("valdemird") said
 // nothing to a searcher; this names what the site is while keeping the brand.
 const homeTitle = lang === 'es'
 	? 'valdemird — Ingeniero de software y herramientas para devs'
 	: 'valdemird — Software engineer building developer tools';
-
-// "From the lab" embed — the branching story from the worktrees post, live.
-const labOps: LabGitOp[] = [
-	{ op: 'commit', branch: 'main', label: 'init' },
-	{ op: 'branch', name: 'fix/auth', from: 'main' },
-	{ op: 'branch', name: 'feat/charts', from: 'main' },
-	{ op: 'commit', branch: 'fix/auth', label: lang === 'es' ? 'agente 1' : 'agent 1' },
-	{ op: 'commit', branch: 'feat/charts', label: lang === 'es' ? 'agente 2' : 'agent 2' },
-	{ op: 'commit', branch: 'main', label: lang === 'es' ? 'tú, en main' : 'you, on main' },
-	{ op: 'merge', from: 'fix/auth', into: 'main', label: 'PR #1' },
-	{ op: 'merge', from: 'feat/charts', into: 'main', label: 'PR #2' },
-];
 
 // Entity graph: WebSite + canonical Person (owning the subdomains) + each owned
 // web property. Ties valdemird.com and its subdomains to one creator entity.
@@ -190,29 +169,11 @@ const homeJsonLd = {
 				</div>
 			</section>
 
-			<!-- From the lab -->
-			<section class="section lab-section" id="from-the-lab">
-				<div class="section-header">
-					<span class="section-label">02</span>
-					<h2>{strings.home.fromLabTitle}</h2>
-					<div class="section-line"></div>
-				</div>
-				<div class="lab-inner">
-					<p class="lab-blurb">{strings.home.fromLabBlurb}</p>
-					<GitGraph
-						ops={labOps}
-						lang={lang}
-						caption={lang === 'es' ? 'Tres lanes, tres agentes, cero colisiones. Del post de worktrees.' : 'Three lanes, three agents, zero collisions. From the worktrees post.'}
-					/>
-					<a class="lab-link" href={labPath}>{strings.home.fromLabLink}</a>
-				</div>
-			</section>
-
 			<!-- Recent Posts -->
 			{recentPosts.length > 0 && (
 				<section class="section posts-section" id="posts">
 					<div class="section-header">
-						<span class="section-label">03</span>
+						<span class="section-label">02</span>
 						<h2>{strings.home.recentPostsTitle}</h2>
 						<div class="section-line"></div>
 					</div>
@@ -794,35 +755,6 @@ const homeJsonLd = {
 	.posts-list {
 		display: flex;
 		flex-direction: column;
-	}
-
-	/* ---- From the lab ---- */
-	.lab-inner {
-		max-width: var(--content-width);
-		margin-inline: auto;
-		display: flex;
-		flex-direction: column;
-	}
-
-	.lab-blurb {
-		font-size: 0.95rem;
-		line-height: 1.7;
-		color: var(--color-text-secondary);
-		margin: 0 0 1.5rem;
-	}
-
-	.lab-link {
-		align-self: flex-start;
-		margin-top: 1.25rem;
-		font-family: var(--font-mono);
-		font-size: 0.78rem;
-		color: var(--color-accent);
-		text-decoration: none;
-	}
-
-	.lab-link:hover {
-		color: var(--color-accent-hover);
-		text-decoration: underline;
 	}
 
 	.view-all {
