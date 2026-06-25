@@ -181,6 +181,27 @@ const mermaidId = `mermaid-${Math.random().toString(36).slice(2, 7)}`;
 		overflow: visible;
 	}
 
+	/*
+	 * Pin label typography to exactly what Mermaid measured (fontSize: 14,
+	 * system-ui — see mermaid.initialize above). The article/learn body CSS
+	 * applies font-size, line-height and letter-spacing to descendants, and
+	 * those inherit into the foreignObject HTML labels — inflating the rendered
+	 * text past the box Mermaid sized for it, so text spills out of the rects.
+	 * Re-pinning the metrics here makes render == measure across every diagram.
+	 */
+	.mermaid-diagram :global(.mermaid-rendered foreignObject),
+	.mermaid-diagram :global(.mermaid-rendered .nodeLabel),
+	.mermaid-diagram :global(.mermaid-rendered .edgeLabel),
+	.mermaid-diagram :global(.mermaid-rendered .label),
+	.mermaid-diagram :global(.mermaid-rendered foreignObject *) {
+		font-family: system-ui, -apple-system, sans-serif;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.4;
+		letter-spacing: normal;
+		word-spacing: normal;
+	}
+
 	.mermaid-diagram :global(.mermaid-rendered .nodeLabel),
 	.mermaid-diagram :global(.mermaid-rendered .edgeLabel),
 	.mermaid-diagram :global(.mermaid-rendered .label) {

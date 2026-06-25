@@ -2,24 +2,27 @@
 import { getLearnModules, groupByPhase, moduleHref, courseHomeHref, baseSlug, type Lang } from '../../lib/learn';
 import { glossaryHref } from '../../lib/learn-glossary';
 
-interface Heading {
-	depth: number;
-	slug: string;
-	text: string;
-}
-
 interface Props {
 	lang: Lang;
 	currentSlug?: string;
-	currentHeadings?: Heading[];
 }
 
-const { lang, currentSlug, currentHeadings } = Astro.props;
+const { lang, currentSlug } = Astro.props;
 const modules = await getLearnModules(lang);
 const phases = groupByPhase(modules);
 const es = lang === 'es';
-// Sections of the current module (h2 only) for the in-rail page index.
-const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
+
+// Flatten the phase grouping into a single 01–16 reading order. The phase stays
+// only as a lightweight divider label; modules carry a global number that lines
+// up with the header's "Module N of NN". This removes the Phase→Module nesting
+// level (and the "folder with one file" feel of single-module phases).
+let counter = 0;
+const numberedPhases = phases.map((p) => ({
+	title: p.title,
+	phase: p.phase,
+	modules: p.modules.map((m) => ({ entry: m, num: ++counter })),
+}));
+const total = counter;
 ---
 
 <nav class="learn-sidebar" aria-label={es ? 'Índice del curso' : 'Course index'}>
@@ -27,30 +30,19 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 		{es ? '← Mapa del curso' : '← Course map'}
 	</a>
 	<ol class="phase-list">
-		{phases.map((p) => (
-			<li class="phase">
-				<p class="phase-label">
-					<span class="phase-num">{String(p.phase).padStart(2, '0')}</span>
-					{p.title[lang]}
-				</p>
+		{numberedPhases.map((p, i) => (
+			<li class="phase" class:list={[{ first: i === 0 }]}>
+				<p class="phase-label">{p.title[lang]}</p>
 				<ul class="module-list">
-					{p.modules.map((m) => {
-						const slug = baseSlug(m.id);
+					{p.modules.map(({ entry, num }) => {
+						const slug = baseSlug(entry.id);
 						const active = slug === currentSlug;
 						return (
 							<li>
 								<a href={moduleHref(slug, lang)} class:list={[{ active }]} aria-current={active ? 'page' : undefined}>
-									{m.data.title}
+									<span class="mod-num">{String(num).padStart(2, '0')}</span>
+									<span class="mod-title">{entry.data.title}</span>
 								</a>
-								{active && sections.length > 1 && (
-									<ul class="section-list" data-toc>
-										{sections.map((s) => (
-											<li>
-												<a href={`#${s.slug}`} data-toc-link={s.slug}>{s.text}</a>
-											</li>
-										))}
-									</ul>
-								)}
 							</li>
 						);
 					})}
@@ -60,41 +52,6 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 	</ol>
 	<a class="sidebar-glossary" href={glossaryHref(lang)}>{es ? 'Glosario →' : 'Glossary →'}</a>
 </nav>
-
-<script>
-	// Scroll-spy: highlight the current module section in the rail.
-	function initLearnToc() {
-		const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('[data-toc-link]'));
-		if (!links.length) return () => {};
-		const byId = new Map(links.map((l) => [l.dataset.tocLink!, l]));
-		const heads = Array.from(document.querySelectorAll<HTMLElement>('.article-body h2[id]')).filter((h) => byId.has(h.id));
-		if (!heads.length) return () => {};
-		let current: HTMLAnchorElement | null = null;
-		const setActive = (id: string) => {
-			const link = byId.get(id);
-			if (!link || link === current) return;
-			current?.classList.remove('toc-active');
-			current?.removeAttribute('aria-current');
-			link.classList.add('toc-active');
-			link.setAttribute('aria-current', 'true');
-			current = link;
-		};
-		const obs = new IntersectionObserver(
-			(entries) => {
-				const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-				if (visible[0]) setActive((visible[0].target as HTMLElement).id);
-			},
-			{ rootMargin: '-15% 0px -70% 0px', threshold: 0 },
-		);
-		heads.forEach((h) => obs.observe(h));
-		return () => obs.disconnect();
-	}
-	let cleanupToc = initLearnToc();
-	document.addEventListener('astro:before-swap', () => cleanupToc?.());
-	document.addEventListener('astro:after-swap', () => {
-		cleanupToc = initLearnToc();
-	});
-</script>
 
 <style>
 	.learn-sidebar {
@@ -122,7 +79,7 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 
 	.sidebar-glossary {
 		display: inline-block;
-		margin-top: var(--space-md);
+		margin-top: var(--space-lg);
 		font-family: var(--font-mono);
 		font-size: 0.7rem;
 		text-transform: uppercase;
@@ -134,75 +91,64 @@ const sections = (currentHeadings ?? []).filter((h) => h.depth === 2);
 	.sidebar-glossary:hover { opacity: 0.75; }
 
 	.phase-list { list-style: none; margin: 0; padding: 0; }
-	.phase { margin-bottom: var(--space-lg); }
+
+	/* Phase = a lightweight divider, not a nesting container. A hairline top rule
+	   separates groups (design-system mechanism #3) — no boxes, no left bars. */
+	.phase { margin: 0; padding-top: var(--space-md); }
+	.phase:not(.first) {
+		margin-top: var(--space-md);
+		border-top: 1px solid var(--color-border);
+	}
+	.phase.first { padding-top: 0; }
 
 	.phase-label {
-		display: flex;
-		align-items: baseline;
-		gap: 0.5em;
-		margin: 0 0 0.5em;
+		margin: 0 0 0.55em;
 		font-family: var(--font-mono);
-		font-size: 0.66rem;
+		font-size: 0.64rem;
 		text-transform: uppercase;
 		letter-spacing: 0.12em;
 		color: var(--color-text-secondary);
-		line-height: 1.4;
+		line-height: 1.45;
 	}
-	.phase-num { color: var(--color-accent); font-weight: 600; }
 
 	.module-list { list-style: none; margin: 0; padding: 0; }
 	.module-list li { margin: 0; }
 	.module-list a {
-		display: block;
-		padding: 0.32em 0.6em;
+		display: grid;
+		grid-template-columns: 1.7em 1fr;
+		align-items: baseline;
+		gap: 0.1em;
+		padding: 0.42em 0.6em;
 		border-radius: var(--radius-sm);
 		color: var(--color-text-secondary);
 		text-decoration: none;
 		line-height: 1.35;
 		transition: color 0.18s var(--ease-spring), background 0.18s var(--ease-spring);
 	}
+	.mod-num {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-text-tertiary, var(--color-text-secondary));
+		opacity: 0.7;
+		transition: color 0.18s var(--ease-spring), opacity 0.18s var(--ease-spring);
+	}
 	.module-list a:hover { color: var(--color-text); background: var(--color-accent-subtle); }
+	.module-list a:hover .mod-num { opacity: 1; }
 	.module-list a.active {
 		color: var(--color-accent);
 		background: var(--color-accent-subtle);
 		font-weight: 500;
 	}
-
-	/* In-rail page index: the active module's sections (h2). Active state uses
-	   the same tinted-wash + accent-text mechanism as the module links — no
-	   left accent bar (design-system hard rule). */
-	.section-list {
-		list-style: none;
-		margin: 0.15em 0 0.5em;
-		padding: 0 0 0 1.5em;
-		font-size: 0.82rem;
-	}
-	.section-list a {
-		display: block;
-		padding: 0.24em 0.6em;
-		border-radius: var(--radius-sm);
-		color: var(--color-text-secondary);
-		text-decoration: none;
-		line-height: 1.3;
-		transition: color 0.18s var(--ease-spring), background 0.18s var(--ease-spring);
-	}
-	.section-list a:hover { color: var(--color-text); background: var(--color-accent-subtle); }
-	.section-list a.toc-active {
-		color: var(--color-accent);
-		background: var(--color-accent-subtle);
-		font-weight: 500;
-	}
+	.module-list a.active .mod-num { color: var(--color-accent); opacity: 1; }
 
 	/* Mobile: the rail becomes a tapped-open card, so grow the touch targets to
 	   the 44px WCAG minimum and bump the body size for thumb reading. */
 	@media (max-width: 900px) {
 		.learn-sidebar { font-size: 0.95rem; }
 		.module-list a {
-			display: flex;
-			align-items: center;
 			min-height: 44px;
+			align-items: center;
 			padding: 0.5em 0.7em;
 		}
-		.section-list a { min-height: 40px; display: flex; align-items: center; }
 	}
 </style>

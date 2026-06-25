@@ -1,0 +1,119 @@
+---
+import type { Lang } from '../../lib/learn';
+
+interface Heading {
+	depth: number;
+	slug: string;
+	text: string;
+}
+
+interface Props {
+	headings?: Heading[];
+	lang: Lang;
+}
+
+const { headings, lang } = Astro.props;
+const es = lang === 'es';
+// Right-rail page index: the current module's top-level sections (h2). Pulling
+// this out of the course map removes the third nesting level the rail used to
+// carry (Phase → Module → Section).
+const sections = (headings ?? []).filter((h) => h.depth === 2);
+---
+
+{sections.length > 1 && (
+	<nav class="page-nav" aria-label={es ? 'En esta página' : 'On this page'}>
+		<p class="page-nav-label">{es ? 'En esta página' : 'On this page'}</p>
+		<ol class="page-nav-list">
+			{sections.map((s) => (
+				<li>
+					<a href={`#${s.slug}`} data-toc-link={s.slug}>{s.text}</a>
+				</li>
+			))}
+		</ol>
+	</nav>
+)}
+
+<script>
+	// Scroll-spy: highlight the current section in the right rail as it scrolls
+	// through the viewport. Re-initialises across View Transitions.
+	function initPageNav() {
+		const links = Array.from(document.querySelectorAll<HTMLAnchorElement>('.page-nav [data-toc-link]'));
+		if (!links.length) return () => {};
+		const byId = new Map(links.map((l) => [l.dataset.tocLink!, l]));
+		const heads = Array.from(document.querySelectorAll<HTMLElement>('.article-body h2[id]')).filter((h) => byId.has(h.id));
+		if (!heads.length) return () => {};
+		let current: HTMLAnchorElement | null = null;
+		const setActive = (id: string) => {
+			const link = byId.get(id);
+			if (!link || link === current) return;
+			current?.classList.remove('active');
+			current?.removeAttribute('aria-current');
+			link.classList.add('active');
+			link.setAttribute('aria-current', 'true');
+			current = link;
+		};
+		const obs = new IntersectionObserver(
+			(entries) => {
+				const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+				if (visible[0]) setActive((visible[0].target as HTMLElement).id);
+			},
+			{ rootMargin: '-15% 0px -70% 0px', threshold: 0 },
+		);
+		heads.forEach((h) => obs.observe(h));
+		return () => obs.disconnect();
+	}
+	let cleanupPageNav = initPageNav();
+	document.addEventListener('astro:before-swap', () => cleanupPageNav?.());
+	document.addEventListener('astro:after-swap', () => {
+		cleanupPageNav = initPageNav();
+	});
+</script>
+
+<style>
+	.page-nav {
+		font-size: 0.82rem;
+	}
+	.page-nav-label {
+		margin: 0 0 0.7em;
+		padding-bottom: 0.6em;
+		border-bottom: 1px solid var(--color-border);
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-secondary);
+	}
+	.page-nav-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		counter-reset: pnav;
+	}
+	.page-nav-list li { counter-increment: pnav; margin: 0; }
+	.page-nav-list a {
+		display: grid;
+		grid-template-columns: 1.6em 1fr;
+		gap: 0.1em;
+		align-items: baseline;
+		padding: 0.34em 0;
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		line-height: 1.4;
+		transition: color 0.18s var(--ease-spring);
+	}
+	.page-nav-list a::before {
+		content: counter(pnav, decimal-leading-zero);
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		color: var(--color-text-secondary);
+		opacity: 0.55;
+		transition: color 0.18s var(--ease-spring), opacity 0.18s var(--ease-spring);
+	}
+	.page-nav-list a:hover { color: var(--color-text); }
+	.page-nav-list a:hover::before { opacity: 1; }
+	.page-nav-list a.active {
+		color: var(--color-accent);
+		font-weight: 500;
+	}
+	.page-nav-list a.active::before { color: var(--color-accent); opacity: 1; }
+</style>

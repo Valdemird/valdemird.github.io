@@ -5,6 +5,7 @@ import Footer from '../components/Footer.astro';
 import ReadingProgress from '../components/blog/ReadingProgress.astro';
 import HeadingAnchors from '../components/blog/HeadingAnchors.astro';
 import LearnSidebar from '../components/learn/LearnSidebar.astro';
+import LearnOnThisPage from '../components/learn/LearnOnThisPage.astro';
 import LearnSources from '../components/learn/LearnSources.astro';
 import LearnVideos from '../components/learn/LearnVideos.astro';
 import LearnRecall from '../components/learn/LearnRecall.astro';
@@ -134,7 +135,7 @@ const breadcrumbJsonLd = {
 							{es ? 'Índice del curso' : 'Course map'}
 						</summary>
 						<div class="sidebar-inner">
-							<LearnSidebar lang={lang} currentSlug={slug} currentHeadings={headings} />
+							<LearnSidebar lang={lang} currentSlug={slug} />
 						</div>
 					</details>
 				</aside>
@@ -220,6 +221,9 @@ const breadcrumbJsonLd = {
 						) : <span />}
 					</nav>
 				</article>
+				<aside class="toc-col">
+					<LearnOnThisPage headings={headings} lang={lang} />
+				</aside>
 			</div>
 		</main>
 		<Footer />
@@ -236,13 +240,49 @@ const breadcrumbJsonLd = {
 				if (mq.matches) { if (!userInitiated) d.removeAttribute('open'); }
 				else d.setAttribute('open', '');
 			}
+
+			// After a (View-Transition) navigation the article opens at the top —
+			// correct for a new module — but the course-map rail also resets to the
+			// top, hiding the module you just clicked. Scroll the rail (NOT the
+			// window) so the active module stays centred and in focus.
+			function keepActiveModuleVisible() {
+				const rail = document.querySelector('.sidebar-col');
+				if (!rail || mq.matches) return; // mobile rail is static, not scrollable
+				const active = rail.querySelector('.module-list a.active');
+				if (!active) return;
+				requestAnimationFrame(() => {
+					const railRect = rail.getBoundingClientRect();
+					const aRect = active.getBoundingClientRect();
+					const delta = (aRect.top - railRect.top) - (rail.clientHeight - aRect.height) / 2;
+					rail.scrollTop += delta;
+				});
+			}
+
+			// In-page TOC links: scroll smoothly to the heading ourselves instead of
+			// letting the router treat the hash click as a navigation (which jumped
+			// the page to the top). preventDefault keeps the reader's place.
+			function onTocClick(e: Event) {
+				const a = (e.target as HTMLElement)?.closest?.('.toc-col a[href^="#"], .page-toc a[href^="#"]');
+				if (!a) return;
+				const id = decodeURIComponent((a as HTMLAnchorElement).getAttribute('href')!.slice(1));
+				const target = document.getElementById(id);
+				if (!target) return;
+				e.preventDefault();
+				target.scrollIntoView({ behavior: isReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+				history.replaceState(null, '', '#' + id);
+			}
+
 			function init() {
 				syncCourseMap();
+				keepActiveModuleVisible();
 				if (isReducedMotion()) return;
 				initScrollReveals('.article-body h2, .article-body h3');
 				document.addEventListener('astro:before-swap', cleanupAll, { once: true });
 			}
 			mq.addEventListener('change', () => syncCourseMap());
+			// Capture phase: run before the router's click handler so preventDefault
+			// makes it bail (it checks event.defaultPrevented) — no jump to top.
+			document.addEventListener('click', onTocClick, true);
 			init();
 			document.addEventListener('astro:after-swap', init);
 		</script>
@@ -252,13 +292,16 @@ const breadcrumbJsonLd = {
 <style>
 	main { max-width: 100%; margin: 0; padding: 0; }
 
+	/* Three-pane documentation layout: course map · article · on-this-page.
+	   Wider than the global --wide-width (scoped to learn only) so the article
+	   reclaims its full reading measure between the two nav rails. */
 	.learn-layout {
-		max-width: var(--wide-width);
+		max-width: 80rem;
 		margin: 0 auto;
 		padding: var(--space-lg);
 		display: grid;
-		grid-template-columns: 16rem minmax(0, 1fr);
-		gap: var(--space-2xl);
+		grid-template-columns: 15rem minmax(0, 1fr) 12rem;
+		gap: var(--space-xl);
 		align-items: start;
 	}
 
@@ -268,6 +311,14 @@ const breadcrumbJsonLd = {
 		max-height: calc(100vh - 7rem);
 		overflow-y: auto;
 		padding-right: var(--space-sm);
+	}
+
+	/* Right rail: sticky in-page index, scroll-spied. */
+	.toc-col {
+		position: sticky;
+		top: 5.5rem;
+		max-height: calc(100vh - 7rem);
+		overflow-y: auto;
 	}
 
 	/* The course map is a collapsed <details> on mobile (so the article is
@@ -297,7 +348,7 @@ const breadcrumbJsonLd = {
 		.sidebar-summary { display: none; }
 	}
 
-	.content-col { max-width: var(--content-width); }
+	.content-col { max-width: var(--content-width); margin-inline: auto; width: 100%; }
 
 	.crumbs {
 		display: flex;
@@ -378,7 +429,8 @@ const breadcrumbJsonLd = {
 	}
 	.module-header hr { margin-top: var(--space-lg); }
 
-	/* "On this page" jump nav — mobile only; desktop shows sections in the rail. */
+	/* "On this page" jump nav — shown when the right rail is dropped (≤1200px).
+	   Above that, the sticky scroll-spied .toc-col carries the in-page index. */
 	.page-toc {
 		display: none;
 		margin: 0 0 var(--space-xl);
@@ -528,6 +580,14 @@ const breadcrumbJsonLd = {
 	}
 	.pager-title { color: var(--color-text); font-weight: 500; line-height: 1.3; }
 
+	/* ≤1200px: drop the right rail to a two-pane layout; the in-page index falls
+	   back to the collapsible "On this page" block above the article. */
+	@media (max-width: 1200px) {
+		.learn-layout { grid-template-columns: 15rem minmax(0, 1fr); max-width: var(--wide-width); }
+		.toc-col { display: none; }
+		.page-toc { display: block; }
+	}
+	/* ≤900px: single column. The course map collapses into a tapped-open card. */
 	@media (max-width: 900px) {
 		.learn-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-lg); }
 		.sidebar-col {
@@ -538,7 +598,6 @@ const breadcrumbJsonLd = {
 			border: 1px solid var(--color-border);
 			border-radius: var(--radius-md);
 		}
-		.page-toc { display: block; }
 	}
 	@media (max-width: 768px) {
 		.article-body { font-size: 1.02rem; line-height: 1.65; }
