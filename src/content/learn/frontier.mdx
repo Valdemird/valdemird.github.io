@@ -15,10 +15,11 @@ sources:
   - { grade: "A", title: "Measuring AI Ability to Complete Long Tasks (Time Horizon) + Time Horizon 1.1", author: "METR", year: 2026, url: "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/" }
   - { grade: "A", title: "Effective context engineering for AI agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
   - { grade: "A", title: "Darwin Gödel Machine: Open-Ended Evolution of Self-Improving Agents", author: "Zhang et al. (Sakana AI, UBC, Vector Institute)", year: 2025, url: "https://arxiv.org/abs/2505.22954" }
+  - { grade: "A", title: "o3 time-horizon evaluation report", author: "METR", year: 2026, url: "https://metr.org/evaluations/openai-o3-report/" }
   - { grade: "B", title: "A Survey of Agent Interoperability Protocols (MCP, ACP, A2A, ANP)", author: "arXiv 2505.02279", year: 2025, url: "https://arxiv.org/html/2505.02279v1" }
   - { grade: "C", title: "Gartner: over 40% of agentic AI projects will be canceled by end of 2027", author: "Gartner press release", year: 2025, url: "https://www.gartner.com/en/newsroom/press-releases/2025-06-25-gartner-predicts-over-40-percent-of-agentic-ai-projects-will-be-canceled-by-end-of-2027" }
-  - { grade: "C", title: "Genie 3 world model (foundation/model-based)", author: "Google DeepMind", year: 2025, url: "https://techcrunch.com/2025/08/05/deepmind-thinks-genie-3-world-model-presents-stepping-stone-towards-agi/" }
-  - { grade: "D", title: "Reliability composition (geometric decay, 0.95^n)", author: "course synthesis", year: 2026, url: "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/" }
+  - { grade: "B", title: "Genie 3: A new frontier for world models", author: "Google DeepMind", year: 2025, url: "https://deepmind.google/blog/genie-3-a-new-frontier-for-world-models/" }
+  - { grade: "D", title: "Reliability composition (geometric decay, 0.95^n)", author: "course synthesis", year: 2026 }
 ---
 
 import Callout from '../../components/blog/Callout.astro';
@@ -39,7 +40,7 @@ The beginner reads single-turn benchmarks (MMLU, GPQA) and infers agentic abilit
 METR's measurement is the credible number. The task length agents can finish at ~50% reliability has been **doubling roughly every seven months** (~188 days historically). The recent slope is steeper: around four months if you fit from 2023, and as fast as ~three months (≈10× per year) on 2024-2025 models per the Time Horizon 1.1 update. The measurement is real. The extrapolation is not guaranteed. A doubling that held for a few years can bend.
 </Callout>
 
-To anchor the scale: a model like o3 sustains a horizon around 110 minutes at 50% reliability. That's the kind of number to design against. Not "is the model smart" but "where does *mine* fall over."
+To anchor the scale: a model like o3 sustains a horizon around 90 minutes (1.5 hours) at 50% reliability under METR's original methodology, revised to ~120 minutes under METR's 2026 recalibration (Time Horizon 1.1). That's the kind of number to design against. Not "is the model smart" but "where does *mine* fall over." (o3 is no longer frontier as of mid-2026 — Claude Opus 4.5 sits around 320 minutes.)
 
 <MermaidDiagram title="Time-horizon: a doubling, not a ceiling" chart={`
 graph LR

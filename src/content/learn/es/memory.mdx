@@ -20,6 +20,7 @@ sources:
   - { grade: "A", title: "Effective Context Engineering for AI Agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
   - { grade: "B", title: "Continual Learning in Token Space", author: "Letta", year: 2025, url: "https://www.letta.com/blog/continual-learning" }
   - { grade: "B", title: "State of AI Agent Memory 2026", author: "Mem0 (ECAI 2025 paper)", year: 2026, url: "https://mem0.ai/blog/state-of-ai-agent-memory-2026" }
+  - { grade: "A", title: "BEAM: Beyond a Million Tokens — Benchmarking Long-Context Memory", author: "Tavakoli, Salemi, Ye, Abdalla, Zamani, Mitchell (ICLR 2026)", year: 2026, url: "https://arxiv.org/abs/2510.27246" }
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
@@ -104,7 +105,7 @@ Cada entrada lleva `source` y `trust_level`. En el retrieval, las de origen no c
 El gap de producción número uno hoy no es el retrieval de hechos: es la **evolución temporal del estado**. Los sistemas tratan el cambio como *reemplazo* (overwrite) en lugar de *evolución* (transición versionada). Un usuario que se muda de Nueva York a San Francisco debe mostrar una transición temporal, no un overwrite que borra la historia. Sin timestamps precisos, ordenamiento temporal y un mecanismo de decay/invalidación, los hechos de alta relevancia se vuelven **confiadamente incorrectos**.
 
 <Callout type="warning" title="El contexto enorme no sustituye la memoria">
-El razonamiento temporal y multi-hop es justo donde caen los benchmarks de contexto largo: la calidad de recall y de razonamiento se degrada de forma marcada al escalar el contexto de 1M a 10M tokens, aunque el modelo tenga acceso a toda la información (BEAM / "Beyond a Million Tokens", ICLR 2026). Así que "contexto enorme = no necesito memoria" es falso. Meter todo en la ventana es caro y *empeora* la precisión. Evito a propósito una cifra dura aquí: la degradación es real, el número que circula por ahí no está bien respaldado.
+El razonamiento temporal y multi-hop es justo donde caen los benchmarks de contexto largo. En BEAM ("Beyond a Million Tokens", ICLR 2026), el recall y el razonamiento en tareas multi-hop y temporales se degradan de forma abrupta al escalar las conversaciones de 1M a 10M tokens — el razonamiento temporal colapsa casi a cero. Pero cuidado con cómo lo lees: *no* es un resultado limpio de acceso total. A 10M tokens ninguno de los modelos evaluados (máximo 1M de contexto) puede meter la conversación entera, así que solo ven el segmento más reciente que les cabe — la degradación refleja tanto el límite de longitud de contexto *como* la incapacidad de retener todos los tokens, no un modelo que lo ve todo y aun así falla. Donde *sí* obtienes una señal limpia de "falla incluso con acceso total" es en el rango 128K→1M, donde los modelos de ventana de 1M reciben la conversación completa y aun así se degradan. En cualquier caso, "contexto enorme = no necesito memoria" es falso: meter todo en la ventana es caro y *empeora* la precisión.
 </Callout>
 
 ## Compactación: pérdida de información dirigida (y canal de ataque)

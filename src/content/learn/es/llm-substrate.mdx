@@ -22,6 +22,9 @@ sources:
   - { grade: "A", title: "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via RL", author: "DeepSeek", year: 2025, url: "https://arxiv.org/abs/2501.12948" }
   - { grade: "A", title: "The Bitter Lesson", author: "Rich Sutton", year: 2019, url: "http://www.incompleteideas.net/IncIdeas/BitterLesson.html" }
   - { grade: "B", title: "Tokenization counts: the impact of tokenization on arithmetic", author: "Singh & Strouse", year: 2024, url: "https://arxiv.org/abs/2402.14903" }
+  - { grade: "B", title: "Does Reinforcement Learning Really Incentivize Reasoning Capacity in LLMs Beyond the Base Model? (Limit of RLVR)", author: "Yue et al.", year: 2025, url: "https://arxiv.org/abs/2504.13837" }
+  - { grade: "B", title: "ProRL: Prolonged Reinforcement Learning", author: "Liu et al., NVIDIA", year: 2025, url: "https://arxiv.org/abs/2505.24864" }
+  - { grade: "B", title: "RULER: What's the Real Context Size of Your Long-Context Language Models?", author: "Hsieh et al.", year: 2024, url: "https://arxiv.org/abs/2404.06654" }
   - { grade: "B", title: "Effort & extended thinking (niveles de effort, deprecación de budget_tokens)", author: "Anthropic API docs", year: 2026, url: "https://platform.claude.com/docs/en/build-with-claude/effort" }
 ---
 
@@ -94,7 +97,7 @@ Si el modelo generaliza por copia de patrón, dos antipatrones se vuelven obvios
 
 ## El tool-use se entrena, no se prompea
 
-Que un modelo decida cuándo llamar una herramienta, encadene varias y sepa detenerse no es magia del prompt. Es un comportamiento que al modelo le *enseñaron* a base de ensayo y error: primero le mostraron buenos ejemplos (<Term name="SFT (Supervised Fine-Tuning)" lang="es">SFT</Term> sobre trayectorias) y luego lo premiaron cuando sus respuestas de verdad cuadraban (RL con recompensa al final de la trayectoria). La receta de referencia hoy es <Term name="GRPO (Group Relative Policy Optimization)" lang="es">GRPO</Term> con recompensas verificables (<Term name="RLVR (RL from Verifiable Rewards)" lang="es">RLVR</Term>).
+Que un modelo decida cuándo llamar una herramienta, encadene varias y sepa detenerse no es magia del prompt. Es un comportamiento que al modelo le *enseñaron* a base de ensayo y error: le mostraron buenos ejemplos (<Term name="SFT (Supervised Fine-Tuning)" lang="es">SFT</Term> sobre trayectorias) y lo premiaron cuando sus respuestas de verdad cuadraban (RL con recompensa al final de la trayectoria). La familia de técnicas que hace esto es la misma con la que se entrena el *razonamiento*: <Term name="GRPO (Group Relative Policy Optimization)" lang="es">GRPO</Term> con recompensas verificables (<Term name="RLVR (RL from Verifiable Rewards)" lang="es">RLVR</Term>). La referencia pública más clara de esa receta es DeepSeek-R1 (2025), que usó GRPO + RLVR para inducir cadena de pensamiento con respuesta verificable, no tool-use: R1 se publicó sin function-calling nativo. Así que lee R1 como la referencia del *método de entrenamiento*, no como un modelo entrenado para herramientas.
 
 <Callout type="warning" title="Cuenta bien lo de DeepSeek-R1">
 Es DeepSeek-R1-**Zero** el que demuestra que el RL puro (GRPO) sobre el modelo base induce razonamiento *sin SFT previo*. El modelo DeepSeek-R1 que se publicó **sí** usa SFT: añade un cold-start de SFT antes del RL precisamente para arreglar legibilidad y estabilidad. La receta es "GRPO + recompensas verificables". Lo que no debes afirmar es que R1 prescinde de SFT.

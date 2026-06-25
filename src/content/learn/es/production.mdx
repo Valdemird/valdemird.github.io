@@ -15,11 +15,10 @@ sources:
   - { grade: "A", title: "Building Effective Agents", author: "Anthropic Engineering", year: 2024, url: "https://www.anthropic.com/research/building-effective-agents" }
   - { grade: "A", title: "Demystifying evals for AI agents", author: "Anthropic Engineering", year: 2026, url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents" }
   - { grade: "A", title: "Code execution with MCP: building more efficient AI agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/code-execution-with-mcp" }
-  - { grade: "B", title: "Durable Execution: The Key to Harnessing AI Agents in Production", author: "Inngest", year: 2025, url: "https://www.inngest.com/blog/durable-execution-key-to-harnessing-ai-agents" }
+  - { grade: "B", title: "Durable Execution: The Key to Harnessing AI Agents in Production", author: "Inngest (Charly Poly)", year: 2026, url: "https://www.inngest.com/blog/durable-execution-key-to-harnessing-ai-agents" }
   - { grade: "B", title: "Architecting Resilient LLM Agents: A Guide to Secure Plan-then-Execute Implementations", author: "Del Rosario et al.", year: 2025, url: "https://arxiv.org/pdf/2509.08646" }
   - { grade: "C", title: "ALAS: Transactional and Dynamic Multi-Agent LLM Planning", author: "Geng & Chang, Stanford", year: 2025, url: "https://arxiv.org/pdf/2511.03094" }
   - { grade: "C", title: "Don't Break the Cache: An Evaluation of Prompt Caching for Long-Horizon Agentic Tasks", author: "PwC (arXiv 2601.06007)", year: 2026, url: "https://arxiv.org/pdf/2601.06007" }
-  - { grade: "D", title: "Postmortem público: un pipeline multi-agente quemó ~$47k en 11 días (blog, anecdótico)", author: "DEV.to / Medium", year: 2025, url: "https://dev.to" }
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
@@ -141,7 +140,7 @@ Un requisito sutil que muchos pasan por alto: persiste la *entrada normalizada* 
 
 ## Los presupuestos de coste y latencia van en la infraestructura
 
-Los runaway loops son incidentes reales. Un postmortem público (un pipeline multi-agente, reportado en blog y anecdótico, no un informe corporativo auditado) describe ~$47k quemados en 11 días porque dos agentes hicieron ping-pong sin tope de gasto ni kill switch. [D] Toma la cifra exacta como ilustrativa, pero el modo de fallo es real y común.
+Los runaway loops son incidentes reales. Un postmortem público (un pipeline multi-agente, reportado en blog y anecdótico, no un informe corporativo auditado) describe ~$47k quemados en 11 días porque dos agentes hicieron ping-pong sin tope de gasto ni kill switch. Toma la cifra exacta como ilustrativa, pero el modo de fallo es real y común.
 
 La lección no es "añade un límite al system prompt". Un límite a nivel de prompt es una sugerencia que el agente puede ignorar o razonar para sortear. Los límites duros, máximo de iteraciones por turno, presupuesto de tokens por tenant y por día, un circuit breaker que se dispara cuando la velocidad de gasto supera la media móvil, viven en infraestructura, fuera del control del agente, chequeados *antes* de la llamada al modelo.
 

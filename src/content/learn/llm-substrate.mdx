@@ -22,6 +22,9 @@ sources:
   - { grade: "A", title: "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via RL", author: "DeepSeek", year: 2025, url: "https://arxiv.org/abs/2501.12948" }
   - { grade: "A", title: "The Bitter Lesson", author: "Rich Sutton", year: 2019, url: "http://www.incompleteideas.net/IncIdeas/BitterLesson.html" }
   - { grade: "B", title: "Tokenization counts: the impact of tokenization on arithmetic", author: "Singh & Strouse", year: 2024, url: "https://arxiv.org/abs/2402.14903" }
+  - { grade: "B", title: "Does Reinforcement Learning Really Incentivize Reasoning Capacity in LLMs Beyond the Base Model? (Limit of RLVR)", author: "Yue et al.", year: 2025, url: "https://arxiv.org/abs/2504.13837" }
+  - { grade: "B", title: "ProRL: Prolonged Reinforcement Learning", author: "Liu et al., NVIDIA", year: 2025, url: "https://arxiv.org/abs/2505.24864" }
+  - { grade: "B", title: "RULER: What's the Real Context Size of Your Long-Context Language Models?", author: "Hsieh et al.", year: 2024, url: "https://arxiv.org/abs/2404.06654" }
   - { grade: "B", title: "Effort & extended thinking (effort levels, budget_tokens deprecation)", author: "Anthropic API docs", year: 2026, url: "https://platform.claude.com/docs/en/build-with-claude/effort" }
 ---
 
@@ -94,7 +97,7 @@ If the model generalizes by pattern-copy, two antipatterns get obvious. First, a
 
 ## Tool-use is trained, not prompted
 
-A model deciding when to call a tool, chaining several, and knowing when to stop is not prompt magic. It's a behavior the model was *taught* by trial and error: shown good examples first (<Term name="SFT (Supervised Fine-Tuning)">SFT</Term> on trajectories), then rewarded when its answers actually checked out (RL with a reward at the end of the trajectory). The reference recipe today is <Term name="GRPO (Group Relative Policy Optimization)">GRPO</Term> with verifiable rewards (<Term name="RLVR (RL from Verifiable Rewards)">RLVR</Term>).
+A model deciding when to call a tool, chaining several, and knowing when to stop is not prompt magic. It's a behavior the model was *taught* by trial and error: shown good examples (<Term name="SFT (Supervised Fine-Tuning)">SFT</Term> on trajectories) and rewarded when its answers actually checked out (RL with a reward at the end of the trajectory). The family of techniques that does this is the same one used to train *reasoning*: <Term name="GRPO (Group Relative Policy Optimization)">GRPO</Term> with verifiable rewards (<Term name="RLVR (RL from Verifiable Rewards)">RLVR</Term>). The clearest public reference for that recipe is DeepSeek-R1 (2025), which used GRPO + RLVR to induce verifiable-answer chain-of-thought, not tool-use: R1 shipped without native function-calling. So read R1 as the reference for the *training method*, not as a tool-trained model.
 
 <Callout type="warning" title="Get DeepSeek-R1 right">
 It's DeepSeek-R1-**Zero** that shows pure RL (GRPO) on the base model induces reasoning *without any prior SFT*. The shipped DeepSeek-R1 model **does** use SFT. It adds a cold-start SFT stage before RL precisely to fix readability and stability. The recipe is "GRPO + verifiable rewards." What you must not claim is that R1 skips SFT.

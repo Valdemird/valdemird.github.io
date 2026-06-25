@@ -18,7 +18,8 @@ sources:
   - { grade: "A", title: "The Berkeley Function Calling Leaderboard (BFCL)", author: "Patil et al., UC Berkeley (Gorilla)", year: 2025, url: "https://gorilla.cs.berkeley.edu/leaderboard.html" }
   - { grade: "B", title: "MCPTox: A Benchmark for Tool Poisoning Attack on Real-World MCP Servers", author: "arXiv 2508.14925", year: 2025, url: "https://arxiv.org/pdf/2508.14925" }
   - { grade: "B", title: "From REST to MCP: An Empirical Study of API Wrapping", author: "arXiv 2507.16044", year: 2025, url: "https://arxiv.org/pdf/2507.16044" }
-  - { grade: "B", title: "MCP Specification 2025-06-18", author: "Model Context Protocol", year: 2025, url: "https://modelcontextprotocol.info/specification/" }
+  - { grade: "B", title: "MCP Tool Descriptions Are Smelly", author: "arXiv 2602.14878", year: 2026, url: "https://arxiv.org/abs/2602.14878" }
+  - { grade: "B", title: "MCP Specification 2025-11-25", author: "Model Context Protocol", year: 2025, url: "https://modelcontextprotocol.io/specification/2025-11-25" }
   - { grade: "C", title: "ETDI: Mitigating Tool Squatting and Rug Pull Attacks in MCP", author: "arXiv 2506.01333", year: 2025, url: "https://arxiv.org/html/2506.01333v1" }
 ---
 
@@ -41,7 +42,7 @@ El conjunto de tools que expones es el **espacio de acciones del POMDP del agent
 
 La pregunta de granularidad tiene una respuesta limpia: la unidad correcta es un workflow que el agente completa, no un endpoint que tu API cubre. La guía de Anthropic es explícita en colapsar `list_users` + `list_events` + `create_event` en un único `schedule_event`. El agente tenía que hacer tres llamadas correctas, sostener dos resultados intermedios en contexto y no perder el hilo entre ellas. Ahora hace una.
 
-Hay peso empírico detrás. Un estudio de 2025 sobre envolver automáticamente APIs REST en servidores MCP encontró que las tools generadas son de baja calidad para agentes precisamente porque la granularidad y las descripciones se heredan del API, no del workflow. El auto-wrapping sirve para un prototipo y es peligroso como estrategia de diseño.
+Hay peso empírico detrás. Un estudio de 2025 sobre envolver automáticamente APIs REST en servidores MCP midió la escala del problema: ~92% de las tools MCP son simples wrappers de REST y exponen una mediana de apenas ~19% de las operaciones del API subyacente, así que propone generación automática más filtrado y reagrupación (AutoMCP) para recortar la complejidad por número de tools. La crítica de calidad más profunda viene de otro lado: una auditoría de 2026 encontró que el 97,1% de las descripciones de tools MCP arrastran al menos un "olor" de calidad, y el problema de granularidad y descripciones es que ambas se heredan del API en vez del workflow. El auto-wrapping sirve para un prototipo y es peligroso como estrategia de diseño.
 
 Cuando sí expongas varias tools del mismo dominio, prefíjalas (`asana_search`, `asana_projects_search`) para que el modelo no esté eligiendo entre nombres que colisionan semánticamente.
 
@@ -90,7 +91,7 @@ Aquí está el contraste en un solo esquema. Misma capacidad, dos granularidades
 
 ## Más tools no es más capaz
 
-El folklore dice que una caja de herramientas más grande es un agente más fuerte. La medición dice lo contrario. La precisión de selección de tool se degrada al crecer el catálogo: la cifra que se cita es una caída del 7-85%, y la selección tipo retrieval empieza a fallar incluso en recuperar la tool correcta. Cinco servidores MCP conectados pueden costar unos 55K tokens de definiciones antes del primer mensaje del usuario; añade un servidor de Jira y cruzas los 100K.
+El folklore dice que una caja de herramientas más grande es un agente más fuerte. La medición dice lo contrario. La precisión de selección de tool se degrada al crecer el catálogo: la cifra que se cita es una caída del 7-85%, y la selección tipo retrieval empieza a fallar incluso en recuperar la tool correcta. Un puñado de servidores MCP conectados puede cargar decenas de miles de tokens de definiciones en el contexto antes del primer mensaje del usuario: el overhead por tool ronda los 500-1.400 tokens, y servidores grandes como GitHub o Jira corren cada uno ~10K-18K. Un setup de cinco servidores suele caer en el rango ~30K-60K, y el total depende muchísimo de qué servidores y versiones tengas conectados — revisa el tuyo con el `/context` de Claude Code. En el peor caso sin optimizar, Anthropic cita definiciones de tools llegando a ~150K tokens en un solo setup de Google Drive + Salesforce.
 
 <Callout type="warning" title="Lee con cuidado la cifra del 7-85%">
 Ese rango es un efecto reportado real, no una línea limpia de un único benchmark. La caída depende muchísimo del modelo, del catálogo y de qué tan parecidos sean los nombres de las tools. Lo que se sostiene es la *dirección* (más tools, peor selección), no una ley precisa que puedas citar con dos cifras significativas. [D] Trátalo como "mide tu propia degradación", no como dogma.
@@ -147,7 +148,7 @@ Un servidor que aprobaste cambia silenciosamente la definición de una tool desp
 </Tabs>
 
 <Callout type="note" title="Lo que la spec ya hace por ti">
-La MCP Specification 2025-06-18 añadió structured tool output, elicitation (un servidor pidiéndole datos al usuario a mitad de operación) y, relevante aquí, un OAuth Resource Server obligatorio con Resource Indicators (RFC 8707) para defender contra ataques de confused-deputy y fuga de tokens. El protocolo se está endureciendo; trátalo como un piso, no como un techo.
+La revisión 2025-06-18 de la spec de MCP añadió structured tool output, elicitation (un servidor pidiéndole datos al usuario a mitad de operación) y, relevante aquí, un OAuth Resource Server obligatorio con Resource Indicators (RFC 8707) para defender contra ataques de confused-deputy y fuga de tokens. La revisión estable actual es la 2025-11-25, con más endurecimiento de autorización en camino. El protocolo se está endureciendo; trátalo como un piso, no como un techo.
 </Callout>
 
 La postura de diseño que se deriva: trata las descripciones de tools de terceros como input no confiable. Fija versiones, re-aprueba ante cualquier cambio en una descripción, y si adoptas code execution, córrelo en un sandbox. El spotlighting solo por prompt no basta sin verificación de origen.

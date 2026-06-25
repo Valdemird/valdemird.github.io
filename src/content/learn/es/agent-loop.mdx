@@ -20,6 +20,7 @@ sources:
   - { grade: "A", title: "Large Language Models Cannot Self-Correct Reasoning Yet", author: "Huang et al., Google DeepMind (ICLR 2024)", year: 2024, url: "https://arxiv.org/abs/2310.01798" }
   - { grade: "A", title: "Building Effective Agents", author: "Schluntz & Zhang, Anthropic", year: 2024, url: "https://www.anthropic.com/engineering/building-effective-agents" }
   - { grade: "A", title: "Reflexion: Language Agents with Verbal Reinforcement Learning", author: "Shinn, Cassano et al.", year: 2023, url: "https://arxiv.org/abs/2303.11366" }
+  - { grade: "A", title: "MONA: Myopic Optimization with Non-myopic Approval Can Mitigate Multi-step Reward Hacking", author: "Farquhar, Varma, Lindner et al., Google DeepMind", year: 2025, url: "https://arxiv.org/abs/2501.13011" }
   - { grade: "A", title: "How the agent loop works (Agent SDK)", author: "Anthropic", year: 2025, url: "https://code.claude.com/docs/en/agent-sdk/agent-loop" }
   - { grade: "A", title: "τ-bench: A Benchmark for Tool-Agent-User Interaction", author: "Yao et al., Sierra Research", year: 2024, url: "https://arxiv.org/abs/2406.12045" }
   - { grade: "B", title: "12-Factor Agents", author: "Dexter Horthy, HumanLayer", year: 2025, url: "https://github.com/humanlayer/12-factor-agents" }
@@ -139,7 +140,7 @@ graph TD
 Un max-turns duro y un budget de tokens son los dos fáciles. El que la gente saltea es el **loop-guard de no-progreso**: hashear los últimos N tool calls (nombre más args normalizados) y cortar, o forzar un cambio de estrategia, cuando el mismo call se repite. Sin él, un agente puede quemar un budget entero girando en falso antes de que algún cap grueso lo salve. Y una tool de terminación (una acción explícita de "terminé" o "escalá a un humano") le da al modelo una forma limpia de parar en vez de irse apagando.
 
 <Callout type="warning" title="pass@1 te va a mentir">
-Para sistemas estocásticos multiturno, una corrida verde no significa casi nada. τ-bench introdujo un usuario simulado, una tool de terminación y la métrica **pass^k** precisamente porque lo que importa es la consistencia a lo largo de k corridas, no un pass@1 aislado. Si medís con pass@1 y cantás victoria, estás midiendo suerte.
+Para sistemas estocásticos multiturno, una corrida verde no significa casi nada. τ-bench introdujo un usuario simulado por LLM, una señal de parada (el usuario emite `###STOP###`) junto con una tool de escalado a humano, y la métrica **pass^k** precisamente porque lo que importa es la consistencia a lo largo de k corridas, no un pass@1 aislado. Si medís con pass@1 y cantás victoria, estás midiendo suerte.
 </Callout>
 
 ## El human-in-the-loop es solo otra tool call

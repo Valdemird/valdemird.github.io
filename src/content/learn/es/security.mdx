@@ -17,9 +17,11 @@ sources:
   - { grade: "A", title: "Defending Against Indirect Prompt Injection Attacks With Spotlighting", author: "Hines et al. (Microsoft)", year: 2024, url: "https://arxiv.org/pdf/2403.14720" }
   - { grade: "A", title: "AgentDojo: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for LLM Agents", author: "Debenedetti et al. (ETH Zurich)", year: 2024, url: "https://arxiv.org/abs/2406.13352" }
   - { grade: "B", title: "The lethal trifecta for AI agents: private data, untrusted content, and external communication", author: "Simon Willison", year: 2025, url: "https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/" }
-  - { grade: "B", title: "Agents Rule of Two: A Practical Approach to AI Agent Security", author: "Meta AI", year: 2025, url: "https://simonwillison.net/2025/Nov/2/new-prompt-injection-papers/" }
+  - { grade: "B", title: "Agents Rule of Two: A Practical Approach to AI Agent Security", author: "Meta AI", year: 2025, url: "https://ai.meta.com/blog/practical-ai-agent-security/" }
   - { grade: "B", title: "OWASP Top 10 for Agentic Applications (2026)", author: "OWASP GenAI Security Project", year: 2026, url: "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/" }
-  - { grade: "C", title: "MCP Security Notification: Tool Poisoning Attacks", author: "Invariant Labs", year: 2025, url: "https://www.truefoundry.com/blog/blog-mcp-tool-poisoning-gateway-defense" }
+  - { grade: "B", title: "MCP Security Notification: Tool Poisoning Attacks", author: "Invariant Labs (Beurer-Kellner & Fischer)", year: 2025, url: "https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks" }
+  - { grade: "B", title: "MCPoison: ejecución de código persistente en Cursor IDE vía bypass de confianza en MCP (CVE-2025-54136)", author: "Check Point Research", year: 2025, url: "https://research.checkpoint.com/2025/cursor-vulnerability-mcpoison/" }
+  - { grade: "A", title: "CVE-2025-54135 (CurXecute): prompt injection indirecto a RCE en Cursor IDE", author: "NVD / Aim Labs", year: 2025, url: "https://nvd.nist.gov/vuln/detail/CVE-2025-54135" }
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
@@ -45,11 +47,11 @@ La consecuencia operativa es un giro de 180 grados. Deja de invertir en detectar
 
 ## La lethal trifecta: auditar por capacidades, no por intenciones
 
-Simon Willison destiló el riesgo en un modelo mental de una línea. Un agente se vuelve una herramienta de exfiltración garantizada cuando reúne tres capacidades a la vez: acceso a datos privados, exposición a contenido no confiable y un canal para comunicarse al exterior.
+Simon Willison destiló el riesgo en un modelo mental de una línea. Un agente queda peligrosamente expuesto a la exfiltración de datos cuando reúne tres capacidades a la vez: acceso a datos privados, exposición a contenido no confiable y un canal para comunicarse al exterior. Él plantea esa combinación como una que vuelve el robo de datos vía prompt injection fácil y probable, no como una certeza.
 
 <MermaidDiagram title="La lethal trifecta" chart={`
 graph LR
-  A["Datos privados"] --> X["Exfiltración garantizada<br/>con un prompt inyectado"]
+  A["Datos privados"] --> X["Expuesto a exfiltración<br/>con un prompt inyectado"]
   B["Contenido no confiable"] --> X
   C["Canal externo"] --> X
 `} />
@@ -146,7 +148,7 @@ Esto es defensa en profundidad, no un reemplazo de los chequeos de la app. El pu
 Una trampa merece su propio aviso. Escribir en la memoria de largo plazo de un agente es una *acción consecuente*, no una comodidad que se pre-aprueba. Si contenido no confiable de un documento o un mensaje puede fluir hasta una nota guardada, una inyección sobrevive a la sesión y reescribe el comportamiento del agente en turnos futuros. El memory poisoning es la versión lenta de la trifecta: la exfil ocurre días después, a partir de datos que el atacante plantó hoy. Gatea las escrituras a memoria igual que cualquier otra escritura, o al menos etiqueta la procedencia de lo que se guarda.
 
 <Callout type="warning" title="La cadena de suministro escribe en tu prompt">
-Las descripciones de tools, los resultados de servidores MCP de terceros y las skills entran al contexto del modelo sin sanitización ni provenance. Confiar en un MCP server es confiar en código que escribe en tu prompt. El envenenamiento de descripciones de tools es una clase reconocida con CVEs reales (CVE-2025-54136, "MCPoison", un rug-pull que cambia la definición de un tool después de aprobado, y CVE-2025-54135, "CurXecute"), y está en el Top 10 agéntico de OWASP junto al goal hijacking y el memory poisoning. Pinea versiones, audita servers, trata sus descripciones y resultados como input no confiable, y alerta ante cambios de descripción.
+Las descripciones de tools, los resultados de servidores MCP de terceros y las skills entran al contexto del modelo sin sanitización ni provenance. Confiar en un MCP server es confiar en código que escribe en tu prompt. El envenenamiento de descripciones de tools ("Tool Poisoning Attacks") es una clase reconocida — descubierta y bautizada por Invariant Labs en su investigación sobre el MCP de GitHub y el de WhatsApp —, donde un server malicioso esconde instrucciones dentro de la descripción de un tool para secuestrar al agente. La cadena de suministro de MCP también ha producido CVEs concretos en IDEs reales: CVE-2025-54136 ("MCPoison", hallado por Check Point Research) es un bypass de confianza en la config que permite a un atacante con acceso de escritura cambiar en silencio el comando de un MCP server ya aprobado en la config de Cursor, sin re-aprobación, ejecutando código del atacante en cada arranque (parcheado en Cursor 1.3); CVE-2025-54135 ("CurXecute", hallado por Aim Labs) es un fallo de prompt injection indirecto a RCE donde contenido no confiable reescribe `~/.cursor/mcp.json` y se auto-ejecuta (parcheado en Cursor 1.3.9). OWASP cataloga el prompt injection de forma general, y el goal hijacking y el memory poisoning están en su Top 10 agéntico. Pinea versiones, audita servers, trata sus descripciones y resultados como input no confiable, y alerta ante cambios de descripción.
 </Callout>
 
 ## El HITL solo cuenta si el humano aprueba lo de verdad

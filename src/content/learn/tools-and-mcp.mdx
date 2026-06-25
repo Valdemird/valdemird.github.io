@@ -18,7 +18,8 @@ sources:
   - { grade: "A", title: "The Berkeley Function Calling Leaderboard (BFCL)", author: "Patil et al., UC Berkeley (Gorilla)", year: 2025, url: "https://gorilla.cs.berkeley.edu/leaderboard.html" }
   - { grade: "B", title: "MCPTox: A Benchmark for Tool Poisoning Attack on Real-World MCP Servers", author: "arXiv 2508.14925", year: 2025, url: "https://arxiv.org/pdf/2508.14925" }
   - { grade: "B", title: "From REST to MCP: An Empirical Study of API Wrapping", author: "arXiv 2507.16044", year: 2025, url: "https://arxiv.org/pdf/2507.16044" }
-  - { grade: "B", title: "MCP Specification 2025-06-18", author: "Model Context Protocol", year: 2025, url: "https://modelcontextprotocol.info/specification/" }
+  - { grade: "B", title: "MCP Tool Descriptions Are Smelly", author: "arXiv 2602.14878", year: 2026, url: "https://arxiv.org/abs/2602.14878" }
+  - { grade: "B", title: "MCP Specification 2025-11-25", author: "Model Context Protocol", year: 2025, url: "https://modelcontextprotocol.io/specification/2025-11-25" }
   - { grade: "C", title: "ETDI: Mitigating Tool Squatting and Rug Pull Attacks in MCP", author: "arXiv 2506.01333", year: 2025, url: "https://arxiv.org/html/2506.01333v1" }
 ---
 
@@ -41,7 +42,7 @@ The set of tools you expose is the **action space of the agent's POMDP**. The mo
 
 The granularity question has a clean answer: the right unit is a workflow the agent completes, not an endpoint your API covers. Anthropic's guidance is explicit about collapsing `list_users` + `list_events` + `create_event` into a single `schedule_event`. The agent had to make three correct calls, hold two intermediate results in context, and not lose the thread between them. Now it makes one.
 
-There's empirical weight behind this. A 2025 study of automatically wrapping REST APIs into MCP servers found the generated tools are low-quality for agents precisely because granularity and descriptions get inherited from the API, not from the workflow. Auto-wrapping is fine for a prototype and dangerous as a design strategy.
+There's empirical weight behind this. A 2025 study of automatically wrapping REST APIs into MCP servers measured the scale of the problem: ~92% of MCP tools are bare REST wrappers, and they expose a median of only ~19% of the underlying API's operations — so it proposes automated generation plus filtering and regrouping (AutoMCP) to cut tool-count complexity. The deeper quality critique comes from elsewhere: a 2026 audit found 97.1% of MCP tool descriptions carry at least one quality "smell," and the granularity/description problem is that both get inherited from the API rather than from the workflow. Auto-wrapping is fine for a prototype and dangerous as a design strategy.
 
 When you do expose several tools in the same domain, prefix them (`asana_search`, `asana_projects_search`) so the model isn't choosing between semantically colliding names.
 
@@ -90,7 +91,7 @@ Here is the contrast in one schema. Same capability, two granularities.
 
 ## More tools is not more capable
 
-The folklore says a bigger toolbox is a stronger agent. The measurement says the opposite. Tool-selection accuracy degrades as the catalog grows: the figure that gets cited is a 7–85% drop, and retrieval-style selection starts failing to surface the right tool at all. Five connected MCP servers can cost around 55K tokens of definitions before the user's first message; add a Jira server and you cross 100K.
+The folklore says a bigger toolbox is a stronger agent. The measurement says the opposite. Tool-selection accuracy degrades as the catalog grows: the figure that gets cited is a 7–85% drop, and retrieval-style selection starts failing to surface the right tool at all. A handful of connected MCP servers can load tens of thousands of tokens of tool definitions into context before the user's first message: per-tool overhead runs roughly 500–1,400 tokens, and large servers like GitHub or Jira each run ~10K–18K. A five-server setup commonly lands in the ~30K–60K range, and the total depends heavily on which servers and versions are connected — check your own with Claude Code's `/context`. In an unoptimized worst case, Anthropic has cited tool definitions reaching ~150K tokens in a single Google Drive + Salesforce setup.
 
 <Callout type="warning" title="Read the 7–85% number carefully">
 That range is a real reported effect, not a single clean benchmark line. The drop depends hard on the model, the catalog, and how similar the tool names are. The *direction* holds (more tools, worse selection), but it's not a precise law you can quote to two significant figures. [D] Treat it as "measure your own degradation," not gospel.
@@ -147,7 +148,7 @@ A server you approved silently changes a tool's definition after the fact. **CVE
 </Tabs>
 
 <Callout type="note" title="What the spec already does for you">
-The MCP Specification 2025-06-18 added structured tool output, elicitation (a server asking the user for data mid-operation), and (relevant here) a mandatory OAuth Resource Server with Resource Indicators (RFC 8707) to defend against confused-deputy and token-leakage attacks. The protocol is hardening; treat it as a floor, not a ceiling.
+The MCP spec's 2025-06-18 revision added structured tool output, elicitation (a server asking the user for data mid-operation), and (relevant here) a mandatory OAuth Resource Server with Resource Indicators (RFC 8707) to defend against confused-deputy and token-leakage attacks. The current stable revision is 2025-11-25, with further authorization hardening on the way. The protocol is hardening; treat it as a floor, not a ceiling.
 </Callout>
 
 The design posture that follows: treat third-party tool descriptions as untrusted input. Pin versions, re-approve on any change in a description, and if you adopt code execution, run it in a sandbox. Spotlighting by prompt alone is not enough without origin verification.

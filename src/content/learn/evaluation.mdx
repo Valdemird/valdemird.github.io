@@ -14,7 +14,7 @@ tldr:
 sources:
   - { grade: "A", title: "τ-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains", author: "Yao et al., Sierra", year: 2024, url: "https://arxiv.org/abs/2406.12045" }
   - { grade: "A", title: "Who Validates the Validators? Aligning LLM-Assisted Evaluation with Human Preferences (EvalGen)", author: "Shankar et al., UIST", year: 2024, url: "https://people.eecs.berkeley.edu/~bjoern/papers/shankar-validators-uist2024.pdf" }
-  - { grade: "A", title: "Justice or Prejudice? Quantifying Biases in LLM-as-a-Judge", author: "arXiv 2410.02736", year: 2024, url: "https://arxiv.org/pdf/2410.02736" }
+  - { grade: "A", title: "Justice or Prejudice? Quantifying Biases in LLM-as-a-Judge", author: "Ye, Wang, Huang et al., ICLR 2025", year: 2025, url: "https://arxiv.org/pdf/2410.02736" }
   - { grade: "A", title: "The Berkeley Function Calling Leaderboard (BFCL): From Tool Use to Agentic Evaluation", author: "Patil et al., PMLR", year: 2025, url: "https://proceedings.mlr.press/v267/patil25a.html" }
   - { grade: "A", title: "Pairwise or Pointwise? Evaluating Feedback Protocols for Bias in LLM-Based Evaluation", author: "arXiv 2504.14716, COLM", year: 2025, url: "https://arxiv.org/abs/2504.14716" }
   - { grade: "B", title: "Why is error analysis so important in LLM evals", author: "Hamel Husain", year: 2024, url: "https://hamel.dev/blog/posts/evals-faq/why-is-error-analysis-so-important-in-llm-evals-and-how-is-it-performed.html" }
@@ -131,7 +131,7 @@ When code can't capture quality, you need an LLM judge. But a judge is not an or
 The defense is twofold. Calibrate against human labels with Cohen's kappa: the convention is kappa >0.6 acceptable, >0.8 strong. A judge at kappa below 0.4 is an expensive noise generator wearing a metric's costume. And design mitigations: permute positions and average (swap & average), rubrics with anchor examples, binary or 3-level scales instead of Likert 1-5.
 
 <Callout type="note" title="Pairwise or pointwise — which for which decision">
-Pointwise (score each output 0-1 against a rubric) is comparable over time: better for debugging and longitudinal monitoring. Pairwise (is B better than A?) correlates better with humans, better for model selection. The price of pairwise: preferences flip ~35% of the time when you swap order, versus ~9% for absolute pointwise scores, and it's more exploitable. It's not "which is better" but "which for which decision."
+Pointwise (score each output 0-1 against a rubric) is comparable over time: better for debugging and longitudinal monitoring. Pairwise (is B better than A?) correlates better with humans, better for model selection. The price of pairwise: it's more exploitable — when an adversarial generator embeds a spurious distractor feature into one response, the judge's preference flips ~35% of the time, versus ~9% for absolute pointwise scores (Tripathi et al., COLM 2025). It's not "which is better" but "which for which decision."
 </Callout>
 
 ## The eval as moat, and benchmark folklore
