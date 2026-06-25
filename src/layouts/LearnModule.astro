@@ -240,13 +240,49 @@ const breadcrumbJsonLd = {
 				if (mq.matches) { if (!userInitiated) d.removeAttribute('open'); }
 				else d.setAttribute('open', '');
 			}
+
+			// After a (View-Transition) navigation the article opens at the top —
+			// correct for a new module — but the course-map rail also resets to the
+			// top, hiding the module you just clicked. Scroll the rail (NOT the
+			// window) so the active module stays centred and in focus.
+			function keepActiveModuleVisible() {
+				const rail = document.querySelector('.sidebar-col');
+				if (!rail || mq.matches) return; // mobile rail is static, not scrollable
+				const active = rail.querySelector('.module-list a.active');
+				if (!active) return;
+				requestAnimationFrame(() => {
+					const railRect = rail.getBoundingClientRect();
+					const aRect = active.getBoundingClientRect();
+					const delta = (aRect.top - railRect.top) - (rail.clientHeight - aRect.height) / 2;
+					rail.scrollTop += delta;
+				});
+			}
+
+			// In-page TOC links: scroll smoothly to the heading ourselves instead of
+			// letting the router treat the hash click as a navigation (which jumped
+			// the page to the top). preventDefault keeps the reader's place.
+			function onTocClick(e: Event) {
+				const a = (e.target as HTMLElement)?.closest?.('.toc-col a[href^="#"], .page-toc a[href^="#"]');
+				if (!a) return;
+				const id = decodeURIComponent((a as HTMLAnchorElement).getAttribute('href')!.slice(1));
+				const target = document.getElementById(id);
+				if (!target) return;
+				e.preventDefault();
+				target.scrollIntoView({ behavior: isReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+				history.replaceState(null, '', '#' + id);
+			}
+
 			function init() {
 				syncCourseMap();
+				keepActiveModuleVisible();
 				if (isReducedMotion()) return;
 				initScrollReveals('.article-body h2, .article-body h3');
 				document.addEventListener('astro:before-swap', cleanupAll, { once: true });
 			}
 			mq.addEventListener('change', () => syncCourseMap());
+			// Capture phase: run before the router's click handler so preventDefault
+			// makes it bail (it checks event.defaultPrevented) — no jump to top.
+			document.addEventListener('click', onTocClick, true);
 			init();
 			document.addEventListener('astro:after-swap', init);
 		</script>
