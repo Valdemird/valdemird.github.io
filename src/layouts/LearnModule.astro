@@ -8,6 +8,7 @@ import LearnSidebar from '../components/learn/LearnSidebar.astro';
 import LearnSources from '../components/learn/LearnSources.astro';
 import LearnVideos from '../components/learn/LearnVideos.astro';
 import LearnRecall from '../components/learn/LearnRecall.astro';
+import TLDR from '../components/blog/TLDR.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import {
 	getLearnModules,
@@ -48,10 +49,11 @@ interface Props {
 	readingTime?: number;
 	sources?: Source[];
 	headings?: Heading[];
+	summary?: string[];
 	tldr?: string[];
 }
 
-const { title, description, slug, lang, phase, tier, durability, updatedDate, readingTime, sources, headings, tldr } = Astro.props;
+const { title, description, slug, lang, phase, tier, durability, updatedDate, readingTime, sources, headings, summary, tldr } = Astro.props;
 const es = lang === 'es';
 
 // Sections of this module (h2) — drives the mobile-only "On this page" jump nav.
@@ -191,6 +193,9 @@ const breadcrumbJsonLd = {
 					)}
 
 					<div class="article-body">
+						{summary && summary.length > 0 && (
+							<TLDR bullets={summary} lang={lang} title={es ? 'EMPIEZA AQUÍ' : 'START HERE'} />
+						)}
 						<slot />
 					</div>
 

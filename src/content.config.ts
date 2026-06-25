@@ -39,6 +39,10 @@ const learn = defineCollection({
 		/** How long the idea stays true. */
 		durability: z.enum(['atemporal', 'duradero', 'efimero']).optional(),
 		updatedDate: z.coerce.date().optional(),
+		/** Plain-language top-of-page orientation (Layer 0 of the easy→deep ramp).
+		 * Rendered above the body via <TLDR>; distinct from `tldr`, which feeds the
+		 * end-of-module recall check. 1–3 jargon-free sentences. */
+		summary: z.array(z.string()).optional(),
 		tldr: z.array(z.string()).optional(),
 		/** Attributed sources with a credibility grade A/B/C/D. */
 		sources: z

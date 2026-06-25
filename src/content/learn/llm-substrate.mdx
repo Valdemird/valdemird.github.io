@@ -5,8 +5,12 @@ phase: 1
 order: 1
 tier: fundamento
 durability: atemporal
-updatedDate: 2026-06-19
+updatedDate: 2026-06-23
 lang: en
+summary:
+  - "An LLM guesses the next word, remembers nothing on its own, and can only look at a limited amount of text at once."
+  - "Those three plain facts have proper names (stochastic, stateless, finite-window), and almost everything you build around the model is there to make up for one of them."
+  - "You don't need the math under the hood. You need to recognize which of the three is biting you when the agent misbehaves."
 tldr:
   - "An LLM reduces, for engineering purposes, to three facts: it's stochastic, stateless, and runs on a finite window."
   - "Almost every agent design decision (memory, evals, context budgeting) is a workaround for one of those three."
@@ -27,13 +31,15 @@ import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import Term from '../../components/learn/Term.astro';
 
-Before you write a single line of your harness, you have to know what the engine actually is. Not "an assistant with memory." Not "a reasoning machine." An LLM is a stochastic, stateless function that predicts the next token over a finite <Term name="Context window">context window</Term>. That's it. Almost everything you'll build as an agent engineer (sessions, memory, human-in-the-loop, evals, token budgets) exists to compensate for those three properties. Internalize them and you stop fighting the model. You start building the right scaffolding around it.
+Before you write a single line of your harness, you have to know what the engine actually is. Strip away the marketing and an LLM does three plain things, and only three. **It guesses the next word, it remembers nothing on its own, and it can only look at a limited amount of text at once.** Not "an assistant with memory." Not "a reasoning machine." Get those three facts in your bones and you stop fighting the model. You start building the right scaffolding around it.
+
+Each plain fact has a proper name you'll meet everywhere. Guessing the next word is being <Term name="Stochastic">stochastic</Term> (the output is *sampled* from a probability distribution, so the same input can give different answers). Remembering nothing is being <Term name="Stateless">stateless</Term> (it retains nothing between API calls). And the limited view is a finite <Term name="Context window">context window</Term>. Almost everything you'll build as an agent engineer (sessions, memory, human-in-the-loop, evals, token budgets) exists to compensate for one of those three.
 
 <Callout type="important" title="The one mental model">
-Reduce the LLM to three facts and the rest of the field falls out of them. It's **stochastic** (the output is sampled from a probability distribution). It's **stateless** (it remembers nothing between calls). It runs on a **finite window** whose attention costs O(n²) and whose recall decays before the window even fills.
+Reduce the LLM to three facts and the rest of the field falls out of them. It's **stochastic** (the output is sampled from a probability distribution). It's **stateless** (it remembers nothing between calls). It runs on a **finite window**: roughly, double the text and you quadruple the cost of reading it, and the model's recall starts slipping before the window is even full.
 </Callout>
 
-You don't need to implement attention, gradients, or a tokenizer to ship a good agent. What decides whether your agent survives production is a causal model of *why the model fails* (digit quantization from BPE, recency, sampling, refusals) so you can design the harness that absorbs it.
+You don't need to implement attention, gradients, or a tokenizer to ship a good agent. What decides whether your agent survives production is a causal model of *why the model fails* (<Term name="Digit quantization">digit quantization</Term> from BPE, recency, sampling, refusals) so you can design the harness that absorbs it.
 
 ## Three properties, and what each one forces
 
@@ -88,7 +94,7 @@ If the model generalizes by pattern-copy, two antipatterns get obvious. First, a
 
 ## Tool-use is trained, not prompted
 
-A model deciding when to call a tool, chaining several, and knowing when to stop is not prompt magic. It's behavior shaped by multi-turn post-training: SFT on trajectories plus RL with a reward at the end of the trajectory. The reference recipe today is GRPO with verifiable rewards (RLVR).
+A model deciding when to call a tool, chaining several, and knowing when to stop is not prompt magic. It's a behavior the model was *taught* by trial and error: shown good examples first (<Term name="SFT (Supervised Fine-Tuning)">SFT</Term> on trajectories), then rewarded when its answers actually checked out (RL with a reward at the end of the trajectory). The reference recipe today is <Term name="GRPO (Group Relative Policy Optimization)">GRPO</Term> with verifiable rewards (<Term name="RLVR (RL from Verifiable Rewards)">RLVR</Term>).
 
 <Callout type="warning" title="Get DeepSeek-R1 right">
 It's DeepSeek-R1-**Zero** that shows pure RL (GRPO) on the base model induces reasoning *without any prior SFT*. The shipped DeepSeek-R1 model **does** use SFT. It adds a cold-start SFT stage before RL precisely to fix readability and stability. The recipe is "GRPO + verifiable rewards." What you must not claim is that R1 skips SFT.
@@ -96,11 +102,13 @@ It's DeepSeek-R1-**Zero** that shows pure RL (GRPO) on the base model induces re
 
 Two practical consequences fall out of this. First, the model carries strong priors about what well-designed tools look like (clear schemas, descriptive names, prescriptive descriptions) because that's what it was trained against. Second, the agent's reliability frontier is the distribution of tasks it was trained on, which is why you evaluate by trajectory, not only by final answer.
 
-There's a live debate worth flagging: whether RL only sharpens capabilities already in the base model's distribution, or adds genuinely new ones. One camp (Yue et al., "Limit of RLVR") finds base models match RL-tuned ones at large pass@k, suggesting RL just samples existing solutions more efficiently. Another (ProRL) reports prolonged RL uncovering strategies the base model never reaches. Treat it as contested, not settled.
+<Collapsible title="Open question: does RL add new skills, or just sharpen old ones?">
+A live debate worth flagging: whether RL only sharpens capabilities already in the base model's distribution, or adds genuinely new ones. One camp (Yue et al., "Limit of RLVR") finds base models match RL-tuned ones at large <Term name="pass@k vs pass^k">pass@k</Term>, suggesting RL just samples existing solutions more efficiently. Another (ProRL) reports prolonged RL uncovering strategies the base model never reaches. Treat it as contested, not settled.
+</Collapsible>
 
 ## BPE decides what the model sees, and where it breaks
 
-The model doesn't see characters or numbers. It sees BPE tokens. That causes systematic, predictable failures. Arithmetic breaks because digits get grouped into tokens arbitrarily. Character counting breaks for the same reason. And structure (JSON, tool-args) costs real format tokens.
+The model doesn't see characters or numbers. It sees <Term name="Token / BPE (Byte-Pair Encoding)">BPE tokens</Term>. That causes systematic, predictable failures. Arithmetic breaks because digits get grouped into tokens arbitrarily. Character counting breaks for the same reason. And structure (JSON, tool-args) costs real format tokens.
 
 <Callout type="tip" title="Operational golden rule">
 Never trust the model for exact calculation, counting, or fine string manipulation. Delegate it to a tool. This is the mechanical reason, not a style preference, that "use a calculator" isn't optional.

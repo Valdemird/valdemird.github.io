@@ -72,6 +72,11 @@ export const GLOSSARY: GlossaryTerm[] = [
 		def: { en: "The idea that a transformer has a finite, degradable capacity to attend across tokens, so context tokens are a scarce resource to spend rather than free storage.", es: "La idea de que un transformer tiene una capacidad finita y degradable para atender a través de los tokens, por lo que los tokens de contexto son un recurso escaso que se gasta, no almacenamiento gratuito." },
 	},
 	{
+		term: "Augmented LLM",
+		slug: "augmented-llm",
+		def: { en: "The base building block of agents: a model extended with retrieval, tools, and memory, each with its own interface. Workflows and agents are both built on this unit, not on the raw model.", es: "El bloque base de los agentes: un modelo ampliado con recuperación, herramientas y memoria, cada una con su propia interfaz. Tanto los workflows como los agentes se construyen sobre esta unidad, no sobre el modelo en bruto." },
+	},
+	{
 		term: "Automation bias / overreliance",
 		slug: "automation-bias-overreliance",
 		def: { en: "The tendency of human approvers to rubber-stamp AI outputs without genuine scrutiny, eroding the safety value of a human-in-the-loop even when people are trained to resist it.", es: "La tendencia de los aprobadores humanos a validar sin reservas las salidas de la IA sin un escrutinio genuino, erosionando el valor de seguridad de un human-in-the-loop incluso cuando se entrena a las personas para resistirlo." },
@@ -242,6 +247,11 @@ export const GLOSSARY: GlossaryTerm[] = [
 		def: { en: "A fail-closed security posture where anything not explicitly permitted is rejected and an agent starts with no capabilities, granted only the specific tools the current task or role requires via an explicit allowlist.", es: "Una postura de seguridad fail-closed en la que todo lo que no esté explícitamente permitido se rechaza y un agente arranca sin capacidades, concediéndosele solo las herramientas específicas que la tarea o el rol actual requieren mediante una allowlist explícita." },
 	},
 	{
+		term: "Digit quantization",
+		slug: "digit-quantization",
+		def: { en: "The arithmetic errors that come from how a model chops numbers into tokens: byte-pair encoding can group digits inconsistently (e.g. '1234' as '123'+'4'), so the model never sees clean place value and miscalculates. It's a tokenization artifact, not a reasoning failure.", es: "Los errores aritméticos que surgen de cómo el modelo trocea los números en tokens: el byte-pair encoding puede agrupar los dígitos de forma inconsistente (p. ej., '1234' como '123'+'4'), de modo que el modelo nunca ve un valor posicional limpio y calcula mal. Es un artefacto de la tokenización, no un fallo de razonamiento." },
+	},
+	{
 		term: "DPO (Direct Preference Optimization)",
 		slug: "dpo-direct-preference-optimization",
 		def: { en: "A method reaching the same aligned policy as RLHF by minimizing a classification loss over (preferred, rejected) response pairs, removing the separate reward model and RL loop.", es: "Un método que alcanza la misma política alineada que RLHF minimizando una pérdida de clasificación sobre pares de respuestas (preferida, rechazada), eliminando el modelo de recompensa y el bucle de RL por separado." },
@@ -410,6 +420,11 @@ export const GLOSSARY: GlossaryTerm[] = [
 		term: "MAST (Multi-Agent System failure Taxonomy)",
 		slug: "mast-multi-agent-system-failure-taxonomy",
 		def: { en: "A UC Berkeley taxonomy of 14 multi-agent failure modes grouped into specification/system-design (~42%), inter-agent misalignment (~37%), and task-verification (~21%) categories.", es: "Una taxonomía de UC Berkeley de 14 modos de fallo de sistemas multiagente agrupados en categorías de especificación/diseño del sistema (~42%), desalineación entre agentes (~37%) y verificación de tareas (~21%)." },
+	},
+	{
+		term: "MDP (Markov Decision Process)",
+		slug: "mdp-markov-decision-process",
+		def: { en: "A decision model where the agent sees the full state of the world before each action. It's the fully-observed special case of a POMDP; a single, self-contained LLM API call is a degenerate one-step MDP, while a real agent acting on partial information is a POMDP.", es: "Un modelo de decisión en el que el agente ve el estado completo del mundo antes de cada acción. Es el caso especial totalmente observado de un POMDP; una llamada de API a un LLM aislada y autocontenida es un MDP degenerado de un solo paso, mientras que un agente real que actúa sobre información parcial es un POMDP." },
 	},
 	{
 		term: "Memory poisoning",
@@ -602,6 +617,11 @@ export const GLOSSARY: GlossaryTerm[] = [
 		def: { en: "Treating the model as a near-pure function from current state plus a new observation to the next action, holding no durable memory of its own so all persistent state lives outside it.", es: "Tratar al modelo como una función casi pura que va del estado actual más una nueva observación a la siguiente acción, sin mantener memoria duradera propia, de modo que todo el estado persistente vive fuera de él." },
 	},
 	{
+		term: "Stochastic",
+		slug: "stochastic",
+		def: { en: "The output isn't fixed: run the model twice on the same input and you can get different answers, because each next token is sampled at random from a probability distribution. This is why one passing run proves little and you measure reliability across many (pass^k), not one.", es: "La salida no es fija: ejecuta el modelo dos veces con la misma entrada y puedes obtener respuestas distintas, porque cada token siguiente se muestrea al azar de una distribución de probabilidad. Por eso una sola ejecución correcta prueba poco y la fiabilidad se mide en muchas (pass^k), no en una." },
+	},
+	{
 		term: "Sub-agent",
 		slug: "sub-agent",
 		def: { en: "A separate LLM invocation with its own isolated context window, spawned to handle a slice of work and return only a distilled result to the main thread — a context-management device, not an org-chart role.", es: "Una invocación de LLM independiente con su propia context window aislada, lanzada para encargarse de una porción del trabajo y devolver solo un resultado destilado al hilo principal — un mecanismo de gestión de contexto, no un rol de organigrama." },
@@ -635,6 +655,11 @@ export const GLOSSARY: GlossaryTerm[] = [
 		term: "Test-time compute / extended thinking",
 		slug: "test-time-compute-extended-thinking",
 		def: { en: "Spending extra inference-time reasoning tokens to improve answer quality, controlled on current Claude models by the effort parameter rather than a fixed token budget.", es: "Gastar tokens de razonamiento adicionales en tiempo de inferencia para mejorar la calidad de la respuesta, controlado en los modelos Claude actuales mediante el parámetro de esfuerzo en lugar de un presupuesto fijo de tokens." },
+	},
+	{
+		term: "TOCTOU (time-of-check to time-of-use)",
+		slug: "toctou-time-of-check-to-time-of-use",
+		def: { en: "A class of bug where what was checked and what gets used drift apart between the two moments. In an agent: a human approves one action, but the model is re-invoked and runs a slightly different one. The fix is to persist the validated input at check time and execute that exact record, not a fresh model call.", es: "Una clase de bug en la que lo que se verificó y lo que se ejecuta se separan entre los dos momentos. En un agente: un humano aprueba una acción, pero el modelo se reinvoca y ejecuta una ligeramente distinta. La solución es persistir la entrada validada en el momento de la verificación y ejecutar ese registro exacto, no una nueva llamada al modelo." },
 	},
 	{
 		term: "Token / BPE (Byte-Pair Encoding)",
