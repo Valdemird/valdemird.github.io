@@ -20,6 +20,7 @@ sources:
   - { grade: "A", title: "Large Language Models Cannot Self-Correct Reasoning Yet", author: "Huang et al., Google DeepMind (ICLR 2024)", year: 2024, url: "https://arxiv.org/abs/2310.01798" }
   - { grade: "A", title: "Building Effective Agents", author: "Schluntz & Zhang, Anthropic", year: 2024, url: "https://www.anthropic.com/engineering/building-effective-agents" }
   - { grade: "A", title: "Reflexion: Language Agents with Verbal Reinforcement Learning", author: "Shinn, Cassano et al.", year: 2023, url: "https://arxiv.org/abs/2303.11366" }
+  - { grade: "A", title: "MONA: Myopic Optimization with Non-myopic Approval Can Mitigate Multi-step Reward Hacking", author: "Farquhar, Varma, Lindner et al., Google DeepMind", year: 2025, url: "https://arxiv.org/abs/2501.13011" }
   - { grade: "A", title: "How the agent loop works (Agent SDK)", author: "Anthropic", year: 2025, url: "https://code.claude.com/docs/en/agent-sdk/agent-loop" }
   - { grade: "A", title: "τ-bench: A Benchmark for Tool-Agent-User Interaction", author: "Yao et al., Sierra Research", year: 2024, url: "https://arxiv.org/abs/2406.12045" }
   - { grade: "B", title: "12-Factor Agents", author: "Dexter Horthy, HumanLayer", year: 2025, url: "https://github.com/humanlayer/12-factor-agents" }
@@ -139,7 +140,7 @@ graph TD
 A hard max-turns and a token budget are the easy two. The one people skip is the **no-progress loop guard**: hash the last N tool calls (name plus normalized args) and cut, or force a strategy change, when the same call repeats. Without it, an agent can burn a whole budget spinning before any coarse cap saves it. And a termination tool, an explicit "I'm done" or "escalate to a human" action, gives the model a clean way to stop instead of trailing off.
 
 <Callout type="warning" title="pass@1 will lie to you">
-For stochastic multi-turn systems, one green run means almost nothing. τ-bench introduced a simulated user, a termination tool, and the **pass^k** metric precisely because consistency across k runs is what matters, not a single pass@1. If you measure with pass@1 and declare victory, you're measuring luck.
+For stochastic multi-turn systems, one green run means almost nothing. τ-bench introduced an LLM-simulated user, a stop signal (the user emits `###STOP###`) paired with a transfer-to-human escalation tool, and the **pass^k** metric precisely because consistency across k runs is what matters, not a single pass@1. If you measure with pass@1 and declare victory, you're measuring luck.
 </Callout>
 
 ## Human-in-the-loop is just another tool call

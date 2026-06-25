@@ -18,6 +18,7 @@ tldr:
 sources:
   - { grade: "A", title: "Building Effective Agents", author: "Anthropic (Schluntz, Zhang)", year: 2024, url: "https://www.anthropic.com/research/building-effective-agents" }
   - { grade: "A", title: "The Landscape of Agentic Reinforcement Learning for LLMs: A Survey", author: "arXiv 2509.02547", year: 2025, url: "https://arxiv.org/html/2509.02547v5" }
+  - { grade: "B", title: "Trial and Error: Exploration-Based Trajectory Optimization for LLM Agents (ETO)", author: "Song et al. (arXiv 2403.02502)", year: 2024, url: "https://arxiv.org/abs/2403.02502" }
   - { grade: "A", title: "Effective Context Engineering for AI Agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
   - { grade: "A", title: "The Illusion of Diminishing Returns: Measuring Long Horizon Execution in LLMs", author: "arXiv 2509.09677", year: 2025, url: "https://arxiv.org/pdf/2509.09677" }
   - { grade: "A", title: "A Reduction of Imitation Learning and Structured Prediction (DAgger)", author: "Ross, Gordon & Bagnell", year: 2011, url: "https://arxiv.org/abs/1011.0686" }
@@ -45,7 +46,7 @@ Here is what researchers call this picture, because you'll meet the words everyw
 
 The decision-maker is a <Term name="Policy (π)">policy</Term>: a function from everything observed so far to the next action. Written out, that's `π(action | observation, history)` — and the bar reads as "given." The next action *given* what the agent has seen. The LLM, steered by its system prompt, *is* that policy.
 
-The world it acts on is a <Term name="POMDP (Partially Observable Markov Decision Process)">POMDP</Term>: a decision process where you never see the full state of the world, only partial observations of it. (A single, self-contained API call is the easy opposite: a one-shot <Term name="MDP (Markov Decision Process)">MDP</Term> where the model sees everything it needs at once. A real agent almost never lives there.) The formal statement comes from the 2025 agentic-RL survey. You don't need the formalism to build. You need the decomposition, because it renames problems you already have into problems you can reason about.
+The world it acts on is a <Term name="POMDP (Partially Observable Markov Decision Process)">POMDP</Term>: a decision process where you never see the full state of the world, only partial observations of it. (A single, self-contained API call is the easy opposite: a one-shot <Term name="MDP (Markov Decision Process)">MDP</Term> where the model sees everything it needs at once. A real agent almost never lives there.) This is the standard formulation in the agentic-RL literature, used since 2023–2024 (ReAct, ETO, HiAgent) and itself built on the classical POMDP (Åström, 1965); the 2025 agentic-RL survey gives a clean consolidated statement of it, contrasting the single-step MDP of LLM-RL with the POMDP of agentic RL. You don't need the formalism to build. You need the decomposition, because it renames problems you already have into problems you can reason about.
 
 <Callout type="important" title="The one mental model">
 An agent is a policy **π(action | observation, history)**. The LLM-reasoner *is* π: it maps (system prompt + observation-action history) → action. The harness runs that action against an environment, and the resulting observation (the real ground truth, not the model's prediction) feeds the next step. Everything else (RAG, memory, HITL, evals) derives from this.
@@ -88,7 +89,7 @@ graph TB
 Most of the production systems people called "agentic" in 2025 were workflows with an LLM as a component. That's not an insult, it's the recommendation. Anthropic names five workflow patterns that cover most cases before you need a full agent: prompt chaining (sequential), routing (classify and dispatch), parallelization (sectioning/voting), orchestrator-workers (a lead delegates dynamically), and evaluator-optimizer (generate and critique in a loop). Confusing workflow with agent produces the archetypal over-engineering: a reasoning loop where a 10ms API call would have done.
 
 <Callout type="note" title="The atom underneath both">
-The base unit isn't the raw LLM. It's the <Term name="Augmented LLM">**augmented LLM**</Term> = LLM + retrieval + tools + memory, each with its own interface. This matters because it stops you treating RAG, memory, and tools as loose features. They're the three ways to extend the belief state beyond the context window. Workflows and agents are *molecules* built on this atom.
+The basic building block isn't the raw LLM. It's the <Term name="Augmented LLM">**augmented LLM**</Term> = an LLM enhanced with augmentations like retrieval, tools, and memory, exposed to the model through an easy, well-documented interface (e.g. via the Model Context Protocol). This matters because it stops you treating RAG, memory, and tools as loose features. They're the three ways to extend the belief state beyond the context window. Workflows and agents are *molecules* built on this atom.
 </Callout>
 
 ## The loop is a control loop, not a long thought

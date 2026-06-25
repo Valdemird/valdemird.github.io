@@ -15,10 +15,11 @@ sources:
   - { grade: "A", title: "Measuring AI Ability to Complete Long Tasks (Time Horizon) + Time Horizon 1.1", author: "METR", year: 2026, url: "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/" }
   - { grade: "A", title: "Effective context engineering for AI agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
   - { grade: "A", title: "Darwin Gödel Machine: Open-Ended Evolution of Self-Improving Agents", author: "Zhang et al. (Sakana AI, UBC, Vector Institute)", year: 2025, url: "https://arxiv.org/abs/2505.22954" }
+  - { grade: "A", title: "Informe de evaluación de horizonte temporal de o3", author: "METR", year: 2026, url: "https://metr.org/evaluations/openai-o3-report/" }
   - { grade: "B", title: "A Survey of Agent Interoperability Protocols (MCP, ACP, A2A, ANP)", author: "arXiv 2505.02279", year: 2025, url: "https://arxiv.org/html/2505.02279v1" }
   - { grade: "C", title: "Gartner: más del 40% de los proyectos de IA agéntica se cancelarán para fin de 2027", author: "Gartner press release", year: 2025, url: "https://www.gartner.com/en/newsroom/press-releases/2025-06-25-gartner-predicts-over-40-percent-of-agentic-ai-projects-will-be-canceled-by-end-of-2027" }
-  - { grade: "C", title: "Genie 3 world model (foundation/model-based)", author: "Google DeepMind", year: 2025, url: "https://techcrunch.com/2025/08/05/deepmind-thinks-genie-3-world-model-presents-stepping-stone-towards-agi/" }
-  - { grade: "D", title: "Composición de fiabilidad (decaimiento geométrico, 0.95^n)", author: "síntesis del curso", year: 2026, url: "https://metr.org/blog/2025-03-19-measuring-ai-ability-to-complete-long-tasks/" }
+  - { grade: "B", title: "Genie 3: A new frontier for world models", author: "Google DeepMind", year: 2025, url: "https://deepmind.google/blog/genie-3-a-new-frontier-for-world-models/" }
+  - { grade: "D", title: "Composición de fiabilidad (decaimiento geométrico, 0.95^n)", author: "síntesis del curso", year: 2026 }
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
@@ -39,7 +40,7 @@ El principiante lee benchmarks de un solo turno (MMLU, GPQA) e infiere capacidad
 La medición de METR es el número creíble. La longitud de tarea que los agentes terminan al ~50% de fiabilidad se ha estado **duplicando cada ~7 meses** (~188 días en lo histórico). La pendiente reciente es más empinada: alrededor de cuatro meses si ajustas desde 2023, y hasta ~tres meses (≈10× por año) en los modelos de 2024-2025 según el update Time Horizon 1.1. La medición es real. La extrapolación no está garantizada. Un doblaje que se sostuvo unos años puede doblarse.
 </Callout>
 
-Para fijar la escala: un modelo como o3 sostiene un horizonte de unos 110 minutos al 50% de fiabilidad. Ese es el tipo de número contra el que diseñar. No "¿es listo el modelo?" sino "¿dónde se cae *el mío*?".
+Para fijar la escala: un modelo como o3 sostiene un horizonte de unos 90 minutos (1,5 horas) al 50% de fiabilidad con la metodología original de METR, revisado a ~120 minutos con la recalibración de 2026 de METR (Time Horizon 1.1). Ese es el tipo de número contra el que diseñar. No "¿es listo el modelo?" sino "¿dónde se cae *el mío*?". (o3 ya no es frontera a mediados de 2026: Claude Opus 4.5 ronda los 320 minutos.)
 
 <MermaidDiagram title="Horizonte temporal: un doblaje, no un techo" chart={`
 graph LR

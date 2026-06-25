@@ -15,7 +15,7 @@ sources:
   - { grade: "A", title: "Effective context engineering for AI agents", author: "Anthropic (Applied AI)", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
   - { grade: "A", title: "Context Rot: Evaluating LLM Performance Degradation with Increasing Input Tokens", author: "Chroma Research", year: 2025, url: "https://www.trychroma.com/research/context-rot" }
   - { grade: "A", title: "Effective harnesses for long-running agents", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents" }
-  - { grade: "A", title: "Don't Build Multi-Agents", author: "Cognition (Walden Yan)", year: 2025, url: "https://cognition.ai/blog/dont-build-multi-agents" }
+  - { grade: "A", title: "Don't Build Multi-Agents", author: "Cognition (Walden Yan)", year: 2025, url: "https://cognition.com/blog/dont-build-multi-agents" }
   - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
   - { grade: "A", title: "MemGPT: Towards LLMs as Operating Systems", author: "Packer et al. (UC Berkeley)", year: 2023, url: "https://arxiv.org/abs/2310.08560" }
   - { grade: "A", title: "Gemini 2.5 technical report (context poisoning, Pokémon agent)", author: "Google DeepMind", year: 2025, url: "https://arxiv.org/abs/2507.06261" }
@@ -60,7 +60,7 @@ It's wrong to say "every model degrades at every length increment." The study sh
 
 This is why the classic lexical needle-in-a-haystack (NIAH) is misleading as a long-context capability test: it returns ~100% and hides the real degradation, because finding an exact string is trivial next to reasoning semantically over the content. To measure anything real you need multi-step benchmarks like LongMemEval or LOCOMO.
 
-Two counterintuitive Chroma results almost nobody applies. First, accuracy is higher near the start of context than in the middle (the old "lost in the middle") so putting the critical stuff (instructions, HITL rules) at the front is a cheap lever. Second, shuffling the haystack (breaking the local coherence of the filler) sometimes *improves* performance: the logical structure of the filler can confuse attention, which means "arranging the context nicely" doesn't always help.
+The most counterintuitive Chroma result almost nobody applies: shuffling the haystack (breaking the logical and structural coherence of the filler) *consistently improved* performance across all 18 models tested. The logical structure of the filler can confuse attention, which means "arranging the context nicely" can actively hurt. Worth noting what the study did *not* find: on the standard needle-in-a-haystack retrieval task there was no notable "lost in the middle" position effect (no significant variation across the 11 needle positions). A start-of-sequence advantage showed up only in a separate generation task (the Repeated Words experiment), so the familiar "put critical stuff at the front" lever is on weaker footing than the folklore suggests.
 
 ## The four pathologies: a diagnostic vocabulary
 
@@ -149,7 +149,7 @@ Isolate context with sub-agents only for read-only / no-shared-state tasks (rese
 
 Overrated: the obsession with bigger windows (1M tokens) as the solution. Context rot shows filling the window degrades accuracy; what matters is signal density, not capacity. Prompt engineering as a standalone discipline. It is a subset of context engineering. Lexical NIAH as a capability test. Multi-agent "by default because it scales." Embedding RAG as the automatic answer to "it doesn't fit."
 
-Ignored or underused: degradation is position-dependent, so putting instructions and HITL rules at the start is a near-free lever almost nobody applies on purpose. Tools are context too. Bloated or ambiguous tool definitions cause confusion, so shrinking and disambiguating the tool set is context engineering, not just API design. Memory without verification is debt: a write-through memory with no quality gate can persist poisoned data that contaminates every future turn. And structure helps. Markdown or XML headers and sections improve instruction-following over "everything in one blob."
+Ignored or underused: there's a modest start-of-sequence advantage (it showed up in Chroma's generation task, though not in plain retrieval), so putting instructions and HITL rules at the front is a cheap lever almost nobody applies on purpose — just don't expect front-loading to rescue a needle buried in the middle. Tools are context too. Bloated or ambiguous tool definitions cause confusion, so shrinking and disambiguating the tool set is context engineering, not just API design. Memory without verification is debt: a write-through memory with no quality gate can persist poisoned data that contaminates every future turn. And structure helps. Markdown or XML headers and sections improve instruction-following over "everything in one blob."
 
 ## Common mistakes
 

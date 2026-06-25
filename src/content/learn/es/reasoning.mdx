@@ -12,9 +12,11 @@ tldr:
   - "El test-time compute es una palanca real de escalado (más tokens de razonamiento pueden ganarle a un modelo mucho más grande), pero la precisión puede caer pasado cierto presupuesto. Calibra el effort por ruta."
   - "En modelos de razonamiento nativo, el prompting prescriptivo de 'piensa paso a paso' estorba. Y la cadena de razonamiento visible no es una traza fiel, así que no sirve como auditoría de seguridad."
 sources:
-  - { grade: "A", title: "Reasoning Models Don't Always Say What They Think / Measuring Faithfulness in CoT", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/research/measuring-faithfulness-in-chain-of-thought-reasoning" }
+  - { grade: "A", title: "Reasoning Models Don't Always Say What They Think", author: "Anthropic (Chen, Benton et al.)", year: 2025, url: "https://www.anthropic.com/research/reasoning-models-dont-say-think" }
+  - { grade: "A", title: "Measuring Faithfulness in Chain-of-Thought Reasoning", author: "Anthropic", year: 2023, url: "https://www.anthropic.com/research/measuring-faithfulness-in-chain-of-thought-reasoning" }
   - { grade: "A", title: "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models", author: "Wei et al., Google", year: 2022, url: "https://arxiv.org/abs/2201.11903" }
   - { grade: "A", title: "Self-Consistency Improves Chain of Thought Reasoning", author: "Wang et al., Google", year: 2022, url: "https://arxiv.org/abs/2203.11171" }
+  - { grade: "B", title: "Reevaluación del escalado de self-consistency en modelos de razonamiento modernos", author: "(2025)", year: 2025, url: "https://arxiv.org/abs/2511.00751" }
   - { grade: "A", title: "ReAct: Synergizing Reasoning and Acting in Language Models", author: "Yao et al., Princeton/Google", year: 2022, url: "https://arxiv.org/abs/2210.03629" }
   - { grade: "A", title: "Reflexion: Language Agents with Verbal Reinforcement Learning", author: "Shinn et al.", year: 2023, url: "https://arxiv.org/abs/2303.11366" }
   - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
@@ -120,7 +122,7 @@ Resumir, comprimir o rotar el transcript (folding/recap) frena la saturación de
 
 El modelo no puede verificarse a sí mismo de forma fiable. Reflexion (auto-reflexión verbal sobre los fallos) es útil conceptualmente pero **frágil sin una señal externa de verdad**; el modelo tiende a racionalizar en lugar de corregir. El multiplicador real del razonamiento es una *señal de verdad externa*: un test que corre, un grep que encuentra (o no) un dato, una herramienta que falla.
 
-Self-consistency muestrea varias trazas y vota la respuesta mayoritaria. Su límite práctico: trata todas las trazas igual (ignora su calidad) y **satura en torno a k≈10-15**; muestrear más solo re-explora caminos viejos. Un verificador alcanza mayor precisión con menos tokens. Muestrear 64 veces como bala de plata es quemar presupuesto.
+Self-consistency muestrea varias trazas y vota la respuesta mayoritaria. Su límite práctico: trata todas las trazas igual (ignora su calidad), y hasta dónde llegan las ganancias **depende de qué tan fuerte sea el modelo**. En los modelos de la época de 2022 de Wang et al., la precisión seguía subiendo hasta ~40 muestras (el ajuste canónico), con rendimientos decrecientes en vez de un corte tajante. En los modelos fuertes de 2025-2026 el punto de saturación llega mucho antes — **en torno a k≈10-15** — porque las trazas muestreadas se solapan y muestrear más solo re-explora caminos viejos. Un verificador alcanza mayor precisión con menos tokens. Muestrear 64 veces como bala de plata es quemar presupuesto.
 
 <Collapsible title="Cuándo sí tienes un verificador y cuándo no">
 Si hay una señal de verdad determinista (código que compila, un dato que existe en un archivo), usa best-of-N con ese verificador: le gana al majority voting ciego a menor coste en tokens. La búsqueda agéntica sobre archivos (grep/glob/read), sin RAG ni embeddings, *es* un verificador externo barato: el dato existe o no existe. Cuando no hay verificador y la respuesta es discreta, self-consistency es el recurso, pero topa la k cerca del punto de saturación, no en 64. Reflexion sin señal externa es el caso a evitar: produce "mejoras" frágiles y autocomplacientes.

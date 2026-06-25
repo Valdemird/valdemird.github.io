@@ -20,6 +20,7 @@ sources:
   - { grade: "A", title: "Effective Context Engineering for AI Agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents" }
   - { grade: "B", title: "Continual Learning in Token Space", author: "Letta", year: 2025, url: "https://www.letta.com/blog/continual-learning" }
   - { grade: "B", title: "State of AI Agent Memory 2026", author: "Mem0 (ECAI 2025 paper)", year: 2026, url: "https://mem0.ai/blog/state-of-ai-agent-memory-2026" }
+  - { grade: "A", title: "BEAM: Beyond a Million Tokens — Benchmarking Long-Context Memory", author: "Tavakoli, Salemi, Ye, Abdalla, Zamani, Mitchell (ICLR 2026)", year: 2026, url: "https://arxiv.org/abs/2510.27246" }
 ---
 
 import Callout from '../../components/blog/Callout.astro';
@@ -104,7 +105,7 @@ Every entry carries `source` and `trust_level`. At retrieval, untrusted-origin e
 Today's number-one production gap isn't fact retrieval. It's the **temporal evolution of state**. Systems treat change as *replacement* (overwrite) instead of *evolution* (a versioned transition). A user who moves from New York to San Francisco should show a temporal transition, not an overwrite that erases the history. Without precise timestamps, temporal ordering, and a decay/invalidation mechanism, high-relevance facts turn **confidently wrong**.
 
 <Callout type="warning" title="Big context does not replace memory">
-Temporal and multi-hop reasoning is exactly where long-context benchmarks fall: recall and reasoning quality degrade markedly as context scales from 1M to 10M tokens, even when the model has access to all the information (BEAM / "Beyond a Million Tokens", ICLR 2026). So "huge context = I don't need memory" is false. Dumping everything in the window is expensive and *worsens* accuracy. I'm avoiding a hard percentage here on purpose: the degradation is real, the specific number floating around is not well-sourced.
+Temporal and multi-hop reasoning is exactly where long-context benchmarks fall. On BEAM ("Beyond a Million Tokens", ICLR 2026), recall and reasoning on multi-hop and temporal tasks degrade sharply as conversations scale from 1M to 10M tokens — temporal reasoning collapses toward zero. Be careful how you read this, though: it is *not* a clean full-access result. At 10M tokens none of the evaluated models (max 1M context) can fit the whole conversation, so they only see the most recent fitting segment — the degradation reflects both context-length limits *and* the inability to hold all the tokens, not a model that sees everything and still fails. Where you *do* get a clean "fails even with full access" signal is the 128K→1M range, where the 1M-window models receive the entire conversation and still degrade. Either way, "huge context = I don't need memory" is false: dumping everything in the window is expensive and *worsens* accuracy.
 </Callout>
 
 ## Compaction is directed information loss (and an attack channel)

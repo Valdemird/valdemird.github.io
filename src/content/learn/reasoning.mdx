@@ -12,9 +12,11 @@ tldr:
   - "Test-time compute is a genuine scaling lever — more reasoning tokens can beat a much larger model — but accuracy can drop past a certain budget. Calibrate effort per route."
   - "On native reasoning models, prescriptive 'think step by step' prompting gets in the way. And the visible chain of thought is not a faithful trace, so it's useless as a security audit."
 sources:
-  - { grade: "A", title: "Reasoning Models Don't Always Say What They Think / Measuring Faithfulness in CoT", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/research/measuring-faithfulness-in-chain-of-thought-reasoning" }
+  - { grade: "A", title: "Reasoning Models Don't Always Say What They Think", author: "Anthropic (Chen, Benton et al.)", year: 2025, url: "https://www.anthropic.com/research/reasoning-models-dont-say-think" }
+  - { grade: "A", title: "Measuring Faithfulness in Chain-of-Thought Reasoning", author: "Anthropic", year: 2023, url: "https://www.anthropic.com/research/measuring-faithfulness-in-chain-of-thought-reasoning" }
   - { grade: "A", title: "Chain-of-Thought Prompting Elicits Reasoning in Large Language Models", author: "Wei et al., Google", year: 2022, url: "https://arxiv.org/abs/2201.11903" }
   - { grade: "A", title: "Self-Consistency Improves Chain of Thought Reasoning", author: "Wang et al., Google", year: 2022, url: "https://arxiv.org/abs/2203.11171" }
+  - { grade: "B", title: "Reevaluating Self-Consistency Scaling in Modern Reasoning Models", author: "(2025)", year: 2025, url: "https://arxiv.org/abs/2511.00751" }
   - { grade: "A", title: "ReAct: Synergizing Reasoning and Acting in Language Models", author: "Yao et al., Princeton/Google", year: 2022, url: "https://arxiv.org/abs/2210.03629" }
   - { grade: "A", title: "Reflexion: Language Agents with Verbal Reinforcement Learning", author: "Shinn et al.", year: 2023, url: "https://arxiv.org/abs/2303.11366" }
   - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/multi-agent-research-system" }
@@ -120,7 +122,7 @@ Summarizing, compacting, or rotating the transcript (folding/recap) curbs attent
 
 The model can't reliably verify itself. Reflexion (verbal self-reflection on failures) is useful conceptually but **fragile without an external truth signal**; the model tends to rationalize instead of correct. The real multiplier on reasoning is an *external truth signal*: a test that runs, a grep that finds (or doesn't) a fact, a tool that fails.
 
-Self-consistency samples several traces and votes the majority answer. Its practical limit: it treats all traces equally (ignoring quality) and **saturates around k≈10-15**; sampling more just re-explores old paths. A verifier reaches higher accuracy with fewer tokens. Sampling 64 times as a silver bullet is just burning budget.
+Self-consistency samples several traces and votes the majority answer. Its practical limit: it treats all traces equally (ignoring quality), and how far the gains run **depends on how strong the model is**. On the 2022-era models in Wang et al., accuracy kept climbing out to ~40 samples (the canonical setting), with diminishing returns rather than a hard cutoff. On strong 2025-2026 models the saturation point arrives much earlier — **around k≈10-15** — because the sampled traces overlap and sampling more just re-explores old paths. A verifier reaches higher accuracy with fewer tokens. Sampling 64 times as a silver bullet is just burning budget.
 
 <Collapsible title="When you actually do have a verifier vs when you don't">
 If there's a deterministic truth signal (code that compiles, a datum that exists in a file), use best-of-N with that verifier: it beats blind majority voting at lower token cost. Agentic search over files (grep/glob/read), with no RAG or embeddings, *is* a cheap external verifier: the datum exists or it doesn't. When no verifier exists and the answer is discrete, self-consistency is the fallback, but cap k near the saturation point, not at 64. Reflexion without an external signal is the case to avoid; it produces fragile, self-congratulatory "improvements."

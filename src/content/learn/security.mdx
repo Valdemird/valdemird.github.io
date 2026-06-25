@@ -17,9 +17,11 @@ sources:
   - { grade: "A", title: "Defending Against Indirect Prompt Injection Attacks With Spotlighting", author: "Hines et al. (Microsoft)", year: 2024, url: "https://arxiv.org/pdf/2403.14720" }
   - { grade: "A", title: "AgentDojo: A Dynamic Environment to Evaluate Prompt Injection Attacks and Defenses for LLM Agents", author: "Debenedetti et al. (ETH Zurich)", year: 2024, url: "https://arxiv.org/abs/2406.13352" }
   - { grade: "B", title: "The lethal trifecta for AI agents: private data, untrusted content, and external communication", author: "Simon Willison", year: 2025, url: "https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/" }
-  - { grade: "B", title: "Agents Rule of Two: A Practical Approach to AI Agent Security", author: "Meta AI", year: 2025, url: "https://simonwillison.net/2025/Nov/2/new-prompt-injection-papers/" }
+  - { grade: "B", title: "Agents Rule of Two: A Practical Approach to AI Agent Security", author: "Meta AI", year: 2025, url: "https://ai.meta.com/blog/practical-ai-agent-security/" }
   - { grade: "B", title: "OWASP Top 10 for Agentic Applications (2026)", author: "OWASP GenAI Security Project", year: 2026, url: "https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/" }
-  - { grade: "C", title: "MCP Security Notification: Tool Poisoning Attacks", author: "Invariant Labs", year: 2025, url: "https://www.truefoundry.com/blog/blog-mcp-tool-poisoning-gateway-defense" }
+  - { grade: "B", title: "MCP Security Notification: Tool Poisoning Attacks", author: "Invariant Labs (Beurer-Kellner & Fischer)", year: 2025, url: "https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks" }
+  - { grade: "B", title: "MCPoison: Cursor IDE Persistent Code Execution via MCP Trust Bypass (CVE-2025-54136)", author: "Check Point Research", year: 2025, url: "https://research.checkpoint.com/2025/cursor-vulnerability-mcpoison/" }
+  - { grade: "A", title: "CVE-2025-54135 (CurXecute): indirect prompt injection to RCE in Cursor IDE", author: "NVD / Aim Labs", year: 2025, url: "https://nvd.nist.gov/vuln/detail/CVE-2025-54135" }
 ---
 
 import Callout from '../../components/blog/Callout.astro';
@@ -45,11 +47,11 @@ The operational consequence is a 180-degree turn. Stop investing in *detecting* 
 
 ## The lethal trifecta: audit by capability, not by intent
 
-Simon Willison distilled the risk into a one-line mental model. An agent becomes a guaranteed exfiltration tool when it holds three capabilities at once: access to private data, exposure to untrusted content, and a channel to communicate externally.
+Simon Willison distilled the risk into a one-line mental model. An agent becomes dangerously exposed to data exfiltration when it holds three capabilities at once: access to private data, exposure to untrusted content, and a channel to communicate externally. He frames the combination as one that makes prompt-injection-based data theft easy and likely, not a certainty.
 
 <MermaidDiagram title="The lethal trifecta" chart={`
 graph LR
-  A["Private data"] --> X["Guaranteed exfiltration<br/>on one injected prompt"]
+  A["Private data"] --> X["Exposed to exfiltration<br/>on one injected prompt"]
   B["Untrusted content"] --> X
   C["External channel"] --> X
 `} />
@@ -146,7 +148,7 @@ This is defense-in-depth, not a replacement for app-level checks. The point is t
 One trap deserves its own warning. Writing to an agent's long-term memory is a *consequential action*, not a convenience to pre-approve. If untrusted content from a document or a message can flow into a stored note, an injection survives the session and rewrites the agent's behavior on future turns. Memory poisoning is the slow version of the trifecta: the exfil happens days later, from data the attacker planted today. Gate writes to memory the same way you gate any other write, or at minimum tag the provenance of what gets stored.
 
 <Callout type="warning" title="The supply chain writes into your prompt">
-Tool descriptions, third-party MCP server results, and skills enter the model's context with no sanitization and no provenance. Trusting an MCP server is trusting code that writes into your prompt. Tool-description poisoning is a recognized class with real CVEs (CVE-2025-54136, "MCPoison", a rug-pull that swaps a tool's definition after approval, and CVE-2025-54135, "CurXecute"), and it sits in the OWASP agentic Top 10 alongside goal hijacking and memory poisoning. Pin versions, audit servers, treat their descriptions and results as untrusted input, and alert on description changes.
+Tool descriptions, third-party MCP server results, and skills enter the model's context with no sanitization and no provenance. Trusting an MCP server is trusting code that writes into your prompt. Tool-description poisoning ("Tool Poisoning Attacks") is a recognized class — discovered and named by Invariant Labs in their GitHub MCP and WhatsApp MCP research — where a malicious server hides instructions inside a tool's description to hijack the agent. The MCP supply chain has also produced concrete CVEs in real IDEs: CVE-2025-54136 ("MCPoison", found by Check Point Research) is a config-trust-bypass that lets an attacker with write access silently swap an already-approved MCP server's command in Cursor's config without re-approval, running attacker code on every launch (patched in Cursor 1.3); CVE-2025-54135 ("CurXecute", found by Aim Labs) is an indirect-prompt-injection-to-RCE flaw where untrusted content rewrites `~/.cursor/mcp.json` and auto-executes (patched in Cursor 1.3.9). OWASP catalogs prompt injection broadly, and goal hijacking and memory poisoning sit in its agentic Top 10. Pin versions, audit servers, treat their descriptions and results as untrusted input, and alert on description changes.
 </Callout>
 
 ## HITL only counts if the human approves the real thing

@@ -15,11 +15,10 @@ sources:
   - { grade: "A", title: "Building Effective Agents", author: "Anthropic Engineering", year: 2024, url: "https://www.anthropic.com/research/building-effective-agents" }
   - { grade: "A", title: "Demystifying evals for AI agents", author: "Anthropic Engineering", year: 2026, url: "https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents" }
   - { grade: "A", title: "Code execution with MCP: building more efficient AI agents", author: "Anthropic Engineering", year: 2025, url: "https://www.anthropic.com/engineering/code-execution-with-mcp" }
-  - { grade: "B", title: "Durable Execution: The Key to Harnessing AI Agents in Production", author: "Inngest", year: 2025, url: "https://www.inngest.com/blog/durable-execution-key-to-harnessing-ai-agents" }
+  - { grade: "B", title: "Durable Execution: The Key to Harnessing AI Agents in Production", author: "Inngest (Charly Poly)", year: 2026, url: "https://www.inngest.com/blog/durable-execution-key-to-harnessing-ai-agents" }
   - { grade: "B", title: "Architecting Resilient LLM Agents: A Guide to Secure Plan-then-Execute Implementations", author: "Del Rosario et al.", year: 2025, url: "https://arxiv.org/pdf/2509.08646" }
   - { grade: "C", title: "ALAS: Transactional and Dynamic Multi-Agent LLM Planning", author: "Geng & Chang, Stanford", year: 2025, url: "https://arxiv.org/pdf/2511.03094" }
   - { grade: "C", title: "Don't Break the Cache: An Evaluation of Prompt Caching for Long-Horizon Agentic Tasks", author: "PwC (arXiv 2601.06007)", year: 2026, url: "https://arxiv.org/pdf/2601.06007" }
-  - { grade: "D", title: "Public postmortem: multi-agent pipeline burned ~$47k in 11 days (blog, anecdotal)", author: "DEV.to / Medium", year: 2025, url: "https://dev.to" }
 ---
 
 import Callout from '../../components/blog/Callout.astro';
@@ -141,7 +140,7 @@ One subtle requirement people miss: persist the *normalized input* at the moment
 
 ## Cost and latency budgets belong in the infrastructure
 
-Runaway loops are real incidents. One public postmortem (a multi-agent pipeline, blog-reported and anecdotal, not an audited corporate report) describes ~$47k burned over 11 days because two agents ping-ponged with no spend cap and no kill switch. [D] Treat the exact figure as illustrative, but the failure mode is real and common.
+Runaway loops are real incidents. One public postmortem (a multi-agent pipeline, blog-reported and anecdotal, not an audited corporate report) describes ~$47k burned over 11 days because two agents ping-ponged with no spend cap and no kill switch. Treat the exact figure as illustrative, but the failure mode is real and common.
 
 The lesson isn't "add a limit to the system prompt." A prompt-level limit is a suggestion the agent can ignore or reason its way around. The hard limits, max iterations per turn, token budget per tenant per day, a circuit breaker that trips when spend velocity spikes above the moving average, live in infrastructure, outside the agent's control, checked *before* the model call.
 

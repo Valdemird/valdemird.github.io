@@ -13,7 +13,7 @@ tldr:
   - "Agentic search is not free. It spends 3-10x more tokens and is far more latency-sensitive. RAG still wins for huge corpora that don't fit and high-volume, low-latency FAQ."
 sources:
   - { grade: "A", title: "Introducing Contextual Retrieval", author: "Anthropic", year: 2024, url: "https://www.anthropic.com/news/contextual-retrieval" }
-  - { grade: "A", title: "Claude Code: why agentic search replaced RAG + vector DB", author: "Boris Cherny, Anthropic", year: 2025, url: "https://x.com/bcherny/status/2017824286489383315" }
+  - { grade: "B", title: "Claude Code: why agentic search replaced RAG + vector DB", author: "Boris Cherny, Anthropic", year: 2025, url: "https://x.com/bcherny/status/2017824286489383315" }
   - { grade: "A", title: "From Local to Global: A GraphRAG Approach to Query-Focused Summarization", author: "Microsoft Research", year: 2024, url: "https://arxiv.org/abs/2404.16130" }
   - { grade: "A", title: "LazyGraphRAG: setting a new standard for quality and cost", author: "Microsoft Research", year: 2025, url: "https://www.microsoft.com/en-us/research/blog/lazygraphrag-setting-a-new-standard-for-quality-and-cost/" }
   - { grade: "B", title: "Fishing for Answers: One-shot vs. Iterative Retrieval Strategies for RAG", author: "arXiv 2509.04820", year: 2025, url: "https://arxiv.org/pdf/2509.04820" }
@@ -83,7 +83,7 @@ If you do keep RAG, reranking is almost always the best cost/benefit improvement
 
 ## Latency amplifies 83x, so tool speed is viability
 
-The most counterintuitive and most production-critical fact: in search agents, end-to-end latency amplifies up to **83x** when mean retrieval latency rises from 0.6s to 4.4s, because each slow step multiplies by the number of iterations. In RAG, with its ~4 fixed calls, latency is stable. The design implication: a slow search tool isn't "slow," it's systemically unviable in an agentic loop. Local ripgrep isn't an optimization, it's a viability requirement. Budget latency per iteration and cap the number of steps.
+The most counterintuitive and most production-critical fact: in search agents, end-to-end latency is magnified by over **83x** when mean retrieval latency rises from 0.6s to 4.4s. That's wildly disproportionate — far more than the ~7x rise in retrieval time itself — and the mechanism isn't simple iteration-count multiplication. It's a scheduling cascade: minor retrieval delays cause requests to miss their scheduling windows under FCFS, which evicts their prefix KV-cache (hit rate falls from over 30% to under 21%) and forces costly token recomputation. In RAG, with its ~4 fixed calls, latency is stable. The design implication: a slow search tool isn't "slow," it's systemically unviable in an agentic loop. Local ripgrep isn't an optimization, it's a viability requirement. Budget latency per iteration and cap the number of steps.
 
 <Callout type="warning" title="'No embeddings = cheap' is the wrong intuition">
 Agentic search moves the cost from "retriever precision" (CAPEX, the index you build and maintain) to "tokens per turn" (OPEX). It can spend 3-10x more tokens. Measure cost per turn and latency per iteration explicitly. Don't assume the agentic path is free just because there's no vector DB on the bill.

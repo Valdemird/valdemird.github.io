@@ -74,7 +74,7 @@ export const GLOSSARY: GlossaryTerm[] = [
 	{
 		term: "Augmented LLM",
 		slug: "augmented-llm",
-		def: { en: "The base building block of agents: a model extended with retrieval, tools, and memory, each with its own interface. Workflows and agents are both built on this unit, not on the raw model.", es: "El bloque base de los agentes: un modelo ampliado con recuperación, herramientas y memoria, cada una con su propia interfaz. Tanto los workflows como los agentes se construyen sobre esta unidad, no sobre el modelo en bruto." },
+		def: { en: "Anthropic's basic building block of agentic systems: a model enhanced with augmentations like retrieval, tools, and memory, exposed to it through an easy, well-documented interface. Workflows and agents are both built on this unit, not on the raw model.", es: "El bloque básico de construcción de los sistemas agénticos según Anthropic: un modelo enriquecido con aumentaciones como recuperación, herramientas y memoria, expuestas mediante una interfaz sencilla y bien documentada. Tanto los workflows como los agentes se construyen sobre esta unidad, no sobre el modelo en bruto." },
 	},
 	{
 		term: "Automation bias / overreliance",

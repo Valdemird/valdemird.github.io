@@ -14,11 +14,11 @@ tldr:
 sources:
   - { grade: "A", title: "Building Effective Agents", author: "Schluntz & Zhang, Anthropic", year: 2024, url: "https://www.anthropic.com/engineering/building-effective-agents" }
   - { grade: "A", title: "How we built our multi-agent research system", author: "Anthropic", year: 2025, url: "https://www.anthropic.com/engineering/built-multi-agent-research-system" }
-  - { grade: "B", title: "Don't Build Multi-Agents", author: "Walden Yan, Cognition", year: 2025, url: "https://cognition.ai/blog/dont-build-multi-agents" }
+  - { grade: "B", title: "Don't Build Multi-Agents", author: "Walden Yan, Cognition", year: 2025, url: "https://cognition.com/blog/dont-build-multi-agents" }
   - { grade: "A", title: "Why Do Multi-Agent LLM Systems Fail? (MAST)", author: "Cemri, Pan et al., UC Berkeley — NeurIPS 2025", year: 2025, url: "https://arxiv.org/abs/2503.13657" }
   - { grade: "B", title: "Revisiting Multi-Agent Debate as Test-Time Scaling", author: "arXiv 2505.22960", year: 2025, url: "https://arxiv.org/pdf/2505.22960" }
   - { grade: "B", title: "Improving Factuality and Reasoning through Multiagent Debate", author: "Du, Li, Torralba, Tenenbaum, Mordatch (MIT/Google), ICML 2024", year: 2023, url: "https://arxiv.org/pdf/2305.14325" }
-  - { grade: "C", title: "Security Threat Modeling for AI-Agent Protocols (MCP, A2A, ANP)", author: "arXiv 2602.11327", year: 2026, url: "https://arxiv.org/pdf/2602.11327" }
+  - { grade: "C", title: "Security Threat Modeling for AI-Agent Protocols (MCP, A2A, Agora, ANP)", author: "arXiv 2602.11327", year: 2026, url: "https://arxiv.org/pdf/2602.11327" }
 ---
 
 import Callout from '../../components/blog/Callout.astro';
@@ -83,7 +83,7 @@ When two sub-agents generate parts of the same artifact without seeing each othe
 Conflicting implicit decisions explain why fan-out works for search and fails for generation. Searching makes no decision that another agent's output must respect. Generating does. If sub-agents share no state, they can't coordinate edits. Full stop.
 </Callout>
 
-The second Cognition principle follows: when you delegate, don't pass only "the task" or the last message. Pass the full trace: history, tool calls, prior reasoning. And here's the trade-off people try to dodge and can't: coherence = shared context = tokens. The token cost of passing full traces is exactly what makes good multi-agent expensive.
+Cognition's first principle follows: when you delegate, don't pass only "the task" or the last message. Share context, and share full agent traces, not just individual messages: history, tool calls, prior reasoning. And here's the trade-off people try to dodge and can't: coherence = shared context = tokens. The token cost of passing full traces is exactly what makes good multi-agent expensive.
 
 <Callout type="warning" title="The most common antipattern">
 People trim the context passed to sub-agents "to save tokens" and then act surprised the synthesized output is incoherent. The high cost of well-done multi-agent is a feature, not a bug to optimize away. If you can't afford the full traces, you probably shouldn't use multi-agent for that task.

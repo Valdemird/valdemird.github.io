@@ -13,7 +13,7 @@ tldr:
   - "La búsqueda agéntica no es gratis: gasta 3-10x más tokens y es mucho más sensible a la latencia. RAG sigue ganando en corpus enormes que no caben y en FAQ de alto volumen y baja latencia."
 sources:
   - { grade: "A", title: "Introducing Contextual Retrieval", author: "Anthropic", year: 2024, url: "https://www.anthropic.com/news/contextual-retrieval" }
-  - { grade: "A", title: "Claude Code: por qué la búsqueda agéntica reemplazó a RAG + vector DB", author: "Boris Cherny, Anthropic", year: 2025, url: "https://x.com/bcherny/status/2017824286489383315" }
+  - { grade: "B", title: "Claude Code: por qué la búsqueda agéntica reemplazó a RAG + vector DB", author: "Boris Cherny, Anthropic", year: 2025, url: "https://x.com/bcherny/status/2017824286489383315" }
   - { grade: "A", title: "From Local to Global: A GraphRAG Approach to Query-Focused Summarization", author: "Microsoft Research", year: 2024, url: "https://arxiv.org/abs/2404.16130" }
   - { grade: "A", title: "LazyGraphRAG: setting a new standard for quality and cost", author: "Microsoft Research", year: 2025, url: "https://www.microsoft.com/en-us/research/blog/lazygraphrag-setting-a-new-standard-for-quality-and-cost/" }
   - { grade: "B", title: "Fishing for Answers: One-shot vs. Iterative Retrieval Strategies for RAG", author: "arXiv 2509.04820", year: 2025, url: "https://arxiv.org/pdf/2509.04820" }
@@ -83,7 +83,7 @@ Si mantienes RAG, el rerank es casi siempre la mejor mejora coste/beneficio ante
 
 ## La latencia se amplifica 83x, así que la velocidad de la herramienta es viabilidad
 
-Lo más contraintuitivo y lo más crítico para producción: en agentes de búsqueda, la latencia end-to-end se amplifica hasta **83x** cuando la latencia media de recuperación sube de 0.6s a 4.4s, porque cada paso lento se multiplica por el número de iteraciones. En RAG, con sus ~4 llamadas fijas, la latencia es estable. La implicación de diseño: una herramienta de búsqueda lenta no es "lenta", es sistémicamente inviable en un bucle agéntico. El ripgrep local no es una optimización, es un requisito de viabilidad. Presupuesta latencia por iteración y acota el número de pasos.
+Lo más contraintuitivo y lo más crítico para producción: en agentes de búsqueda, la latencia end-to-end se magnifica más de **83x** cuando la latencia media de recuperación sube de 0.6s a 4.4s. Es desproporcionado — mucho más que el ~7x que sube el tiempo de recuperación en sí — y el mecanismo no es una simple multiplicación por el número de iteraciones. Es una cascada de scheduling: retrasos menores en la recuperación hacen que las peticiones pierdan su ventana de scheduling bajo FCFS, lo que desaloja su KV-cache de prefijo (la tasa de aciertos cae de más del 30% a menos del 21%) y obliga a recomputar tokens a un coste alto. En RAG, con sus ~4 llamadas fijas, la latencia es estable. La implicación de diseño: una herramienta de búsqueda lenta no es "lenta", es sistémicamente inviable en un bucle agéntico. El ripgrep local no es una optimización, es un requisito de viabilidad. Presupuesta latencia por iteración y acota el número de pasos.
 
 <Callout type="warning" title="'Sin embeddings = barato' es la intuición equivocada">
 La búsqueda agéntica mueve el coste de "precisión del retriever" (CAPEX, el índice que construyes y mantienes) a "tokens por turno" (OPEX). Puede gastar 3-10x más tokens. Mide coste por turno y latencia por iteración de forma explícita. No asumas que el camino agéntico es gratis solo porque no hay una vector DB en la factura.

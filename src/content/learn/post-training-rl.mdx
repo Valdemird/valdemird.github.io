@@ -15,12 +15,13 @@ sources:
   - { grade: "A", title: "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning", author: "DeepSeek-AI (also Nature, vol 645 pp 633-638)", year: 2025, url: "https://www.nature.com/articles/s41586-025-09422-z" }
   - { grade: "A", title: "A Practitioner's Guide to Multi-turn Agentic Reinforcement Learning", author: "Wang & Ammanabrolu, UC San Diego", year: 2025, url: "https://arxiv.org/html/2510.01132v1" }
   - { grade: "A", title: "Agent-RLVR: Training Software Engineering Agents via Guidance and Environment Rewards", author: "arXiv 2506.11425", year: 2025, url: "https://arxiv.org/abs/2506.11425" }
-  - { grade: "A", title: "Constitutional AI: Harmlessness from AI Feedback / CAI chapter of the RLHF Book", author: "Anthropic; Nathan Lambert (rlhfbook.com)", year: 2022, url: "https://rlhfbook.com/c/13-cai" }
+  - { grade: "A", title: "Constitutional AI: Harmlessness from AI Feedback (primary paper, coins the term RLAIF)", author: "Bai et al., Anthropic", year: 2022, url: "https://arxiv.org/abs/2212.08073" }
+  - { grade: "A", title: "Synthetic Data chapter (Constitutional AI section) of the RLHF Book", author: "Nathan Lambert (rlhfbook.com)", year: 2024, url: "https://rlhfbook.com/c/13-cai" }
   - { grade: "A", title: "Inference-Time Reward Hacking in Large Language Models", author: "NeurIPS 2025 poster", year: 2025, url: "https://neurips.cc/virtual/2025/poster/116653" }
-  - { grade: "B", title: "RLHF Book (post-training taxonomy, sycophancy)", author: "Nathan Lambert (rlhfbook.com)", year: 2025, url: "https://rlhfbook.com/" }
+  - { grade: "B", title: "RLHF Book (post-training taxonomy)", author: "Nathan Lambert (rlhfbook.com)", year: 2025, url: "https://rlhfbook.com/" }
   - { grade: "B", title: "Direct Preference Optimization (DPO)", author: "Rafailov et al.; summary by Cameron Wolfe", year: 2023, url: "https://cameronrwolfe.substack.com/p/direct-preference-optimization" }
-  - { grade: "B", title: "RL Posttraining for Tool-Using Agents: GRPO, Async RL, and Reward Design in 2026", author: "Zylos Research", year: 2026, url: "https://zylos.ai/en/research/2026-04-10-rl-posttraining-tool-using-agents-grpo-async-rl/" }
-  - { grade: "C", title: "Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?", author: "Gekhman et al., EMNLP", year: 2024, url: "https://arxiv.org/abs/2405.05904" }
+  - { grade: "C", title: "RL Posttraining for Tool-Using Agents: GRPO, Async RL, and Reward Design in 2026", author: "Zylos Research (vendor blog)", year: 2026, url: "https://zylos.ai/en/research/2026-04-10-rl-posttraining-tool-using-agents-grpo-async-rl/" }
+  - { grade: "C", title: "Does Fine-Tuning LLMs on New Knowledge Encourage Hallucinations?", author: "Gekhman et al., EMNLP 2024", year: 2024, url: "https://arxiv.org/abs/2405.05904" }
   - { grade: "D", title: "Author synthesis: 'Agent = Model + Harness', layer separation, Goodhart-on-judges", author: "valdemird.com", year: 2026 }
 ---
 
@@ -116,7 +117,7 @@ The other half of the "demystify the RL" story is **GRPO**. The bottleneck of RL
 GRPO has real pathologies: **entropy collapse** (the policy goes deterministic and stops exploring), **advantage collapse** (when every sample in the group has the same reward, the advantage is zero and there's no gradient), and **KL drift** (the policy wanders too far from the reference model). The variants exist precisely to manage these.
 </Callout>
 
-Constitutional AI / RLAIF rounds out the layer-2 picture. Anthropic generates preference data by having the model critique and revise its own responses against a constitution (principles in natural language), then a model labels which response is better according to a randomly chosen principle. CAI (Bai et al. 2022) was the first documented large-scale instance of RL from AI feedback. One precision: it didn't *define* "RLAIF." Google formalized that term in 2023; CAI was the first instance of the technique [D]. For an agent engineer this has a concrete, constant consequence: **the safety hard-rails of Claude you rely on come from here.** A company persona concatenated into your system prompt *cannot* override those trained limits. They're etched in the weights, not the context.
+Constitutional AI / RLAIF rounds out the layer-2 picture. Anthropic generates preference data by having the model critique and revise its own responses against a constitution (principles in natural language), then a model labels which response is better according to a randomly chosen principle. CAI (Bai et al. 2022) was the first documented large-scale instance of RL from AI feedback. One precision: this same paper is also where the term "RLAIF" was coined — it states it verbatim in its abstract. Google's 2023 paper (Lee et al.) didn't formalize the term; it popularized and scaled RLAIF, showing it matches RLHF on broader tasks while citing Constitutional AI as the term's origin [D]. For an agent engineer this has a concrete, constant consequence: **the safety hard-rails of Claude you rely on come from here.** A company persona concatenated into your system prompt *cannot* override those trained limits. They're etched in the weights, not the context.
 
 ## Sycophancy and inherited biases from post-training
 
