@@ -19,6 +19,16 @@ When adding a new blog post, ensure ALL of the following:
 - Verify `og:type="article"` is applied (handled automatically via `BlogPost.astro` → `BaseHead type="article"`)
 - Run `npm run build` to confirm both posts compile and hreflang links are correct
 
+## Learn Track (agentic-systems course)
+
+The `/learn/agentic-systems/` modules (`src/content/learn/*.mdx`, ES in `src/content/learn/es/`) follow an **easy→deep ramp**: a beginner starts gently and can drill as deep as they want without the prose losing rigor or references. Authoring rules:
+
+- **Plain-language first, formal name second.** No hard term, symbol, or notation may appear cold in a title, `summary`, opening sentence, or headline `Callout`. Open with an intuition or analogy and the one plain claim; introduce the formalism only after, as a "here's what experts call this" turn.
+- **`summary` frontmatter (Layer 0).** Every module gets a `summary: string[]` of 1–3 jargon-free sentences. It renders above the body via `<TLDR>` (wired in `LearnModule.astro`). It is distinct from `tldr`, which feeds the end-of-module `LearnRecall` check — keep both.
+- **Gloss hard terms at first use with `<Term name="...">`.** The master glossary lives in `src/lib/learn-glossary.ts` (inline tooltip + glossary page); `<Term>` fails open (renders plain text) if the headword is missing. Decode notation in prose (e.g. read `π(a|o,h)` as "the next action *given* what it's seen").
+- **Deep-dives go in `<Collapsible>`.** Proofs, derivations (εT², `p^t` caveats), research-camp disputes, and edge cases are demoted behind a labeled control — never deleted. Demotion ≠ deletion: the precise notation and its citation stay reachable in one click.
+- Apply every change to **both** EN and ES (paired filenames); write the ES natively with `/blog-writer`, don't machine-translate. Run `npm run build` (validates `astro check` + hreflang reciprocity).
+
 ## Commands
 
 - **Dev server**: `npm run dev` (localhost:4321)

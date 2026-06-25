@@ -5,8 +5,12 @@ phase: 3
 order: 5
 tier: core
 durability: atemporal
-updatedDate: 2026-06-19
+updatedDate: 2026-06-23
 lang: en
+summary:
+  - "An agent is just a model wrapped in ordinary code (the 'harness'). The model decides one move; the harness runs it, remembers things, and decides when to stop."
+  - "Most agents that die in production die in that wrapper code, not in the model."
+  - "The model keeps no memory between turns, so the harness holds all of it, and every loop only earns its place by checking the model's move against something real."
 tldr:
   - "Agent = Model + Harness. The distance between a demo and a production system is mostly harness gap, not model gap."
   - "Own your control flow: the outer loop lives in deterministic code; the model only decides which tool to call inside a turn. Treat the model as a stateless reducer with all durable state held outside it."
@@ -28,6 +32,7 @@ import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import Tabs from '../../components/blog/Tabs.astro';
 import TabPanel from '../../components/blog/TabPanel.astro';
+import Term from '../../components/learn/Term.astro';
 
 Most agents that die in production don't die because the model is bad. They die because the code wrapping the model (the harness) doesn't know when to stop, repeats the same error twenty times, duplicates a write after a retry, or asks the model to grade its own work. This module trains the eye for that boundary. The diagnostic that separates the people who ship from the people who demo is one question: *did the model fail, or did the harness fail?*
 
@@ -35,11 +40,11 @@ Most agents that die in production don't die because the model is bad. They die 
 An agent is **Model + Harness**. The harness is all the code, config, and execution logic that isn't the model. The gap between an impressive demo and a system that survives production is almost entirely harness gap. A decent model with a great harness beats a great model with a bad harness. That's a heuristic, not a measurement, but it's the right thing to bet on.
 </Callout>
 
-This isn't a fringe framing. Anthropic's "Building Effective Agents" describes agents as LLMs using tools in a loop, and spends most of its advice on the loop, not the model. The `think → act → observe` cycle that ReAct popularized is not the architecture. It's the iteration mechanism. What actually decides whether your agent works is two things: every step has to inject **ground truth** from the environment (a real tool result, not a self-assessment), and the **control flow has to live somewhere you own**.
+This isn't a fringe framing. Anthropic's "Building Effective Agents" describes agents as LLMs using tools in a loop, and spends most of its advice on the loop, not the model. The `think → act → observe` cycle (the technique that named this loop is <Term name="ReAct (think-act-observe)">ReAct</Term>) is not the architecture. It's the iteration mechanism. What actually decides whether your agent works is two things: every step has to inject <Term name="Ground truth">**ground truth**</Term> from the environment (a real tool result, not a self-assessment), and the **control flow has to live somewhere you own**.
 
 ## The model is a stateless reducer
 
-Treat the model as a nearly pure function: `(state, observation) → think + tool_call`. It holds no durable state of its own. The harness is the state machine that wraps it: invokes it, executes its tool calls, persists state outside it, and decides when to cut.
+Each turn, the model takes the current state plus the latest observation and produces a thought and a tool call. It holds no memory between turns, so you have to hold the memory for it. Said formally, the model is a <Term name="Stateless reducer">stateless reducer</Term>: a nearly pure function `(state, observation) → think + tool_call` (read it as "give me where we are and what just happened, and I'll give you the next move"). The harness is the state machine that wraps it: invokes it, executes its tool calls, persists state outside it, and decides when to cut.
 
 HumanLayer's "12-Factor Agents" names two distinct ideas here, and they get conflated constantly. **Factor 12, "Make your agent a stateless reducer,"** is the shape of the model: a pure reduction from state to next action. **Factor 8, "Own your control flow,"** is a separate factor about *who drives the loop*: you write the outer loop, you keep the kill-switch. Same spirit, two claims. Don't merge them.
 
@@ -88,7 +93,7 @@ A pattern worth stealing: keep the synchronous edge dumb. The HTTP edge that rec
 
 ## Ground truth beats self-reflection
 
-There's a seductive cult around self-correction: the idea that the model can review its own reasoning and improve it. Reflexion popularized this as verbal episodic memory of past failures. The evidence is blunter than the hype. Huang et al. (DeepMind, ICLR 2024) found that LLMs do not reliably self-correct reasoning without an external signal, and that intrinsic self-correction can *degrade* output, because the evaluator shares the generator's blind spots.
+There's a seductive cult around self-correction: the idea that the model can review its own reasoning and improve it. <Term name="Reflexion">Reflexion</Term> popularized this as the model keeping verbal notes on its own past failures. The evidence is blunter than the hype. Huang et al. (DeepMind, ICLR 2024) found that LLMs do not reliably self-correct reasoning without an external signal, and that intrinsic self-correction can *degrade* output, because the evaluator shares the generator's blind spots.
 
 <Callout type="important" title="The golden rule of the loop">
 An iteration only adds value if it injects **observable ground truth**: the real result of a tool, a test that passes or fails, a concrete error. Reflexion is useful, but only with a trustworthy external verifier (a compiler, a test, a grader). Never as pure self-judgment.
@@ -139,10 +144,10 @@ For stochastic multi-turn systems, one green run means almost nothing. τ-bench 
 
 ## Human-in-the-loop is just another tool call
 
-Contacting a human is not a special case bolted onto the side of the loop. It's another tool that pauses the reducer and waits for input. This unifies approvals, clarifications, and escalation under one mechanism. A common shape: reads auto-execute, writes get intercepted and surface a Confirm/Decline prompt. One elite detail worth copying: before showing the confirmation, validate and persist the *normalized* input, and have the gate return a denial so the model stops. When the human confirms, you execute that exact persisted input. That closes a semantic TOCTOU gap where the model could "change its mind" between the prompt and the tap. What was confirmed equals what runs.
+Contacting a human is not a special case bolted onto the side of the loop. It's another tool that pauses the reducer and waits for input. This unifies approvals, clarifications, and escalation under one mechanism. A common shape: reads auto-execute, writes get intercepted and surface a Confirm/Decline prompt. One elite detail worth copying: before showing the confirmation, validate and persist the *normalized* input, and have the gate return a denial so the model stops. When the human confirms, you execute that exact persisted input. That closes a semantic <Term name="TOCTOU (time-of-check to time-of-use)">TOCTOU</Term> gap (time-of-check to time-of-use: the gap where what was approved drifts from what actually runs) where the model could "change its mind" between the prompt and the tap. What was confirmed equals what runs.
 
 ## Idempotency: the failure nobody talks about
 
-Agents have many failure points (orchestration, a probabilistic model, external tool calls, HITL pauses) that ordinary retries don't handle. The write that crashes halfway is the classic one. If a worker dies mid-write and the queue retries the job, without an idempotency key per confirmed action the retry duplicates the effect: two records where there should be one. Locks and session logs reduce the blast radius but don't guarantee this. Attach an idempotency key to every tool call with an external effect and you make the retry safe.
+Agents have many failure points (orchestration, a probabilistic model, external tool calls, HITL pauses) that ordinary retries don't handle. The write that crashes halfway is the classic one. If a worker dies mid-write and the queue retries the job, without an <Term name="Idempotency">idempotency</Term> key per confirmed action the retry duplicates the effect: two records where there should be one. Locks and session logs reduce the blast radius but don't guarantee this. Attach an idempotency key to every tool call with an external effect and you make the retry safe.
 
 The thread through all of it is the same. Keep the model on its one line, doing the one thing it's good at: deciding the next action given the state. Push everything else, the boring durable software, into a harness you can read, test, and stop. The reliability you ship is mostly the quality of that boundary, and there's no clean point at which it's finished. Every production incident is one more rule the harness should have had.

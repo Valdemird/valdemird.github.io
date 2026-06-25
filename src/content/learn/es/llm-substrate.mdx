@@ -5,8 +5,12 @@ phase: 1
 order: 1
 tier: fundamento
 durability: atemporal
-updatedDate: 2026-06-19
+updatedDate: 2026-06-23
 lang: es
+summary:
+  - "Un LLM adivina la siguiente palabra, no recuerda nada por su cuenta y solo puede mirar una cantidad limitada de texto a la vez."
+  - "Esos tres hechos llanos tienen nombre propio (estocástico, stateless, ventana finita) y casi todo lo que construyes alrededor del modelo está ahí para compensar uno de ellos."
+  - "No necesitas la matemática de adentro. Necesitas reconocer cuál de los tres te está mordiendo cuando el agente se porta mal."
 tldr:
   - "Para fines de ingeniería, un LLM se reduce a tres hechos: es estocástico, es stateless y corre sobre una ventana finita."
   - "Casi toda decisión de diseño de un agente (memoria, evals, presupuesto de contexto) es un parche para una de esas tres."
@@ -27,13 +31,15 @@ import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Term from '../../../components/learn/Term.astro';
 
-Antes de escribir una línea de tu harness, tienes que saber qué es realmente el motor. No es "un asistente con memoria". No es "una máquina de razonar". Un LLM es una función estocástica y stateless que predice el siguiente token sobre una <Term name="Context window" lang="es">ventana de contexto finita</Term>. Nada más. Casi todo lo que vas a construir como ingeniero de agentes (sesiones, memoria, human-in-the-loop, evals, presupuestos de tokens) existe para compensar esas tres propiedades. Las internalizas y dejas de pelear contra el modelo: empiezas a diseñar el andamiaje correcto a su alrededor.
+Antes de escribir una línea de tu harness, tienes que saber qué es realmente el motor. Quítale el marketing y un LLM hace tres cosas llanas, y solo tres. **Adivina la siguiente palabra, no recuerda nada por su cuenta y solo puede mirar una cantidad limitada de texto a la vez.** No es "un asistente con memoria". No es "una máquina de razonar". Mete esos tres hechos en los huesos y dejas de pelear contra el modelo: empiezas a diseñar el andamiaje correcto a su alrededor.
+
+Cada hecho llano tiene un nombre propio que vas a encontrarte por todas partes. Adivinar la siguiente palabra es ser <Term name="Stochastic" lang="es">estocástico</Term> (la salida se *muestrea* de una distribución de probabilidad, así que la misma entrada puede dar respuestas distintas). No recordar nada es ser <Term name="Stateless" lang="es">stateless</Term> (no retiene nada entre llamadas a la API). Y la vista limitada es una <Term name="Context window" lang="es">ventana de contexto finita</Term>. Casi todo lo que vas a construir como ingeniero de agentes (sesiones, memoria, human-in-the-loop, evals, presupuestos de tokens) existe para compensar una de esas tres.
 
 <Callout type="important" title="El único modelo mental">
-Reduce el LLM a tres hechos y el resto del campo se deriva de ellos. Es **estocástico** (la salida se muestrea de una distribución de probabilidad). Es **stateless** (no recuerda nada entre llamadas). Corre sobre una **ventana finita** cuya atención cuesta O(n²) y cuyo recall se degrada antes incluso de llenarse.
+Reduce el LLM a tres hechos y el resto del campo se deriva de ellos. Es **estocástico** (la salida se muestrea de una distribución de probabilidad). Es **stateless** (no recuerda nada entre llamadas). Corre sobre una **ventana finita**: a grandes rasgos, doblar el texto cuadruplica el coste de leerlo, y el recall del modelo empieza a resbalar antes de que la ventana siquiera se llene.
 </Callout>
 
-No necesitas implementar atención, gradientes ni un tokenizador para enviar un buen agente. Lo que decide si tu agente sobrevive a producción es tener un modelo causal de *por qué falla el modelo* (cuantización de dígitos por BPE, recencia, sampling, refusals) para diseñar el harness que lo absorbe.
+No necesitas implementar atención, gradientes ni un tokenizador para enviar un buen agente. Lo que decide si tu agente sobrevive a producción es tener un modelo causal de *por qué falla el modelo* (<Term name="Digit quantization" lang="es">cuantización de dígitos</Term> por BPE, recencia, sampling, refusals) para diseñar el harness que lo absorbe.
 
 ## Tres propiedades, y lo que fuerza cada una
 
@@ -88,7 +94,7 @@ Si el modelo generaliza por copia de patrón, dos antipatrones se vuelven obvios
 
 ## El tool-use se entrena, no se prompea
 
-Que un modelo decida cuándo llamar una herramienta, encadene varias y sepa detenerse no es magia del prompt. Es comportamiento moldeado por post-entrenamiento multiturno: SFT sobre trayectorias más RL con recompensa al final de la trayectoria. La receta de referencia hoy es GRPO con recompensas verificables (RLVR).
+Que un modelo decida cuándo llamar una herramienta, encadene varias y sepa detenerse no es magia del prompt. Es un comportamiento que al modelo le *enseñaron* a base de ensayo y error: primero le mostraron buenos ejemplos (<Term name="SFT (Supervised Fine-Tuning)" lang="es">SFT</Term> sobre trayectorias) y luego lo premiaron cuando sus respuestas de verdad cuadraban (RL con recompensa al final de la trayectoria). La receta de referencia hoy es <Term name="GRPO (Group Relative Policy Optimization)" lang="es">GRPO</Term> con recompensas verificables (<Term name="RLVR (RL from Verifiable Rewards)" lang="es">RLVR</Term>).
 
 <Callout type="warning" title="Cuenta bien lo de DeepSeek-R1">
 Es DeepSeek-R1-**Zero** el que demuestra que el RL puro (GRPO) sobre el modelo base induce razonamiento *sin SFT previo*. El modelo DeepSeek-R1 que se publicó **sí** usa SFT: añade un cold-start de SFT antes del RL precisamente para arreglar legibilidad y estabilidad. La receta es "GRPO + recompensas verificables". Lo que no debes afirmar es que R1 prescinde de SFT.
@@ -96,11 +102,13 @@ Es DeepSeek-R1-**Zero** el que demuestra que el RL puro (GRPO) sobre el modelo b
 
 De aquí salen dos consecuencias prácticas. Primero, el modelo arrastra priors fuertes sobre cómo lucen las herramientas bien diseñadas (esquemas claros, nombres descriptivos, descripciones prescriptivas), porque es contra eso que se entrenó. Segundo, la frontera de fiabilidad del agente es la distribución de tareas sobre la que se entrenó, y por eso evalúas por trayectoria, no solo por la respuesta final.
 
-Hay un debate vivo que conviene señalar: si el RL solo afila capacidades que ya están en la distribución del modelo base, o si añade algunas genuinamente nuevas. Un bando (Yue et al., "Limit of RLVR") encuentra que los modelos base igualan a los afinados con RL para pass@k grande, lo que sugiere que el RL solo muestrea soluciones existentes con más eficiencia. Otro (ProRL) reporta que el RL prolongado descubre estrategias que el modelo base nunca alcanza. Trátalo como abierto, no como cerrado.
+<Collapsible title="Pregunta abierta: ¿el RL añade habilidades nuevas o solo afila las viejas?">
+Un debate vivo que conviene señalar: si el RL solo afila capacidades que ya están en la distribución del modelo base, o si añade algunas genuinamente nuevas. Un bando (Yue et al., "Limit of RLVR") encuentra que los modelos base igualan a los afinados con RL para <Term name="pass@k vs pass^k" lang="es">pass@k</Term> grande, lo que sugiere que el RL solo muestrea soluciones existentes con más eficiencia. Otro (ProRL) reporta que el RL prolongado descubre estrategias que el modelo base nunca alcanza. Trátalo como abierto, no como cerrado.
+</Collapsible>
 
 ## El BPE decide qué ve el modelo, y dónde se rompe
 
-El modelo no ve caracteres ni números. Ve tokens BPE. Eso causa fallos sistemáticos y predecibles. La aritmética se rompe porque los dígitos se agrupan en tokens de forma arbitraria. El conteo de caracteres se rompe por lo mismo. Y la estructura (JSON, tool-args) cuesta tokens reales de formato.
+El modelo no ve caracteres ni números. Ve <Term name="Token / BPE (Byte-Pair Encoding)" lang="es">tokens BPE</Term>. Eso causa fallos sistemáticos y predecibles. La aritmética se rompe porque los dígitos se agrupan en tokens de forma arbitraria. El conteo de caracteres se rompe por lo mismo. Y la estructura (JSON, tool-args) cuesta tokens reales de formato.
 
 <Callout type="tip" title="Regla de oro operativa">
 Nunca confíes en el modelo para cálculo exacto, conteo o manipulación fina de strings. Delégalo a una herramienta. Esta es la razón mecánica (no una preferencia de estilo) de por qué "usa una calculadora" no es opcional.
