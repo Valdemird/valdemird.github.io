@@ -17,7 +17,7 @@ import Timeline from '../../../components/blog/Timeline.astro';
 
 He visto a desarrolladores pasar meses con cursos, tutoriales y documentación, y seguir sin sentirse listos para construir algo real. También he visto a desarrolladores con la mitad del "tiempo de estudio" lanzar apps a producción que realmente funcionan. La diferencia no es talento. Es método.
 
-**Los que construyen aprenden más rápido que los que estudian.** No porque construir sea más difícil, sino porque fuerza una relación fundamentalmente diferente con el conocimiento.
+**Los que construyen aprenden más rápido que los que estudian.** Construir fuerza una relación distinta con el conocimiento: tomas las decisiones en vez de mirar cómo las toma otro.
 
 ## La trampa del tutorial
 
@@ -52,7 +52,7 @@ Los tutoriales te enseñan qué funciona. Construir te enseña qué falla y dón
 
 ## La investigación es clara: activo le gana a pasivo
 
-Esto no es solo intuición. Hay ciencia rigurosa detrás. Un [metaanálisis de 225 estudios publicado en PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) por Freeman et al. encontró que los estudiantes en entornos de aprendizaje activo obtuvieron un 6% más en exámenes y fueron **1.5x menos propensos a reprobar** en comparación con las clases pasivas tradicionales.
+Hay ciencia rigurosa detrás de esto. Un [metaanálisis de 225 estudios publicado en PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) por Freeman et al. encontró que los estudiantes en entornos de aprendizaje activo obtuvieron un 6% más en exámenes y fueron **1.5x menos propensos a reprobar** en comparación con las clases pasivas tradicionales.
 
 <StatGrid columns={3} stats={[
   { value: "1.5×", label: "menos probabilidad de reprobar", context: "activo vs pasivo — Freeman et al., 225 estudios" },
@@ -70,14 +70,11 @@ Construir algo → escribir sobre ello → enseñárselo a alguien → construir
 
 ## Por qué los side projects aceleran tu carrera
 
-Los side projects no son solo para aprender. Crean un **portafolio visible de buen criterio** — prueba de que sabes tomar decisiones, no solo seguir instrucciones.
+Los side projects hacen más que enseñarte. Crean un **portafolio visible de buen criterio**: prueba de que sabes tomar decisiones, no solo seguir instrucciones.
 
 <MermaidDiagram title="El flywheel del maker" chart="graph TD\n    A[Construir algo] --> B[Encontrar problemas reales]\n    B --> C[Resolverlos]\n    C --> D[Ganar conocimiento profundo]\n    D --> E[Compartir lo aprendido]\n    E --> F[Atraer oportunidades]\n    F --> A" />
 
-Cuando publicas un proyecto, demuestras:
-- **Decisiones de arquitectura**: escogiste una base de datos, un framework, una estrategia de deploy
-- **Pensamiento de trade-offs**: sopesaste opciones y escogiste una (esta es la habilidad más valiosa en ingeniería senior)
-- **Capacidad de terminar**: la mayoría de desarrolladores empiezan proyectos; pocos los terminan
+Cuando publicas un proyecto, muestras lo que una lista de tecnologías no puede. Escogiste una base de datos, un framework, una forma de desplegar — y te hiciste cargo de esas decisiones. Sopesaste trade-offs reales y te comprometiste con uno, que es buena parte de lo que de verdad es la ingeniería senior. Y terminaste, algo que la mayoría de desarrolladores nunca hace.
 
 <Collapsible title="Lo que los hiring managers realmente buscan">
 
@@ -93,13 +90,13 @@ Un proyecto lanzado con decisiones reales le gana a un CV con tecnologías lista
 
 Hay un efecto compuesto que la mayoría no ve. Cuando construyes y compartes públicamente:
 
-1. **Aprendes la cosa** (al construirla)
-2. **Solidificas el conocimiento** (al escribir sobre ella)
-3. **Recibes feedback** (de personas que leen tu post)
-4. **Descubres huecos** (preguntas que aún no puedes responder)
-5. **Llenas esos huecos en el siguiente proyecto** (el ciclo se repite)
+1. Aprendes la cosa al construirla.
+2. La solidificas al escribir sobre ella.
+3. Quienes leen tu post te dan feedback.
+4. Sus preguntas exponen huecos que aún no puedes responder.
+5. Llenas esos huecos en el siguiente proyecto, y el ciclo se repite.
 
-Cada proyecto hace mejor al siguiente. No solo técnicamente. Tu capacidad de *pensar sobre problemas* mejora. Desarrollas intuición que ningún tutorial puede enseñar.
+Cada proyecto hace mejor al siguiente, técnicamente y en cómo *piensas sobre los problemas*. Desarrollas una intuición que ningún tutorial puede enseñar.
 
 <Callout type="note" title="No tiene que ser original">
 No necesitas inventar un nuevo framework. Construye una app de tareas, pero hazla *tuya*. Escoge el tech stack, diseña la UI, toma las decisiones difíciles. Una idea familiar bien ejecutada enseña más que una idea ambiciosa abandonada.
@@ -107,15 +104,15 @@ No necesitas inventar un nuevo framework. Construye una app de tareas, pero hazl
 
 ## Cómo empezar
 
-La barrera más grande no es la habilidad — es el perfeccionismo. El antídoto:
+El perfeccionismo frena más proyectos que la falta de habilidad. El antídoto:
 
-1. **Escoge un problema que realmente tengas.** No construyas un "proyecto de práctica". Construye [algo que vayas a usar](/blog/es/game-feel-on-the-web/). La motivación para terminar es 10x mayor cuando eres tu propio usuario.
+1. Escoge un problema que realmente tengas. No un "proyecto de práctica" — [algo que vayas a usar](/blog/es/game-feel-on-the-web/). La motivación para terminar es 10x mayor cuando eres tu propio usuario.
 
-2. **Restringe el scope sin piedad.** La primera versión debería tomar un fin de semana, no un mes. Lanza el MVP vergonzoso. Siempre puedes iterar.
+2. Mantén la primera versión en un fin de semana, no un mes. Lanza el MVP vergonzoso; siempre puedes iterar.
 
-3. **Escribe una cosa sobre ello.** Un blog post, un hilo de tweets, un README con explicaciones de decisiones reales. Enseñar es el multiplicador.
+3. Escribe una cosa sobre ello — un post, un hilo, un README con las decisiones reales. Enseñar es el multiplicador.
 
-4. **Ponlo en línea.** Despliégalo en algún lugar real. Un proyecto en localhost es un borrador. Un proyecto con URL es un producto.
+4. Ponlo en línea, en algún lugar real.
 
 <Timeline items={[
   { date: "Fin de semana 1", title: "Construye la feature core. Hazle deploy.", body: "Un proyecto en localhost es un borrador; una URL lo vuelve real." },
@@ -132,7 +129,7 @@ No puedes llegar a ese conocimiento leyendo. Solo puedes construirlo. Michael Po
 
 > "Lo que no puedo crear, no lo entiendo." — Richard Feynman (escrito en su pizarra al momento de su muerte, 1988)
 
-Deja de prepararte. Empieza a construir. El aprendizaje sigue.
+Así que escoge eso que llevas tiempo queriendo estudiar y construye una versión mala este fin de semana. Vas a aprender más de sus bugs que del curso que nunca terminas.
 
 ---
 

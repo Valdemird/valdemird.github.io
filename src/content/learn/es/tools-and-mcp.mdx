@@ -38,7 +38,7 @@ Una tool no es un endpoint que le pasaste al modelo. Es una interfaz de usuario 
 El conjunto de tools que expones es el **espacio de acciones del POMDP del agente**. El modelo solo puede actuar a través de lo que definiste, y elige entre ellas razonando sobre los nombres, esquemas y descripciones que escribiste. Así que esas cadenas no son documentación: son la superficie de la política. Mal esquema, mala política. No hay otro lugar aparte donde viva "la lógica de verdad".
 </Callout>
 
-## Consolida por workflow, no por endpoint
+## Consolida por workflow
 
 La pregunta de granularidad tiene una respuesta limpia: la unidad correcta es un workflow que el agente completa, no un endpoint que tu API cubre. La guía de Anthropic es explícita en colapsar `list_users` + `list_events` + `create_event` en un único `schedule_event`. El agente tenía que hacer tres llamadas correctas, sostener dos resultados intermedios en contexto y no perder el hilo entre ellas. Ahora hace una.
 

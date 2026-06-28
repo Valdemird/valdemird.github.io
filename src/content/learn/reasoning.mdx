@@ -54,7 +54,7 @@ Instead of pouring all compute into pretraining, you spend some at inference gen
 It's a repeated myth that R1 needed "10-100× more tokens" than o1. There's no public evidence for that. Both sit in the **same order of magnitude**: tens of thousands of reasoning tokens, capped around 32K of generation. R1 is notably verbose, but the dramatic ratio isn't documented.
 </Callout>
 
-The operational consequence: there's an accuracy-vs-tokens curve with an elbow. Below the elbow you get *underthinking* (the model gives up early). Above it, *overthinking*: it burns tokens without gaining accuracy, and can even degrade. More thinking is not monotonically better. That's why the elite practice is to measure the curve per task type, not to flip on max effort "just in case."
+The operational consequence: there's an accuracy-vs-tokens curve with an elbow. Below the elbow you get *underthinking* (the model gives up early). Above it, *overthinking*: it burns tokens without gaining accuracy, and can even degrade. More thinking is not monotonically better. That's why the disciplined practice is to measure the curve per task type, not to flip on max effort "just in case."
 
 <MermaidDiagram title="Accuracy vs thinking budget: underthink, elbow, overthink" chart={`
 graph LR

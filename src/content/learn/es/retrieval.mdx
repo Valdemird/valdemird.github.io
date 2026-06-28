@@ -67,7 +67,7 @@ Los embeddings comprimen significado y pierden precisión en tokens raros. Un c�
 Los **embeddings densos** capturan paráfrasis y sinónimos ("agendar" ≈ "reservar"); difuminan `TS-999`, `cliente_8842`, nombres propios; buenos para FAQ semántica. **BM25 / grep** hacen match exacto de identificadores, códigos y símbolos; sin staleness; baratos y auditables; sufren con sinónimos puros. En código e IDs el léxico domina. La late-interaction multi-vector (ColBERTv2) es el punto medio frontier cuando sí mantienes índice.
 </Callout>
 
-## El umbral de ~200k tokens es la primera pregunta, no la última
+## Empieza por el umbral de ~200k tokens
 
 Anthropic lo recomienda explícitamente: si el corpus cabe bajo ~200k tokens (~500 páginas), no construyas RAG. Mételo todo en el prompt con prompt caching. RAG solo gana cuando el corpus excede la ventana. Montar un pipeline de embeddings para 50 documentos es over-engineering caro de mantener. El prompt caching es lo que hace viable la estrategia "todo en contexto": amortiza el corpus repetido y baja el preproceso de Contextual Retrieval a $1.02/M tokens. Esta es tu primera pregunta de diseño, y su frontera crece con las ventanas de 1M+.
 
@@ -75,7 +75,7 @@ Anthropic lo recomienda explícitamente: si el corpus cabe bajo ~200k tokens (~5
 El encuadre de context engineering de Anthropic: no vuelques todo de antemano. Mantén identificadores ligeros (paths, queries) y carga datos bajo demanda con herramientas. La búsqueda agéntica es el just-in-time retrieval llevado a su conclusión. El corpus es el filesystem, el cargador es grep/read.
 </Callout>
 
-## Contextual Retrieval: el chunk perdió su contexto, no el embedding
+## Contextual Retrieval: el chunk perdió su contexto
 
 Trocear rompe correferencias. Un chunk que dice "el margen creció 3%" no sabe de qué empresa ni de qué trimestre. La técnica de Anthropic antepone a cada chunk un contexto generado por LLM que lo sitúa en el documento, antes de embeber e indexar con BM25. Reduce el fallo de recuperación top-20 un **49%** (de 5.7% a 2.9%), y un **67%** (a 1.9%) si además le sumas rerank. La lección estructural: el problema nunca fue el modelo de embeddings, fue que el chunk perdió su contexto. La búsqueda agéntica lo evita de raíz leyendo el documento entero a demanda. Y el truco funciona también fuera de embeddings. Persistir un resumen-contexto por documento ayuda a un agente a decidir qué leer.
 

@@ -1,5 +1,5 @@
 ---
-title: "AI Gave Me Speed. Tests Gave Me Control."
+title: "AI gave me speed. Tests gave me control."
 description: "I ran /insights after a month with Claude Code in a side project. The numbers I expected weren't the interesting ones. Here's what was."
 pubDate: 2026-04-27
 reviewedDate: 2026-05-14
@@ -36,7 +36,7 @@ This post is what `/insights` showed me and the one shift I made because of it.
 The bottleneck wasn't AI. It was me, trusting AI without a feedback loop. Tests are the cheapest way to buy that loop back.
 </Callout>
 
-## What `/insights` Showed
+## What `/insights` showed
 
 The flattering parts were the ones I already knew:
 
@@ -56,7 +56,7 @@ Mid-session, I asked for a stash to pause work on a half-broken branch. The pop 
 
 This is the part of working with AI that nobody posts on Twitter. The hero shots are real. What surrounds them looks a lot like normal engineering. You're confused for a while, then it clicks.
 
-## The Pattern I Actually Found
+## The pattern I actually found
 
 The interesting failure mode wasn't "AI got it wrong." It was subtler. AI reached for a fix before it had a diagnosis.
 
@@ -98,7 +98,7 @@ This isn't a bad habit you can prompt away. The model predicts tokens that stati
 If your AI fix changes a property on the broken element and the bug doesn't move, stop. The constraint is upstream. Make it walk the parent chain before touching another property.
 </Callout>
 
-## The Seatbelt: Tests
+## The seatbelt: tests
 
 Here's what changed my relationship with AI in the side project: I leaned hard on tests, and I stopped feeling anxious about how much I was delegating.
 
@@ -217,7 +217,7 @@ The diagram I now keep in my head:
 
 Without the loop, you're asking your gut whether AI got it right. On a one-line tweak, sure, your eyes catch it. On a multi-file refactor, your gut didn't read the full diff.
 
-## Spec First, Code Second
+## Spec first, code second
 
 The other thing `/insights` made obvious: features I started with a written spec ended cleaner than features I improvised in chat.
 
@@ -237,7 +237,7 @@ Here's what one of my specs looks like, kept short on purpose. This one was for 
 
 One screen of bullets. The model stops guessing and starts executing.
 
-## What I'm Not Going to Tell You
+## What I'm not going to tell you
 
 I'm not going to tell you AI makes you a better engineer. I don't know if it does. The data I have is on me, in one project, over one month.
 

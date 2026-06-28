@@ -132,7 +132,7 @@ Multi-agent            → only now, and write down why you went up a level.
 
 ## Verification and termination are first-class
 
-A whole MAST category (~21%) is that nobody verifies the output and nobody knows when to stop. Multi-agent makes it worse: the synthesizer tends to trust sub-agents without re-checking. The evaluator-optimizer pattern (one LLM generates, another scores against criteria and returns feedback in a loop until a threshold) and code-based graders exist precisely to close this gap. It's one of the most underrated and disproportionately high-impact investments in reliability.
+A whole MAST category (~21%) is that nobody verifies the output and nobody knows when to stop. Multi-agent makes it worse: the synthesizer tends to trust sub-agents without re-checking. The evaluator-optimizer pattern (one LLM generates, another scores against criteria and returns feedback in a loop until a threshold) and code-based graders exist precisely to close this gap. It's an underrated, high-impact investment in reliability.
 
 <Callout type="warning" title="Cap the loop">
 Evaluator-optimizer closes the verification gap, but it brings its own risk: infinite loops. Always set an explicit iteration limit (say, max 2). A grader that never converges is worse than no grader.

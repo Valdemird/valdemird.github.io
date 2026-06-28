@@ -40,8 +40,8 @@ Un agente que "piensa más" no es un agente que piensa mejor. Es un agente que g
 
 El razonamiento de un modelo son tokens intermedios que a veces condicionan la respuesta final y a veces la racionalizan después de haberla decidido. El salto de 2024 a 2025-2026 es que eso dejó de ser un truco de prompting (Chain-of-Thought) para convertirse en una capacidad entrenada con RL: o1/o3, DeepSeek-R1 y el extended/adaptive thinking de Claude. El modelo decide cuánto computar en inferencia.
 
-<Callout type="important" title="El único knob que importa">
-El knob más importante de un agente moderno no es el tamaño del modelo. Es **cuánto cómputo le dejas gastar por turno en inferencia**. Dentro de un rango, escalar test-time compute (más tokens de razonamiento) sustituye a escalar el pre-entrenamiento. Snell et al. mostraron que el escalado compute-óptimo en inferencia puede ganarle a un modelo varias veces más grande en ciertos problemas.
+<Callout type="important" title="La única palanca que importa">
+La palanca más importante de un agente moderno no es el tamaño del modelo. Es **cuánto cómputo le dejas gastar por turno en inferencia**. Dentro de un rango, escalar test-time compute (más tokens de razonamiento) sustituye a escalar el pre-entrenamiento. Snell et al. mostraron que el escalado compute-óptimo en inferencia puede ganarle a un modelo varias veces más grande en ciertos problemas.
 </Callout>
 
 La analogía que mantengo: piensa en el razonamiento visible como el **borrador** de un examinando, no como el **acta notarial** de su decisión. Un borrador a veces refleja el cálculo real y a veces es una justificación escrita *después* de que la mano ya marcó la casilla. Confiar en el borrador como prueba de cómo se llegó a la respuesta es justo el error que Anthropic documentó: inyectas una pista superficial en el prompt y el modelo a menudo la obedece sin *mencionarla*, e incluso construye una justificación alternativa plausible.
@@ -54,7 +54,7 @@ En vez de volcar todo el cómputo en pre-entrenamiento, gastas una parte en infe
 Es un mito repetido que R1 necesitó "10-100× más tokens" que o1. No hay evidencia pública de eso. Ambos están en el **mismo orden de magnitud**: decenas de miles de tokens de razonamiento, con un tope cercano a los 32K de generación. R1 es notablemente verboso, pero el ratio dramático no está documentado.
 </Callout>
 
-La consecuencia operativa: hay una curva precisión-vs-tokens con un codo. Por debajo del codo aparece el *underthinking* (el modelo se rinde pronto). Por encima, el *overthinking*: quema tokens sin ganar precisión, e incluso la degrada. Más thinking no es monótonamente mejor. Por eso la práctica de élite es medir la curva por tipo de tarea, no activar el effort máximo "por si acaso".
+La consecuencia operativa: hay una curva precisión-vs-tokens con un codo. Por debajo del codo aparece el *underthinking* (el modelo se rinde pronto). Por encima, el *overthinking*: quema tokens sin ganar precisión, e incluso la degrada. Más thinking no es monótonamente mejor. Por eso la práctica disciplinada es medir la curva por tipo de tarea, no activar el effort máximo "por si acaso".
 
 <MermaidDiagram title="Precisión vs presupuesto de thinking: underthink, codo, overthink" chart={`
 graph LR

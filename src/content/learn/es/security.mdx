@@ -62,7 +62,7 @@ La potencia de este marco es que te obliga a auditar agentes por capacidades, no
 
 Meta generalizó la trifecta de "exfiltración de datos" a "cualquier acción consecuente". El Agents Rule of Two dice que un agente autónomo, sin humano en el loop, puede tener como mucho dos de estas tres: procesa input no confiable, accede a datos sensibles, o puede cambiar estado / comunicar al exterior. Las tres juntas exigen un humano en el loop.
 
-La belleza es que convierte la "seguridad", algo abstracto, en un presupuesto de capacidades por sesión que enumeras y verificas como un invariante de diseño. Es la mejor guía práctica de diseño que existe hoy, en ausencia de defensas fiables.
+Lo que te da este marco es que convierte la "seguridad", algo abstracto, en un presupuesto de capacidades por sesión que enumeras y verificas como un invariante de diseño. Es la guía práctica de diseño más sólida que existe hoy, en ausencia de defensas fiables.
 
 <Callout type="note" title="Trifecta vs Rule of Two">
 La trifecta es el caso particular del Rule of Two donde la acción consecuente es específicamente *exfiltrar*. El Rule of Two es más general porque cubre también reagendar una cita, borrar un registro o enviar un mensaje. Mismo principio, mayor cobertura.
