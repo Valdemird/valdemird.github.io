@@ -142,7 +142,7 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 		beliefs: [
 			{ title: 'Spec-driven development', desc: 'Write the spec before the code. Let the LLM be your co-architect, not just your typist.', postSlug: 'custom-commands-ai-coding', linkLabel: 'I wrote about this →' },
 			{ title: 'Build in public', desc: 'Share what you learn. The best way to solidify knowledge is to teach it.', postSlug: 'building-to-learn', linkLabel: 'I wrote about this →' },
-			{ title: 'Beauty & function', desc: "Tools should be beautiful AND functional. Design is not decoration, it's communication.", postSlug: 'interactive-blog-components', linkLabel: 'I wrote about this →' },
+			{ title: 'Beauty & function', desc: "Tools should be beautiful and functional. Design is part of the message, not a coat of paint.", postSlug: 'interactive-blog-components', linkLabel: 'I wrote about this →' },
 		],
 		featuredCert: {
 			issuedDisplay: 'Anthropic Education · Issued June 5, 2026',
@@ -183,7 +183,7 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 			items: [
 				'Terminé la Ingeniería de Sistemas y el examen de Claude Certified Architect, ambos este año.',
 				'Construyendo todo.valdemird.com: planificación con IA, Pomodoro y drag-and-drop.',
-				'Explorando IA on-device en el navegador. Si tu Chrome lo soporta, el chat del botón de la esquina corre localmente en tu máquina.',
+				'Explorando IA on-device en el navegador. Si tu Chrome lo admite, el chat del botón de la esquina corre localmente en tu máquina.',
 				'Escribiendo sobre componentes interactivos y agentes de Claude corriendo en paralelo.',
 			],
 		},
@@ -218,7 +218,7 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 		beliefs: [
 			{ title: 'Desarrollo spec-driven', desc: 'Escribe el spec antes del código. Deja que el LLM sea tu coarquitecto, no solo tu mecanógrafo.', postSlug: 'custom-commands-ai-coding', linkLabel: 'Escribí sobre esto →' },
 			{ title: 'Construir en público', desc: 'Comparte lo que aprendes. La mejor forma de solidificar el conocimiento es enseñarlo.', postSlug: 'building-to-learn', linkLabel: 'Escribí sobre esto →' },
-			{ title: 'Belleza y función', desc: 'Las herramientas deben ser hermosas Y funcionales. El diseño no es decoración — es comunicación.', postSlug: 'interactive-blog-components', linkLabel: 'Escribí sobre esto →' },
+			{ title: 'Belleza y función', desc: 'Las herramientas deben ser bonitas y funcionales. El diseño es parte del mensaje, no una capa de pintura.', postSlug: 'interactive-blog-components', linkLabel: 'Escribí sobre esto →' },
 		],
 		featuredCert: {
 			issuedDisplay: 'Anthropic Education · Emitida el 5 de junio de 2026',

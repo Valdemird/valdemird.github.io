@@ -1,5 +1,5 @@
 ---
-title: "Shipping a High-Accuracy AI Agent: What to Prioritize, What to Ignore"
+title: "Shipping a high-accuracy AI agent: what to prioritize, what to ignore"
 description: "The gap between a 95% agent and a flaky demo is the harness, not the model. What actually raises an AI agent's hit rate, and the distractions to skip."
 pubDate: 2026-06-26
 tags: ["ai-agents", "llm", "production", "reliability", "engineering"]
@@ -142,13 +142,13 @@ One arrow. Semantic returns. The error tells the model how to fix itself.
 
 A tool that hands back 8K tokens didn't succeed, it poisoned the next several turns. Cap and paginate output, namespace large catalogs, and make every write idempotent. The full treatment is in [a tool is UX for an LLM](/learn/agentic-systems/tools-and-mcp/).
 
-## Spend context like an attention budget, not storage
+## Spend context like an attention budget
 
 A 1M-token window makes "just put it all in" look free. It isn't. Attention is roughly O(n²), and recall sags on a U-curve well before the nominal limit. Every irrelevant token both dilutes the signal the model is attending to *and* quadruples cost. More context is not more intelligence.
 
 Treat the window as the agent's belief state and curate it every turn. Keep lightweight identifiers in-window and pull the heavy data just-in-time through a tool. Evict stale tool outputs once you've distilled what mattered. Put the load-bearing facts at the very start and the very end, where recall is best. When the agent starts hallucinating, repeating actions, or losing the thread, those are belief-state pathologies. You fix them by eviction, not by enlarging the window and hoping. The [context-engineering module](/learn/agentic-systems/context-engineering/) names the failure modes so you can diagnose which one you're looking at.
 
-## The eval is your control loop, not a final exam
+## Your eval is the control loop
 
 Your hit rate is capped by your eval's fidelity, full stop. If the eval reads noise, you're driving blind no matter how fast you iterate. And the part that surprises people: the eval grader, the RL reward, and any self-improvement fitness are mathematically the same object. A grader the model can game is a grader that actively trains your agent to fool you.
 
@@ -191,13 +191,13 @@ Equally important is where *not* to spend the afternoon. Every row here is somet
     { key: "instead", label: "Do instead", align: "left" },
   ]}
   rows={[
-    { trap: "Reach for multi-agent “because it scales”", why: "~79% of failures are coordination, not model limits; fan-out burns ~15× the tokens for parallel compute, not better reasoning", instead: "Single linear agent + compaction. Fan out only read-only exploration; keep every write on one thread" },
+    { trap: "Reach for multi-agent 'because it scales'", why: "~79% of failures are coordination, not model limits; fan-out burns ~15× the tokens for parallel compute, not better reasoning", instead: "Single linear agent + compaction. Fan out only read-only exploration; keep every write on one thread" },
     { trap: "Trust chain-of-thought as an audit log", why: "Models act on hints they never verbalize and rationalize after the fact; the visible chain is often non-causal", instead: "Build evals, gates, and observability on the trajectory of tool calls (what it DID, not what it said)" },
     { trap: "Fine-tune first", why: "Teaches form over substance, ~1.5× inference premium, and training on new facts raises hallucination", instead: "Walk the ladder: prompt → few-shot → context/harness → RAG → fine-tune last. The harness is ~90% of ROI" },
     { trap: "Buy a bigger context window", why: "Recall sags on a U-curve before the limit; irrelevant tokens dilute attention even when it all fits", instead: "Minimize signal density, not fit. Measure your real effective window" },
     { trap: "Stand up a vector DB by default", why: "An embedding pipeline for 50 docs is a staleness and security liability for nothing", instead: "Corpus under ~200k tokens: load it in-context with caching. Lexical (BM25/grep) for identifiers and codes" },
     { trap: "Treat spotlighting as the security boundary", why: "Cuts injection ~50%→<2% but an adaptive attacker erases the residual", instead: "Put the privilege boundary in deterministic code; keep spotlighting as defense-in-depth only" },
-    { trap: "Crank thinking/effort to max “just in case”", why: "Past the elbow you hit an overthinking regime: accuracy flattens or drops while you pay per reasoning token", instead: "Measure the accuracy-vs-tokens curve per route and set effort at the elbow" },
+    { trap: "Crank thinking/effort to max 'just in case'", why: "Past the elbow you hit an overthinking regime: accuracy flattens or drops while you pay per reasoning token", instead: "Measure the accuracy-vs-tokens curve per route and set effort at the elbow" },
   ]}
   caption="Spend the afternoon on the ladder above, not on this list."
 />

@@ -61,7 +61,7 @@ The analogy I keep coming back to: the LLM is a CPU with no RAM and no disk. Fer
 
 ## Context is an attention budget, not a bucket
 
-This is the highest-impact idea in the whole field. Context is not storage. It's a finite attention budget you spend every turn.
+This is the highest-impact idea in this course. Context is not storage. It's a finite attention budget you spend every turn.
 
 Transformer attention relates every pair of tokens, so the compute is O(n²): double the context and you roughly quadruple the prefill cost. That's the physical, non-negotiable root of the token budget.
 

@@ -105,7 +105,7 @@ Cambiar a un modelo mejor no arregla un sistema multi-agente mal diseñado. Si t
 
 ## Orquestador-worker, con presupuesto de esfuerzo explícito
 
-El patrón ganador de Anthropic no es "spawnea agentes libremente". Es un lead que dicta un presupuesto de esfuerzo por subtarea: para un hecho simple, un agente con 3-10 tool calls; para una comparación, 2-4 subagentes con 10-15 calls cada uno. Sin esos límites, los agentes duplican trabajo o sobre-investigan. Orquestar bien es enseñarle al lead a delegar con límites, no solo a descomponer.
+El patrón ganador de Anthropic no es "lanzar agentes sin límite". Es un lead que dicta un presupuesto de esfuerzo por subtarea: para un hecho simple, un agente con 3-10 tool calls; para una comparación, 2-4 subagentes con 10-15 calls cada uno. Sin esos límites, los agentes duplican trabajo o sobre-investigan. Orquestar bien es enseñarle al lead a delegar con límites, no solo a descomponer.
 
 <MermaidDiagram title="Orquestador-worker con delegación acotada" chart={`
 graph TD
@@ -132,7 +132,7 @@ Multi-agente          → solo ahora, y deja por escrito por qué subiste de niv
 
 ## Verificación y terminación, de primera clase
 
-Una categoría entera de MAST (~21%) es que nadie verifica el output y nadie sabe cuándo parar. El multi-agente lo agrava: el sintetizador tiende a confiar en los subagentes sin re-verificar. El patrón evaluator-optimizer (un LLM genera, otro evalúa contra criterios y devuelve feedback en bucle hasta un umbral) y los graders code-based existen justo para cerrar este hueco. Es de las inversiones más infravaloradas y desproporcionadamente impactantes en fiabilidad.
+Una categoría entera de MAST (~21%) es que nadie verifica el output y nadie sabe cuándo parar. El multi-agente lo agrava: el sintetizador tiende a confiar en los subagentes sin re-verificar. El patrón evaluator-optimizer (un LLM genera, otro evalúa contra criterios y devuelve feedback en bucle hasta un umbral) y los graders code-based existen justo para cerrar este hueco. Es una inversión infravalorada y de alto impacto en fiabilidad.
 
 <Callout type="warning" title="Acota el bucle">
 El evaluator-optimizer cierra el hueco de verificación, pero trae su propio riesgo: bucles infinitos. Pon siempre un límite de iteraciones explícito (digamos, máx 2). Un grader que nunca converge es peor que no tener grader.
@@ -140,7 +140,7 @@ El evaluator-optimizer cierra el hueco de verificación, pero trae su propio rie
 
 ## Lo que el consenso sobrevalora
 
-El debate multi-agente como técnica de razonamiento está sobrevalorado. El paper "society of minds" de 2023 lanzó la ola: varias instancias debaten N rondas para converger, mejorando factualidad y razonamiento. Pero el estudio sistemático de 2025 muestra que el debate frecuentemente no le gana a self-consistency (majority voting) a igual presupuesto de cómputo, reframeándolo como consistencia cara, no razonamiento superior. Vacuna contra el hype: prueba self-consistency primero.
+El debate multi-agente como técnica de razonamiento está sobrevalorado. El paper "society of minds" de 2023 lanzó la ola: varias instancias debaten N rondas para converger, mejorando factualidad y razonamiento. Pero el estudio sistemático de 2025 muestra que el debate frecuentemente no le gana a self-consistency (majority voting) a igual presupuesto de cómputo, lo replantea como consistencia cara, no como razonamiento superior. Vacuna contra el hype: prueba self-consistency primero.
 
 También sobrevalorado: las metáforas organizacionales ("CEO", "analista", "crítico"). Inducen arquitecturas con comunicación rica y decisiones en conflicto, justo el antipatrón de MAST. Los frameworks pesados orientados a roles te invitan a saltarte el "primero prueba algo simple", que es lo contrario de lo que recomienda la evidencia.
 

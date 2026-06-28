@@ -54,7 +54,7 @@ graph TD
 
 Without this hierarchy you can't measure latency per step, attribute cost to a sub-goal, or see the wrong decision. The analogy I keep: the turn trace is the *flight data recorder*, not the pilot's report after landing. The report (the output) says "there was turbulence." The black box gives you every sensor reading and every decision in temporal order. That's the only thing that lets you reconstruct an accident you can't reproduce by flying again.
 
-## Capture the input context per step, not output-only
+## Capture the input context per step
 
 Here's the counterintuitive part. Observability has to be an architecture requirement, not a logging add-on. The reason is empirical. The *Seeing the Whole Elephant* benchmark measures failure attribution in multi-agent systems and finds that with full traces, attribution reaches around 65.9% at the agent level and 30.3% at the step level, a relative gain of up to ~+89% at the step level against the partial-observability counterpart (16% to 30.3%, the dynamic-replay configuration).
 
@@ -64,7 +64,7 @@ It's tempting to write "51% to 65.9% just from having full traces," but that dis
 
 So design the agent to emit its prompt, its state, and its tool-args at each step. The cheapest place to hook this is right before a tool runs: a `PreToolUse`-style interceptor records the call, the arguments, and what it got back. That recorded step-context is exactly what the attribution research identifies as decisive.
 
-## Non-determinism is an infrastructure property, not sampling
+## Non-determinism is an infrastructure property
 
 The most expensive belief a novice debugger holds is that `temperature=0` gives reproducibility. It's false. Thinking Machines showed in 2025 that LLM inference non-determinism doesn't come from sampling. It comes from the lack of *batch-invariance* in GPU kernels (matmul, RMSNorm, attention). Your request's output changes with the *batch size*, which changes with the server's concurrent traffic. The same input can give two different outputs at temperature 0 simply because another user was hitting the server at the same moment.
 

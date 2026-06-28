@@ -47,7 +47,7 @@ No es un encuadre marginal. "Building Effective Agents" de Anthropic describe a 
 
 En cada turno, el modelo toma el estado actual más la última observación y produce un pensamiento y un tool call. No guarda memoria entre turnos, así que la memoria la tenés que guardar vos por él. Dicho formalmente, el modelo es un <Term name="Stateless reducer" lang="es">reducer stateless</Term>: una función casi pura `(estado, observación) → think + tool_call` (leelo como "dame dónde estamos y qué acaba de pasar, y te doy el próximo movimiento"). El harness es la máquina de estados que lo envuelve: lo invoca, ejecuta sus tool calls, persiste el estado fuera de él y decide cuándo cortar.
 
-Los "12-Factor Agents" de HumanLayer nombran aquí dos ideas distintas que se confunden a cada rato. El **Factor 12, "Make your agent a stateless reducer"**, es la forma del modelo: una reducción pura de estado a próxima acción. El **Factor 8, "Own your control flow"**, es un factor aparte sobre *quién maneja el loop*: tú escribes el outer loop, tú te quedas con el kill-switch. Mismo espíritu, dos afirmaciones. No las fusiones.
+Los "12-Factor Agents" de HumanLayer nombran aquí dos ideas distintas que se confunden a cada rato. El **Factor 12, "Make your agent a stateless reducer"**, es la forma del modelo: una reducción pura de estado a próxima acción. El **Factor 8, "Own your control flow"**, es un factor aparte sobre *quién maneja el loop*: vos escribís el outer loop, vos te quedás con el kill-switch. Mismo espíritu, dos afirmaciones. No las fusiones.
 
 <CodeBlock filename="turn.ts">
 ```ts
@@ -67,11 +67,11 @@ async function runTurn(state) {
 ```
 </CodeBlock>
 
-El modelo solo vive en una línea: `model.reduce`. Todo lo demás es código determinista que tú escribes, testeás e instrumentás. Esa es la frontera que defiende el resto del módulo.
+El modelo solo vive en una línea: `model.reduce`. Todo lo demás es código determinista que vos escribís, testeás e instrumentás. Esa es la frontera que defiende el resto del módulo.
 
 ## La analogía: el modelo es el motor, el harness es el auto
 
-El modelo es un motor de combustión brutal pero ciego. Convierte combustible (contexto) en empuje (un tool call). No tiene frenos, ni volante, ni tablero, ni cinturón. El harness es el auto entero: el chasis que sobrevive al choque (estado durable), los frenos (stopping conditions), el volante (control de flujo determinista), el tablero (observabilidad), el airbag (human-in-the-loop). Nadie compra un motor. Compras un auto. Y aun así casi todos los tutoriales te venden el motor y le llaman agente.
+El modelo es un motor de combustión brutal pero ciego. Convierte combustible (contexto) en empuje (un tool call). No tiene frenos, ni volante, ni tablero, ni cinturón. El harness es el auto entero: el chasis que sobrevive al choque (estado durable), los frenos (stopping conditions), el volante (control de flujo determinista), el tablero (observabilidad), el airbag (human-in-the-loop). Nadie compra un motor. Comprás un auto. Y aun así casi todos los tutoriales te venden el motor y lo llaman agente.
 
 ## Control de flujo: código determinista vs delegado al modelo
 

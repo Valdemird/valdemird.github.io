@@ -1,5 +1,5 @@
 ---
-title: "Learn by Building: Why Makers Learn Faster Than Students"
+title: "Learn by building: why makers learn faster than students"
 description: "The most effective way to master a technology isn't reading docs or watching tutorials, it's shipping something real. Here's the case for learning by building."
 pubDate: 2026-03-14
 tags: ["learning", "maker", "productivity", "career"]
@@ -17,9 +17,9 @@ import Timeline from '../../components/blog/Timeline.astro';
 
 I've watched developers spend months on courses, tutorials, and documentation and still feel unprepared to build something real. I've also watched developers with half the "study time" ship production apps that actually work. The difference isn't talent. It's method.
 
-**Builders learn faster than students.** Not because building is harder, but because it forces a fundamentally different relationship with knowledge.
+**Builders learn faster than students.** Building forces a different relationship with knowledge: you make the decisions instead of watching someone else make them.
 
-## The Tutorial Trap
+## The tutorial trap
 
 Tutorials feel productive. You follow along, everything works, you understand each step. But there's a hidden cost: you're learning the *instructor's* decisions, not making your own.
 
@@ -50,9 +50,9 @@ The critical difference: when you build, you encounter the *messy middle*, the p
 Tutorials teach you what works. Building teaches you what breaks, and that's the knowledge that actually matters in production.
 </Callout>
 
-## The Research Is Clear: Active Beats Passive
+## The research is clear: active beats passive
 
-This isn't just intuition. There's rigorous science behind it. A [meta-analysis of 225 studies published in PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) by Freeman et al. found that students in active learning environments scored 6% higher on exams and were **1.5x less likely to fail** compared to traditional passive lectures.
+There's rigorous science behind it. A [meta-analysis of 225 studies published in PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) by Freeman et al. found that students in active learning environments scored 6% higher on exams and were **1.5x less likely to fail** compared to traditional passive lectures.
 
 <StatGrid columns={3} stats={[
   { value: "1.5×", label: "less likely to fail", context: "active vs passive — Freeman et al., 225 studies" },
@@ -68,16 +68,13 @@ Nobel laureate Richard Feynman formalized this insight into what's now known as 
 Build something → write about it → teach someone → build the next thing. Each step reinforces the previous one. This is the Feynman Technique applied to engineering: build it, then explain it until it's simple.
 </Callout>
 
-## Why Side Projects Accelerate Your Career
+## Why side projects accelerate your career
 
-Side projects aren't just for learning. They create a **visible portfolio of judgment** — proof that you can make decisions, not just follow instructions.
+Side projects do more than teach you. They create a **visible portfolio of judgment**: proof that you can make decisions, not just follow instructions.
 
 <MermaidDiagram title="The Maker Flywheel" chart="graph TD\n    A[Build something] --> B[Hit real problems]\n    B --> C[Solve them]\n    C --> D[Gain deep knowledge]\n    D --> E[Share what you learned]\n    E --> F[Attract opportunities]\n    F --> A" />
 
-When you ship a project, you demonstrate:
-- **Architecture decisions**: you chose a database, a framework, a deployment strategy
-- **Trade-off thinking**: you weighed options and picked one (this is the most valuable skill in senior engineering)
-- **Finishing ability**: most developers start projects; few finish them
+When you ship a project, you show the things a list of technologies can't. You picked a database, a framework, a way to deploy — and owned those calls. You weighed real trade-offs and committed to one, which is most of what senior engineering actually is. And you finished, which most developers never do.
 
 <Collapsible title="What hiring managers actually look for">
 
@@ -89,33 +86,33 @@ A shipped project with real decisions beats a resume of technologies listed.
 
 </Collapsible>
 
-## The Compound Effect of Building in Public
+## The compound effect of building in public
 
 There's a compounding effect that most people miss. When you build and share publicly:
 
-1. **You learn the thing** (by building it)
-2. **You solidify the knowledge** (by writing about it)
-3. **You get feedback** (from people who read your post)
-4. **You discover gaps** (questions you can't answer yet)
-5. **You fill those gaps in the next project** (the cycle repeats)
+1. You learn the thing by building it.
+2. You solidify it by writing about it.
+3. Readers give you feedback.
+4. Their questions expose gaps you can't answer yet.
+5. You fill those gaps in the next project, and the cycle repeats.
 
-Each project makes the next one better. Not just technically. Your ability to *think about problems* improves. You develop intuition that no tutorial can teach.
+Each project makes the next one better, technically and in how you *think about problems*. You develop intuition that no tutorial can teach.
 
 <Callout type="note" title="It doesn't have to be original">
 You don't need to invent a new framework. Build a todo app, but make it *yours*. Choose the tech stack, design the UI, make the hard decisions. A well-executed familiar idea teaches more than an abandoned ambitious one.
 </Callout>
 
-## How to Start
+## How to start
 
-The biggest barrier isn't skill — it's perfectionism. Here's the antidote:
+Perfectionism stops more projects than missing skill ever will. The antidote:
 
-1. **Pick a problem you actually have.** Don't build a "practice project." Build [something you'll use](/blog/game-feel-on-the-web/). The motivation to finish is 10x higher when you're your own user.
+1. Pick a problem you actually have. Don't build a "practice project" — build [something you'll use](/blog/game-feel-on-the-web/). The motivation to finish is 10x higher when you're your own user.
 
-2. **Constrain the scope ruthlessly.** The first version should take a weekend, not a month. Ship the embarrassing MVP. You can always iterate.
+2. Constrain the scope ruthlessly. The first version should take a weekend, not a month. Ship the embarrassing MVP; you can always iterate.
 
-3. **Write one thing about it.** A blog post, a tweet thread, a README with actual decision explanations. Teaching is the multiplier.
+3. Write one thing about it — a blog post, a tweet thread, a README with the actual decisions. Teaching is the multiplier.
 
-4. **Ship it.** Deploy it somewhere real. A project on localhost is a draft. A project with a URL is a product.
+4. Ship it somewhere real.
 
 <Timeline items={[
   { date: "Weekend 1", title: "Build the core feature. Deploy it.", body: "A project on localhost is a draft; a URL makes it real." },
@@ -124,7 +121,7 @@ The biggest barrier isn't skill — it's perfectionism. Here's the antidote:
   { date: "Then", title: "Repeat with the next idea." },
 ]} />
 
-## The Knowledge You Can't Google
+## The knowledge you can't Google
 
 There's a type of engineering knowledge that doesn't exist in documentation. It lives in the gap between "I know how X works" and "I know what happens when X meets Y in production." Michael Polanyi called this [tacit knowledge](https://en.wikipedia.org/wiki/Tacit_knowledge), the kind of knowing you can only acquire through experience, not instruction.
 
@@ -132,7 +129,7 @@ You can't read your way to this knowledge. You can only build your way there.
 
 > "What I cannot create, I do not understand." — Richard Feynman (written on his blackboard at the time of his death, 1988)
 
-Stop preparing. Start building. The learning follows.
+So pick the thing you've been meaning to study, and build a bad version of it this weekend instead. You'll learn more from its bugs than from the course you keep not finishing.
 
 ---
 

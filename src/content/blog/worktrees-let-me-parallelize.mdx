@@ -1,5 +1,5 @@
 ---
-title: "Git Worktrees Let Me Run Three Claude Agents in Parallel"
+title: "Git worktrees let me run three Claude agents in parallel"
 description: "Three Claude agents on three bugs in one afternoon, only because each ran in its own git worktree. The file-isolation discipline that makes parallel AI agents safe, and the mistake that taught it to me."
 pubDate: 2026-05-13
 tags: ["ai-tools", "developer-workflow", "git", "claude-code"]
@@ -41,7 +41,7 @@ Worktrees are how you make the same impulse safe. Each agent gets its own checko
 
 That's the clean story. The actual one starts with me breaking it.
 
-## The First Time It Broke
+## The first time it broke
 
 The first time I asked Claude to create a worktree, it created the worktree *inside* the repo it was working in. Not as a sibling directory, not somewhere safe — inside the source tree that Next.js was actively watching.
 
@@ -143,7 +143,7 @@ Here's the same afternoon as git history. Press play, or arrow through it one op
 
 I'm being short on product detail on purpose. The bugs themselves are not the interesting part. The interesting part is that three agents could work on three of them in the same afternoon without colliding once.
 
-## When the First Pass Isn't Enough
+## When the first pass isn't enough
 
 Worktrees solve collisions between agents. They don't solve incomplete fixes from any single one.
 
@@ -181,7 +181,7 @@ Acting is cheap. Observing is what fills the context window, and a session that 
 Before declaring a Storybook fix done, ask the agent to enumerate every import the changed story's component touches and confirm each is either real-or-mocked. Same idea for any test setup. The "what else does this thing transitively need" question costs five seconds; the alternative is two CI cycles per fix.
 </Callout>
 
-## What I Wrote Down
+## What I wrote down
 
 After all of this I added three lines to my `CLAUDE.md` for projects where I might run parallel sessions. They're not aspirational — they're the rules I broke at least once.
 
@@ -200,7 +200,7 @@ The first line is the one that costs you the most when violated. If an agent sta
 Worktrees in `.claude/worktrees/` work for me because that path is gitignored on the projects where I do this. If you use a different location, make sure it's either outside the repo or hidden from both git and your dev server's file watcher. Otherwise you'll either ship a worktree as part of your repo (embarrassing) or you'll trigger an infinite compile loop (humbling). Both are doable.
 </Collapsible>
 
-## What Worktrees Don't Solve
+## What worktrees don't solve
 
 I picked Saturday's three bugs because they sat in three different layers of the stack. That wasn't strategy. It was the queue. If I'd had three bugs that all touched the same hook, or three changes that each modified a shared type, the worktrees would have kept the diffs apart and the merge would have been a war. Physical isolation doesn't buy semantic isolation.
 
@@ -261,7 +261,7 @@ The other thing nobody mentions out loud: parallelism shifts where your time goe
 
 That doesn't make worktrees less useful. It makes them more honest. The story isn't "three agents do the work of three engineers." It's "three agents do the work of three typists, and one engineer still has to integrate them."
 
-## The Real Constraint
+## The real constraint
 
 This whole post is a sequel to one I wrote a month ago about tests. The argument there was that delegating to AI is only safe when there's a feedback loop fast enough to catch its mistakes. Tests are that loop on the *what* axis — did the change do the thing.
 

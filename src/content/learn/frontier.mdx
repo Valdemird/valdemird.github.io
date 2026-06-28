@@ -77,7 +77,7 @@ The **Darwin Gödel Machine** (Zhang et al., 2025) is a coding agent that rewrit
 Notice what makes it work: a fitness function. Self-improvement succeeds only when bolted to an external, *verifiable* grader, not to self-judgment. That's the same eval↔reward↔grader equivalence from the evaluation and reward modules, now running the optimizer. The reward that shapes a policy, the grader that scores an eval, and the fitness that selects a variant are the same object wearing three hats. The ceiling of self-improvement is the quality of that grader.
 </Callout>
 
-This is the most underrated point in the whole field. A weak grader means the agent optimizes the metric instead of the task. Goodhart, applied to your own evaluator, amplified by the optimization loop. Which is why everything you built earlier (code-based graders plus an LLM judge, scored on trajectory, run pass^k) isn't just QA. It's the substrate any future self-improvement would stand on.
+This is the point most people underrate. A weak grader means the agent optimizes the metric instead of the task. Goodhart, applied to your own evaluator, amplified by the optimization loop. Which is why everything you built earlier (code-based graders plus an LLM judge, scored on trajectory, run pass^k) isn't just QA. It's the substrate any future self-improvement would stand on.
 
 <Collapsible title="Profundizar: why the 'boring' optimizer beats the recursive one">
 The seductive story is a model that improves itself with no human in the loop, compounding without bound. The empirical story is slower and bounded: DGM is restricted to coding tasks with a verifiable eval, scales with compute gradually, and is only as good as its benchmark. The "Gödel machine that rewrites itself without limit" stays theoretical. Treating DGM as imminent recursive AGI is hype. Treating it as a powerful offline optimizer for your harness (evolve the persona, the toolset, the allowlist against your eval suite) is correct and useful today. The difference between those two readings is whether you have a trustworthy grader.
@@ -119,6 +119,6 @@ Context engineering ties it together. If sustained coherence is the bottleneck, 
 
 You came in wanting to build agents. You leave knowing the engine is a stochastic, stateless, finite-window next-token function, and that nearly everything else (the loop, memory, evals, HITL, security, this whole frontier) is scaffolding to make that function reliable across a horizon it was never built to hold.
 
-There's no neat bow to tie. The horizon keeps doubling, the graders keep being the ceiling, and the gap between "responds" and "responds correctly and stops on time" is where all the real engineering lives. The field will hand you a more capable model every few months. It will not hand you a system. That part is still yours to build, and the people who build it well will be the ones who measured the horizon instead of trusting the demo.
+There's no neat bow to tie. The horizon keeps doubling, the graders keep being the ceiling, and the gap between "responds" and "responds correctly and stops on time" is where all the real engineering lives. The field will hand you a more capable model every few months. It will not hand you a system. That part is still yours to build.
 
 Go measure where your agent falls over. Then put a gate there.

@@ -59,7 +59,7 @@ Escribir evals a priori se *siente* como ingeniería seria. Pero estás optimiza
 
 ## pass^k: la frontera entre demo y producción
 
-Aquí está la distinción estadística más cara de ignorar. **pass@1** mide el rendimiento medio: la probabilidad de que *un* intento pase. Es lo que un benchmark publicita porque es la cifra más alta. **pass^k** = pᵏ mide la probabilidad de que *los k intentos pasen todos*, que es la fiabilidad real.
+Aquí hay una distinción estadística cara de ignorar. **pass@1** mide el rendimiento medio: la probabilidad de que *un* intento pase. Es lo que un benchmark publicita porque es la cifra más alta. **pass^k** = pᵏ mide la probabilidad de que *los k intentos pasen todos*, que es la fiabilidad real.
 
 La diferencia decae exponencialmente. Un agente al 90% pass@1 cae a 0,9⁸ ≈ 43% en k=8. τ-bench lo muestra con datos: GPT-4o logra 61% pass@1 pero solo 25% pass^8 en el dominio retail. Traducido a tu negocio: una de cada cuatro veces, la misma confirmación de cita falla de forma no-determinista. Nadie en un SaaS multi-tenant acepta eso.
 

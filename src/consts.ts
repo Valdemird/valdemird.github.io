@@ -102,13 +102,13 @@ export const UI_STRINGS = {
 		home: {
 			greeting: "Hi, I'm",
 			name: 'valdemird',
-			subtitle: 'Software Engineer & Builder',
+			subtitle: 'Software engineer & builder',
 			bio: 'I ship products for companies across the Americas. After hours I build my own tools and write down what breaks. This site is me showing my work.',
 			statusBadge: "Let's talk, learn, and build",
 			metaDescription: 'Software engineer and builder. I make developer tools and write about what I learn.',
 			projectsTitle: 'Projects',
-			gamesTitle: 'Games & Experiments',
-			recentPostsTitle: 'Recent Posts',
+			gamesTitle: 'Games & experiments',
+			recentPostsTitle: 'Recent posts',
 			viewAllPosts: 'View all posts',
 			terminalTitle: '~/projects',
 		},
@@ -122,7 +122,7 @@ export const UI_STRINGS = {
 			minRead: 'min read',
 		},
 		about: {
-			title: 'About Me',
+			title: 'About me',
 			description: 'Sebastian Castano, full-stack engineer in Cali, Colombia. 8+ years shipping products, a spec-driven AI workflow, and a site built from its own live components.',
 		},
 		footer: {

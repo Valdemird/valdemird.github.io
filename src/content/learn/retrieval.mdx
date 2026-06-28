@@ -67,7 +67,7 @@ Embeddings compress meaning and lose precision on rare tokens. An error code lik
 **Dense embeddings** capture paraphrase and synonyms ("schedule" ≈ "book"); they blur `TS-999`, `customer_8842`, proper nouns; good for semantic FAQ. **BM25 / grep** match identifiers, codes, symbols exactly; no staleness; cheap and auditable; struggle with pure synonyms. In code and IDs, lexical dominates. Late-interaction multi-vector (ColBERTv2) is the frontier middle ground when you do keep an index.
 </Callout>
 
-## The ~200k-token threshold is the first question, not the last
+## Start with the ~200k-token threshold
 
 Anthropic recommends it explicitly: if the corpus fits under ~200k tokens (~500 pages), don't build RAG. Put it all in the prompt with prompt caching. RAG only wins when the corpus exceeds the window. Building an embedding pipeline for 50 documents is expensive over-engineering. Prompt caching is what makes the "everything in context" strategy viable. It amortizes the repeated corpus and brings Contextual Retrieval preprocessing down to $1.02/M tokens. This is your first design question, and the frontier grows with 1M+ windows.
 
@@ -75,7 +75,7 @@ Anthropic recommends it explicitly: if the corpus fits under ~200k tokens (~500 
 Anthropic's context-engineering framing: don't dump everything up front. Keep lightweight identifiers (paths, queries) and load data on demand with tools. Agentic search is just-in-time retrieval taken to its conclusion. The corpus is the filesystem, the loader is grep/read.
 </Callout>
 
-## Contextual Retrieval: the chunk lost its context, not the embedding
+## Contextual Retrieval: the chunk lost its context
 
 Chunking breaks coreference. A chunk saying "margin grew 3%" doesn't know which company or which quarter. Anthropic's technique prepends to each chunk an LLM-generated context that situates it in the document, before embedding and indexing with BM25. It cuts top-20 retrieval failure by **49%** (from 5.7% to 2.9%), and **67%** (to 1.9%) if you add reranking on top. The structural lesson: the problem was never the embedding model, it was that the chunk lost its context. Agentic search avoids it at the root by reading the whole document on demand. And the trick works outside embeddings too. Persisting a context summary per document helps an agent decide what to read.
 

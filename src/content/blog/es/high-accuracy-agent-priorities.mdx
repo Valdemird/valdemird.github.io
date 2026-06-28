@@ -142,13 +142,13 @@ Una flecha. Retornos semánticos. El error le dice al modelo cómo corregirse so
 
 Un tool que devuelve 8K tokens no acertó, envenenó los siguientes turnos. Limita y pagina la salida, dale namespace a los catálogos grandes, y haz idempotente cada escritura. El tratamiento completo está en [un tool es UX para un LLM](/es/learn/agentic-systems/tools-and-mcp/).
 
-## Gasta el contexto como un presupuesto de atención, no como almacenamiento
+## Gasta el contexto como un presupuesto de atención
 
 Una ventana de 1M de tokens hace que "mételo todo" parezca gratis. No lo es. La atención es aproximadamente O(n²), y la recuperación se hunde en una curva en U bastante antes del límite nominal. Cada token irrelevante diluye la señal a la que el modelo está atendiendo *y* cuadruplica el costo. Más contexto no es más inteligencia.
 
 Trata la ventana como el estado de creencia del agente y cúrala en cada turno. Mantén identificadores ligeros dentro de la ventana y trae los datos pesados justo a tiempo a través de un tool. Desaloja salidas de tools que ya quedaron viejas en cuanto destilaste lo que importaba. Pon los hechos que cargan el peso al principio y al final, donde la recuperación es mejor. Cuando el agente empieza a alucinar, a repetir acciones o a perder el hilo, esas son patologías del estado de creencia. Se arreglan desalojando, no agrandando la ventana con la esperanza de que mejore. El [módulo de ingeniería de contexto](/es/learn/agentic-systems/context-engineering/) le pone nombre a cada modo de fallo para que puedas diagnosticar cuál estás viendo.
 
-## El eval es tu sistema de control, no el examen final
+## Tu eval es el sistema de control
 
 Tu tasa de acierto está limitada por la fidelidad de tu eval, sin matices. Si el eval lee ruido, manejas a ciegas por más rápido que iteres. Y la parte que sorprende: el grader del eval, la recompensa de RL y cualquier fitness de automejora son matemáticamente el mismo objeto. Un grader que el modelo puede engañar es un grader que entrena activamente a tu agente para engañarte.
 
@@ -191,13 +191,13 @@ Igual de importante es dónde *no* gastar la tarde. Cada fila de aquí es algo q
     { key: "instead", label: "Haz esto en su lugar", align: "left" },
   ]}
   rows={[
-    { trap: "Recurrir a multiagente “porque escala”", why: "~79% de los fallos son de coordinación, no del modelo; el fan-out quema ~15× los tokens por cómputo paralelo, no por mejor razonamiento", instead: "Un solo agente lineal + compactación. Haz fan-out solo en exploración de solo lectura; mantén cada escritura en un único hilo" },
+    { trap: "Recurrir a multiagente 'porque escala'", why: "~79% de los fallos son de coordinación, no del modelo; el fan-out quema ~15× los tokens por cómputo paralelo, no por mejor razonamiento", instead: "Un solo agente lineal + compactación. Haz fan-out solo en exploración de solo lectura; mantén cada escritura en un único hilo" },
     { trap: "Confiar en el chain-of-thought como bitácora de auditoría", why: "Los modelos actúan sobre pistas que nunca verbalizan y racionalizan después; la cadena visible suele ser no causal", instead: "Construye evals, compuertas y observabilidad sobre la trayectoria de llamadas a tools — lo que HIZO, no lo que dijo" },
     { trap: "Hacer fine-tuning primero", why: "Enseña forma sobre fondo, ~1.5× de premium en inferencia, y entrenar sobre hechos nuevos sube la alucinación", instead: "Sube la escalera: prompt → few-shot → contexto/harness → RAG → fine-tuning al final. El harness es ~90% del ROI" },
     { trap: "Comprar una ventana de contexto más grande", why: "La recuperación se hunde en una curva en U antes del límite; los tokens irrelevantes diluyen la atención aunque todo quepa", instead: "Minimiza la densidad de señal, no el encaje. Mide tu ventana efectiva real" },
     { trap: "Montar una vector DB por defecto", why: "Un pipeline de embeddings para 50 docs es un pasivo de staleness y seguridad a cambio de nada", instead: "Corpus bajo ~200k tokens: cárgalo en contexto con caching. Léxico (BM25/grep) para identificadores y códigos" },
     { trap: "Tratar el spotlighting como la frontera de seguridad", why: "Recorta la inyección ~50%→<2% pero un atacante adaptativo borra el residuo", instead: "Pon la frontera de privilegio en código determinista; deja el spotlighting solo como defensa en profundidad" },
-    { trap: "Subir el thinking/effort al máximo “por si acaso”", why: "Pasado el codo entras en un régimen de sobrepensar: el acierto se aplana o cae mientras pagas por cada token de razonamiento", instead: "Mide la curva acierto-vs-tokens por ruta y fija el effort en el codo" },
+    { trap: "Subir el thinking/effort al máximo 'por si acaso'", why: "Pasado el codo entras en un régimen de sobrepensar: el acierto se aplana o cae mientras pagas por cada token de razonamiento", instead: "Mide la curva acierto-vs-tokens por ruta y fija el effort en el codo" },
   ]}
   caption="Gasta la tarde en la escalera de arriba, no en esta lista."
 />

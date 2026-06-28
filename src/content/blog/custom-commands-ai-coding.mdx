@@ -1,5 +1,5 @@
 ---
-title: "Custom Slash Commands for AI Coding: Build Your Own Spec-Driven Workflow"
+title: "Custom slash commands for AI coding: build your own spec-driven workflow"
 description: "How 6 markdown files turned my AI coding assistant into a structured co-architect and why you should build your own command system instead of relying on raw prompts."
 pubDate: 2026-03-10
 tags: ["ai-tools", "developer-workflow", "productivity", "automation"]
@@ -25,7 +25,7 @@ The idea is simple: instead of typing the same instructions every time ("explore
 
 I built 6 commands that form a **spec-driven development pipeline**. Here's how and why you should build your own.
 
-## Why Raw Prompts Fail at Scale
+## Why raw prompts fail at scale
 
 When you type *"add JWT auth to my API"*, you're asking the model to make dozens of implicit decisions:
 
@@ -40,7 +40,7 @@ The model will guess. Sometimes it guesses right. Often it doesn't. And you spen
 The bottleneck isn't code generation, it's **specification**. If you clearly define *what* you want, the *how* becomes almost trivial for the model.
 </Callout>
 
-## The Pipeline
+## The pipeline
 
 Six commands, each a single markdown file, forming a linear pipeline where each step produces an artifact and every transition requires your approval:
 
@@ -87,7 +87,7 @@ Six commands, each a single markdown file, forming a linear pipeline where each 
   </svg>
 </StepThroughDiagram>
 
-## Command 1: Create. From Idea to Structured Spec
+## Command 1: create. From idea to structured spec
 
 You give it a name and a rough description. The command outputs a structured spec with context, expected behavior, edge cases, constraints, acceptance criteria, and, critically, **open questions** it detected that *you* need to answer.
 
@@ -114,7 +114,7 @@ Instead of guessing your JWT library preference, it asks you.
 It takes 5 minutes to answer questions in a spec. It takes 2 hours to untangle wrong assumptions in code. Force specification before code.
 </Callout>
 
-## Command 2: Audit. The Spec Meets Your Codebase
+## Command 2: audit. The spec meets your codebase
 
 This is where the model **explores your actual project** — file structure, naming conventions, error handling patterns, existing dependencies — and enriches the spec with a technical analysis section.
 
@@ -132,11 +132,11 @@ This is where the model **explores your actual project** — file structure, nam
 
 This step prevents the #1 failure mode of AI-generated code: **ignoring existing patterns**. After the audit, the model knows your project's conventions. The code it writes later will *fit*.
 
-## Command 3: Review. The Readiness Traffic Light
+## Command 3: review. The readiness traffic light
 
 Before investing time in implementation, this command evaluates the spec:
 
-<Tabs labels={["Ready", "With Assumptions", "Blocking"]}>
+<Tabs labels={["Ready", "With assumptions", "Blocking"]}>
 <TabPanel>
 
 🟢 **Ready**: Well-defined. All decisions made. Proceed to planning.
@@ -156,7 +156,7 @@ Before investing time in implementation, this command evaluates the spec:
 
 If something is red, you fix it now, not after 3 phases of implementation.
 
-## Command 4: Plan. Phased Implementation
+## Command 4: plan. Phased implementation
 
 The plan command generates a step-by-step implementation plan. Each phase is small (1-3 files), verifiable (clear "done" criteria), and independent (reviewable before continuing).
 
@@ -178,13 +178,13 @@ The plan command generates a step-by-step implementation plan. Each phase is sma
 Hard rule: **maximum 3-4 phases** for medium features. If it needs more, the feature is too big and should be split. This prevents scope creep.
 </Callout>
 
-## Command 5: Implement. One Phase at a Time
+## Command 5: implement. One phase at a time
 
 The implementation command only executes **one phase at a time**. After each phase, it summarizes what it did, what decisions it made, and asks for your review before continuing.
 
 This is the key difference from "generate everything at once". If Phase 1 reveals a problem, you adjust the plan before Phase 2 starts. The cost of change stays low throughout the project.
 
-## Bonus: Review Commands
+## Bonus: review commands
 
 Two additional commands for ongoing code quality:
 
@@ -193,7 +193,7 @@ Two additional commands for ongoing code quality:
 | Performance review | O(n²) loops, N+1 queries, memory leaks, caching, bundle sizes | Severity-ranked findings with fixes |
 | Architecture review | SOLID principles, coupling, separation of concerns, security | Layer diagram + refactoring roadmap |
 
-## Set It Up
+## Set it up
 
 <CopyableCommand command="mkdir -p .commands" />
 
@@ -216,12 +216,12 @@ Drop your command files in:
 
 Each command is a standalone markdown file. Your AI coding tool picks them up automatically as slash commands. No configuration needed.
 
-## Build Time Saved
+## Build time saved
 
 In my experience, the spec-driven approach cuts rework significantly:
 
 <InteractiveChart
-  title="Time Spent on Rework"
+  title="Time spent on rework"
   type="bar"
   data={[
     { label: "Raw prompts", value: 45, color: "oklch(0.65 0.2 27)" },
@@ -231,13 +231,13 @@ In my experience, the spec-driven approach cuts rework significantly:
 
 *(Percentage of session time spent fixing AI-generated code that didn't fit)*
 
-## The Golden Rule
+## The golden rule
 
 > Never skip steps under pressure. The time you "save" by skipping the audit or the review, you pay triple in corrections later.
 
-This isn't about slowing down. It's about **investing 10 minutes in specification to save 2 hours in debugging**. Your AI tool becomes dramatically more useful when you treat it as a collaborator that needs context, not a magic box that guesses what you want.
+Those 10 minutes in specification save 2 hours in debugging. Your AI tool becomes dramatically more useful when you treat it as a collaborator that needs context, not a magic box that guesses what you want.
 
-Structured workflows beat raw prompts. Every time.
+The commands just make that discipline automatic, so you don't have to remember to be disciplined at 2am.
 
 ---
 
