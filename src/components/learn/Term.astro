@@ -44,12 +44,14 @@ const href = entry ? `${glossaryHref(lang)}#${entry.slug}` : glossaryHref(lang);
 		text-underline-offset: 3px;
 	}
 	.gloss-pop {
-		position: absolute;
-		bottom: calc(100% + 0.5em);
+		/* Positioned with JS (position: fixed) so it can be clamped to the
+		   viewport and never overflows off-screen near the edges. */
+		position: fixed;
+		top: 0;
 		left: 0;
 		z-index: 40;
 		width: max-content;
-		max-width: min(22rem, 80vw);
+		max-width: min(22rem, calc(100vw - 1.5rem));
 		padding: 0.7em 0.85em;
 		background: var(--color-bg);
 		border: 1px solid var(--color-border);
@@ -63,10 +65,7 @@ const href = entry ? `${glossaryHref(lang)}#${entry.slug}` : glossaryHref(lang);
 		transform: translateY(4px);
 		transition: opacity 0.16s var(--ease-smooth), transform 0.16s var(--ease-spring), visibility 0.16s;
 	}
-	.gloss-term:hover + .gloss-pop,
-	.gloss-term:focus-visible + .gloss-pop,
-	.gloss-term[aria-expanded='true'] + .gloss-pop,
-	.gloss-pop:hover {
+	.gloss-pop.is-open {
 		opacity: 1;
 		visibility: visible;
 		transform: translateY(0);
@@ -82,31 +81,85 @@ const href = entry ? `${glossaryHref(lang)}#${entry.slug}` : glossaryHref(lang);
 		color: var(--color-accent);
 		text-decoration: none;
 	}
-	@media (max-width: 560px) {
-		.gloss-pop { left: auto; right: 0; }
-	}
 </style>
 
 <script>
-	// Touch devices have no hover: toggle the tooltip on tap via aria-expanded.
+	// The popover is fixed-positioned and placed/clamped by JS so it never
+	// overflows the viewport — on hover (desktop), focus (keyboard), or tap (touch).
+	const MARGIN = 12; // min gap to the viewport edge
+	const GAP = 8; // gap between the term and the popover
+
+	function placePop(gloss: HTMLElement) {
+		const btn = gloss.querySelector<HTMLElement>('.gloss-term');
+		const pop = gloss.querySelector<HTMLElement>('.gloss-pop');
+		if (!btn || !pop) return;
+		const r = btn.getBoundingClientRect();
+		const pr = pop.getBoundingClientRect();
+		// Horizontal: align with the term, then clamp inside the viewport.
+		let left = r.left;
+		const maxLeft = window.innerWidth - pr.width - MARGIN;
+		if (left > maxLeft) left = maxLeft;
+		if (left < MARGIN) left = MARGIN;
+		// Vertical: prefer above the term; drop below if there's no room.
+		let top = r.top - pr.height - GAP;
+		if (top < MARGIN) top = r.bottom + GAP;
+		pop.style.left = `${Math.round(left)}px`;
+		pop.style.top = `${Math.round(top)}px`;
+	}
+
+	function closeAll(except?: Element | null) {
+		document.querySelectorAll<HTMLElement>('.gloss.is-open').forEach((g) => {
+			if (g === except) return;
+			g.classList.remove('is-open');
+			g.querySelector('.gloss-pop')?.classList.remove('is-open');
+			g.querySelector('.gloss-term')?.setAttribute('aria-expanded', 'false');
+		});
+	}
+
+	function openGloss(gloss: HTMLElement) {
+		closeAll(gloss);
+		placePop(gloss);
+		gloss.classList.add('is-open');
+		gloss.querySelector('.gloss-pop')?.classList.add('is-open');
+		gloss.querySelector('.gloss-term')?.setAttribute('aria-expanded', 'true');
+	}
+
+	function closeGloss(gloss: HTMLElement) {
+		gloss.classList.remove('is-open');
+		gloss.querySelector('.gloss-pop')?.classList.remove('is-open');
+		gloss.querySelector('.gloss-term')?.setAttribute('aria-expanded', 'false');
+	}
+
 	function initGlossTerms() {
-		document.querySelectorAll<HTMLButtonElement>('.gloss-term').forEach((btn) => {
-			if (btn.dataset.bound) return;
-			btn.dataset.bound = '1';
+		document.querySelectorAll<HTMLElement>('.gloss').forEach((gloss) => {
+			if (gloss.dataset.bound) return;
+			gloss.dataset.bound = '1';
+			const btn = gloss.querySelector<HTMLButtonElement>('.gloss-term');
+			if (!btn) return;
+			// Tap / click toggles (primary path on touch, where there's no hover).
 			btn.addEventListener('click', (e) => {
 				e.preventDefault();
-				const open = btn.getAttribute('aria-expanded') === 'true';
-				document.querySelectorAll('.gloss-term[aria-expanded="true"]').forEach((o) => o.setAttribute('aria-expanded', 'false'));
-				btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+				if (gloss.classList.contains('is-open')) closeGloss(gloss);
+				else openGloss(gloss);
 			});
+			// Hover (desktop) and keyboard focus.
+			gloss.addEventListener('mouseenter', () => openGloss(gloss));
+			gloss.addEventListener('mouseleave', () => closeGloss(gloss));
+			btn.addEventListener('focus', () => openGloss(gloss));
+			btn.addEventListener('blur', () => closeGloss(gloss));
 		});
 		if (!(document as any)._glossDismiss) {
 			(document as any)._glossDismiss = true;
+			// Dismiss on outside click, on Escape, and reposition on scroll/resize.
 			document.addEventListener('click', (e) => {
-				if (!(e.target as HTMLElement).closest?.('.gloss')) {
-					document.querySelectorAll('.gloss-term[aria-expanded="true"]').forEach((o) => o.setAttribute('aria-expanded', 'false'));
-				}
+				if (!(e.target as HTMLElement).closest?.('.gloss')) closeAll();
 			});
+			document.addEventListener('keydown', (e) => {
+				if ((e as KeyboardEvent).key === 'Escape') closeAll();
+			});
+			const reposition = () => closeAll();
+			window.addEventListener('scroll', reposition, { passive: true });
+			window.addEventListener('resize', reposition, { passive: true });
 		}
 	}
 	initGlossTerms();
