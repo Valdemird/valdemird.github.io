@@ -1,8 +1,9 @@
 ---
-title: "Learn by building: why makers learn faster than students"
-description: "The most effective way to master a technology isn't reading docs or watching tutorials, it's shipping something real. Here's the case for learning by building."
+title: "Learn by building: why a real project beats another tutorial"
+description: "Tutorials teach the instructor's decisions. Building teaches yours. What the active-learning research actually measured, and a number this post got backwards."
 pubDate: 2026-03-14
-tags: ["learning", "maker", "productivity", "career"]
+updatedDate: 2026-10-27
+tags: ["learning", "side-projects", "developer-workflow", "career"]
 featured: false
 lang: en
 ---
@@ -10,14 +11,20 @@ lang: en
 import Callout from '../../components/blog/Callout.astro';
 import Tabs from '../../components/blog/Tabs.astro';
 import TabPanel from '../../components/blog/TabPanel.astro';
-import Collapsible from '../../components/blog/Collapsible.astro';
 import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
 import StatGrid from '../../components/blog/StatGrid.astro';
 import Timeline from '../../components/blog/Timeline.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
 
-I've watched developers spend months on courses, tutorials, and documentation and still feel unprepared to build something real. I've also watched developers with half the "study time" ship production apps that actually work. The difference isn't talent. It's method.
+In June I shipped a [16-module wiki on agentic systems](/learn/agentic-systems/) on this site. I didn't write it by hand. Claude Code workflows drafted and cross-checked it, and then I studied the result until I understood it well enough to argue with it.
 
-**Builders learn faster than students.** Building forces a different relationship with knowledge: you make the decisions instead of watching someone else make them.
+Six days after the first commit, a second pass came back. It was an adversarial fact-check where independent agents had to confirm each claim against the web, and it found 20 confirmed claim errors and 26 source issues across the modules. One module credited RLAIF to Google in 2023. The term comes from Anthropic's Constitutional AI paper, from 2022.
+
+Every one of those errors had already passed the first cross-check. On the page they read as smoothly as the correct claims around them. The only way to find them was to go back to the sources.
+
+This post had one of those errors too. I'll get to it.
+
+**You learn faster when you build.** Building forces a different relationship with knowledge: you make the decisions instead of watching someone else make them.
 
 ## The tutorial trap
 
@@ -50,53 +57,43 @@ The critical difference: when you build, you encounter the *messy middle*, the p
 Tutorials teach you what works. Building teaches you what breaks, and that's the knowledge that actually matters in production.
 </Callout>
 
-## The research is clear: active beats passive
+## What the research actually measured
 
-There's rigorous science behind it. A [meta-analysis of 225 studies published in PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) by Freeman et al. found that students in active learning environments scored 6% higher on exams and were **1.5x less likely to fail** compared to traditional passive lectures.
+A [meta-analysis of 225 studies published in PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) by Freeman et al. (2014) compared active learning with traditional lectures in undergraduate STEM courses. Exam scores were about 6% higher in the active sections. Students in lecture-only classes were **1.5 times more likely to fail**: 33.8% failed under lecturing against 21.8% under active learning.
+
+Here's my error. When I published this post in March, that sentence said active learners were "1.5x less likely to fail." That's the paper's ratio pointed the wrong way. It survived seven months, including a voice pass in June that edited this exact paragraph and left the number alone. Nobody caught it until the audit for this refresh went back to the paper.
 
 <StatGrid columns={3} stats={[
-  { value: "1.5×", label: "less likely to fail", context: "active vs passive — Freeman et al., 225 studies" },
+  { value: "1.5×", label: "higher failure rate in lecture-only classes", context: "33.8% vs 21.8%. Freeman et al. 2014, 225 studies" },
   { value: "+6%", label: "on exam scores", context: "same PNAS meta-analysis" },
-  { value: "0.27 SD", label: "higher post-test scores", context: "2024 randomized trial, medical students" },
+  { value: "0.27 SD", label: "higher post-test scores", context: "2024 crossover trial, 146 medical students" },
 ]} />
 
-The most recent confirmation is a [2024 randomized trial with medical students](https://link.springer.com/article/10.1007/s40670-024-02219-1). The evidence keeps piling up — hands-on engagement beats passive absorption, and tutorials *feel* productive without *being* productive.
+A [2024 randomized crossover trial](https://link.springer.com/article/10.1007/s40670-024-02219-1) with 146 second-year medical students points the same way. In the interactive sessions, students scored 0.27 standard deviations higher on a test of learning than after the passive lectures.
 
-Nobel laureate Richard Feynman formalized this insight into what's now known as the [Feynman Technique](https://fs.blog/feynman-technique/): if you can't explain something simply, you don't truly understand it. Teaching forces you to close the gap between "I get it" and "I can explain it."
+The idea that passive learning *feels* better while teaching less comes from a different study. [Deslauriers et al. (2019)](https://doi.org/10.1073/pnas.1821936116) compared two ways of teaching the same introductory physics content: active classes, and lectures by experienced, highly rated instructors. Students in the active classes learned more, and rated their own learning *lower*. The authors' reading is that students took the extra effort as a sign they were learning less. The 2024 medical trial didn't reproduce that gap, since its students learned more and felt they learned more. The two studies disagree on how active learning feels. They agree on the test scores.
 
-<Callout type="tip" title="The maker's loop">
-Build something → write about it → teach someone → build the next thing. Each step reinforces the previous one. This is the Feynman Technique applied to engineering: build it, then explain it until it's simple.
-</Callout>
+None of these studies tested side projects. They compared sitting through a lecture with doing something during class. Going from there to "build a project instead of finishing the course" is my extrapolation. I think it holds, but it's mine.
+
+Richard Feynman gets the credit for the next part. The so-called [Feynman Technique](https://fs.blog/feynman-technique/)<Sidenote>He never wrote it down as a method. The name and the step-by-step version come from study blogs decades after his death, around 2011.</Sidenote> says to explain the thing in plain words, and the places where you stall are the places you don't understand yet. Teaching forces you to close the gap between "I get it" and "I can explain it."
+
+The wiki leans on the same idea. Every module ends with a recall check (see the bottom of [the agent loop module](/learn/agentic-systems/agent-loop/)): before you move on, you try to state each key idea from memory, then reveal it to compare. Rereading is easier, and that's why it sticks less.
 
 ## Why side projects accelerate your career
 
-Side projects do more than teach you. They create a **visible portfolio of judgment**: proof that you can make decisions, not just follow instructions.
+Side projects do more than teach you. They create a **visible portfolio of judgment**: proof that you can make decisions on your own.
 
-<MermaidDiagram title="The Maker Flywheel" chart="graph TD\n    A[Build something] --> B[Hit real problems]\n    B --> C[Solve them]\n    C --> D[Gain deep knowledge]\n    D --> E[Share what you learned]\n    E --> F[Attract opportunities]\n    F --> A" />
+<MermaidDiagram title="The maker flywheel" chart="graph TD\n    A[Build something] --> B[Hit real problems]\n    B --> C[Solve them]\n    C --> D[Gain deep knowledge]\n    D --> E[Share what you learned]\n    E --> F[Attract opportunities]\n    F --> A" />
 
-When you ship a project, you show the things a list of technologies can't. You picked a database, a framework, a way to deploy — and owned those calls. You weighed real trade-offs and committed to one, which is most of what senior engineering actually is. And you finished, which most developers never do.
-
-<Collapsible title="What hiring managers actually look for">
-
-After interviewing 100+ engineers, the pattern is clear: the strongest candidates aren't the ones with the most certifications. They're the ones who can explain *why* they made specific technical decisions in their projects.
-
-"I used Prisma instead of raw SQL because the team was small and move-fast mattered more than query optimization" tells me more than "I have 5 years of database experience."
-
-A shipped project with real decisions beats a resume of technologies listed.
-
-</Collapsible>
+When you ship a project, you show the things a list of technologies can't. You picked a database, a framework, a way to deploy, and you owned those calls. You weighed real trade-offs and committed to one, which is most of what senior engineering actually is. And you finished it, which is harder than starting it.
 
 ## The compound effect of building in public
 
-There's a compounding effect that most people miss. When you build and share publicly:
+Building and sharing in public compounds. You learn the thing by building it, and you pin it down by writing about it. Readers' questions then expose the gaps you can't answer yet, and the next project is where you fill them.
 
-1. You learn the thing by building it.
-2. You solidify it by writing about it.
-3. Readers give you feedback.
-4. Their questions expose gaps you can't answer yet.
-5. You fill those gaps in the next project, and the cycle repeats.
+The wiki went through the writing half of that loop. It became the [post on shipping a high-accuracy agent](/blog/high-accuracy-agent-priorities/), which is sixteen modules squeezed into one priority list, with every section linking back to the module it came from. Sometimes the writing step sends you back to building: the [interactive components on this blog](/blog/interactive-blog-components/) exist because some claims in other posts were more than a paragraph could carry.
 
-Each project makes the next one better, technically and in how you *think about problems*. You develop intuition that no tutorial can teach.
+Each project makes the next one better, technically and in how you *think about problems*.
 
 <Callout type="note" title="It doesn't have to be original">
 You don't need to invent a new framework. Build a todo app, but make it *yours*. Choose the tech stack, design the UI, make the hard decisions. A well-executed familiar idea teaches more than an abandoned ambitious one.
@@ -104,26 +101,18 @@ You don't need to invent a new framework. Build a todo app, but make it *yours*.
 
 ## How to start
 
-Perfectionism stops more projects than missing skill ever will. The antidote:
-
-1. Pick a problem you actually have. Don't build a "practice project" — build [something you'll use](/blog/game-feel-on-the-web/). The motivation to finish is 10x higher when you're your own user.
-
-2. Constrain the scope ruthlessly. The first version should take a weekend, not a month. Ship the embarrassing MVP; you can always iterate.
-
-3. Write one thing about it — a blog post, a tweet thread, a README with the actual decisions. Teaching is the multiplier.
-
-4. Ship it somewhere real.
+Perfectionism stops more projects than missing skill ever will. Pick a problem you actually have, so you're your own first user. Keep the first version to a weekend, ship the embarrassing MVP, and write one thing about it, even if it's just a README with the actual decisions. Small is fine. The calendar PWA behind [my post on tests](/blog/tests-gave-me-control/) was a personal sandbox for learning Next.js patterns, and it still gave me a whole post to write.
 
 <Timeline items={[
   { date: "Weekend 1", title: "Build the core feature. Deploy it.", body: "A project on localhost is a draft; a URL makes it real." },
-  { date: "Weekend 2", title: "Fix the top three things that bother you.", body: "You're your own user now — the list writes itself." },
+  { date: "Weekend 2", title: "Fix the top three things that bother you.", body: "You're your own user now, so the list writes itself." },
   { date: "Weekend 3", title: "Write about what you learned.", body: "Teaching is the multiplier.", emphasize: true },
   { date: "Then", title: "Repeat with the next idea." },
 ]} />
 
 ## The knowledge you can't Google
 
-There's a type of engineering knowledge that doesn't exist in documentation. It lives in the gap between "I know how X works" and "I know what happens when X meets Y in production." Michael Polanyi called this [tacit knowledge](https://en.wikipedia.org/wiki/Tacit_knowledge), the kind of knowing you can only acquire through experience, not instruction.
+There's a type of engineering knowledge that doesn't exist in documentation. It lives in the gap between "I know how X works" and "I know what happens when X meets Y in production." Michael Polanyi called this [tacit knowledge](https://en.wikipedia.org/wiki/Tacit_knowledge), the kind of knowing you pick up through experience and can't fully put into words.
 
 You can't read your way to this knowledge. You can only build your way there.
 
@@ -134,7 +123,8 @@ So pick the thing you've been meaning to study, and build a bad version of it th
 ---
 
 **Further reading:**
-- [Active learning increases student performance in STEM](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111), Freeman et al., PNAS
+- [Active learning increases student performance in science, engineering, and mathematics](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111), Freeman et al., PNAS, 2014
+- [Measuring actual learning versus feeling of learning in response to being actively engaged in the classroom](https://doi.org/10.1073/pnas.1821936116), Deslauriers et al., PNAS, 2019
+- [Active versus passive learning in large-group sessions in medical school: a randomized cross-over trial](https://link.springer.com/article/10.1007/s40670-024-02219-1), Boedeker et al., Medical Science Educator, 2024
 - [The Feynman Technique](https://fs.blog/feynman-technique/), Farnam Street
-- [Building Beyond the Job: Dev Side Projects in 2025](https://dev.to/matin676/building-beyond-the-job-dev-side-projects-in-2025-3meb), DEV Community
-- [New Research Shows Learning Is More Effective When Active](https://www.cmu.edu/news/stories/archives/2021/october/active-learning.html), Carnegie Mellon
+- [Learn: engineering agentic systems](/learn/agentic-systems/), the 16-module wiki this post opens with

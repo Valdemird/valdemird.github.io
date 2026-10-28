@@ -272,13 +272,18 @@ const stepLabels = ops.map((o) => o.label ?? (o.op === 'branch' ? `branch ${o.na
 				stop();
 				return;
 			}
+			// Reduced motion: no autoplay at all. Flipping through every commit at
+			// 50 ms read as flicker; land on the final graph instead.
+			if (onReducedMotion()) {
+				go(total);
+				return;
+			}
 			if (current >= total) current = 0;
 			playBtn.textContent = '⏸';
-			const interval = onReducedMotion() ? 50 : 900;
 			timer = setInterval(() => {
 				go(current + 1);
 				if (current >= total) stop();
-			}, interval);
+			}, 900);
 		});
 
 		apply();
@@ -292,7 +297,7 @@ const stepLabels = ops.map((o) => o.label ?? (o.op === 'branch' ? `branch ${o.na
 	}
 
 	init();
-	document.addEventListener('astro:after-swap', init);
+	document.addEventListener('astro:page-load', init);
 </script>
 
 <style>

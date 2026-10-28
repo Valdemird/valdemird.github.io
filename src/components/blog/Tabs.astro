@@ -4,17 +4,33 @@ interface Props {
 }
 
 const { labels } = Astro.props;
-const tabId = `tabs-${Math.random().toString(36).slice(2, 7)}`;
+
+// Deterministic id: a hash of the labels, plus an occurrence suffix when the
+// same label set shows up twice on one page. Same input, same HTML, every build.
+function hash(input: string): string {
+	let h = 5381;
+	for (let i = 0; i < input.length; i++) h = ((h << 5) + h + input.charCodeAt(i)) >>> 0;
+	return h.toString(36);
+}
+const base = `tabs-${hash(labels.join('\u0000'))}`;
+const locals = (Astro.locals ?? {}) as unknown as { __tabsSeen?: Map<string, number> };
+const seen = (locals.__tabsSeen ??= new Map<string, number>());
+const occurrence = (seen.get(base) ?? 0) + 1;
+seen.set(base, occurrence);
+const tabId = occurrence === 1 ? base : `${base}-${occurrence}`;
 ---
 
-<div class="tabs-container" id={tabId} data-active="0">
+<div class="tabs-container" id={tabId} data-tabs>
 	<div class="tabs-header" role="tablist">
 		{labels.map((label, i) => (
 			<button
 				role="tab"
 				class:list={['tab-btn', { active: i === 0 }]}
-				data-tab-index={i}
+				id={`${tabId}-tab-${i}`}
+				aria-controls={`${tabId}-panel-${i}`}
 				aria-selected={i === 0 ? 'true' : 'false'}
+				tabindex={i === 0 ? 0 : -1}
+				data-tab-index={i}
 				type="button"
 			>
 				{label}
@@ -28,42 +44,92 @@ const tabId = `tabs-${Math.random().toString(36).slice(2, 7)}`;
 </div>
 
 <script>
-	function initTabs() {
-		document.querySelectorAll('.tabs-container').forEach((container) => {
-			const buttons = container.querySelectorAll<HTMLButtonElement>('.tab-btn');
-			const panels = container.querySelectorAll<HTMLElement>('.tab-panel');
-			const indicator = container.querySelector<HTMLElement>('.tab-indicator');
+	// WAI-ARIA APG tabs: roving tabindex, Arrow Left/Right (wrapping), Home/End,
+	// automatic activation. Listeners live on elements inside the container, so
+	// a View Transition swap drops them with the old DOM; the resize observers
+	// are disconnected explicitly before the swap.
+	let observers: ResizeObserver[] = [];
 
-			function activate(index: number) {
-				buttons.forEach((btn, i) => {
-					btn.classList.toggle('active', i === index);
-					btn.setAttribute('aria-selected', i === index ? 'true' : 'false');
-				});
-				panels.forEach((panel, i) => {
-					panel.classList.toggle('active', i === index);
-				});
-				// Move indicator
-				if (indicator && buttons[index]) {
-					const btn = buttons[index];
-					indicator.style.width = `${btn.offsetWidth}px`;
-					indicator.style.transform = `translateX(${btn.offsetLeft}px)`;
-				}
-			}
+	function setup(container: HTMLElement) {
+		if (container.dataset.tabsReady) return;
+		container.dataset.tabsReady = '1';
 
-			buttons.forEach((btn) => {
-				btn.addEventListener('click', () => {
-					const index = parseInt(btn.dataset.tabIndex || '0');
-					activate(index);
-				});
-			});
+		// Only this set's own tabs and panels, never those of a nested <Tabs>.
+		const own = (el: Element) => el.closest('[data-tabs]') === container;
+		const buttons = Array.from(container.querySelectorAll<HTMLButtonElement>('.tab-btn')).filter(own);
+		const panels = Array.from(container.querySelectorAll<HTMLElement>('.tab-panel')).filter(own);
+		const header = container.querySelector<HTMLElement>(':scope > .tabs-header');
+		const indicator = header?.querySelector<HTMLElement>(':scope > .tab-indicator') ?? null;
+		let current = 0;
 
-			// Initialize indicator position
-			if (buttons.length > 0) activate(0);
+		buttons.forEach((btn, i) => {
+			const panel = panels[i];
+			if (!panel) return;
+			panel.id = btn.getAttribute('aria-controls') ?? `${container.id}-panel-${i}`;
+			panel.setAttribute('aria-labelledby', btn.id);
 		});
+
+		function placeIndicator() {
+			const btn = buttons[current];
+			if (!indicator || !btn) return;
+			indicator.style.width = `${btn.offsetWidth}px`;
+			indicator.style.transform = `translateX(${btn.offsetLeft}px)`;
+		}
+
+		function activate(index: number, focus = false) {
+			current = index;
+			buttons.forEach((btn, i) => {
+				const on = i === index;
+				btn.classList.toggle('active', on);
+				btn.setAttribute('aria-selected', on ? 'true' : 'false');
+				btn.tabIndex = on ? 0 : -1;
+			});
+			panels.forEach((panel, i) => {
+				const on = i === index;
+				panel.classList.toggle('active', on);
+				panel.hidden = !on;
+			});
+			if (focus) buttons[index]?.focus();
+			placeIndicator();
+		}
+
+		buttons.forEach((btn, i) => {
+			btn.addEventListener('click', () => activate(i));
+			btn.addEventListener('keydown', (e) => {
+				const last = buttons.length - 1;
+				let next: number | null = null;
+				if (e.key === 'ArrowRight') next = current === last ? 0 : current + 1;
+				else if (e.key === 'ArrowLeft') next = current === 0 ? last : current - 1;
+				else if (e.key === 'Home') next = 0;
+				else if (e.key === 'End') next = last;
+				if (next === null) return;
+				e.preventDefault();
+				activate(next, true);
+			});
+		});
+
+		if (buttons.length > 0) activate(0);
+
+		// Re-measure when fonts load or the tabs change width (e.g. inside a
+		// Collapsible that was closed at init time).
+		if (header && 'ResizeObserver' in window) {
+			const ro = new ResizeObserver(placeIndicator);
+			ro.observe(header);
+			observers.push(ro);
+		}
 	}
 
-	initTabs();
-	document.addEventListener('astro:after-swap', initTabs);
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-tabs]').forEach(setup);
+	}
+
+	function teardown() {
+		observers.forEach((ro) => ro.disconnect());
+		observers = [];
+	}
+
+	document.addEventListener('astro:page-load', init);
+	document.addEventListener('astro:before-swap', teardown);
 </script>
 
 <style>
@@ -101,6 +167,12 @@ const tabId = `tabs-${Math.random().toString(36).slice(2, 7)}`;
 	.tab-btn:hover { color: var(--color-text); }
 	.tab-btn.active { color: var(--color-text); }
 
+	.tab-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -2px;
+		color: var(--color-text);
+	}
+
 	.tab-indicator {
 		position: absolute;
 		bottom: 0;
@@ -121,9 +193,28 @@ const tabId = `tabs-${Math.random().toString(36).slice(2, 7)}`;
 		padding: 1.25rem;
 	}
 
-	.tabs-panels :global(.tab-panel.active) {
+	/* Before the script runs (or without JS), show the first panel. */
+	.tabs-panels :global(.tab-panel.active),
+	.tabs-container:not([data-tabs-ready]) .tabs-panels :global(.tab-panel:first-child) {
 		display: block;
+	}
+
+	.tabs-panels :global(.tab-panel.active) {
 		animation: tabFadeIn 0.25s var(--ease-smooth);
+	}
+
+	.tabs-panels :global(.tab-panel[hidden]) {
+		display: none;
+	}
+
+	.tabs-panels :global(.tab-panel:focus-visible) {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -2px;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.tabs-panels :global(.tab-panel.active) { animation: none; }
+		.tab-indicator { transition: none; }
 	}
 
 	@keyframes tabFadeIn {

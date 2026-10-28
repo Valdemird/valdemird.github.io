@@ -1,8 +1,9 @@
 ---
-title: "Aprender construyendo: por qué los makers aprenden más rápido que los estudiantes"
-description: "La forma más efectiva de dominar una tecnología no es leer docs ni ver tutoriales — es construir algo real. Por qué aprender haciendo funciona mejor."
+title: "Aprender construyendo: un proyecto real enseña más que un tutorial"
+description: "Un tutorial te muestra las decisiones de otro; construir te obliga a tomar las tuyas. Qué midió de verdad la investigación y un dato que este post invirtió."
 pubDate: 2026-03-14
-tags: ["aprendizaje", "maker", "productividad", "carrera"]
+updatedDate: 2026-10-27
+tags: ["aprendizaje", "proyectos-personales", "flujo-de-trabajo", "carrera"]
 featured: false
 lang: es
 ---
@@ -10,18 +11,24 @@ lang: es
 import Callout from '../../../components/blog/Callout.astro';
 import Tabs from '../../../components/blog/Tabs.astro';
 import TabPanel from '../../../components/blog/TabPanel.astro';
-import Collapsible from '../../../components/blog/Collapsible.astro';
 import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
 import StatGrid from '../../../components/blog/StatGrid.astro';
 import Timeline from '../../../components/blog/Timeline.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
 
-He visto a desarrolladores pasar meses con cursos, tutoriales y documentación, y seguir sin sentirse listos para construir algo real. También he visto a desarrolladores con la mitad del "tiempo de estudio" lanzar apps a producción que realmente funcionan. La diferencia no es talento. Es método.
+En junio publiqué en este sitio una [wiki de 16 módulos sobre sistemas agénticos](/es/learn/agentic-systems/). No la escribí a mano. La redactaron y verificaron de forma cruzada unos workflows de Claude Code, y después yo la estudié hasta entenderla lo suficiente como para poder discutirle.
 
-**Los que construyen aprenden más rápido que los que estudian.** Construir fuerza una relación distinta con el conocimiento: tomas las decisiones en vez de mirar cómo las toma otro.
+Seis días después del primer commit llegó una segunda pasada. Era un fact-check adversarial en el que agentes independientes tenían que confirmar cada afirmación contra la web, y encontró 20 errores confirmados en las afirmaciones y 26 problemas de fuentes repartidos por los módulos. Un módulo le atribuía RLAIF a Google en 2023. El término viene del paper de Constitutional AI de Anthropic, de 2022.
+
+Todos esos errores ya habían pasado la primera verificación cruzada. En la página se leían igual de fluidos que las afirmaciones correctas que tenían al lado. La única forma de encontrarlos era volver a las fuentes.
+
+Este post también tenía uno de esos errores. Ya llego a eso.
+
+**Se aprende más rápido construyendo.** Construir te obliga a una relación distinta con el conocimiento: tomas las decisiones en vez de mirar cómo las toma otro.
 
 ## La trampa del tutorial
 
-Los tutoriales se sienten productivos. Sigues los pasos, todo funciona, entiendes cada paso. Pero hay un costo oculto: estás aprendiendo las decisiones del *instructor*, no tomando las tuyas.
+Los tutoriales se sienten productivos. Sigues las instrucciones, todo funciona, entiendes cada paso. Pero hay un costo oculto: estás aprendiendo las decisiones del *instructor*, no tomando las tuyas.
 
 <Tabs labels={["Aprender con tutorial", "Aprender construyendo"]}>
 <TabPanel>
@@ -44,78 +51,60 @@ Los tutoriales se sienten productivos. Sigues los pasos, todo funciona, entiende
 </TabPanel>
 </Tabs>
 
-La diferencia crítica: cuando construyes, te metes en la *zona pantanosa* — esa parte entre "entiendo el concepto" y "funciona en producción". Ahí es donde ocurre el aprendizaje real.
+La diferencia de fondo es que, cuando construyes, te metes en la *zona pantanosa*, esa parte entre "entiendo el concepto" y "funciona en producción". Ahí es donde ocurre el aprendizaje real.
 
-<Callout type="important" title="La ventaja del builder">
-Los tutoriales te enseñan qué funciona. Construir te enseña qué falla y dónde — y ese es el conocimiento que realmente importa en producción.
+<Callout type="important" title="La ventaja de construir">
+Los tutoriales te enseñan qué funciona. Construir te enseña qué falla y dónde, y ese es el conocimiento que de verdad importa en producción.
 </Callout>
 
-## La investigación es clara: activo le gana a pasivo
+## Qué midió de verdad la investigación
 
-Hay ciencia rigurosa detrás de esto. Un [metaanálisis de 225 estudios publicado en PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) por Freeman et al. encontró que los estudiantes en entornos de aprendizaje activo obtuvieron un 6% más en exámenes y fueron **1.5x menos propensos a reprobar** en comparación con las clases pasivas tradicionales.
+Un [metaanálisis de 225 estudios publicado en PNAS](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111) por Freeman et al. (2014) comparó el aprendizaje activo con las clases magistrales tradicionales en cursos universitarios de ciencias, ingeniería y matemáticas. En las secciones activas las notas de examen fueron alrededor de un 6% más altas. Los estudiantes de clases puramente expositivas tuvieron **1.5 veces más probabilidad de reprobar**: reprobó el 33.8% con clase magistral frente al 21.8% con aprendizaje activo.
+
+Aquí está mi error. Cuando publiqué este post en marzo, esa frase decía que quienes aprendían de forma activa tenían "1.5x menos probabilidad de reprobar". Es la razón del paper apuntando al revés. Sobrevivió siete meses, incluida una pasada de estilo en junio que editó justo este párrafo y dejó el número intacto. Nadie lo notó hasta que la auditoría para esta actualización volvió al paper.
 
 <StatGrid columns={3} stats={[
-  { value: "1.5×", label: "menos probabilidad de reprobar", context: "activo vs pasivo — Freeman et al., 225 estudios" },
+  { value: "1.5×", label: "más reprobación en clases solo expositivas", context: "33.8% vs 21.8%. Freeman et al. 2014, 225 estudios" },
   { value: "+6%", label: "en las notas de examen", context: "el mismo metaanálisis de PNAS" },
-  { value: "0.27 SD", label: "más alto en el post-test", context: "ensayo aleatorizado de 2024, estudiantes de medicina" },
+  { value: "0.27 SD", label: "más alto en el post-test", context: "ensayo cruzado de 2024, 146 estudiantes de medicina" },
 ]} />
 
-La confirmación más reciente es un [ensayo aleatorizado de 2024 con estudiantes de medicina](https://link.springer.com/article/10.1007/s40670-024-02219-1). La evidencia sigue acumulándose — la participación práctica le gana a la absorción pasiva, y los tutoriales *se sienten* productivos sin *serlo*.
+Un [ensayo aleatorizado cruzado de 2024](https://link.springer.com/article/10.1007/s40670-024-02219-1) con 146 estudiantes de segundo año de medicina apunta en la misma dirección. En las sesiones interactivas, los estudiantes sacaron 0.27 desviaciones estándar más en una prueba de aprendizaje que después de las clases pasivas.
 
-El premio Nobel Richard Feynman formalizó este insight en lo que hoy se conoce como la [Técnica Feynman](https://fs.blog/feynman-technique/): si no puedes explicar algo de forma simple, no lo entiendes realmente. Enseñar te fuerza a cerrar la brecha entre "lo entiendo" y "puedo explicarlo".
+La idea de que lo pasivo *se siente* mejor aunque enseñe menos viene de otro estudio. [Deslauriers et al. (2019)](https://doi.org/10.1073/pnas.1821936116) compararon dos formas de enseñar el mismo contenido de física introductoria: clases activas y clases magistrales de profesores experimentados y muy bien evaluados. Quienes estuvieron en las clases activas aprendieron más y, aun así, calificaron su propio aprendizaje como *menor*. Los autores lo interpretan así: los estudiantes tomaron el esfuerzo extra como señal de que estaban aprendiendo menos. El ensayo de medicina de 2024 no reprodujo esa brecha, porque sus estudiantes aprendieron más y además sintieron que aprendían más. Los dos estudios no coinciden en cómo se siente aprender de forma activa. En las notas sí coinciden.
 
-<Callout type="tip" title="El loop del maker">
-Construir algo → escribir sobre ello → enseñárselo a alguien → construir lo siguiente. Cada paso refuerza el anterior. Es la Técnica Feynman aplicada a la ingeniería: constrúyelo, luego explícalo hasta que sea simple.
-</Callout>
+Ninguno de estos estudios evaluó side projects. Compararon escuchar una clase sentado con hacer algo durante la clase. Pasar de ahí a "construye un proyecto en vez de terminar el curso" es una extrapolación mía. Creo que se sostiene, pero es mía.
+
+A Richard Feynman se le atribuye lo que sigue. La llamada [Técnica Feynman](https://fs.blog/feynman-technique/)<Sidenote>Él nunca la escribió como método. El nombre y la versión paso a paso salieron de blogs de estudio décadas después de su muerte, hacia 2011.</Sidenote> propone explicar el tema con palabras sencillas: los puntos donde te trabas son justo los que todavía no entiendes. Enseñar te obliga a cerrar la brecha entre "lo entiendo" y "puedo explicarlo".
+
+La wiki se apoya en la misma idea. Cada módulo termina con un repaso activo (míralo al final del [módulo sobre el loop del agente](/es/learn/agentic-systems/agent-loop/)): antes de seguir, intentas enunciar de memoria cada idea clave y luego la revelas para comparar. Releer cuesta menos, y por eso mismo fija menos.
 
 ## Por qué los side projects aceleran tu carrera
 
-Los side projects hacen más que enseñarte. Crean un **portafolio visible de buen criterio**: prueba de que sabes tomar decisiones, no solo seguir instrucciones.
+Los side projects hacen más que enseñarte. Crean un **portafolio visible de buen criterio**: prueba de que sabes decidir por tu cuenta.
 
-<MermaidDiagram title="El flywheel del maker" chart="graph TD\n    A[Construir algo] --> B[Encontrar problemas reales]\n    B --> C[Resolverlos]\n    C --> D[Ganar conocimiento profundo]\n    D --> E[Compartir lo aprendido]\n    E --> F[Atraer oportunidades]\n    F --> A" />
+<MermaidDiagram title="El ciclo de quien construye" chart="graph TD\n    A[Construir algo] --> B[Encontrar problemas reales]\n    B --> C[Resolverlos]\n    C --> D[Ganar conocimiento profundo]\n    D --> E[Compartir lo aprendido]\n    E --> F[Atraer oportunidades]\n    F --> A" />
 
-Cuando publicas un proyecto, muestras lo que una lista de tecnologías no puede. Escogiste una base de datos, un framework, una forma de desplegar — y te hiciste cargo de esas decisiones. Sopesaste trade-offs reales y te comprometiste con uno, que es buena parte de lo que de verdad es la ingeniería senior. Y terminaste, algo que la mayoría de desarrolladores nunca hace.
-
-<Collapsible title="Lo que los hiring managers realmente buscan">
-
-Después de entrevistar a más de 100 ingenieros, el patrón es claro: los candidatos más fuertes no son los que tienen más certificaciones. Son los que pueden explicar *por qué* tomaron decisiones técnicas específicas en sus proyectos.
-
-"Usé Prisma en vez de SQL crudo porque el equipo era pequeño y moverse rápido importaba más que optimizar queries" me dice más que "tengo 5 años de experiencia en bases de datos".
-
-Un proyecto lanzado con decisiones reales le gana a un CV con tecnologías listadas.
-
-</Collapsible>
+Cuando publicas un proyecto, muestras lo que una lista de tecnologías no puede. Escogiste una base de datos, un framework, una forma de desplegar, y te hiciste cargo de esas decisiones. Sopesaste trade-offs reales y te comprometiste con uno, que es buena parte de lo que de verdad es la ingeniería senior. Y lo terminaste, que cuesta más que empezarlo.
 
 ## El efecto compuesto de construir en público
 
-Hay un efecto compuesto que la mayoría no ve. Cuando construyes y compartes públicamente:
+Construir y compartir en público tiene un efecto compuesto. Aprendes la cosa al construirla y la fijas al escribir sobre ella. Después, las preguntas de quienes te leen dejan al descubierto los huecos que todavía no sabes llenar, y el siguiente proyecto es donde los llenas.
 
-1. Aprendes la cosa al construirla.
-2. La solidificas al escribir sobre ella.
-3. Quienes leen tu post te dan feedback.
-4. Sus preguntas exponen huecos que aún no puedes responder.
-5. Llenas esos huecos en el siguiente proyecto, y el ciclo se repite.
+La wiki llegó a la parte de escribir de ese ciclo. Terminó convertida en el [post sobre cómo lanzar un agente de alta precisión](/blog/es/high-accuracy-agent-priorities/), que es la wiki de dieciséis módulos comprimida en una sola lista de prioridades, con cada sección enlazando al módulo del que salió. A veces escribir te devuelve a construir: los [componentes interactivos de este blog](/blog/es/interactive-blog-components/) existen porque algunas afirmaciones de otros posts eran más de lo que un párrafo podía cargar.
 
-Cada proyecto hace mejor al siguiente, técnicamente y en cómo *piensas sobre los problemas*. Desarrollas una intuición que ningún tutorial puede enseñar.
+Cada proyecto hace mejor al siguiente, técnicamente y en cómo *piensas los problemas*.
 
 <Callout type="note" title="No tiene que ser original">
-No necesitas inventar un nuevo framework. Construye una app de tareas, pero hazla *tuya*. Escoge el tech stack, diseña la UI, toma las decisiones difíciles. Una idea familiar bien ejecutada enseña más que una idea ambiciosa abandonada.
+No necesitas inventar un nuevo framework. Construye una app de tareas, pero hazla *tuya*. Escoge el stack, diseña la UI, toma las decisiones difíciles. Una idea conocida bien ejecutada enseña más que una idea ambiciosa abandonada.
 </Callout>
 
 ## Cómo empezar
 
-El perfeccionismo frena más proyectos que la falta de habilidad. El antídoto:
-
-1. Escoge un problema que realmente tengas. No un "proyecto de práctica" — [algo que vayas a usar](/blog/es/game-feel-on-the-web/). La motivación para terminar es 10x mayor cuando eres tu propio usuario.
-
-2. Mantén la primera versión en un fin de semana, no un mes. Lanza el MVP vergonzoso; siempre puedes iterar.
-
-3. Escribe una cosa sobre ello — un post, un hilo, un README con las decisiones reales. Enseñar es el multiplicador.
-
-4. Ponlo en línea, en algún lugar real.
+El perfeccionismo frena más proyectos que la falta de habilidad. Escoge un problema que de verdad tengas, para que el primer usuario seas tú. Que la primera versión quepa en un fin de semana, publica el MVP que te da vergüenza y escribe una cosa sobre él, aunque sea un README con las decisiones reales. Que sea pequeño no es problema. La PWA de calendario detrás de [mi post sobre tests](/blog/es/tests-gave-me-control/) era un sandbox personal para aprender patrones de Next.js, y aun así me dio para escribir un post entero.
 
 <Timeline items={[
-  { date: "Fin de semana 1", title: "Construye la feature core. Hazle deploy.", body: "Un proyecto en localhost es un borrador; una URL lo vuelve real." },
+  { date: "Fin de semana 1", title: "Construye la función principal y publícala.", body: "Un proyecto en localhost es un borrador; una URL lo vuelve real." },
   { date: "Fin de semana 2", title: "Arregla las tres cosas que más te molestan.", body: "Ahora eres tu propio usuario: la lista se escribe sola." },
   { date: "Fin de semana 3", title: "Escribe sobre lo que aprendiste.", body: "Enseñar es el multiplicador.", emphasize: true },
   { date: "Después", title: "Repite con la siguiente idea." },
@@ -125,7 +114,7 @@ El perfeccionismo frena más proyectos que la falta de habilidad. El antídoto:
 
 Hay un tipo de conocimiento de ingeniería que no existe en ninguna documentación. Vive en la brecha entre "sé cómo funciona X" y "sé qué pasa cuando X se encuentra con Y en producción".
 
-No puedes llegar a ese conocimiento leyendo. Solo puedes construirlo. Michael Polanyi lo llamó [conocimiento tácito](https://en.wikipedia.org/wiki/Tacit_knowledge) — el tipo de saber que solo se adquiere a través de la experiencia, no de la instrucción.
+No puedes llegar a ese conocimiento leyendo. Solo puedes construirlo. Michael Polanyi lo llamó [conocimiento tácito](https://en.wikipedia.org/wiki/Tacit_knowledge): el tipo de saber que se adquiere con la experiencia y que no terminas de poder poner en palabras.
 
 > "Lo que no puedo crear, no lo entiendo." — Richard Feynman (escrito en su pizarra al momento de su muerte, 1988)
 
@@ -134,7 +123,8 @@ Así que escoge eso que llevas tiempo queriendo estudiar y construye una versió
 ---
 
 **Lectura adicional:**
-- [Active learning increases student performance in STEM](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111), Freeman et al., PNAS
-- [La Técnica Feynman](https://fs.blog/feynman-technique/), Farnam Street
-- [Building Beyond the Job: Dev Side Projects in 2025](https://dev.to/matin676/building-beyond-the-job-dev-side-projects-in-2025-3meb), DEV Community
-- [New Research Shows Learning Is More Effective When Active](https://www.cmu.edu/news/stories/archives/2021/october/active-learning.html), Carnegie Mellon
+- [Active learning increases student performance in science, engineering, and mathematics](https://www.pnas.org/doi/abs/10.1073/pnas.1319030111), Freeman et al., PNAS, 2014
+- [Measuring actual learning versus feeling of learning in response to being actively engaged in the classroom](https://doi.org/10.1073/pnas.1821936116), Deslauriers et al., PNAS, 2019
+- [Active versus passive learning in large-group sessions in medical school: a randomized cross-over trial](https://link.springer.com/article/10.1007/s40670-024-02219-1), Boedeker et al., Medical Science Educator, 2024
+- [La Técnica Feynman](https://fs.blog/feynman-technique/), Farnam Street (en inglés)
+- [Aprende: ingeniería de sistemas agénticos](/es/learn/agentic-systems/), la wiki de 16 módulos con la que abre este post

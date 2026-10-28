@@ -23,6 +23,24 @@
 	--color-destructive: oklch(0.58 0.22 27);
 	--color-success: oklch(0.6 0.18 145);
 	--color-warning: oklch(0.75 0.15 75);
+	--color-important: oklch(0.62 0.18 300);
+
+	/* Text-safe status colors: use these (not the fills above) for any status
+	   TEXT — eyebrows, badges, labels. ≥4.5:1 on bg, bg-secondary, surface,
+	   accent-subtle and on their own 0.045–0.12 washes (light + dark). */
+	--color-success-text: oklch(0.5 0.14 145);
+	--color-warning-text: oklch(0.5 0.11 70);
+	--color-important-text: oklch(0.5 0.18 300);
+	/* Text on a solid --color-accent fill (selection, numbered chips). */
+	--color-on-accent: oklch(1 0 0);
+
+	/* Source-grade chips (A–D): theme-independent fills read with --grade-ink
+	   (≥7.6:1 on every fill in both themes). */
+	--grade-a: oklch(0.74 0.13 150);
+	--grade-b: oklch(0.74 0.12 235);
+	--grade-c: oklch(0.8 0.13 75);
+	--grade-d: oklch(0.74 0.02 265);
+	--grade-ink: oklch(0.21 0.03 265);
 
 	/* Shadows */
 	--shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
@@ -45,9 +63,11 @@
 	--space-2xl: 4rem;
 
 	/* Typography */
-	--font-serif: 'Fraunces', 'Georgia', serif;
-	--font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-	--font-mono: 'Geist Mono', 'SF Mono', 'Fira Code', monospace;
+	/* @fontsource-variable registers "<Family> Variable"; the plain names are
+	   kept as a second choice for locally installed static copies. */
+	--font-serif: 'Fraunces Variable', 'Fraunces', Georgia, serif;
+	--font-sans: 'Geist Variable', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+	--font-mono: 'Geist Mono Variable', 'Geist Mono', ui-monospace, 'SF Mono', 'Fira Code', monospace;
 
 	/* Transitions */
 	--ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -70,7 +90,7 @@
 	--color-text: oklch(0.93 0.005 260);
 	--color-reading: oklch(0.88 0.008 260); /* long-form body: soft off-white, easier than full -text on dark */
 	--color-text-secondary: oklch(0.7 0.01 260);
-	--color-text-muted: oklch(0.58 0.01 260); /* ≥4.5:1 on dark --color-bg (WCAG AA) */
+	--color-text-muted: oklch(0.63 0.01 260); /* ≥4.5:1 on dark bg, bg-secondary, surface and accent-subtle (WCAG AA) */
 	--color-border: oklch(0.3 0.015 260 / 0.5);
 	--color-border-strong: oklch(0.4 0.015 260);
 	--color-accent: oklch(0.7 0.12 260);
@@ -79,6 +99,11 @@
 	--color-destructive: oklch(0.65 0.2 27);
 	--color-success: oklch(0.65 0.16 145);
 	--color-warning: oklch(0.78 0.13 75);
+	--color-important: oklch(0.7 0.15 300);
+	--color-success-text: oklch(0.72 0.15 145);
+	--color-warning-text: oklch(0.8 0.13 75);
+	--color-important-text: oklch(0.74 0.13 300);
+	--color-on-accent: oklch(0.16 0.01 260);
 
 	--shadow-sm: 0 1px 2px oklch(0 0 0 / 0.15);
 	--shadow-md: 0 4px 12px oklch(0 0 0 / 0.2), 0 1px 3px oklch(0 0 0 / 0.15);
@@ -86,14 +111,16 @@
 	--shadow-xl: 0 20px 48px oklch(0 0 0 / 0.3), 0 8px 16px oklch(0 0 0 / 0.2);
 }
 
+/* Twin of the block above for first paint / no-JS (keep the two in sync). */
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme='light']) {
 		--color-bg: oklch(0.16 0.01 260);
 		--color-bg-secondary: oklch(0.2 0.01 260);
 		--color-surface: oklch(0.22 0.015 260);
 		--color-text: oklch(0.93 0.005 260);
+		--color-reading: oklch(0.88 0.008 260);
 		--color-text-secondary: oklch(0.7 0.01 260);
-		--color-text-muted: oklch(0.58 0.01 260); /* ≥4.5:1 on dark --color-bg (WCAG AA) */
+		--color-text-muted: oklch(0.63 0.01 260); /* ≥4.5:1 on dark bg, bg-secondary, surface and accent-subtle (WCAG AA) */
 		--color-border: oklch(0.3 0.015 260 / 0.5);
 		--color-border-strong: oklch(0.4 0.015 260);
 		--color-accent: oklch(0.7 0.12 260);
@@ -102,6 +129,11 @@
 		--color-destructive: oklch(0.65 0.2 27);
 		--color-success: oklch(0.65 0.16 145);
 		--color-warning: oklch(0.78 0.13 75);
+		--color-important: oklch(0.7 0.15 300);
+		--color-success-text: oklch(0.72 0.15 145);
+		--color-warning-text: oklch(0.8 0.13 75);
+		--color-important-text: oklch(0.74 0.13 300);
+		--color-on-accent: oklch(0.16 0.01 260);
 
 		--shadow-sm: 0 1px 2px oklch(0 0 0 / 0.15);
 		--shadow-md: 0 4px 12px oklch(0 0 0 / 0.2), 0 1px 3px oklch(0 0 0 / 0.15);
@@ -254,6 +286,28 @@ pre > code {
 	font-family: inherit;
 }
 
+/* Shiki dual themes: the light theme is inlined; swap to the dark one in
+   both dark selectors (JS-set attribute and the no-JS media twin). */
+[data-theme='dark'] .astro-code,
+[data-theme='dark'] .astro-code span {
+	color: var(--shiki-dark) !important;
+	background-color: var(--shiki-dark-bg) !important;
+	font-style: var(--shiki-dark-font-style) !important;
+	font-weight: var(--shiki-dark-font-weight) !important;
+	text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) .astro-code,
+	:root:not([data-theme='light']) .astro-code span {
+		color: var(--shiki-dark) !important;
+		background-color: var(--shiki-dark-bg) !important;
+		font-style: var(--shiki-dark-font-style) !important;
+		font-weight: var(--shiki-dark-font-weight) !important;
+		text-decoration: var(--shiki-dark-text-decoration) !important;
+	}
+}
+
 /* --- Media --- */
 img {
 	max-width: 100%;
@@ -308,9 +362,11 @@ th {
 }
 
 /* --- Selection --- */
+/* --color-on-accent flips to the dark bg in dark mode (white on the lighter
+   dark-mode accent was 2.7:1). */
 ::selection {
 	background: var(--color-accent);
-	color: white;
+	color: var(--color-on-accent);
 }
 
 /* --- Scrollbar --- */
@@ -470,6 +526,12 @@ body::after {
 	opacity: 0.04;
 }
 
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) body::after {
+		opacity: 0.04;
+	}
+}
+
 /* --- Focus visible --- */
 :focus-visible {
 	outline: 2px solid var(--color-accent);
@@ -478,7 +540,9 @@ body::after {
 }
 
 /* --- Skip link (a11y) --- */
-/* Visually hidden until focused, then drops in below the top edge. */
+/* Parked well above the viewport with no shadow until focused (the resting
+   shadow used to bleed into the top-left corner), then drops in. Not
+   visibility:hidden — that would take it out of the tab order. */
 .skip-link {
 	position: fixed;
 	top: 0.75rem;
@@ -493,14 +557,16 @@ body::after {
 	background: var(--color-surface);
 	border: 1px solid var(--color-border-strong);
 	border-radius: var(--radius-md);
-	box-shadow: var(--shadow-lg);
+	box-shadow: none;
 	text-decoration: none;
-	transform: translateY(calc(-100% - 1.5rem));
-	transition: transform var(--duration-normal) var(--ease-spring);
+	transform: translateY(calc(-200% - 1.5rem));
+	transition: transform var(--duration-normal) var(--ease-spring),
+		box-shadow var(--duration-normal) var(--ease-smooth);
 }
 
 .skip-link:focus {
 	transform: translateY(0);
+	box-shadow: var(--shadow-lg);
 }
 
 /* --- Responsive --- */

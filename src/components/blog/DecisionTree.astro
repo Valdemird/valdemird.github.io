@@ -170,7 +170,7 @@ const serialized = JSON.stringify(nodes);
   }
 
   init();
-  document.addEventListener("astro:after-swap", init);
+  document.addEventListener("astro:page-load", init);
 </script>
 
 <style>
@@ -264,7 +264,11 @@ const serialized = JSON.stringify(nodes);
     transform: translateY(-1px);
     border-color: var(--color-accent);
     background: oklch(from var(--color-accent) l c h / 0.08);
-    outline: none;
+  }
+
+  .dt-choice:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
   }
 
   .dt-reset {
@@ -284,7 +288,9 @@ const serialized = JSON.stringify(nodes);
     transition: color var(--duration-fast) var(--ease-smooth);
   }
 
-  .dt-reset:hover {
+  .dt-reset:hover,
+  .dt-reset:focus-visible {
     color: var(--color-text);
+    border-color: var(--color-border-strong);
   }
 </style>

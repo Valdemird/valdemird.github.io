@@ -2,8 +2,9 @@
 /**
  * ReadingMeta — compact metadata line: reading time + word count.
  *
- * Values are computed at build time by `remark-reading-meta` and come
- * from the post's frontmatter (`readingTime` and `wordCount`).
+ * The caller passes both values: `readingTime` from `readingMinutes(entry.body)`
+ * (src/lib/learn.ts) and `wordCount` from `countWords(cleanMdxBody(entry.body))`
+ * (src/lib/mdx-plaintext.ts).
  */
 interface Props {
 	readingTime?: number;

@@ -187,20 +187,53 @@ const { graphic = "right" } = Astro.props;
   }
 
   .scrolly-steps {
+    --scrolly-wash: 0.045;
     display: flex;
     flex-direction: column;
     gap: 60vh;
     padding: 20vh 0;
+    counter-reset: scrolly-step;
   }
 
+  :global([data-theme='dark']) .scrolly-steps {
+    --scrolly-wash: 0.085;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .scrolly-steps {
+      --scrolly-wash: 0.085;
+    }
+  }
+
+  /* Each step carries a mono numbered index (01, 02, ...) as its marker; the
+     active one gets the accent index, a tinted wash and hairline top/bottom
+     rules. No left accent bar. */
   .scrolly-steps :global(.scrolly-step) {
+    counter-increment: scrolly-step;
     padding: 1.5rem;
-    border-left: 3px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
+    border-bottom: 1px solid transparent;
     transition: border-color 0.4s var(--ease-smooth), background 0.4s var(--ease-smooth);
   }
 
+  .scrolly-steps :global(.scrolly-step)::before {
+    content: counter(scrolly-step, decimal-leading-zero);
+    display: block;
+    margin-bottom: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    color: var(--color-text-muted);
+    transition: color 0.4s var(--ease-smooth);
+  }
+
   .scrolly-steps :global(.scrolly-step[data-active="true"]) {
-    border-left-color: var(--color-accent);
-    background: oklch(from var(--color-accent) l c h / 0.04);
+    border-bottom-color: var(--color-border);
+    background: oklch(from var(--color-accent) l c h / var(--scrolly-wash));
+  }
+
+  .scrolly-steps :global(.scrolly-step[data-active="true"])::before {
+    color: var(--color-accent-hover);
   }
 </style>

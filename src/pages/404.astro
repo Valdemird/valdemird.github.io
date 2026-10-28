@@ -1,32 +1,93 @@
 ---
+import { getCollection } from 'astro:content';
 import BaseHead from '../components/BaseHead.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
-import { SITE_TITLE, getLocale, UI_STRINGS } from '../consts';
+import { SITE_TITLE, UI_STRINGS } from '../consts';
+import { baseSlug, courseHomeHref, moduleHref, type Lang } from '../lib/learn';
 
-const locale = getLocale(Astro.url);
-const isEs = locale === 'es';
+// GitHub Pages serves this one static file for every missing path, so the page
+// is built in English and both languages ship in the HTML. A small inline
+// script picks the language from the URL and looks for a likely match.
 
-const title = isEs ? 'Página no encontrada' : 'Page not found';
-const heading = '404';
-const message = isEs ? 'Esta página no existe.' : 'This page doesn\u2019t exist.';
-const subMessage = isEs
-	? 'Puede que haya sido movida o el enlace esté incorrecto.'
-	: 'It may have been moved, or the link might be incorrect.';
-const buttonText = isEs ? 'Ir al inicio' : 'Go home';
-const homePath = isEs ? '/es/' : '/';
-const description = isEs
-	? 'No encontramos esta página. Puede que haya cambiado de lugar o el enlace esté roto. Vuelve al inicio para seguir explorando.'
-	: "We couldn't find this page. It may have moved or the link may be broken. Head back home to keep exploring.";
+const COPY = {
+	en: {
+		title: 'Page not found',
+		message: 'This page doesn’t exist.',
+		sub: 'It may have been moved, or the link might be incorrect.',
+		didYouMean: 'Were you looking for this?',
+		elsewhere: 'Or pick up from here',
+		latest: 'Latest post',
+		course: 'Course',
+		courseTitle: 'Engineering agentic systems',
+		lab: 'Lab',
+		labTitle: 'Component gallery',
+		home: 'Go home',
+	},
+	es: {
+		title: 'Página no encontrada',
+		message: 'Esta página no existe.',
+		sub: 'Puede que la hayan movido o que el enlace esté mal.',
+		didYouMean: '¿Buscabas esto?',
+		elsewhere: 'O sigue por aquí',
+		latest: 'Último post',
+		course: 'Curso',
+		courseTitle: 'Ingeniería de sistemas agénticos',
+		lab: 'Lab',
+		labTitle: 'Galería de componentes',
+		home: 'Ir al inicio',
+	},
+} as const;
+
+const description =
+	"We couldn't find this page. It may have moved or the link may be broken. Head back home to keep exploring.";
+
+const posts = (await getCollection('blog'))
+	.filter((p) => !p.data.draft)
+	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+const modules = await getCollection('learn');
+
+function latestPost(lang: Lang) {
+	const p = posts.find((post) => (lang === 'es') === post.id.startsWith('es/'));
+	return p ? { title: p.data.title, href: `/blog/${p.id}/` } : null;
+}
+
+// Every page worth suggesting, per language. Matched at runtime by slug.
+const targets = [
+	...posts.map((p) => ({
+		lang: p.id.startsWith('es/') ? 'es' : 'en',
+		slug: p.id.replace(/^es\//, ''),
+		title: p.data.title,
+		href: `/blog/${p.id}/`,
+	})),
+	...modules.map((m) => {
+		const lang: Lang = m.id.startsWith('es/') ? 'es' : 'en';
+		const slug = baseSlug(m.id);
+		return { lang, slug, title: m.data.title, href: moduleHref(slug, lang) };
+	}),
+];
+
+const blocks = (['en', 'es'] as const).map((lang) => {
+	const copy = COPY[lang];
+	const latest = latestPost(lang);
+	const links: { label: string; title: string; href: string }[] = [];
+	if (latest) links.push({ label: copy.latest, ...latest });
+	links.push({ label: copy.course, title: copy.courseTitle, href: courseHomeHref(lang) });
+	links.push({ label: copy.lab, title: copy.labTitle, href: lang === 'es' ? '/es/lab/' : '/lab/' });
+	return { lang, copy, home: lang === 'es' ? '/es/' : '/', links };
+});
+
+const esNav = UI_STRINGS.es.nav;
+const esCopy = { title: `${COPY.es.title} — ${SITE_TITLE}`, skip: esNav.skipToContent, copyright: UI_STRINGS.es.footer.copyright };
 ---
 
 <!doctype html>
-<html lang={locale}>
+<html lang="en">
 	<head>
-		<BaseHead title={`${title} — ${SITE_TITLE}`} description={description} noindex />
+		<BaseHead title={`${COPY.en.title} — ${SITE_TITLE}`} description={description} noindex />
 	</head>
 	<body>
-		<a id="nf-skip" class="skip-link" href="#main-content">{UI_STRINGS[locale].nav.skipToContent}</a>
+		<a id="nf-skip" class="skip-link" href="#main-content">{UI_STRINGS.en.nav.skipToContent}</a>
 		<Header />
 		<main id="main-content">
 			<script>
@@ -35,7 +96,7 @@ const description = isEs
 				function init404() {
 					if (isReducedMotion()) return;
 					if (!document.documentElement.hasAttribute('data-vt-nav')) {
-						initPageEntrance('.not-found > .animate-fade-in');
+						initPageEntrance('.not-found:not([hidden]) .animate-fade-in');
 					}
 				}
 				function initAndCleanup() {
@@ -45,36 +106,139 @@ const description = isEs
 				initAndCleanup();
 				document.addEventListener('astro:after-swap', initAndCleanup);
 			</script>
-			<div class="not-found">
-				<span class="error-code animate-fade-in">404</span>
-				<h1 id="nf-message" class="animate-fade-in delay-1">{message}</h1>
-				<p id="nf-submessage" class="animate-fade-in delay-2">{subMessage}</p>
-				<a id="nf-home" href={homePath} class="home-btn animate-fade-in delay-3">
-					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-						<line x1="19" y1="12" x2="5" y2="12"></line>
-						<polyline points="12 19 5 12 12 5"></polyline>
-					</svg>
-					<span id="nf-button">{buttonText}</span>
-				</a>
-			</div>
 
-			<!-- GitHub Pages serves a single static /404.html for every missing path,
-			     so locale is detected at runtime from the URL (build-time getLocale is always 'en'). -->
+			{blocks.map(({ lang, copy, home, links }) => (
+				<div class="not-found" data-nf-lang={lang} lang={lang} hidden={lang === 'es'}>
+					<span class="error-code animate-fade-in" aria-hidden="true">404</span>
+					<h1 class="animate-fade-in delay-1">{copy.message}</h1>
+					<p class="nf-sub animate-fade-in delay-2">{copy.sub}</p>
+
+					<a class="nf-guess" data-nf-guess href={home} hidden>
+						<span class="nf-label">{copy.didYouMean}</span>
+						<span class="nf-title" data-nf-guess-title></span>
+					</a>
+
+					<nav class="nf-links animate-fade-in delay-3" aria-label={copy.elsewhere}>
+						<p class="nf-eyebrow">{copy.elsewhere}</p>
+						<ul>
+							{links.map((l) => (
+								<li>
+									<a class="nf-link" href={l.href}>
+										<span class="nf-label">{l.label}</span>
+										<span class="nf-title">{l.title}</span>
+									</a>
+								</li>
+							))}
+						</ul>
+					</nav>
+
+					<a href={home} class="home-btn animate-fade-in delay-4">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+							<line x1="19" y1="12" x2="5" y2="12"></line>
+							<polyline points="12 19 5 12 12 5"></polyline>
+						</svg>
+						<span>{copy.home}</span>
+					</a>
+				</div>
+			))}
+
+			<script is:inline type="application/json" id="nf-data" set:html={JSON.stringify({ targets, esNav, esCopy }).replace(/</g, '\\u003c')} />
 			<script is:inline>
 				(function () {
-					if (!location.pathname.startsWith('/es')) return;
-					document.documentElement.setAttribute('lang', 'es');
-					document.title = 'Página no encontrada — valdemird';
-					var msg = document.getElementById('nf-message');
-					var sub = document.getElementById('nf-submessage');
-					var btn = document.getElementById('nf-button');
-					var home = document.getElementById('nf-home');
-					var skip = document.getElementById('nf-skip');
-					if (skip) skip.textContent = 'Saltar al contenido';
-					if (msg) msg.textContent = 'Esta página no existe.';
-					if (sub) sub.textContent = 'Puede que haya sido movida o el enlace esté incorrecto.';
-					if (btn) btn.textContent = 'Ir al inicio';
-					if (home) home.setAttribute('href', '/es/');
+					var nfData = document.getElementById('nf-data');
+					if (!nfData) return;
+					var nf = JSON.parse(nfData.textContent || '{}');
+					var targets = nf.targets || [];
+					var esNav = nf.esNav;
+					var esCopy = nf.esCopy;
+					var path = location.pathname.toLowerCase().replace(/\.html?$/, '').replace(/\/+$/, '');
+					var es = /^\/es(\/|$)/.test(path) || /^\/blog\/es\//.test(path);
+					var lang = es ? 'es' : 'en';
+
+					if (es) {
+						document.documentElement.setAttribute('lang', 'es');
+						document.title = esCopy.title;
+						var skip = document.getElementById('nf-skip');
+						if (skip) skip.textContent = esCopy.skip;
+						document.querySelectorAll('[data-nf-lang]').forEach(function (el) {
+							el.hidden = el.getAttribute('data-nf-lang') !== 'es';
+						});
+						// The header was built for the English 404; point it at Spanish.
+						var nav = [
+							['/es/', esNav.home],
+							['/es/blog/', esNav.blog],
+							['/es/learn/', esNav.learn],
+							['/es/lab/', esNav.lab],
+							['/es/about/', esNav.about],
+						];
+						['.nav-links a', '#mobile-nav a'].forEach(function (sel) {
+							document.querySelectorAll(sel).forEach(function (a, i) {
+								if (!nav[i]) return;
+								a.setAttribute('href', nav[i][0]);
+								a.textContent = nav[i][1];
+							});
+						});
+						var logo = document.querySelector('#site-header .logo');
+						if (logo) logo.setAttribute('href', '/es/');
+						var sw = document.querySelector('#site-header .lang-switch');
+						if (sw) {
+							sw.setAttribute('href', '/');
+							sw.setAttribute('aria-label', esNav.switchLang + ' English');
+							sw.textContent = 'EN';
+						}
+						var toggle = document.getElementById('menu-toggle');
+						if (toggle) toggle.setAttribute('aria-label', esNav.toggleMenu);
+						// The footer is parsed after this script, so swap it once the DOM is in.
+						var swapFooter = function () {
+							var c = document.querySelector('[data-footer-copyright]');
+							if (c) c.textContent = esCopy.copyright;
+						};
+						if (document.readyState === 'loading') {
+							document.addEventListener('DOMContentLoaded', swapFooter, { once: true });
+						} else {
+							swapFooter();
+						}
+					}
+
+					// "Did you mean": compare the last path segment with every known slug
+					// in this language (edit distance, or a substring for long fragments).
+					var segs = path.split('/').filter(Boolean);
+					var last = segs[segs.length - 1] || '';
+					if (last.length < 3) return;
+
+					function distance(a, b) {
+						var prev = [];
+						for (var j = 0; j <= b.length; j++) prev[j] = j;
+						for (var i = 1; i <= a.length; i++) {
+							var cur = [i];
+							for (var k = 1; k <= b.length; k++) {
+								cur[k] = Math.min(prev[k] + 1, cur[k - 1] + 1, prev[k - 1] + (a[i - 1] === b[k - 1] ? 0 : 1));
+							}
+							prev = cur;
+						}
+						return prev[b.length];
+					}
+
+					var best = null;
+					var bestScore = Infinity;
+					targets.forEach(function (t) {
+						if (t.lang !== lang) return;
+						var d = distance(last, t.slug);
+						if (last.length >= 5 && (t.slug.indexOf(last) !== -1 || last.indexOf(t.slug) !== -1)) d = Math.min(d, 1);
+						var limit = Math.max(2, Math.floor(t.slug.length * 0.34));
+						if (d <= limit && d < bestScore) {
+							best = t;
+							bestScore = d;
+						}
+					});
+					if (!best) return;
+					var block = document.querySelector('[data-nf-lang="' + lang + '"]');
+					var guess = block && block.querySelector('[data-nf-guess]');
+					var title = guess && guess.querySelector('[data-nf-guess-title]');
+					if (!guess || !title) return;
+					guess.setAttribute('href', best.href);
+					title.textContent = best.title;
+					guess.hidden = false;
 				})();
 			</script>
 		</main>
@@ -99,6 +263,7 @@ const description = isEs
 		min-height: 60dvh;
 		padding: 4rem var(--space-lg);
 	}
+	.not-found[hidden] { display: none; }
 
 	.error-code {
 		font-family: var(--font-serif);
@@ -117,11 +282,92 @@ const description = isEs
 		margin-bottom: 0.5rem;
 	}
 
-	p {
+	.nf-sub {
 		font-size: 1rem;
 		color: var(--color-text-muted);
-		margin-bottom: 2.5rem;
+		margin-bottom: 2rem;
 		max-width: 360px;
+	}
+
+	/* Shared eyebrow/title pair for the guess and the recovery links. */
+	.nf-label {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+	.nf-title {
+		font-family: var(--font-serif);
+		font-size: 1rem;
+		line-height: 1.35;
+		color: var(--color-text);
+	}
+
+	.nf-guess,
+	.nf-link {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		padding: 0.9rem 1.1rem;
+		text-align: left;
+		text-decoration: none;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
+		transition: transform var(--duration-normal) var(--ease-spring),
+			box-shadow var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-spring);
+	}
+	.nf-guess:hover,
+	.nf-link:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md);
+		border-color: var(--color-accent);
+	}
+
+	.nf-guess {
+		width: min(100%, 30rem);
+		margin-bottom: 2rem;
+		background: oklch(from var(--color-accent) l c h / 0.045);
+	}
+	.nf-guess[hidden] { display: none; }
+	.nf-guess .nf-title { font-size: 1.15rem; }
+
+	:global([data-theme='dark']) .nf-guess {
+		background: oklch(from var(--color-accent) l c h / 0.085);
+	}
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .nf-guess {
+			background: oklch(from var(--color-accent) l c h / 0.085);
+		}
+	}
+
+	.nf-links {
+		width: min(100%, 48rem);
+		margin-bottom: 2.5rem;
+	}
+	.nf-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-text-muted);
+		margin: 0 0 0.9rem;
+	}
+	.nf-links ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.75rem;
+	}
+	.nf-links li { margin: 0; }
+	.nf-link { height: 100%; }
+
+	@media (max-width: 640px) {
+		.nf-links ul { grid-template-columns: minmax(0, 1fr); }
 	}
 
 	.home-btn {
@@ -138,7 +384,10 @@ const description = isEs
 		background: oklch(from var(--color-surface) l c h / 0.6);
 		backdrop-filter: blur(8px);
 		-webkit-backdrop-filter: blur(8px);
-		transition: all var(--duration-normal) var(--ease-spring);
+		transition: transform var(--duration-normal) var(--ease-spring),
+			box-shadow var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-spring),
+			background var(--duration-normal) var(--ease-spring);
 	}
 
 	.home-btn:hover {

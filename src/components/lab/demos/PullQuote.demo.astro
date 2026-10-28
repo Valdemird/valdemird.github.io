@@ -6,8 +6,8 @@ export const meta = {
 	title: 'PullQuote',
 	category: 'typographic',
 	status: 'stable',
-	summary: 'Editorial pull quote in italic Fraunces with hairline rules and mono attribution; fades in on scroll via GSAP.',
-	summaryEs: 'Cita destacada editorial en Fraunces itálica con hairlines y atribución en mono; aparece con fade al hacer scroll vía GSAP.',
+	summary: 'Editorial pull quote in italic Fraunces between two hairlines, with the attribution in mono. It fades in as you scroll to it.',
+	summaryEs: 'Cita destacada en Fraunces itálica entre dos hairlines, con la atribución en mono. Aparece con un fundido cuando llegas a ella.',
 	why: 'Every post has one sentence I\'d want quoted back at me. Blockquotes with colored left bars are banned here, so this is the classical alternative: italic Fraunces between two short hairlines, like a magazine would set it. If the reader only remembers one line, this component decides which.',
 	whyEs: 'Cada post tiene una frase que querría que me citaran. Las blockquotes con barra izquierda de color están prohibidas aquí, así que esta es la alternativa clásica: Fraunces en itálica entre dos hairlines cortas, como lo compondría una revista. Si el lector solo recuerda una línea, este componente decide cuál.',
 	props: [
@@ -22,7 +22,7 @@ const es = lang === 'es';
 
 <DemoSection
 	label={es ? 'bar / alineada a la izquierda con atribución' : 'bar / left-aligned with attribution'}
-	description={es ? 'La variante por defecto. La tipografía carga el énfasis — sin barra lateral de color, según el sistema de diseño.' : 'The default variant. Typography carries the emphasis — no colored side bar, per the design system.'}
+	description={es ? 'La variante por defecto. La tipografía hace el énfasis; no hay barra lateral de color.' : 'The default variant. The type does the emphasis; there is no colored side bar.'}
 	usage={`<PullQuote cite="me, three worktrees deep on a Saturday">
   The bottleneck was never the model. It was me, serializing
   three independent fixes through one working directory.

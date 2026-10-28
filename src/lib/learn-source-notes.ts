@@ -235,7 +235,7 @@ export const SOURCE_NOTES: Record<string, SourceNote> = {
 			es: ["Estudio primario revisado por pares (NeurIPS 2025) que analiza más de 1600 trazas en 7 frameworks con fuerte acuerdo entre anotadores.", "Fuente de la taxonomía MAST de 14 modos de falla y de los pesos ~42% / ~37% / ~21% de la tabla.", "Fundamenta la afirmación operativa de que un mejor modelo no arregla un sistema multi-agente mal diseñado."],
 		},
 	},
-	"multi-agent::https://cognition.ai/blog/dont-build-multi-agents": {
+	"multi-agent::https://cognition.com/blog/dont-build-multi-agents": {
 		why: { en: "Provides the core mechanism the module hinges on — actions carry implicit decisions, and conflicting implicit decisions make write-fan-out break (the Flappy Bird example).", es: "Aporta el mecanismo central sobre el que gira el módulo: las acciones cargan decisiones implícitas, y las decisiones implícitas en conflicto rompen el fan-out de escritura (el ejemplo de Flappy Bird)." },
 		reasons: {
 			en: ["Primary source for the read/write asymmetry and the 'conflicting implicit decisions' argument the module calls its hinge.", "First-hand position from Cognition; the module uses it as one of the two reconciled camps.", "Grounds the antipattern that trimming context to save tokens produces incoherent synthesized output."],
@@ -256,7 +256,7 @@ export const SOURCE_NOTES: Record<string, SourceNote> = {
 			es: ["Reporte de ingeniería de primera mano del equipo que construyó y midió el sistema, no un resumen secundario.", "Fundamenta la afirmación de que multi-agente es sobre todo comprar cómputo, y la cifra de ~15x en la tabla de costo.", "Fuente del patrón orchestrator-worker con presupuestos de esfuerzo explícitos por subtarea."],
 		},
 	},
-	"observability::https://arxiv.org/html/2604.22708v1": {
+	"observability::https://arxiv.org/abs/2604.22708": {
 		why: { en: "Supplies the empirical basis for making observability an architecture requirement: full traces lift step-level failure attribution by a relative +76%, so the agent must emit input context per step, not output only.", es: "Aporta la base empírica para hacer de la observabilidad un requisito de arquitectura: los traces completos elevan la atribución de fallos a nivel de paso en un +76% relativo, así que el agente debe emitir el contexto de entrada por paso, no solo la salida." },
 		reasons: {
 			en: ["Benchmark paper measuring failure attribution with full vs partial traces across multi-agent systems", "Grounds the 'capture input context per step' section and the +76% step-level attribution figure", "Module cites it carefully, flagging which numbers come from different configurations"],

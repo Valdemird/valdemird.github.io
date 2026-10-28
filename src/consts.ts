@@ -49,43 +49,6 @@ export const ORGANIZATION = {
 
 export const ORGANIZATION_REF = { '@id': ORGANIZATION_ID } as const;
 
-type Project = {
-	readonly title: string;
-	/** Localized description — title and tech stay shared (brand/tech names). */
-	readonly description: { readonly en: string; readonly es: string };
-	readonly url: string;
-	readonly tech: readonly string[];
-	/** Optional screenshot path (e.g. /images/projects/<slug>.webp). When omitted, the card renders a wireframe fallback. */
-	readonly thumbnail?: string;
-};
-
-export const PROJECTS: readonly Project[] = [
-	{
-		title: 'Todo App',
-		description: {
-			en: 'Task manager with AI scheduling, Pomodoro timer, and drag-and-drop. Built because every other todo app annoyed me.',
-			es: 'Gestor de tareas con planificación por IA, temporizador Pomodoro y drag-and-drop. Lo construí porque las demás apps de tareas me molestaban.',
-		},
-		url: 'https://todo.valdemird.com',
-		tech: ['Next.js 15', 'React 19', 'Prisma', 'Tailwind CSS 4', 'Vercel AI SDK'],
-		thumbnail: '/images/projects/todo.webp',
-	},
-];
-
-// Games & interactive experiments — a playground separate from the "real" projects.
-export const EXPERIMENTS: readonly Project[] = [
-	{
-		title: 'valdemird.games',
-		description: {
-			en: 'A space to explore games and interactive experiences. Real-time multiplayer rooms — drop in two players and race. First up: Caza Números.',
-			es: 'Un espacio para explorar juegos y experiencias interactivas. Salas multijugador en tiempo real: entran dos jugadores y compiten. Lo primero: Caza Números.',
-		},
-		url: 'https://games.valdemird.com',
-		tech: ['React', 'Vite', 'TypeScript', 'Socket.IO', 'Vitest'],
-		thumbnail: '/images/projects/games.webp',
-	},
-];
-
 // i18n UI strings
 export const UI_STRINGS = {
 	en: {
@@ -106,20 +69,20 @@ export const UI_STRINGS = {
 			bio: 'I ship products for companies across the Americas. After hours I build my own tools and write down what breaks. This site is me showing my work.',
 			statusBadge: "Let's talk, learn, and build",
 			metaDescription: 'Software engineer and builder. I make developer tools and write about what I learn.',
-			projectsTitle: 'Projects',
-			gamesTitle: 'Games & experiments',
 			recentPostsTitle: 'Recent posts',
 			viewAllPosts: 'View all posts',
-			terminalTitle: '~/projects',
-		},
-		projects: {
-			previewOf: 'Preview of',
+			terminalTitle: '~/valdemird',
 		},
 		blog: {
 			title: 'Blog',
 			description: 'Writing about software, AI tools, and things I\'ve learned building products.',
 			readMore: 'Read more',
 			minRead: 'min read',
+			readNext: 'Read next',
+			followEyebrow: 'Written by',
+			followBio: 'Full-stack engineer in Cali, Colombia. I write about the tools and habits I use to ship software.',
+			followAbout: 'More about me',
+			followRss: 'Follow via RSS',
 		},
 		about: {
 			title: 'About me',
@@ -135,7 +98,7 @@ export const UI_STRINGS = {
 			blog: 'Blog',
 			about: 'Sobre mí',
 			lab: 'Lab',
-			learn: 'Learn',
+			learn: 'Aprende',
 			switchLang: 'Cambiar a',
 			toggleMenu: 'Abrir o cerrar el menú',
 			skipToContent: 'Saltar al contenido',
@@ -147,20 +110,20 @@ export const UI_STRINGS = {
 			bio: 'Lanzo productos para empresas en las Américas. Fuera del horario construyo mis propias herramientas y anoto lo que se rompe en el camino. Este sitio es mi manera de mostrar mi trabajo.',
 			statusBadge: 'Hablemos, aprendamos y construyamos',
 			metaDescription: 'Ingeniero de software y maker. Construyo herramientas para desarrolladores y escribo sobre lo que aprendo.',
-			projectsTitle: 'Proyectos',
-			gamesTitle: 'Juegos y experimentos',
 			recentPostsTitle: 'Posts recientes',
 			viewAllPosts: 'Ver todos los posts',
-			terminalTitle: '~/proyectos',
-		},
-		projects: {
-			previewOf: 'Vista previa de',
+			terminalTitle: '~/valdemird',
 		},
 		blog: {
 			title: 'Blog',
 			description: 'Sobre software, herramientas de IA y cosas que he aprendido construyendo productos.',
 			readMore: 'Leer más',
 			minRead: 'min de lectura',
+			readNext: 'Sigue leyendo',
+			followEyebrow: 'Escrito por',
+			followBio: 'Ingeniero full-stack en Cali, Colombia. Escribo sobre las herramientas y los hábitos que uso para construir software.',
+			followAbout: 'Más sobre mí',
+			followRss: 'Seguir por RSS',
 		},
 		about: {
 			title: 'Sobre mí',
@@ -171,35 +134,6 @@ export const UI_STRINGS = {
 		},
 	},
 } as const;
-
-// --- Web properties (owned subdomains living on other servers) ---
-// Models each project/experiment as a WebApplication authored by the canonical
-// Person. This tells the knowledge graph "valdemird.com and these subdomains
-// share one creator entity" — consolidating brand authority across the domain.
-// Source of truth is PROJECTS + EXPERIMENTS, so adding a card auto-links it.
-export function webPropertyNodes() {
-	return [...PROJECTS, ...EXPERIMENTS].map((p) => ({
-		'@type': 'WebApplication',
-		'@id': `${p.url}#app`,
-		name: p.title,
-		url: p.url,
-		applicationCategory: 'DeveloperApplication',
-		operatingSystem: 'Web',
-		description: p.description.en,
-		author: { '@id': PERSON_ID },
-		publisher: { '@id': PERSON_ID },
-		isPartOf: { '@id': 'https://valdemird.com/#website' },
-	}));
-}
-
-// Canonical Person enriched with the properties it owns — use on identity pages
-// (home, about) where the full entity graph should be declared.
-export function personWithProperties() {
-	return {
-		...PERSON,
-		owns: webPropertyNodes().map((w) => ({ '@id': w['@id'] })),
-	};
-}
 
 export type Locale = keyof typeof UI_STRINGS;
 

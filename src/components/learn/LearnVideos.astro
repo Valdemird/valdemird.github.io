@@ -42,8 +42,17 @@ function hostLabel(url: string): string {
 								class="lv-facade"
 								data-yt={v.youtubeId}
 								aria-label={`${es ? 'Reproducir' : 'Play'}: ${v.title}`}
-								style={`background-image:url(https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg)`}
 							>
+								<img
+									class="lv-thumb"
+									src={`https://i.ytimg.com/vi/${v.youtubeId}/hqdefault.jpg`}
+									alt=""
+									width="480"
+									height="360"
+									loading="lazy"
+									decoding="async"
+									referrerpolicy="no-referrer"
+								/>
 								<span class="lv-play" aria-hidden="true">
 									<svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
 								</span>
@@ -90,13 +99,28 @@ function hostLabel(url: string): string {
 )}
 
 <script>
-	// Click-to-load YouTube in a modal overlay: nothing contacts YouTube until the
+	// Click-to-load YouTube in a modal overlay: the player isn't loaded until the
 	// reader clicks play (privacy + performance), and playback happens in a
 	// centered lightbox over the page. Uses youtube-nocookie + native <dialog> for
-	// ESC, focus handling, and backdrop. Re-inits on Astro view transitions.
+	// ESC, focus handling, and backdrop. Thumbnails are lazy <img>s, so nothing
+	// is fetched from i.ytimg.com until a card scrolls near the viewport.
+	// Re-inits on astro:page-load; listeners are torn down on astro:before-swap.
+	let lvController: AbortController | null = null;
+
+	function teardownLearnVideos() {
+		lvController?.abort();
+		lvController = null;
+		document.body.style.overflow = '';
+	}
+
 	function initLearnVideos() {
+		lvController?.abort();
+		lvController = null;
 		const modal = document.querySelector<HTMLDialogElement>('.lv-modal');
 		if (!modal) return;
+		const controller = new AbortController();
+		lvController = controller;
+		const { signal } = controller;
 		const frame = modal.querySelector<HTMLElement>('.lv-modal-frame');
 		const closeBtn = modal.querySelector<HTMLButtonElement>('.lv-modal-close');
 		if (!frame || !closeBtn) return;
@@ -109,7 +133,8 @@ function hostLabel(url: string): string {
 		function makePoster(btn: HTMLElement | null) {
 			const poster = document.createElement('div');
 			poster.className = 'lv-poster';
-			if (btn) poster.style.backgroundImage = getComputedStyle(btn).backgroundImage;
+			const src = btn?.querySelector<HTMLImageElement>('.lv-thumb')?.currentSrc;
+			if (src) poster.style.backgroundImage = `url("${src}")`;
 			return poster;
 		}
 
@@ -193,39 +218,58 @@ function hostLabel(url: string): string {
 		}
 
 		// Reset state once the dialog actually closes (stops audio, restores scroll).
-		modal.addEventListener('close', () => {
-			frame.innerHTML = '';
-			document.body.style.overflow = '';
-			modal.classList.remove('is-closing');
-			closing = false;
-		});
-		closeBtn.addEventListener('click', requestClose);
+		modal.addEventListener(
+			'close',
+			() => {
+				frame.innerHTML = '';
+				document.body.style.overflow = '';
+				modal.classList.remove('is-closing');
+				closing = false;
+			},
+			{ signal },
+		);
+		closeBtn.addEventListener('click', requestClose, { signal });
 		// Click outside the video (on the backdrop) closes.
-		modal.addEventListener('click', (e) => {
-			if (e.target === modal) requestClose();
-		});
+		modal.addEventListener(
+			'click',
+			(e) => {
+				if (e.target === modal) requestClose();
+			},
+			{ signal },
+		);
 		// Intercept ESC so it plays the shrink-back animation too.
-		modal.addEventListener('cancel', (e) => {
-			e.preventDefault();
-			requestClose();
-		});
+		modal.addEventListener(
+			'cancel',
+			(e) => {
+				e.preventDefault();
+				requestClose();
+			},
+			{ signal },
+		);
 
 		document.querySelectorAll<HTMLButtonElement>('.lv-facade').forEach((btn) => {
-			if (btn.dataset.bound) return;
-			btn.dataset.bound = '1';
-			btn.addEventListener('click', () => {
-				const id = btn.dataset.yt;
-				if (!id) return;
-				openVideo(btn, id, btn.getAttribute('aria-label') || '');
-			});
+			btn.addEventListener(
+				'click',
+				() => {
+					const id = btn.dataset.yt;
+					if (!id) return;
+					openVideo(btn, id, btn.getAttribute('aria-label') || '');
+				},
+				{ signal },
+			);
 		});
 	}
 	initLearnVideos();
-	document.addEventListener('astro:after-swap', initLearnVideos);
+	document.addEventListener('astro:page-load', initLearnVideos);
+	document.addEventListener('astro:before-swap', teardownLearnVideos);
 </script>
 
 <style>
 	.learn-videos {
+		/* The player and its lightbox stay dark in both themes (it's a video
+		   screen), so their ink and scrim are fixed on purpose. */
+		--lv-scrim: oklch(0% 0 0);
+		--lv-ink: oklch(100% 0 0);
 		margin-top: var(--space-2xl);
 		padding-top: var(--space-lg);
 		border-top: 1px solid var(--color-border);
@@ -273,19 +317,23 @@ function hostLabel(url: string): string {
 	.lv-facade {
 		position: relative;
 		cursor: pointer;
-		background-size: cover;
-		background-position: center;
 		background-color: var(--color-surface);
 		padding: 0;
+	}
+	.lv-thumb {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
 	}
 	.lv-facade::after {
 		content: '';
 		position: absolute;
 		inset: 0;
-		background: linear-gradient(180deg, transparent 40%, oklch(0% 0 0 / 0.35));
+		background: linear-gradient(180deg, transparent 40%, oklch(from var(--lv-scrim) l c h / 0.35));
 		transition: background 0.2s var(--ease-smooth);
 	}
-	.lv-facade:hover::after { background: oklch(0% 0 0 / 0.2); }
+	.lv-facade:hover::after { background: oklch(from var(--lv-scrim) l c h / 0.2); }
 
 	.lv-extlink {
 		display: flex;
@@ -317,7 +365,7 @@ function hostLabel(url: string): string {
 		height: 3rem;
 		border-radius: 50%;
 		background: oklch(from var(--color-accent) l c h / 0.92);
-		color: #fff;
+		color: var(--color-bg);
 		padding-left: 2px;
 		transition: transform 0.2s var(--ease-spring);
 	}
@@ -386,10 +434,11 @@ function hostLabel(url: string): string {
 		border: 0;
 		background: transparent;
 		overflow: visible;
-		color: #fff;
+		color: var(--lv-ink);
 	}
 	.lv-modal::backdrop {
-		background: oklch(0% 0 0 / 0.72);
+		/* Older engines don't inherit custom properties into ::backdrop. */
+		background: oklch(from var(--lv-scrim, oklch(0% 0 0)) l c h / 0.72);
 		backdrop-filter: blur(4px);
 	}
 	.lv-modal[open]::backdrop {
@@ -404,8 +453,8 @@ function hostLabel(url: string): string {
 		aspect-ratio: 16 / 9;
 		border-radius: var(--radius-md);
 		overflow: hidden;
-		background: #000;
-		box-shadow: var(--shadow-lg, 0 24px 60px oklch(0% 0 0 / 0.5));
+		background: var(--lv-scrim);
+		box-shadow: var(--shadow-lg);
 		transform-origin: top left;
 		will-change: transform;
 	}
@@ -436,16 +485,16 @@ function hostLabel(url: string): string {
 		width: 2.25rem;
 		height: 2.25rem;
 		padding: 0;
-		border: 1px solid oklch(100% 0 0 / 0.25);
+		border: 1px solid oklch(from var(--lv-ink) l c h / 0.25);
 		border-radius: 50%;
-		background: oklch(0% 0 0 / 0.4);
-		color: #fff;
+		background: oklch(from var(--lv-scrim) l c h / 0.4);
+		color: var(--lv-ink);
 		cursor: pointer;
 		transition: background 0.2s var(--ease-spring), border-color 0.2s var(--ease-spring), transform 0.2s var(--ease-spring);
 	}
 	.lv-modal-close:hover {
-		background: oklch(0% 0 0 / 0.65);
-		border-color: oklch(100% 0 0 / 0.5);
+		background: oklch(from var(--lv-scrim) l c h / 0.65);
+		border-color: oklch(from var(--lv-ink) l c h / 0.5);
 		transform: scale(1.08);
 	}
 	.lv-modal[open] .lv-modal-close {

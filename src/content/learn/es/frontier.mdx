@@ -37,12 +37,12 @@ La pregunta correcta en la frontera no es "qué tan listo es el modelo". Es "cu�
 El principiante lee benchmarks de un solo turno (MMLU, GPQA) e infiere capacidad agéntica. Esos no te dicen casi nada sobre un horizonte largo. La que sí lo hace es el **horizonte temporal de tarea** de METR: la longitud de tarea, medida en tiempo humano, que un agente completa a un 50% de fiabilidad.
 
 <Callout type="important" title="La tendencia, dicha con honestidad">
-La medición de METR es el número creíble. La longitud de tarea que los agentes terminan al ~50% de fiabilidad se ha estado **duplicando cada ~7 meses** (~188 días en lo histórico). La pendiente reciente es más empinada: alrededor de cuatro meses si ajustas desde 2023, y hasta ~tres meses (≈10× por año) en los modelos de 2024-2025 según el update Time Horizon 1.1. La medición es real. La extrapolación no está garantizada. Un doblaje que se sostuvo unos años puede doblarse.
+La medición de METR es el número creíble. La longitud de tarea que los agentes terminan al ~50% de fiabilidad se ha estado **duplicando cada ~7 meses** (~188 días en lo histórico). La pendiente reciente es más empinada: alrededor de cuatro meses si ajustas desde 2023, y hasta ~tres meses (≈10× por año) en los modelos de 2024-2025 según el update Time Horizon 1.1. La medición es real. La extrapolación no está garantizada. Una duplicación que se sostuvo unos años puede frenarse.
 </Callout>
 
 Para fijar la escala: un modelo como o3 sostiene un horizonte de unos 90 minutos (1,5 horas) al 50% de fiabilidad con la metodología original de METR, revisado a ~120 minutos con la recalibración de 2026 de METR (Time Horizon 1.1). Ese es el tipo de número contra el que diseñar. No "¿es listo el modelo?" sino "¿dónde se cae *el mío*?". (o3 ya no es frontera a mediados de 2026: Claude Opus 4.5 ronda los 320 minutos.)
 
-<MermaidDiagram title="Horizonte temporal: un doblaje, no un techo" chart={`
+<MermaidDiagram title="Horizonte temporal: se duplica, no toca techo" chart={`
 graph LR
   A["~minutos<br/>(modelos 2023)"] --> B["~decenas de minutos<br/>(2024)"]
   B --> C["~1-2 horas<br/>(2025)"]

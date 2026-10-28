@@ -24,29 +24,42 @@ function getAltPath(pathname: string, currentLocale: string): string {
 	return pathname.replace(/^\/es\/?/, '/');
 }
 
-const altPath = getAltPath(Astro.url.pathname, locale);
+const pathname = Astro.url.pathname;
+
+// The 404 page has no Spanish twin (GitHub Pages serves one 404.html for every
+// missing path), so its language switch goes to the other locale's home.
+const is404 = /^\/(es\/)?404(\.html|\/)?$/.test(pathname);
+const altPath = is404 ? (altLocale === 'es' ? '/es/' : '/') : getAltPath(pathname, locale);
+
+const prefix = locale === 'es' ? '/es' : '';
+const isHome = pathname === '/' || pathname === '/es/' || pathname === '/es';
+const navItems = [
+	{ href: `${prefix}/`, label: strings.nav.home, active: isHome },
+	{ href: `${prefix}/blog/`, label: strings.nav.blog, active: pathname.includes('/blog') },
+	{ href: `${prefix}/learn/`, label: strings.nav.learn, active: pathname.includes('/learn') },
+	{ href: `${prefix}/lab/`, label: strings.nav.lab, active: /^\/(es\/)?lab(\/|$)/.test(pathname) },
+	{ href: `${prefix}/about/`, label: strings.nav.about, active: pathname.includes('/about') },
+];
+// aria-current: "page" on the exact page, "true" inside its section
+// (e.g. a post under Blog). Normalise a missing trailing slash first.
+const here = pathname.endsWith('/') ? pathname : `${pathname}/`;
+const ariaCurrent = (item: { href: string; active: boolean }) =>
+	item.active ? (here === item.href ? 'page' : 'true') : undefined;
 ---
 
 <header id="site-header" transition:name="site-header" transition:animate="none">
 	<nav>
-		<a href={locale === 'es' ? '/es/' : '/'} class="logo">
+		<a href={`${prefix}/`} class="logo">
 			<span class="logo-text">{SITE_TITLE}</span>
 			<span class="logo-dot"></span>
 		</a>
 
 		<div class="nav-links">
-			<a href={locale === 'es' ? '/es/' : '/'} class:list={[{ active: Astro.url.pathname === '/' || Astro.url.pathname === '/es/' || Astro.url.pathname === '/es' }]}>
-				{strings.nav.home}
-			</a>
-			<a href={locale === 'es' ? '/es/blog/' : '/blog/'} class:list={[{ active: Astro.url.pathname.includes('/blog') }]}>
-				{strings.nav.blog}
-			</a>
-			<a href={locale === 'es' ? '/es/learn/' : '/learn/'} class:list={[{ active: Astro.url.pathname.includes('/learn') }]}>
-				{strings.nav.learn}
-			</a>
-			<a href={locale === 'es' ? '/es/about/' : '/about/'} class:list={[{ active: Astro.url.pathname.includes('/about') }]}>
-				{strings.nav.about}
-			</a>
+			{navItems.map((item) => (
+				<a href={item.href} class:list={[{ active: item.active }]} aria-current={ariaCurrent(item)}>
+					{item.label}
+				</a>
+			))}
 		</div>
 
 		<div class="nav-actions">
@@ -65,30 +78,40 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 	</nav>
 
 	<div id="mobile-nav" class="mobile-nav">
-		<a href={locale === 'es' ? '/es/' : '/'}>{strings.nav.home}</a>
-		<a href={locale === 'es' ? '/es/blog/' : '/blog/'}>{strings.nav.blog}</a>
-		<a href={locale === 'es' ? '/es/learn/' : '/learn/'}>{strings.nav.learn}</a>
-		<a href={locale === 'es' ? '/es/about/' : '/about/'}>{strings.nav.about}</a>
+		{navItems.map((item) => (
+			<a href={item.href} class:list={[{ active: item.active }]} aria-current={ariaCurrent(item)}>{item.label}</a>
+		))}
 	</div>
 </header>
 
 <script>
-	let _headerScrollHandler: (() => void) | null = null;
-	let _headerKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
+	// One controller per page: every listener below is torn down on
+	// astro:before-swap and rebuilt on astro:page-load, so nothing piles up
+	// across View Transitions.
+	let headerController: AbortController | null = null;
 
 	function cleanupHeader() {
-		if (_headerScrollHandler) {
-			window.removeEventListener('scroll', _headerScrollHandler);
-			_headerScrollHandler = null;
-		}
-		if (_headerKeydownHandler) {
-			document.removeEventListener('keydown', _headerKeydownHandler);
-			_headerKeydownHandler = null;
-		}
+		headerController?.abort();
+		headerController = null;
+		// Make sure the menu doesn't linger open across a View Transition.
+		document.getElementById('mobile-nav')?.classList.remove('open');
+		const toggle = document.getElementById('menu-toggle');
+		toggle?.classList.remove('open');
+		toggle?.setAttribute('aria-expanded', 'false');
 	}
 
 	function initHeader() {
+		// On the first visit astro:page-load only fires at window `load`, after the
+		// direct call below already wired this header. Re-running then would close
+		// a menu the reader just opened, so skip a header that is already wired.
+		// The flag lives on the element, so the swapped-in header starts clean.
+		const header = document.getElementById('site-header');
+		if (!header || header.dataset.headerReady) return;
+		header.dataset.headerReady = '1';
 		cleanupHeader();
+		const controller = new AbortController();
+		headerController = controller;
+		const { signal } = controller;
 
 		const menuToggle = document.getElementById('menu-toggle');
 		const mobileNav = document.getElementById('mobile-nav');
@@ -100,29 +123,29 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 		};
 		const isOpen = () => mobileNav?.classList.contains('open') ?? false;
 
-		menuToggle?.addEventListener('click', () => {
-			setOpen(!isOpen());
-		});
+		menuToggle?.addEventListener('click', () => setOpen(!isOpen()), { signal });
 
 		// Escape closes the disclosure and returns focus to the toggle.
-		_headerKeydownHandler = (e: KeyboardEvent) => {
-			if (e.key === 'Escape' && isOpen()) {
-				setOpen(false);
-				menuToggle?.focus();
-			}
-		};
-		document.addEventListener('keydown', _headerKeydownHandler);
+		document.addEventListener(
+			'keydown',
+			(e: KeyboardEvent) => {
+				if (e.key === 'Escape' && isOpen()) {
+					setOpen(false);
+					menuToggle?.focus();
+				}
+			},
+			{ signal },
+		);
 
-		// Make sure the nav doesn't linger open across a View Transition.
-		document.addEventListener('astro:before-swap', () => setOpen(false), { once: true });
-
-		const header = document.getElementById('site-header');
 		let ticking = false;
 		let isScrolled = window.scrollY > 10;
-		header?.classList.toggle('scrolled', isScrolled);
+		header.classList.toggle('scrolled', isScrolled);
 
-		_headerScrollHandler = () => {
-			if (!ticking) {
+		window.addEventListener(
+			'scroll',
+			() => {
+				if (ticking) return;
+				ticking = true;
 				requestAnimationFrame(() => {
 					const shouldBeScrolled = window.scrollY > 10;
 					if (shouldBeScrolled !== isScrolled) {
@@ -131,14 +154,15 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 					}
 					ticking = false;
 				});
-				ticking = true;
-			}
-		};
-		window.addEventListener('scroll', _headerScrollHandler, { passive: true });
+			},
+			{ passive: true, signal },
+		);
 	}
 
+	// astro:page-load fires on the first load and after every navigation;
+	// the direct call covers a page rendered without the client router.
 	initHeader();
-	document.addEventListener('astro:after-swap', initHeader);
+	document.addEventListener('astro:page-load', initHeader);
 	document.addEventListener('astro:before-swap', cleanupHeader);
 </script>
 
@@ -326,6 +350,22 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 		color: var(--color-text);
 	}
 
+	/* Active section in the mobile menu: tinted wash, stronger text, and a
+	   small accent dot after the label (no edge bar). */
+	.mobile-nav a.active {
+		background: oklch(from var(--color-accent) l c h / 0.08);
+		color: var(--color-text);
+		font-weight: 550;
+	}
+	.mobile-nav a.active::after {
+		content: '';
+		width: 5px;
+		height: 5px;
+		margin-left: 0.6em;
+		border-radius: 50%;
+		background: var(--color-accent);
+	}
+
 	@media (max-width: 640px) {
 		.nav-links { display: none; }
 		.menu-toggle { display: flex; width: 44px; height: 44px; }
@@ -339,9 +379,15 @@ const altPath = getAltPath(Astro.url.pathname, locale);
 			padding: 0.2rem 0.3rem;
 		}
 		.mobile-nav.open { display: flex; }
-		.menu-toggle.open .line-1 { transform: rotate(45deg) translate(5px, 5px); }
+		/* Each line rotates around its own centre, then lines 1 and 3 slide
+		   6 units onto the middle line, so the X is symmetric. */
+		.menu-toggle line {
+			transform-box: fill-box;
+			transform-origin: center;
+			transition: transform var(--duration-normal) var(--ease-smooth), opacity var(--duration-normal) var(--ease-smooth);
+		}
+		.menu-toggle.open .line-1 { transform: translateY(6px) rotate(45deg); }
 		.menu-toggle.open .line-2 { opacity: 0; }
-		.menu-toggle.open .line-3 { transform: rotate(-45deg) translate(5px, -5px); }
-		.menu-toggle line { transition: all var(--duration-normal) var(--ease-smooth); transform-origin: center; }
+		.menu-toggle.open .line-3 { transform: translateY(-6px) rotate(-45deg); }
 	}
 </style>

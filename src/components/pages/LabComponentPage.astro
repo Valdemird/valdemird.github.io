@@ -24,7 +24,7 @@ const { meta, Component } = entry;
 const summary = summaryFor(meta, lang);
 const why = whyFor(meta, lang);
 const categoryLabel = (es ? CATEGORY_LABELS_ES : CATEGORY_LABELS)[meta.category];
-const title = es ? `${meta.title} — lab | valdemird` : `${meta.title} — lab | valdemird`;
+const title = `Lab: ${meta.title}`;
 const description = summary ?? (es ? `Demos en vivo del componente ${meta.title}.` : `Live demos of the ${meta.title} component.`);
 ---
 

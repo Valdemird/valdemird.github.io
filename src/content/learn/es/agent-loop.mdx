@@ -126,14 +126,14 @@ Cuándo parar es un problema de primer orden que la mayoría de los tutoriales i
 
 <MermaidDiagram title="La terminación necesita varias condiciones, no una" chart={`
 graph TD
-  A[Cada turno] --> B[max-turns alcanzado?]
-  B -->|si| Z[parar]
-  B -->|no| C[budget excedido?]
-  C -->|si| Z
-  C -->|no| D[loop sin progreso?]
-  D -->|si| Z
-  D -->|no| E[tool de terminacion?]
-  E -->|si| Z
+  A[Cada turno] --> B[¿max-turns alcanzado?]
+  B -->|sí| Z[parar]
+  B -->|no| C[¿budget excedido?]
+  C -->|sí| Z
+  C -->|no| D[¿loop sin progreso?]
+  D -->|sí| Z
+  D -->|no| E[¿se llamó la tool de terminación?]
+  E -->|sí| Z
   E -->|no| A
 `} />
 

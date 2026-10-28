@@ -1,8 +1,10 @@
 ---
-title: "Slash commands custom para programar con IA: construye tu propio flujo spec-driven"
-description: "Cómo 6 archivos markdown convirtieron mi asistente de IA en un coarquitecto estructurado — y por qué deberías construir tu propio sistema de comandos en vez de depender de prompts crudos."
+title: "Desarrollo spec-driven en Claude Code con slash commands"
+description: "Cinco slash commands en markdown para que Claude Code escriba un spec, lo audite contra tu repo, planee fases chicas e implemente una a la vez."
 pubDate: 2026-03-10
-tags: ["herramientas-ia", "workflow", "productividad", "automatizacion"]
+updatedDate: 2026-10-27
+status: "Actualizado para skills de Claude Code"
+tags: ["herramientas-ia", "flujo-de-trabajo", "claude-code", "guiado-por-specs"]
 featured: true
 lang: es
 ---
@@ -15,15 +17,21 @@ import CopyableCommand from '../../../components/blog/CopyableCommand.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Tabs from '../../../components/blog/Tabs.astro';
 import TabPanel from '../../../components/blog/TabPanel.astro';
-import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import TLDR from '../../../components/blog/TLDR.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
 
-Todas las herramientas de IA para programar te dejan escribir prompts en lenguaje natural. Muy pocas te dejan construir *flujos de trabajo estructurados* sobre ellas. Ese es el gap que la mayoría de desarrolladores no ven, y la razón por la que su código generado por IA necesita reescrituras constantes.
+<TLDR lang="es" bullets={[
+  "Cinco archivos markdown en .claude/commands/ hacen que Claude Code escriba un spec, lo audite contra el repo real, marque lo que sigue sin decidir, planee tres o cuatro fases e implemente una por una, con mi aprobación entre cada fase.",
+  "Claude Code ahora trata los custom commands como skills. Los archivos viejos siguen funcionando. Para algo nuevo, una skill con disable-model-invocation: true encaja mejor.",
+]} />
 
-El concepto no es nuevo. El [desarrollo spec-driven](https://en.wikipedia.org/wiki/Spec-driven_development) — definir *qué* quieres antes de escribir *cómo* — ha sido una disciplina de ingeniería de software por décadas. Lo nuevo es aplicarlo a la programación asistida por IA. Como [explora Birgitta Bockeler en martinfowler.com](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html), las herramientas de SDD están trayendo la disciplina de la ingeniería temprana — diseñar antes de codear — a la era agéntica.
+El commit que movió este post a su URL actual también agregó `.claude/specs/improve-blogs.md`. Es un spec para seis componentes interactivos del blog: Tabs, Collapsible, InteractiveChart, MermaidDiagram, CopyableCommand y FileTree. Ese mismo commit trajo los seis, y cuatro aparecen en esta página. El spec sigue la plantilla de `/spec-create`, el primer comando de este post. Los comandos habían entrado al repo esa misma noche, un rato antes, en el mismo commit que el primer borrador de este post.
 
-La idea es simple: en lugar de escribir las mismas instrucciones cada vez ("explora mi codebase primero", "sigue los patrones existentes", "no escribas tests todavía"), las codificas en slash commands reutilizables. Archivos markdown. Sin SDK, sin API, sin sistema de plugins. Solo archivos que tu herramienta de IA lee como instrucciones.
+Al final del spec siguen cuatro preguntas abiertas, sin ninguna respuesta escrita debajo. El código las respondió; el archivo nunca se puso al día. Tenlo presente mientras te cuento lo disciplinado que es el pipeline.
 
-Construí 6 comandos que forman un **pipeline de desarrollo spec-driven**. Te cuento cómo, y por qué deberías armar los tuyos.
+La idea es vieja. El [desarrollo guiado por especificación](https://en.wikipedia.org/wiki/Specification-driven_development) consiste en decidir *qué* quieres antes de escribir *cómo*. Aplicarlo a agentes de código es más nuevo, y no todo el mundo está convencido. Birgitta Böckeler revisó Kiro, spec-kit y Tessl [para martinfowler.com](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html) y salió escéptica: los pasos y los markdown de spec-kit le parecieron "overkill for the size of the problem", y escribió que prefería revisar código antes que todos esos archivos markdown. Creo que tiene razón sobre el costo. Casi todas las reglas de mis comandos están ahí para mantener ese costo bajo.
+
+El mecanismo es sencillo. En lugar de escribir las mismas instrucciones en cada sesión ("explora mi codebase primero", "sigue los patrones existentes", "los tests van en la misma fase que el código"), las escribes una vez como slash commands. Archivos markdown. Sin SDK, sin API, sin plugin.
 
 ## Por qué los prompts crudos fallan a escala
 
@@ -40,16 +48,18 @@ El modelo va a adivinar. A veces acierta. A menudo no. Y terminas gastando más 
 El cuello de botella no es generar código, es la **especificación**. Si defines claramente *qué* quieres, el *cómo* se vuelve casi trivial para el modelo.
 </Callout>
 
+No tengo un número limpio de antes y después para esto. Una versión anterior de este post traía una gráfica de retrabajo; la quité porque nada la había medido. La evidencia más cercana que tengo llegó después: cuando corrí `/insights` sobre un mes de sesiones con Claude Code en un side project, las features que arrancaron con un spec escrito terminaron más limpias que las que improvisé en el chat. Ese mes tiene [su propio post](/blog/es/tests-gave-me-control/).
+
 ## El pipeline
 
-Seis comandos, cada uno un archivo markdown, formando un pipeline lineal donde cada paso produce un artefacto y cada transición requiere tu aprobación:
+Cinco comandos, cada uno un archivo markdown. Mi README lo llama un flujo de seis pasos, porque el segundo paso no es un comando: soy yo respondiendo las preguntas abiertas que encontró el primero. Cada paso deja algo que puedes leer, y cada transición espera tu aprobación:
 
 <StepThroughDiagram steps={[
-  { id: "create", label: "/spec-create — una idea suelta se convierte en un spec estructurado, con las preguntas abiertas que solo tú puedes responder." },
-  { id: "audit", label: "/spec-audit — el modelo explora el codebase real y enriquece el spec con sus convenciones." },
-  { id: "review", label: "/spec-review — el semáforo de preparación: listo, avanzar con supuestos, o bloqueante." },
-  { id: "plan", label: "/spec-plan — tres o cuatro fases pequeñas, cada una verificable por sí sola." },
-  { id: "implement", label: "/spec-implement — una fase a la vez; tu aprobación abre cada transición." },
+  { id: "create", label: "/spec-create: una idea suelta se convierte en un spec estructurado, con las preguntas abiertas que solo tú puedes responder." },
+  { id: "audit", label: "/spec-audit: el modelo explora el codebase real y enriquece el spec con sus convenciones." },
+  { id: "review", label: "/spec-review: el semáforo de preparación. Listo, avanzar con supuestos, o bloqueante." },
+  { id: "plan", label: "/spec-plan: tres o cuatro fases pequeñas, cada una verificable por sí sola." },
+  { id: "implement", label: "/spec-implement: una fase a la vez; tu aprobación abre cada transición." },
 ]}>
   <svg slot="diagram" viewBox="0 0 360 444" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Pipeline spec-driven: crear, auditar, revisar, planear, implementar, listo">
     <defs>
@@ -89,34 +99,50 @@ Seis comandos, cada uno un archivo markdown, formando un pipeline lineal donde c
 
 ## Comando 1: crear. De idea a spec estructurado
 
-Le das un nombre y una descripción general. El comando genera un spec estructurado con contexto, comportamiento esperado, edge cases, restricciones, criterios de aceptación y, crucialmente, **preguntas abiertas** que detectó que *tú* necesitas responder.
+Le das un nombre y una descripción general. El comando escribe un spec estructurado en `.claude/specs/<nombre>.md` con contexto, comportamiento esperado, edge cases, lo que no debe hacer, restricciones, criterios de aceptación y, al final, las **preguntas abiertas** que detectó y que *tú* tienes que responder.
 
-<CodeBlock filename=".commands/spec-create.md">
+Este es el archivo real, recortado:
+
+<CodeBlock filename=".claude/commands/spec-create.md">
 ```markdown
-# Crear Spec
+---
+description: Crea un spec inicial en .claude/specs/ basado en un prompt simple
+argument-hint: <nombre-feature> <descripcion breve>
+allowed-tools: Read, Write, Bash(mkdir:*)
+---
 
-Crea un spec estructurado para: **$ARGUMENTS**
+# Crear Spec Inicial
+
+Quiero crear un spec para la feature: **$ARGUMENTS**
 
 ## Tu tarea
 
-1. Genera un documento de especificación estructurado
-2. Incluye: contexto, comportamiento esperado, edge cases,
-   restricciones, criterios de aceptación
-3. Lista preguntas abiertas que necesitan decisiones humanas
+1. Crea el directorio `.claude/specs/` si no existe
+2. Toma el input que te di y genera un spec estructurado
+3. Guárdalo en `.claude/specs/<nombre-feature>.md`
 
-**No explores el código. Solo crea el spec.**
+<!-- plantilla recortada: contexto, qué quiero, comportamiento
+     esperado, edge cases, lo que NO debe hacer, restricciones,
+     criterios de aceptación, preguntas abiertas -->
+
+4. Al terminar, dime el archivo creado y qué preguntas
+   abiertas debería responder antes del siguiente paso
+
+**No explores el código todavía. Solo crea el spec con lo que te di.**
 ```
 </CodeBlock>
 
-En lugar de adivinar tu preferencia de librería JWT, te pregunta.
+El frontmatter no está de adorno. `argument-hint` aparece en el autocompletado. `allowed-tools` lista las herramientas que Claude puede usar en ese turno sin pedirme permiso, así que crear la carpeta y escribir el archivo no se detiene a preguntar.
+
+En lugar de adivinar qué librería de JWT prefieres, te pregunta.
 
 <Callout type="tip" title="Adelanta las decisiones">
-Toma 5 minutos responder preguntas en un spec. Toma 2 horas desenredar suposiciones equivocadas en código. Fuerza la especificación antes del código.
+Una pregunta resuelta en el spec te cuesta una oración. La misma pregunta resuelta por la adivinanza del modelo vuelve después en forma de código que tienes que leer, poner en duda y reescribir.
 </Callout>
 
 ## Comando 2: auditar. El spec se encuentra con tu codebase
 
-Aquí el modelo **explora tu proyecto real**: estructura de archivos, convenciones de nombrado, patrones de manejo de errores, dependencias existentes, y enriquece el spec con una sección de análisis técnico.
+Aquí el modelo explora tu proyecto real (estructura de archivos, convenciones de nombrado, manejo de errores, dependencias) y le agrega al spec un análisis técnico: archivos a modificar, archivos a crear, patrones a respetar, riesgos y las preguntas que todavía te toca responder.
 
 <Collapsible title="Lo que explora el audit">
 
@@ -124,82 +150,99 @@ Aquí el modelo **explora tu proyecto real**: estructura de archivos, convencion
 - Patrones de arquitectura (MVC, service layer, feature-based)
 - Convenciones de nombrado de archivos y funciones
 - Enfoque actual de manejo de errores
-- Organización de tests y cobertura
+- Organización de los tests
 - Dependencias en package.json / requirements.txt
 - Archivos similares a lo que se quiere construir (para seguir el mismo patrón)
 
 </Collapsible>
 
-Este paso previene la falla #1 del código generado por IA: **ignorar patrones existentes**. Después del audit, el modelo conoce las convenciones de tu proyecto. El código que escriba después va a *encajar*.
+El audit corre con `context: fork` y `agent: Explore`, así que la exploración ocurre en un sub-agente aparte y a la sesión principal solo vuelven los hallazgos. Es el truco de aislar contexto que el [módulo de context engineering](/es/learn/agentic-systems/context-engineering/) recomienda para trabajo de solo lectura: una ventana limpia lee decenas de miles de tokens y tú te quedas solo con el resumen.
+
+Este paso apunta a una falla concreta del código generado por IA: ignorar los patrones que el proyecto ya tiene. Después del audit, el modelo conoce tus convenciones y el código que escriba después encaja con ellas.
+
+<Callout type="warning" title="Un bug en mi propio archivo">
+Explore está documentado como un agente de solo lectura: Write y Edit están bloqueados. Mi `spec-audit.md` corre en Explore *y* le pide actualizar el archivo del spec. Esas dos instrucciones se pelean. Si copias este comando, deja el fork para explorar y que sea la sesión principal la que escriba el análisis en el spec, o quita `agent: Explore`.
+</Callout>
 
 ## Comando 3: revisar. El semáforo de preparación
 
-Antes de invertir tiempo en implementación, este comando evalúa el spec:
+Antes de invertir tiempo en implementar, este comando evalúa el spec. Los emoji vienen tal cual del archivo del comando:
 
 <Tabs labels={["Listo", "Con supuestos", "Bloqueante"]}>
 <TabPanel>
 
-🟢 **Listo**: bien definido. Todas las decisiones tomadas. Avanzar al plan.
+🟢 Listo: bien definido. Todas las decisiones tomadas. Avanzar al plan.
 
 </TabPanel>
 <TabPanel>
 
-🟡 **Puede avanzar**: existe ambigüedad, pero se pueden hacer suposiciones razonables. Cada supuesto se lista explícitamente para que lo apruebes.
+🟡 Puede avanzar: hay ambigüedad, pero se pueden hacer suposiciones razonables. Cada supuesto se lista explícitamente para que lo apruebes o lo cambies.
 
 </TabPanel>
 <TabPanel>
 
-🔴 **Bloqueante**: decisiones críticas pendientes. Ejemplos: "¿Sessions o JWT?", "¿Qué base de datos?", "¿Necesita real-time?" Resuelve antes de continuar.
+🔴 Bloqueante: quedan decisiones críticas. Ejemplos: "¿Sesiones o JWT?", "¿Qué base de datos?", "¿Necesita real-time?" Resuélvelas antes de continuar.
 
 </TabPanel>
 </Tabs>
 
-Si algo está en rojo, lo arreglas ahora, no después de 3 fases de implementación.
+Termina preguntándote si quieres ajustar algo, y el archivo le dice que no haga nada más hasta que respondas. Si algo está en rojo, lo arreglas ahora, no después de tres fases de implementación.
 
 ## Comando 4: planear. Implementación por fases
 
-El plan genera una implementación paso a paso. Cada fase es pequeña (1-3 archivos), verificable (criterio claro de "está listo") e independiente (revisable antes de continuar).
+El comando de plan lee el spec ya auditado y genera un plan por fases. Cada fase es pequeña, verificable (con un criterio claro de "está listo") y revisable antes de que arranque la siguiente. Los tests van en la misma fase que el código. Este ejemplo es una composición del formato, no la salida de una corrida concreta:
 
 <CodeBlock filename="Ejemplo de plan">
 ```markdown
 ### Fase 1: Schema y migración
 **Objetivo:** La tabla Users existe con campos de auth
 **Archivos:** crear migración, modificar schema
+**Tests:** migración up/down
 **Verificar:** la migración corre sin errores
 
 ### Fase 2: Middleware de auth y utilidades
 **Objetivo:** Rutas protegidas retornan 401 sin auth
 **Archivos:** crear middleware, crear utils, modificar entry
+**Tests:** unit tests del middleware
 **Verificar:** curl ruta libre → 200, protegida → 401
 ```
 </CodeBlock>
 
-<Callout type="warning">
-Regla dura: **máximo 3-4 fases** para features medianas. Si necesita más, la feature es demasiado grande y debe dividirse. Esto previene el scope creep.
+<Callout type="warning" title="Máximo 3-4 fases">
+La regla del archivo: máximo 3-4 fases para features medianas. Si necesita más, la feature es demasiado grande y hay que dividirla. Yo la he roto. El spec de GSAP de este repo, titulado "Full Site Enhancement", tiene cinco fases y 23 pasos numerados. Ese título nunca iba a describir una feature mediana.
 </Callout>
+
+El plan mode que trae Claude Code se solapa con este paso, y mi plan tiene el mismo límite: vive en el chat. `/spec-implement` lee "el plan que acordamos" de la conversación. Lo que sobrevive a la sesión es el archivo del spec, que queda commiteado junto al código.
 
 ## Comando 5: implementar. Una fase a la vez
 
-El comando de implementación solo ejecuta **una fase a la vez**. Después de cada fase, resume qué hizo, qué decisiones tomó, y pide tu revisión antes de continuar.
+El comando de implementación recibe el nombre de la feature y un número de fase (`/spec-implement auth-jwt 2`) y ejecuta solo esa fase. Si se topa con algo que cambia el plan, tiene que detenerse y avisarme antes de improvisar. Al cerrar cada fase corre los tests relevantes, resume los archivos que tocó y las decisiones que tomó, y me pide luz verde.
 
-Esta es la diferencia clave con "generar todo de un golpe". Si la Fase 1 revela un problema, ajustas el plan antes de que arranque la Fase 2. El costo del cambio se mantiene bajo durante todo el proyecto.
+Eso es lo que lo separa de "generar todo de un golpe". Si la Fase 1 revela un problema, ajustas el plan antes de que arranque la Fase 2. Detrás hay matemática: los errores por paso se multiplican, y una [compuerta de verificación a mitad de la cadena](/blog/es/high-accuracy-agent-priorities/) convierte una corrida larga y frágil en tramos más cortos que reinician el error.
+
+La compuerta solo sirve si de verdad lees lo que hay detrás. Aprobar resúmenes de fase sin mirarlos es el rubber-stamping contra el que advierte el [módulo de human-in-the-loop](/es/learn/agentic-systems/human-in-the-loop/).
 
 ## Bonus: comandos de review
 
-| Comando | Qué revisa | Output |
+Dos comandos más quedan fuera del pipeline, para revisar calidad de código cuando lo necesites:
+
+| Comando | Qué revisa | Salida |
 |---|---|---|
 | Performance | Loops O(n²), queries N+1, memory leaks, caché, bundles | Hallazgos por severidad con fixes |
-| Arquitectura | SOLID, acoplamiento, separación de concerns, seguridad | Diagrama de capas + roadmap |
+| Arquitectura | SOLID, acoplamiento, separación de responsabilidades, seguridad | Diagrama de capas + roadmap de refactor |
 
 ## Configúralo
 
-<CopyableCommand command="mkdir -p .commands" />
+<CopyableCommand command="mkdir -p .claude/commands" />
 
-Pon tus archivos de comandos:
+Pon los archivos de comandos en `.claude/commands/`. Cada nombre de archivo se vuelve un comando<Sidenote>Mi propio README todavía dice `/project:spec-create`. Ese prefijo es de una versión vieja de Claude Code; hoy el comando es simplemente `/spec-create`.</Sidenote>: `spec-create.md` es `/spec-create`. Los specs que generan quedan en `.claude/specs/`:
 
 <FileTree highlight="spec-create.md">
 <div class="folder">
-<div class="folder-label">.commands</div>
+<div class="folder-label">.claude</div>
+<div class="folder-children">
+<div class="folder">
+<div class="folder-label">commands</div>
 <div class="folder-children">
 <div class="file">spec-create.md</div>
 <div class="file">spec-audit.md</div>
@@ -210,34 +253,35 @@ Pon tus archivos de comandos:
 <div class="file">architecture.md</div>
 </div>
 </div>
+<div class="folder">
+<div class="folder-label">specs</div>
+<div class="folder-children">
+<div class="file">improve-blogs.md</div>
+<div class="file">gsap-ux-improvement.md</div>
+</div>
+</div>
+</div>
+</div>
 </FileTree>
 
-## Tiempo ahorrado en retrabajo
+Claude Code [fusionó los custom commands con las skills](https://code.claude.com/docs/en/slash-commands). Un archivo en `.claude/commands/spec-create.md` y una skill en `.claude/skills/spec-create/SKILL.md` crean el mismo `/spec-create`, y los archivos de comandos viejos siguen funcionando. La documentación dice que para lo nuevo es mejor una skill, porque puede llevar archivos de apoyo. Además, Claude puede cargar una skill por su cuenta cuando le parece relevante.
 
-<InteractiveChart
-  title="Tiempo en retrabajo"
-  type="bar"
-  data={[
-    { label: "Prompts crudos", value: 45, color: "oklch(0.65 0.2 27)" },
-    { label: "Con spec", value: 12, color: "oklch(0.6 0.18 145)" },
-  ]}
-/>
-
-*(Porcentaje del tiempo de sesión arreglando código que no encajó)*
+Esa segunda parte es justo la que conviene apagar en este pipeline. Agrega `disable-model-invocation: true` al frontmatter de `spec-implement`, como mínimo (los archivos de comandos aceptan el mismo campo), para que la única forma de arrancar una fase sea que tú escribas el comando.
 
 ## La regla de oro
 
-> Nunca te saltes pasos bajo presión. El tiempo que "ahorras" saltándote el audit o el review lo pagas triple en correcciones después.
+Mi README cierra el flujo de specs con una "regla de oro", y la mantengo tal cual:
 
-Esos 10 minutos en especificación te ahorran 2 horas en debugging. Tu herramienta de IA se vuelve drásticamente más útil cuando la tratas como un colaborador que necesita contexto, no como una caja mágica que adivina lo que quieres.
+> Nunca saltes pasos bajo presión. El tiempo que "ahorras" saltando el audit o el review lo pagas triple en correcciones después.
 
-Los comandos solo hacen que esa disciplina sea automática, para que no tengas que acordarte de ser disciplinado a las 2am.
+Sigo sin tener una respuesta limpia a la pregunta de Böckeler sobre para qué tamaño de problema sirve esto. Lo que tengo es un tope en `spec-plan.md`, un spec de GSAP en mi propio repo que se lo pasa por encima, y un spec para los componentes de esta página con sus preguntas abiertas todavía ahí, sin responder. Un spec vale la revisión solo mientras sea lo bastante chico como para que de verdad lo revises.
 
 ---
 
 **Lectura adicional:**
+- [Understanding Spec-Driven-Development: Kiro, spec-kit, and Tessl](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html), Birgitta Böckeler, martinfowler.com
 - [Spec-Driven Development: Designing Before You Code](https://medium.com/@dave-patten/spec-driven-development-designing-before-you-code-again-21023ac91180), Dave Patten, Medium
-- [Exploring SDD Tools](https://martinfowler.com/articles/exploring-gen-ai/sdd-3-tools.html), Martin Fowler
 - [Spec-Driven Development: When Architecture Becomes Executable](https://www.infoq.com/articles/spec-driven-development/), InfoQ
-- [Beyond Vibe-Coding: A Practical Guide to Spec-Driven Development](https://www.scalablepath.com/machine-learning/spec-driven-development-guide), Scalable Path
-- [GitHub Spec Kit](https://github.com/github/spec-kit), Tooling open-source de GitHub para SDD
+- [Beyond Vibe-Coding: A Practical Guide to Spec-Driven Development](https://www.scalablepath.com/ai/spec-driven-development-guide), Scalable Path
+- [GitHub Spec Kit](https://github.com/github/spec-kit), tooling open-source de GitHub para SDD
+- [Slash commands y skills](https://code.claude.com/docs/en/slash-commands), documentación de Claude Code (en inglés)

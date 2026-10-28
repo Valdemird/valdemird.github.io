@@ -6,13 +6,14 @@ export const meta = {
 	title: 'MermaidDiagram',
 	category: 'data',
 	status: 'stable',
-	summary: 'Flowcharts and sequence diagrams written as text, rendered to match the site in both light and dark mode.',
-	summaryEs: 'Flowcharts y diagramas de secuencia escritos como texto, renderizados a juego con el sitio tanto en modo claro como oscuro.',
+	summary: 'Flowcharts, sequence and state diagrams written as text, drawn in the site’s own type and colors in light and dark mode.',
+	summaryEs: 'Flowcharts, diagramas de secuencia y de estados escritos como texto, dibujados con la tipografía y los colores del sitio, en modo claro y oscuro.',
 	why: 'The first diagram component on the blog. It earns its place for flowcharts and sequence diagrams — the shapes where a picture beats three paragraphs of prose — and it only loads when you actually scroll to it, so a diagram halfway down a post never slows down the start of it.',
 	whyEs: 'El primer componente de diagramas del blog. Se gana su lugar en flowcharts y diagramas de secuencia — las formas donde una imagen le gana a tres párrafos de prosa — y solo se carga cuando de verdad llegas a él, así que un diagrama a mitad de post nunca frena el arranque.',
 	props: [
 		{ name: 'title', type: 'string', description: 'Optional mono title above the diagram.' },
 		{ name: 'chart', type: 'string', description: 'Mermaid source. Literal \\n sequences are converted to newlines before rendering.' },
+		{ name: 'lang', type: "'en' | 'es'", description: 'Language of the loading and error text. Defaults to the page locale (an /es/ path segment).' },
 	],
 };
 
@@ -28,6 +29,48 @@ const worktreeChart = `flowchart LR
 	a2 --> pr2[PR #42]
 	pr1 --> main
 	pr2 --> main`;
+
+const sequenceChart = es
+	? `sequenceDiagram
+	participant U as Lector
+	participant P as Página
+	participant M as Mermaid
+	U->>P: hace scroll hasta el diagrama
+	P->>M: carga la librería (una vez)
+	M-->>P: SVG medido con las fuentes reales
+	Note over P,M: los labels se miden donde se dibujan
+	P-->>U: diagrama listo`
+	: `sequenceDiagram
+	participant U as Reader
+	participant P as Page
+	participant M as Mermaid
+	U->>P: scrolls to the diagram
+	P->>M: load the library (once)
+	M-->>P: SVG measured with the real fonts
+	Note over P,M: labels are measured where they render
+	P-->>U: diagram ready`;
+
+const stateChart = es
+	? `stateDiagram-v2
+	[*] --> Borrador
+	Borrador --> EnRevision: abrir PR
+	EnRevision --> Borrador: cambios pedidos
+	EnRevision --> Aprobado: review ok
+	Aprobado --> Mergeado: CI verde
+	Mergeado --> [*]`
+	: `stateDiagram-v2
+	[*] --> Draft
+	Draft --> InReview: open PR
+	InReview --> Draft: changes requested
+	InReview --> Approved: review ok
+	Approved --> Merged: CI green
+	Merged --> [*]`;
+
+const pipelineChart = es
+	? `flowchart LR
+	A[Pregunta] --> B[Plan] --> C[Llamada a tool] --> D[Verificar] --> E[Respuesta]`
+	: `flowchart LR
+	A[Question] --> B[Plan] --> C[Tool call] --> D[Verify] --> E[Answer]`;
 ---
 
 <DemoSection
@@ -46,5 +89,35 @@ const worktreeChart = `flowchart LR
   pr2 --> main\`}
 />`}
 >
-	<Diagram title={es ? 'Dos agentes, dos worktrees, cero colisiones' : 'Two agents, two worktrees, zero collisions'} chart={worktreeChart} />
+	<Diagram title={es ? 'Dos agentes, dos worktrees, cero colisiones' : 'Two agents, two worktrees, zero collisions'} chart={worktreeChart} lang={lang} />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'secuencia / quién habla con quién' : 'sequence / who talks to whom'}
+	description={es ? 'Participantes, mensajes y notas con la misma tipografía y los mismos trazos finos que el resto del sitio.' : 'Participants, messages and notes in the same type and hairline strokes as the rest of the site.'}
+	usage={`<MermaidDiagram title="…" chart={\`sequenceDiagram
+  participant U as Reader
+  U->>P: scrolls to the diagram\`} />`}
+>
+	<Diagram title={es ? 'Cómo llega un diagrama a la página' : 'How a diagram reaches the page'} chart={sequenceChart} lang={lang} />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'estados / la vida de un PR' : 'state / the life of a PR'}
+	description={es ? 'Máquinas de estado con transiciones etiquetadas en mono.' : 'State machines, with transition labels set in mono.'}
+	usage={`<MermaidDiagram chart={\`stateDiagram-v2
+  [*] --> Draft
+  Draft --> InReview: open PR\`} />`}
+>
+	<Diagram title={es ? 'De borrador a mergeado' : 'From draft to merged'} chart={stateChart} lang={lang} />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'columna angosta / se reacomoda' : 'narrow column / re-flows'}
+	description={es ? 'Si una cadena de izquierda a derecha no cabe sin achicar las letras, se dibuja de arriba hacia abajo. Solo los diagramas que de verdad no caben se deslizan de lado, y abren en su nodo de arranque, no en una caja cortada a la mitad.' : 'When a left-to-right chain can’t fit without shrinking its text, it’s drawn top to bottom instead. Only diagrams that truly can’t fit scroll sideways, and they open on their starting node, not on a box cut in half.'}
+	usage={`<MermaidDiagram chart={\`flowchart LR
+  A[Question] --> B[Plan] --> C[Tool call] --> D[Verify] --> E[Answer]\`} />`}
+	maxWidth="360px"
+>
+	<Diagram title={es ? 'Una vuelta del agente' : 'One agent turn'} chart={pipelineChart} lang={lang} />
 </DemoSection>

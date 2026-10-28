@@ -124,6 +124,7 @@ const cumulative = steps.map((s) => (acc += s.tokens ?? 0));
 	{caption && <figcaption class="agentloop-caption">{caption}</figcaption>}
 
 	<script
+		is:inline
 		type="application/json"
 		data-al-steps
 		set:html={JSON.stringify({ steps, cumulative, i18n: { idle: L.idle, tool: L.tool, phases: L.phases } })}
@@ -207,15 +208,18 @@ const cumulative = steps.map((s) => (acc += s.tokens ?? 0));
 				stop();
 				return;
 			}
+			// Reduced motion: no autoplay at all. Flipping through every step at
+			// 60 ms read as flicker; land on the final state instead.
+			if (onReducedMotion()) {
+				go(total);
+				return;
+			}
 			if (current >= total) current = 0;
 			playBtn.textContent = '⏸';
-			timer = setInterval(
-				() => {
-					go(current + 1);
-					if (current >= total) stop();
-				},
-				onReducedMotion() ? 60 : 1400,
-			);
+			timer = setInterval(() => {
+				go(current + 1);
+				if (current >= total) stop();
+			}, 1400);
 		});
 
 		apply();
@@ -229,7 +233,7 @@ const cumulative = steps.map((s) => (acc += s.tokens ?? 0));
 	}
 
 	init();
-	document.addEventListener('astro:after-swap', init);
+	document.addEventListener('astro:page-load', init);
 </script>
 
 <style>

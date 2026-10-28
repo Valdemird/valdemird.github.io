@@ -37,20 +37,20 @@ const isWarning = !!status && /outdated|deprecated|archived|desactualizado|obsol
 <p class="freshness">
 	<span class="seg">
 		<span class="key">{labels.published}</span>
-		<span class="sep">·</span>
+		<span class="sep" aria-hidden="true">·</span>
 		<FormattedDate date={pubDate} locale={lang} />
 	</span>
 	{reviewedDate && (
 		<span class="seg">
 			<span class="key">{labels.reviewed}</span>
-			<span class="sep">·</span>
+			<span class="sep" aria-hidden="true">·</span>
 			<FormattedDate date={reviewedDate} locale={lang} />
 		</span>
 	)}
 	{status && (
 		<span class={`seg seg-status${isWarning ? ' is-warning' : ''}`}>
 			<span class="key">{labels.status}</span>
-			<span class="sep">·</span>
+			<span class="sep" aria-hidden="true">·</span>
 			<span class="status-value">{status}</span>
 		</span>
 	)}
@@ -80,9 +80,9 @@ const isWarning = !!status && /outdated|deprecated|archived|desactualizado|obsol
 		gap: 0.45em;
 	}
 
+	/* Muted is the floor for legible text (4.5:1); no extra opacity on top. */
 	.key {
 		color: var(--color-text-muted);
-		opacity: 0.7;
 	}
 
 	.sep {
@@ -100,8 +100,7 @@ const isWarning = !!status && /outdated|deprecated|archived|desactualizado|obsol
 
 	.seg-status.is-warning .status-value,
 	.seg-status.is-warning .key {
-		color: var(--color-warning);
-		opacity: 1;
+		color: var(--color-warning-text);
 	}
 
 	@media (max-width: 540px) {

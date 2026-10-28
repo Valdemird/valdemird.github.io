@@ -1,0 +1,204 @@
+---
+title: "LLM evals from my own games: how my AI game master got unstuck"
+description: "My LLM game master's keyword guard got my turn endings wrong 3 times out of 3. I made my own games the eval, and as structural fixes landed the pass rate went from 56% to 73% on the original graders (up to 8 of those points were crashes in the eval itself)."
+pubDate: 2026-10-27
+tags: ["ai-agents", "llm", "evals", "reliability", "claude-code"]
+featured: true
+lang: en
+---
+
+import Callout from '../../components/blog/Callout.astro';
+import TLDR from '../../components/blog/TLDR.astro';
+import DataTable from '../../components/blog/DataTable.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import PullQuote from '../../components/blog/PullQuote.astro';
+
+<TLDR bullets={[
+  "My AI game master, a personal project I built with Claude Code, felt stuck and boring in my first real games. The logs showed code guards sending the narrator back 8 times in about 27 turns (and cutting a line from one retry), and the end-of-turn word list was wrong 3 times out of 3.",
+  "The fix was a split: code keeps the facts (rules, hidden information, true state), the model reads what I meant through structured tools, and when it's unsure I settle it with one tap and an undo.",
+  "The safety net moved from guards to an eval built from my own sessions, cut right before each thing I said. As structural fixes landed, the pass rate went from 56% to 73% on the suite's original graders. Up to 8 of those points were crashes in the eval itself, fixed after the baseline, and on graders loosened along the way the same run scores 83%. The same eval later caught two prompt edits that looked harmless and weren't.",
+]} />
+
+This past Sunday night I sat down to play the first real game with DMai, the AI game master I'd been building for ten days. DMai is a personal project and it's still private. It's a deterministic D&D 5e rules engine built on the SRD 5.2.1, the openly licensed D&D rules, plus a table app where Claude Haiku 5.5 narrates on top of the engine, with a spoken voice, a TV view and my phone as the controller. I built all of it with Claude Code. The narrator had landed the day before.
+
+After that first game I typed back to Claude Code, among other things: "se traba no es claro respecto a las acciones..." (it gets stuck, it's not clear about the actions) and "...creo que todo esta muy raro la verdad" (honestly, I think everything is really weird).
+
+The next morning I played again. On my 13th turn of that game I told the table itself, mid-game: "está muy aburrido". This is really boring. The narrator answered: "Fuera de la historia: tienes razón en varias cosas. Lo anoto todo para la mesa: menú, movimiento, negociación y lo que ves en el mapa." (Out of the story: you're right about several things. I'll note it all for the table: the menu, movement, the negotiation and what you see on the map.) It had no way to speak out of character, so a guard treated that as narration. A guard is a small code check that sits between the model and the table and sends back or blocks anything that breaks a rule. This one sent the answer back, because "menu" isn't a word the fiction may say, and the narrator retried with "the options". One turn later I ended the session.
+
+So one of the last things my second game did was run a guard over the narrator while it was telling me I had a point. Fixing that took two moves: take the guessing out of code, and replace it with a test suite cut from the games I'd actually played.
+
+<Callout type="important" title="The thesis">
+A word list over a player's sentences is a guess wearing the costume of an invariant. What replaces it has to answer one question per input: I said this. Did the table do it, without making me repeat myself or tap again?
+</Callout>
+
+## Eight guard send-backs in 27 turns
+
+Claude Code went through both sessions' logs before proposing anything. Across about 27 of my turns, the guards had sent the narrator back 8 times (9 verdicts, two of them on the same answer) and cut one line outright.
+
+The end-of-turn guard, `endsTurn`, was a word list. It blocked "termino mi accion" (I end my action), "ya termina" (that's it) and "acá termina mi turno" (my turn ends here). Three interventions, all three wrong. I'd said I was done, and a list of phrases decided I hadn't meant it.
+
+The fiction-only guard sent back five lines of narration, and cut a line from the retry of one of them. Each bounce cost a few seconds (2 to 8 s), and one retry repeated a line the voice had already spoken. Another word list, `isTableQuestion`, was supposed to notice when I asked a rules question out of character. It missed mine, like when I asked why I had to roll Perception with one of the goblins standing right in front of me. That question went to the narrator as if my wizard had said it.
+
+Cost wasn't it. The narrator read about 96% of its input from cache, and a session's play cost about $0.06 (about $0.12–0.13 counting the idle cache keep-alives after the game). The model was missing two things: information and a way to say things.<Sidenote>The narrator had 22 tools and only 5 used strict schemas. One took JSON inside a string parameter, `parametros_json`, and in one live run Haiku left it empty six times in a row.</Sidenote> When I moved by words the table shifted me one square, and since the narrator couldn't see the map, it told that as a climb I hadn't chosen. It had no tool to hand a question to the table, speak out of character, or settle a negotiation.
+
+## How a prompt collects 54 "nevers"
+
+The narrator's rules had grown in three days, one incident at a time. By that Monday morning they were about 3,250 words with 54 "never" in them (the prompt is in English, though I play in Spanish). When we audited them later that day, seven rules appeared twice and one pair contradicted itself: the opening line must never retell my action, and the opening line must say what I'm about to do. Every one of those lines was a real fix for a real failure. Nothing in the prompt said what a good game master actually does.
+
+I didn't notice, because every fix came with a test and the tests passed. The automated suites ran against a scripted narrator. Claude also played the game itself in a headless browser at the end of each milestone, with the live model but a fake voice that plays a tone per line, and most of what those runs flagged got fixed. Meanwhile my real games, with the real model, were stuck.<Sidenote>In the first one the voice service never even started.</Sidenote> I was reviewing green checks and calling that progress.
+
+Claude Code was still patching bugs from my second game when I sent this:
+
+<PullQuote cite="Me, to Claude Code, mid-session (typos fixed)">
+Es bueno tener código determinista validando, pero si vamos a crear una cantidad de bloqueos deterministas no tiene sentido usar un LLM.
+</PullQuote>
+
+Roughly: deterministic code validating things is good, but if we're going to stack up deterministic blocks, there's no point in using an LLM. Claude went back to the logs first, then answered with a count of the guards and one sentence I've kept: "Mi error fue tratar la intención como si fuera un invariante duro." My mistake was treating intent as if it were a hard invariant.
+
+Anthropic has a name for the prompt half of this. The [prompt-audit reference in its claude-api skill](https://github.com/anthropics/skills/blob/main/skills/claude-api/shared/prompt-audit.md) lists "patch accretion: many narrow conditionals, each traceable to one incident", where "the model navigates a maze of special cases instead of a coherent principle". The same file warns that a prohibition list can backfire: "a prohibition against a failure the model wasn't going to make can *anchor it toward* that failure". The [prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices) make the positive version of the point, and their example is a text-to-speech one: a bare "NEVER use ellipses" works worse than explaining that the response will be read aloud. My narrator is read aloud. I had 54 bare nevers.
+
+## Facts, intent and doubt: who decides what
+
+The decision we wrote down that day splits every check by what kind of thing it is deciding.
+
+<DataTable
+  columns={[
+    { key: "kind", label: "Kind", align: "left" },
+    { key: "examples", label: "Examples in DMai", align: "left" },
+    { key: "who", label: "Decided by", align: "left" },
+  ]}
+  rows={[
+    { kind: "Facts", examples: "Is it legal by the rules? Is that creature hidden? Does the narration claim a state the engine contradicts? Is it the same refused call again? Schemas, cost caps, private data", who: "Code. Deterministic, and it stays" },
+    { kind: "Intent", examples: "Did my turn end? Is this a question for the table? Whom am I aiming at? Do the foes take the deal?", who: "The model, through structured tools" },
+    { kind: "Style", examples: "Narration stays in the fiction, and stays short", who: "A code guard that sends a line back once, then cuts the offending sentences, plus a separate channel so the model can say what isn't fiction" },
+    { kind: "Doubt", examples: "The model isn't sure what I meant", who: "Me, on the controller: one tap to confirm, or an undo window" },
+  ]}
+  caption="Adapted from the decision record. Code decides the first row outright. What changed for style is the separate channel, so the narrator has less reason to trip the guard."
+/>
+
+In practice, the end-of-turn word list is gone. The model ends my turn when my words mean it. When it isn't sure, it puts a proposal on my phone marked `ambiguous`, and I confirm it or take it back. "Terminar el turno" (end turn) is always a button, so natural language is never the only way out. A new tool, `a_la_mesa` (to the table), lets the narrator hand my rules question to a separate rules assistant, or put its own out-of-character note on my controller as text the voice skips. The map's reach calculation now tries walkable routes first, so when I ask to go somewhere, my character walks around a slope if there's a path around it.
+
+Negotiation became a ruling. Talking costs no action in combat. When I offer foes a deal, the narrator judges it from what the adventure's notes say they want (hunger, fear, morale) or asks for a Charisma check, and foes who accept end the fight. That one came straight from my second game, where I offered the goblins our food and the narrator invented a reason I couldn't reach them.
+
+None of this is new as a principle. The [human-in-the-loop module](/learn/agentic-systems/human-in-the-loop/) on this site argues for gating by reversibility, and [tools as UX for the model](/learn/agentic-systems/tools-and-mcp/) argues for giving it the actions it needs. I hadn't priced in the cost of removing the guards. The decision record says it bluntly: a model mistake is no longer caught by a word list, so the evaluation and the undo window have to exist before the prompt loses its patches.
+
+## Cutting my own games into test cases
+
+DMai already had evals. Scripted scenarios and simulated personas started fresh sessions on a test adventure. A capability matrix replayed sentences against a scripted narrator. None of them asked whether the table did what I said, in the situation where I said it.
+
+My third game, after the first round of fixes, showed the gap. I said it "mejoro pero todavia tiene problema" (it got better, but it still has a problem). The narrator asked "¿qué haces?" (what do you do?) after every small step. When I said I'd walk up and cast Hideous Laughter on a foe, it dropped half of it. It waited for a confirmation on trips I'd clearly asked for, and it refused to take me back to a town. Every fix for those would change how the model behaves, and nothing measured that before or after.
+
+So Claude Code built what the project calls the forks eval. It takes a session I actually played, cuts it just before one thing I said, reopens it, and plays only that input again with the real model, tools, guards and engine.
+
+<MermaidDiagram title="One fork, one input" chart={`graph TD
+  A["Recorded session"] --> B["Cut before my input N, reopen the copy"]
+  B --> C["Replay N: real model, tools, engine"]
+  C --> D["Driver answers like me: confirm, roll, defaults"]
+  D --> E["Grade facts in code: expect / forbid"]
+`} />
+
+The cut keeps the exact situation: the board, the fight, and the conversation the model had read up to that point. The session log is append-only, so a cut copy is still a valid session. After the replay, a small driver answers the table the way I would: it confirms a waiting proposal and counts it as a wait, a tap I'd have had to make, rolls dice with middling faces, takes defaults on choices, and lets undo windows run out. Then the grader reads facts out of the session log in code. Did a command of this type get committed? Did my character move toward that square? Was there a check, a scene change, a tool call? Who spoke? A case is a list of facts to `expect` and to `forbid`, plus an optional limit on waits.
+
+One replay of one input is a trial, and most runs play each input 3 times. The cases never enter the repository, because they hold my private campaign content. Every live run has a cost cap. A trial costs under two cents on average (the median is under one) and usually takes 5 to 25 seconds (about 12 s typical).
+
+<Collapsible title="Why not just replay the whole session?">
+That was the first option on the table, and it drifts. Replay every recorded input in order, and the moment the narrator answers input 2 differently than it did live, input 3 lands in a situation I never said it in. You're grading a conversation that never happened.
+
+Synthetic scenarios fail the other way. Rewriting my complaint as a fresh test on a fixture adventure keeps the words and loses the situation that gave them their meaning. "Acá termina mi turno" means something specific when it's my turn, in a fight, after I've moved.
+
+Cutting before one input keeps the situation and lets the change under test decide exactly one answer. The trade-off is that a fork depends on the adventure still being compatible with the recorded engine log. If an adventure change breaks the replay, the trial ends in an error.
+</Collapsible>
+
+## What the numbers did
+
+The first suite had 22 inputs, taken from my three live games. Its baseline, on the narrator as it stood after the first round of fixes (the intent word lists were already gone), was 36 of 64 trials. The failures were my complaints, almost line by line: casting a spell as I walked up, trips I'd asked for (on a clean re-run they all waited for a confirm), going back to a town, a companion's attempt left unresolved. The one-step controls mostly passed: ending my turn, questions for the table, and two of the four spells at a named foe.
+
+Then the structural fixes landed one at a time, each judged on the suite. Scenes became places you can travel between. Moving by words worked in every scene with a grid. And one sentence with several steps ("I walk up and cast") became a single proposal with the next steps attached.
+
+<InteractiveChart
+  type="horizontal"
+  title="% of trials passed"
+  story="Same 22 inputs from my own games, graded in code. The pass rate climbed from 56% to 83% as structural fixes landed, on graders loosened along the way. On the baseline's graders the last bar is 73%, and up to 8 points of the climb are crashes in the eval itself."
+  source="Forks eval, live runs on Claude Haiku 5.5, 26 Oct 2026. Trials per run: 64, 62, 40, 66. The first three stopped at their cost cap. After the baseline, Claude Code loosened five graders, one of them twice; bars 2 to 4 use progressively looser versions (see below)."
+  data={[
+    { label: "Baseline (36/64)", value: 56 },
+    { label: "After structural fixes (53/62)", value: 85 },
+    { label: "Later run, 2 trials/case (36/40)", value: 90 },
+    { label: "Full suite, 3 trials/case (55/66)", value: 83 },
+  ]}
+  annotations={[{ targetIndex: 0, text: "The failures were my complaints" }, { targetIndex: 3, text: "All 22 cases, no cap hit", emphasize: true }]}
+/>
+
+Here is what moved on the cases I'd complained about. "Right after its fix" is the run that judged that fix. The last column is the full run that afternoon, the one behind the last bar.
+
+<DataTable
+  columns={[
+    { key: "case", label: "Case", align: "left" },
+    { key: "base", label: "Baseline", align: "right" },
+    { key: "fix", label: "Right after its fix", align: "right" },
+    { key: "later", label: "Full run, afternoon", align: "right" },
+  ]}
+  rows={[
+    { case: "Trips I'd asked for, and going back to town (3 cases)", base: "0/7 clean trials", fix: "9/9, no taps", later: "9/9" },
+    { case: "I walk up and cast a spell, in one sentence", base: "0/3", fix: "2/3, then 2/2", later: "3/3" },
+    { case: "A companion's action the narrator never resolved", base: "1/3", fix: "3/3 on its own run", later: "1/3" },
+    { case: "Turns that end with the narrator asking me something", base: "8%", fix: "2%, then 8%", later: "8%" },
+  ]}
+  caption="x/y is trials passed. The companion case didn't hold, and it's one of the trunk cases further down. Turns that end with a question stayed around 2–8%: no clear change."
+/>
+
+The evals that morning cost under $4 of the $5 I'd approved.
+
+<Collapsible title="How much to trust these numbers">
+Not too much, individually. Most cases ran 3 times, so a single case moving from 1/3 to 2/3 can be noise. The third run used 2 and, like the first two, stopped when it hit its cost cap, which is why the denominators differ (64, 62, 40). The baseline also counted 8 trials that crashed in the eval itself as failures, so 8 of its 28 failures weren't the narrator's. Without them the baseline is 36 of 56, or 64%, but that's a ceiling: 6 of the 8 crashes were on the two trip cases, which failed every trial anyway on a clean re-run. A crash-free baseline sits somewhere between 56% and 64%.
+
+After the baseline, Claude Code also loosened five graders while it worked through the failures, and one of them twice. The orb spell I asked for may now be explained out of character instead of cast, and later it also passes if the narrator asks which energy to use. A parley passes when a goblin answers (three cases). Searching the bodies may use the scene's own search action instead of a companion. On the baseline's own criteria the 85% run scores 79% (49/62), the 2-trial run 83% (33/40), and the full run behind the last bar 73% (48/66). Read the chart as a direction across one day. There was no controlled experiment behind it.
+
+I trust the shape of the failures more. The baseline didn't fail randomly: it failed on exactly the things I'd complained about at the table, and the one-step controls mostly passed. That's what told me the eval was measuring my experience.
+</Collapsible>
+
+## What the eval caught in the prompt rewrite
+
+The second half of the decision was to rewrite the prompt so it opens with principles instead of prohibitions, but only against the eval. The working agreement from that day has one line that matters here: no change goes in if it makes the evaluation worse.
+
+The new prompt keeps the table protocol the code depends on: turn shape, proposals, moves, phases. It opens with ten game-master principles, each with its reason. A few of them: do all the player said. Roll only when failure would change something. The outcome belongs to the engine, so never hint at how it's going before it resolves. When the scene stalls, something happens. Every person in the world wants something, and they don't give in because the player insists. Offers and threats follow the Influence rules of the SRD 5.2.1: a creature the offer pleases accepts with no roll, one it goes against refuses, and only a hesitant one makes the outcome uncertain. The new prompt is no shorter than the old one, and it still says "never" 57 times. What changed is that the principles and their reasons come first.
+
+Old prompt against new, same 22 inputs, 3 trials each. The new column is the second draft. The first scored 52/66, and comparing it case by case is how the dropped clause further down turned up.
+
+<DataTable
+  columns={[
+    { key: "metric", label: "Measure", align: "left" },
+    { key: "old", label: "Old prompt", align: "right" },
+    { key: "new", label: "Principles first", align: "right" },
+  ]}
+  rows={[
+    { metric: "Trials passed", old: "55/66", new: "54/66" },
+    { metric: "Words spoken per input (median)", old: "46", new: "39.5" },
+    { metric: "Latency per input (median)", old: "12.5 s", new: "11.5 s" },
+    { metric: "Bribing goblins with coins (pass = they answer)", old: "1/3", new: "3/3" },
+    { metric: "Offering goblins our food", old: "0/3", new: "2/3" },
+    { metric: "Moving a fallen trunk (2 cases)", old: "1/3 each", new: "0/3 each" },
+  ]}
+  caption="Both columns use the loosened graders. On them the overall pass rate barely moved. The median answer got shorter, and the food offer now works."
+/>
+
+So the rewrite stayed, on these graders: 54 against 55 is inside the noise at three trials a case, the median answer got shorter, and the food offer now passes. The median trial spoke 6.5 fewer words, roughly 2.6 seconds at the 2.5 words a second the decision record assumes for the voice. The average barely moved (51.4 words against 50.9), and 8 of the 22 cases got longer, so it's the typical answer that got shorter. The food row is the same kind of offer I made at the table that Monday morning, the one the narrator refused. The coins row needs reading carefully: a pass there means the goblins answer the offer in character, and in all three trials they turned the gold down and asked for our food instead. That's a fair ruling, but it isn't the bribe working. On the graders as first written the gap is wider: the old prompt scores 48/66 and the new one 43/66. The widening is all offers the new prompt answers in character without a roll. On those graders the coin bribe goes from 1/3 to 0/3, and so does my plea to spare our lives: the old prompt called for a check in 1 of 3 trials and the new one in none, and the goblins just answered. The Influence principle allows that, and the original graders didn't. Even there the offers net out, because the food offer gains the two trials the other two lose. The 5-trial gap itself is the hedged end-of-turn case below (2 trials), the two trunk cases (1 each) and a trial of noise. The trunk cases had already failed 2 of 3 before, so they need their own fix.
+
+I didn't expect the next finding. It was in the lines the rewrite removed or reworded.
+
+<Callout type="warning" title="Two edits that looked harmless">
+In the first draft, some trials asked me in words instead of putting a proposal on my phone. Claude traced it to a clause it had dropped from the confirmation rule, "Then call proponer (or actuar) in the same response" (`proponer` is the tool that puts the proposal there), and put the clause back word for word alongside other edits, so it was never measured on its own. In the second draft, a hedged "creo que ahí queda" (I think that's it) triggered a confirmation in 3 of 3 trials. Reading the failing trials, Claude blamed a single "only" it had added while merging two turn-ending rules, though the first draft carried the same line and passed that case 3 of 3. The eval caught both. A prompt rewrite done by taste would have shipped them.
+</Callout>
+
+The fix was one edit that did three things: it took the "only" out, named the hedge ("creo que ahí queda") in the rule, and narrowed `ambiguous` from "when you are unsure" to words that "could also mean something else". The failing trials had all marked the turn-end `ambiguous`, so the "only" may not have been the lever. After it, the four turn-ending cases went 10 of 10 before that run hit its cost cap. Since the rule now quotes the very phrase that case tests, that 10 of 10 is a check that the fix took, not independent evidence. The prompt-audit row I quoted earlier covers both halves: "test removals, not just additions", and "an eval win for adding a line on top of the stack is not evidence the stack should exist". The first applies to rewording a line as much as deleting one.
+
+## Where the safety net is now
+
+When I wrote [the high-accuracy agent guide](/blog/high-accuracy-agent-priorities/) in June, one of its sections was "Your eval is the control loop", with the advice to build graders from error analysis on real traces. That was research I'd read. This is what it looked like in my own project: graders built from the exact sentences I said at a table, in the exact situations I said them, graded on what the session log recorded. The [evaluation module](/learn/agentic-systems/evaluation/) has the general version.
+
+It also closes a loop from [the tests post](/blog/tests-gave-me-control/), where I wrote that tests catch what you thought to check for. Unit tests and scripted playtests checked what Claude and I thought a player would do. The forks check what I did.
+
+The net underneath it now is 23 sentences of mine: 22 from the first three games and one from a fourth. That's coarse, and the last full report still lists both trunk cases as failing. The rule now is that whatever I say when the table annoys me becomes a case in the suite first. The prompt gets touched after.

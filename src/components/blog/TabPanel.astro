@@ -1,6 +1,8 @@
 ---
-// Used inside <Tabs>. Each TabPanel maps to a tab label by order.
+// Used inside <Tabs>. Each TabPanel maps to a tab label by order. Tabs wires
+// the id and aria-labelledby on page load (it knows the order; the panel
+// doesn't), so the markup here stays a plain region.
 ---
-<div class="tab-panel">
+<div class="tab-panel" role="tabpanel" tabindex="0">
 	<slot />
 </div>

@@ -10,7 +10,7 @@ const year = new Date().getFullYear();
 	<div class="footer-inner">
 		<div class="footer-left">
 			<span class="footer-name">{SITE_TITLE}</span>
-			<span class="footer-copyright">&copy; {year}. {strings.footer.copyright}</span>
+			<span class="footer-copyright">&copy; {year}. <span data-footer-copyright>{strings.footer.copyright}</span></span>
 		</div>
 		<div class="footer-links">
 			{SOCIAL_LINKS.github && (

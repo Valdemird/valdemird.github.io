@@ -36,6 +36,30 @@ const { groups, labHome, active } = Astro.props;
 	))
 }
 
+<script>
+	// The desktop sidebar is its own scroll box. On a deep component page the
+	// active link sits below its fold, so the reader can't see where they are.
+	// Scroll the sidebar (never the window) to bring the active link into view.
+	function revealActiveLabLink() {
+		document.querySelectorAll<HTMLElement>('.lab-nav-link.active').forEach((link) => {
+			let box = link.parentElement;
+			while (box && box !== document.body) {
+				const { overflowY } = getComputedStyle(box);
+				if ((overflowY === 'auto' || overflowY === 'scroll') && box.scrollHeight > box.clientHeight) break;
+				box = box.parentElement;
+			}
+			if (!box || box === document.body) return;
+			const b = box.getBoundingClientRect();
+			const l = link.getBoundingClientRect();
+			if (!l.height) return; // hidden copy (mobile nav or collapsed <details>)
+			if (l.top >= b.top && l.bottom <= b.bottom) return; // already visible
+			box.scrollTop += l.top - b.top - (box.clientHeight - l.height) / 2;
+		});
+	}
+	revealActiveLabLink();
+	document.addEventListener('astro:page-load', revealActiveLabLink);
+</script>
+
 <style>
 	.lab-nav-group + .lab-nav-group {
 		margin-top: var(--space-lg);

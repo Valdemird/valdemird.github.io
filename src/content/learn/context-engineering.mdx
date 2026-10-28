@@ -46,8 +46,7 @@ The most useful frame comes from MemGPT: treat the context window as limited wor
 
 <MermaidDiagram title="The window is RAM, not an infinite buffer" chart={`
 graph LR
-  A["Working memory<br/>(context window)"] --- B["Long-term store<br/>(notes.md, DB, files)"]
-  A -.->|LLM decides paging:<br/>load / evict / compact| B
+  A["Working memory<br/>(context window)"] <-.->|LLM decides paging:<br/>load / evict / compact| B["Long-term store<br/>(notes.md, DB, files)"]
 `} />
 
 ## Context rot: the finding that breaks the intuition

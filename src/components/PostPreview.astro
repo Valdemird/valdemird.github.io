@@ -1,6 +1,8 @@
 ---
+import { getEntry } from 'astro:content';
 import FormattedDate from './FormattedDate.astro';
 import { UI_STRINGS, type Locale } from '../consts';
+import { readingMinutes } from '../lib/learn';
 
 interface Props {
 	id: string;
@@ -11,19 +13,25 @@ interface Props {
 	basePath?: string;
 	locale?: Locale;
 	enableTransition?: boolean;
+	/** Reading time in minutes. Callers should pass `readingMinutes(post.body)`. */
+	readingTime?: number;
 }
 
 const { id, title, description, pubDate, tags, basePath = '/blog', locale = 'en', enableTransition = false } = Astro.props;
-const readingTime = Math.max(1, Math.ceil(description.length / 50));
+
+// Reading time comes from the post body, never the description. When a caller
+// doesn't pass it, look the entry up so every list (home, blog index, Read
+// next) shows the same number as the post header.
+const readingTime =
+	Astro.props.readingTime ?? readingMinutes((await getEntry('blog', id))?.body);
 const minReadLabel = UI_STRINGS[locale].blog.minRead;
 ---
 
 <a href={`${basePath}/${id}/`} class="post-preview">
-	<div class="post-accent" aria-hidden="true"></div>
 	<div class="post-preview-content">
 		<div class="post-preview-meta">
 			<FormattedDate date={pubDate} locale={locale} />
-			<span class="separator">&middot;</span>
+			<span class="separator" aria-hidden="true">&middot;</span>
 			<span>{readingTime} {minReadLabel}</span>
 		</div>
 		{enableTransition ? (
@@ -38,7 +46,7 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 			</div>
 		)}
 	</div>
-	<svg class="post-arrow" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+	<svg class="post-arrow" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 		<line x1="5" y1="12" x2="19" y2="12"></line>
 		<polyline points="12 5 19 12 12 19"></polyline>
 	</svg>
@@ -46,6 +54,7 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 
 <style>
 	.post-preview {
+		--post-wash: 0.045;
 		position: relative;
 		display: flex;
 		align-items: center;
@@ -57,29 +66,33 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 		border: 1px solid transparent;
 		transition: border-color var(--duration-normal) var(--ease-smooth),
 			background var(--duration-normal) var(--ease-smooth),
+			box-shadow var(--duration-normal) var(--ease-smooth),
 			transform var(--duration-normal) var(--ease-spring);
 	}
 
-	.post-accent {
-		position: absolute;
-		left: 0;
-		top: 50%;
-		transform: translateY(-50%);
-		width: 3px;
-		height: 0;
-		background: var(--color-accent);
-		border-radius: 2px;
-		transition: height var(--duration-normal) var(--ease-spring);
+	:global([data-theme='dark']) .post-preview {
+		--post-wash: 0.085;
 	}
 
-	.post-preview:hover {
-		border-color: var(--color-border);
-		background: oklch(from var(--color-surface) l c h / 0.5);
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .post-preview {
+			--post-wash: 0.085;
+		}
+	}
+
+	/* Hover and keyboard focus share one state: tinted wash, shadow, border,
+	   and a small horizontal nudge. No accent bar on the left edge. */
+	.post-preview:hover,
+	.post-preview:focus-visible {
+		border-color: var(--color-border-strong);
+		background: oklch(from var(--color-accent) l c h / var(--post-wash));
+		box-shadow: var(--shadow-md);
 		transform: translateX(4px);
 	}
 
-	.post-preview:hover .post-accent {
-		height: 40%;
+	.post-preview:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 
 	.post-preview-content {
@@ -89,6 +102,7 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 
 	.post-preview-meta {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
 		gap: 0.4rem;
 		font-size: 0.78rem;
@@ -108,8 +122,9 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 		transition: color var(--duration-fast) var(--ease-smooth);
 	}
 
-	.post-preview:hover h3 {
-		color: var(--color-accent);
+	.post-preview:hover h3,
+	.post-preview:focus-visible h3 {
+		color: var(--color-accent-hover);
 	}
 
 	p {
@@ -125,7 +140,9 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 
 	.post-preview-tags {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 0.3rem;
+		min-width: 0;
 		margin-top: 0.5rem;
 	}
 
@@ -133,10 +150,11 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 		font-family: var(--font-mono);
 		font-size: 0.65rem;
 		font-weight: 500;
+		white-space: nowrap;
 		padding: 0.15em 0.5em;
 		background: var(--color-accent-subtle);
 		border-radius: var(--radius-sm);
-		color: var(--color-accent);
+		color: var(--color-accent-hover);
 	}
 
 	.post-arrow {
@@ -148,7 +166,8 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 			transform var(--duration-normal) var(--ease-spring);
 	}
 
-	.post-preview:hover .post-arrow {
+	.post-preview:hover .post-arrow,
+	.post-preview:focus-visible .post-arrow {
 		opacity: 1;
 		transform: translateX(0);
 	}
@@ -156,6 +175,12 @@ const minReadLabel = UI_STRINGS[locale].blog.minRead;
 	@media (max-width: 640px) {
 		.post-preview { padding: var(--space-md); }
 		.post-arrow { display: none; }
-		.post-preview:hover { transform: none; }
+		.post-preview:hover,
+		.post-preview:focus-visible { transform: none; }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.post-preview:hover,
+		.post-preview:focus-visible { transform: none; }
 	}
 </style>

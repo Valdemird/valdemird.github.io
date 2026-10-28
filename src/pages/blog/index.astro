@@ -5,9 +5,11 @@ import Footer from '../../components/Footer.astro';
 import PostPreview from '../../components/PostPreview.astro';
 import DeepDiveCard from '../../components/DeepDiveCard.astro';
 import LabCard from '../../components/LabCard.astro';
+import MapCard from '../../components/MapCard.astro';
 import FormattedDate from '../../components/FormattedDate.astro';
-import { SITE_TITLE, PERSON_ID, t } from '../../consts';
+import { SITE_TITLE, PERSON_ID, ORGANIZATION_ID, t } from '../../consts';
 import { getCollection } from 'astro:content';
+import { readingMinutes } from '../../lib/learn';
 
 const strings = t(Astro.url);
 
@@ -28,7 +30,7 @@ const blogJsonLd = {
 	inLanguage: 'en',
 	isPartOf: { '@id': 'https://valdemird.com/#website' },
 	author: { '@id': PERSON_ID },
-	publisher: { '@id': PERSON_ID },
+	publisher: { '@id': ORGANIZATION_ID },
 	blogPost: posts.map((p) => {
 		const mod = p.data.reviewedDate ?? p.data.updatedDate;
 		return {
@@ -47,7 +49,7 @@ const blogJsonLd = {
 <!doctype html>
 <html lang="en">
 	<head>
-		<BaseHead title={`${strings.blog.title} | ${SITE_TITLE}`} description={strings.blog.description} lang="en" jsonLd={blogJsonLd} alternates={[
+		<BaseHead title={strings.blog.title} description={strings.blog.description} lang="en" jsonLd={blogJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/blog/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/blog/' },
 		]} />
@@ -71,6 +73,7 @@ const blogJsonLd = {
 				<!-- Special, content-heavy blog entries surfaced from the wiki and the component lab -->
 				<DeepDiveCard lang="en" />
 				<LabCard lang="en" />
+				<MapCard lang="en" />
 
 				<!-- Featured post -->
 				{featuredPost && (
@@ -112,6 +115,7 @@ const blogJsonLd = {
 									pubDate={post.data.pubDate}
 									tags={post.data.tags}
 									locale="en"
+									readingTime={readingMinutes(post.body)}
 									enableTransition
 								/>
 							))}
@@ -282,12 +286,14 @@ const blogJsonLd = {
 	}
 
 	.tag {
-		font-size: 0.72rem;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
 		font-weight: 500;
+		white-space: nowrap;
 		padding: 0.2em 0.6em;
 		background: var(--color-accent-subtle);
 		border-radius: var(--radius-sm);
-		color: var(--color-accent);
+		color: var(--color-accent-hover);
 	}
 
 	.read-arrow {

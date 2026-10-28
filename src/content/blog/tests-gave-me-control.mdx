@@ -2,7 +2,8 @@
 title: "AI gave me speed. Tests gave me control."
 description: "I ran /insights after a month with Claude Code in a side project. The numbers I expected weren't the interesting ones. Here's what was."
 pubDate: 2026-04-27
-reviewedDate: 2026-05-14
+updatedDate: 2026-10-27
+reviewedDate: 2026-10-27
 status: "Still reflects my workflow"
 tags: ["ai-tools", "testing", "developer-workflow", "claude-code"]
 featured: true
@@ -23,14 +24,14 @@ import CodeDiff from '../../components/blog/CodeDiff.astro';
 
 <TLDR bullets={[
   "I worked a month with Claude Code on a side project. /insights showed me two things: AI patches symptoms before understanding causes, and tests are the only thing that lets me trust its changes.",
-  "This post is what I changed because of that.",
+  "Two changes came out of it: a ten-second test suite I run after every meaningful change, and a one-screen spec before I start a feature.",
 ]} />
 
 I built a side project this past month. A small calendar/PWA, a personal sandbox to learn Next.js patterns I don't get to use at work. Outside hours, no consulting overlap, just a place to break things on purpose.
 
-At the end of the month I ran `/insights` in Claude Code to see how I'd been working.<Sidenote>`/insights` inspects the session transcript and surfaces patterns in how I prompted, where I iterated, and where I stalled. It's the kind of post-mortem you rarely do on your own work.</Sidenote> I opened it expecting a pat on the back. I got something more uncomfortable: the things AI was doing badly weren't the ones I thought.
+At the end of the month I ran `/insights` in Claude Code to see how I'd been working.<Sidenote>`/insights` reads your recent Claude Code sessions on your machine and writes an HTML report: how you prompt, where you iterate, where you stall. It's the kind of post-mortem you rarely do on your own work.</Sidenote> I opened it expecting a pat on the back. I got something more uncomfortable: the things AI was doing badly weren't the ones I thought.
 
-This post is what `/insights` showed me and the one shift I made because of it.
+This post is what `/insights` showed me and the two habits I changed because of it.
 
 <Callout type="important" title="The thesis">
 The bottleneck wasn't AI. It was me, trusting AI without a feedback loop. Tests are the cheapest way to buy that loop back.
@@ -51,7 +52,7 @@ A landing page scroll behavior took roughly ten rounds of feedback before it con
 There was a session where `git stash` ate eight out of ten files I'd been working on. I won't pretend that was elegant. That was before I tightened up tests and commit-often discipline. Recovery was from memory.
 
 <Collapsible title="The git stash story (skip if you want)">
-Mid-session, I asked for a stash to pause work on a half-broken branch. The pop didn't restore everything because I'd touched files in directories the stash didn't track cleanly. I lost an afternoon's worth of in-progress code that wasn't yet committed. The fix was boring: commit early, commit often, even on garbage WIP branches. The lesson was less boring: I'd assumed AI would treat git operations with the same caution I would. It doesn't. Git is one of the places where "delegate fully" is the wrong default.
+Mid-session, I asked for a stash to pause work on a half-broken branch. The pop didn't restore everything because I'd touched files in directories the stash didn't track cleanly. I lost an afternoon's worth of in-progress code that wasn't yet committed. The fix was boring: commit early, commit often, even on garbage WIP branches. The lesson was less boring: the request was mine, and I assumed AI would run it with the same caution I would. It doesn't. Git is one of the places where "delegate fully" is the wrong default, because the [expensive mistakes are the ones you can't undo](/learn/agentic-systems/human-in-the-loop/). That afternoon is part of why I later moved parallel agent work into [git worktrees](/blog/worktrees-let-me-parallelize/).
 </Collapsible>
 
 This is the part of working with AI that nobody posts on Twitter. The hero shots are real. What surrounds them looks a lot like normal engineering. You're confused for a while, then it clicks.
@@ -60,7 +61,7 @@ This is the part of working with AI that nobody posts on Twitter. The hero shots
 
 The interesting failure mode wasn't "AI got it wrong." It was subtler. AI reached for a fix before it had a diagnosis.
 
-CSS layout was the clearest example. A child element overflowing isn't usually a child problem. It's usually a parent that forgot to constrain height, or a flex axis that nobody set explicitly. AI tends to reach for `items-start`, `max-h-full`, `overflow-hidden`. Properties on the *visible* element. It almost never walks up the cascade first. That's what burned the ten rounds on scroll-snap.
+CSS layout was the clearest example. A child element overflowing isn't usually a child problem. It's usually a parent that forgot to constrain height, or a flex axis that nobody set explicitly. AI tends to reach for `items-start`, `max-h-full`, `overflow-hidden`. Properties on the *visible* element. It almost never walks up the parent chain first. That's what burned the ten rounds on scroll-snap.
 
 Here's the shape of it, reconstructed from the kanban overflow session rather than copied from one commit:
 
@@ -77,9 +78,9 @@ Here's the shape of it, reconstructed from the kanban overflow session rather th
     { line: 7, text: '</div>' },
   ]}
   after={[
-    { line: 1, text: '<div className="board flex gap-4 min-h-0">' },
-    { line: 2, text: '  <section className="column flex flex-col min-h-0">' },
-    { line: 3, text: '    <ul className="overflow-y-auto">' },
+    { line: 1, text: '<div className="board flex h-full gap-4">' },
+    { line: 2, text: '  <section className="column flex flex-col">' },
+    { line: 3, text: '    <ul className="flex-1 min-h-0 overflow-y-auto">' },
     { line: 4, text: '      {cards.map(renderCard)}' },
     { line: 5, text: '    </ul>' },
     { line: 6, text: '  </section>' },
@@ -87,7 +88,7 @@ Here's the shape of it, reconstructed from the kanban overflow session rather th
   ]}
   removed={[3]}
   added={[1, 2, 3]}
-  note="Both AI patches landed on line 3 — the visible element. The constraint was two parents up: a flex child won't shrink below its content unless min-h-0 says it can."
+  note="Both AI patches landed on line 3, the visible element. The constraint sat upstream: the board had no height to hand down, and the column wasn't a flex container, so the list had nothing to shrink into."
 />
 
 Same pattern in Postgres migrations. I asked AI to apply a migration. It failed. AI retried the same `prisma migrate deploy` three times, swapping flags. When I stopped and looked, the problem was that `.env.local` and `.env` pointed at different databases, and `dotenv` was loading the wrong one. The migration was never the problem. AI optimized for "the command that failed" instead of "which environment got loaded."
@@ -102,7 +103,7 @@ If your AI fix changes a property on the broken element and the bug doesn't move
 
 Here's what changed my relationship with AI in the side project: I leaned hard on tests, and I stopped feeling anxious about how much I was delegating.
 
-The number of tests isn't the story. What matters is which surfaces are covered and how fast the suite runs. The full suite finishes in about ten seconds, and the test files are organized by the thing they protect, not by the thing they exercise.
+What matters is which surfaces are covered and how fast the suite runs. The full suite finishes in about ten seconds, and the test files are organized by the thing they protect, not by the thing they exercise.
 
 <FileTree>
 <div class="folder">
@@ -124,7 +125,7 @@ The number of tests isn't the story. What matters is which surfaces are covered 
 
 A ten-second feedback loop is fast enough to run after every meaningful change. AI can make a wrong assumption and I'll know within one breath instead of one deploy.
 
-One trap I had to watch for. If AI writes the code and AI writes the tests, the suite passes because both reflect the model's reading of the spec, not the spec itself. For anything that matters — auth, hooks, server actions — I write the test plan in the spec before AI touches code. AI fills in assertions; deciding what to test stays with me.
+One trap I had to watch for. If AI writes the code and AI writes the tests, the suite passes because both reflect the model's reading of the spec, not the spec itself.<Sidenote>It's the same trap as letting a model grade its own output: the checker shares the generator's blind spots. I go further into it in [my agent field guide](/blog/high-accuracy-agent-priorities/#break-the-chain-verify-against-ground-truth).</Sidenote> For anything that matters — auth, hooks, server actions — I write the test plan in the spec before AI touches code. AI fills in assertions; deciding what to test stays with me.
 
 I'll show you two things from the actual config that did more for my confidence than any prompt template.
 
@@ -148,9 +149,9 @@ coverage: {
 ```
 </CodeBlock>
 
-Those numbers are low on purpose. They're not aspirational, they're today's floor. The question isn't "how much coverage do you have?" but "can the number drop without you noticing?" As a ratchet, it can't. At this floor it only catches gross regressions. The subtle ones need higher coverage to show up. Right now I care about whether the number is moving up, not where it sits.
+Those numbers are low on purpose. They're today's floor. The real question is whether the number can drop without you noticing. As a ratchet, it can't. At this floor it only catches gross regressions. The subtle ones need higher coverage to show up. Right now I care about whether the number is moving up, not where it sits.
 
-The second is the E2E setup running against a real Postgres, not a mock:
+The second is the E2E setup running against a real Postgres:
 
 <CodeBlock filename="playwright.config.ts">
 ```ts
@@ -176,7 +177,7 @@ export default defineConfig({
 
 The E2E tests insert a real session row into the DB to bypass NextAuth, then drive the actual server. No mocks. The two `@smoke` tests do nothing fancy. One navigates every main page, the other creates a task. They exist so that if AI rewires routing or breaks auth in a way that compiles, I know in seconds.
 
-One line in that config deserves more attention than I gave it when I wrote it: `retries: process.env.CI ? 2 : 0`. Two retries in CI is a confession. It says I expect the occasional E2E failure that has nothing to do with my code, and I'd rather re-roll than investigate every one. The reason flakiness earns that confession is that it compounds. A test that flakes 3% of the time passes 97% of runs. A suite of forty tests like that goes green on about three runs out of ten. Same 3%, same code, and the build is red most mornings. Run the math yourself:
+One line in that config deserves more attention than I gave it when I wrote it: `retries: process.env.CI ? 2 : 0`. Two retries in CI is a confession. It says I expect the occasional E2E failure that has nothing to do with my code, and I'd rather re-roll than investigate every one. The reason flakiness earns that confession is that it compounds. A test that flakes 3% of the time passes 97% of runs. A suite of forty tests like that goes green on about three runs out of ten. Same 3%, same code, and the build is red most mornings. It's the same arithmetic that sinks long agent runs, the `p^t` math from my [agent field guide](/blog/high-accuracy-agent-priorities/#run-the-pt-arithmetic-before-you-write-any-code). Run the math yourself:
 
 <FlakySuite
   tests={40}
@@ -217,11 +218,13 @@ The diagram I now keep in my head:
 
 Without the loop, you're asking your gut whether AI got it right. On a one-line tweak, sure, your eyes catch it. On a multi-file refactor, your gut didn't read the full diff.
 
+The agentic-systems course has a whole module on this idea, [evaluation as the control loop](/learn/agentic-systems/evaluation/), and it holds when the code under test is itself an agent. Months later, on DMai, an AI game master I'm building with Claude Code as a personal project (still private), my scripted scenarios didn't measure what I was complaining about at the table. So the eval became my own played sessions, each one cut just before one of my inputs and replayed. That story is in [how my own games became the eval](/blog/my-games-became-the-eval/).
+
 ## Spec first, code second
 
-The other thing `/insights` made obvious: features I started with a written spec ended cleaner than features I improvised in chat.
+The second bullet from `/insights`, the one about specs, led to the other habit I changed.
 
-A spec doesn't need to be long. Goals, non-goals, edge cases, a test plan, an acceptance checklist. Maybe a paragraph each. The point isn't the document. The point is that you've made the decisions before the model has to guess them.
+A spec doesn't need to be long. Goals, non-goals, edge cases, a test plan, an acceptance checklist. Maybe a paragraph each. Writing it forces you to make the decisions before the model has to guess them. Back in March I wrote up the [slash commands I built to create and audit these specs](/blog/custom-commands-ai-coding/).
 
 When I improvised, AI guessed. Sometimes well, sometimes badly. The bad guesses showed up as the ten-round iterations.
 

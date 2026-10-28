@@ -22,7 +22,8 @@ import {
 	DURABILITY_LABEL,
 	type Lang,
 } from '../lib/learn';
-import { PERSON, PERSON_REF, UI_STRINGS } from '../consts';
+import { PERSON, ORGANIZATION_REF, UI_STRINGS } from '../consts';
+import { learnUi } from '../components/learn/strings';
 
 interface Source {
 	grade: 'A' | 'B' | 'C' | 'D';
@@ -55,7 +56,9 @@ interface Props {
 }
 
 const { title, description, slug, lang, phase, tier, durability, updatedDate, readingTime, sources, headings, summary, tldr } = Astro.props;
-const es = lang === 'es';
+const ui = learnUi(lang);
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const hasSummary = !!(summary && summary.length > 0);
 
 // Sections of this module (h2) — drives the mobile-only "On this page" jump nav.
 const sections = (headings ?? []).filter((h) => h.depth === 2);
@@ -67,10 +70,10 @@ const moduleNum = moduleIndex >= 0 ? moduleIndex + 1 : 0;
 const moduleTotal = modules.length;
 
 const currentPath = Astro.url.pathname;
-const homePath = es ? '/es/' : '/';
+const homePath = lang === 'es' ? '/es/' : '/';
 const learnHome = learnHomeHref(lang);
 const courseHome = courseHomeHref(lang);
-const courseName = es ? 'Sistemas agénticos' : 'Agentic systems';
+const courseName = ui.courseShort;
 
 // hreflang: EN/ES share the slug.
 const alternates = [
@@ -79,22 +82,32 @@ const alternates = [
 ];
 
 const ogImage = `/og/learn-${slug}.png`;
+const pageUrl = `https://valdemird.com${currentPath}`;
 
+// Modules carry no separate publish date; updatedDate is the date the current
+// text went live, so it stands in for both fields.
 const articleJsonLd: Record<string, unknown> = {
 	'@context': 'https://schema.org',
 	'@type': 'TechArticle',
+	'@id': `${pageUrl}#article`,
 	headline: title,
 	description,
+	image: {
+		'@type': 'ImageObject',
+		url: `https://valdemird.com${ogImage}`,
+		width: 1200,
+		height: 630,
+	},
 	author: PERSON,
-	publisher: PERSON_REF,
+	publisher: ORGANIZATION_REF,
 	inLanguage: lang,
 	isPartOf: {
 		'@type': 'Course',
-		name: es ? 'Ingeniería de sistemas agénticos' : 'Engineering agentic systems',
+		name: ui.courseFull,
 		url: `https://valdemird.com${courseHome}`,
 	},
-	mainEntityOfPage: { '@type': 'WebPage', '@id': `https://valdemird.com${currentPath}` },
-	...(updatedDate && { dateModified: updatedDate.toISOString() }),
+	mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
+	...(updatedDate && { datePublished: updatedDate.toISOString(), dateModified: updatedDate.toISOString() }),
 	...(sources && sources.length > 0 && {
 		citation: sources.map((s) => ({
 			'@type': 'CreativeWork',
@@ -109,8 +122,8 @@ const breadcrumbJsonLd = {
 	'@context': 'https://schema.org',
 	'@type': 'BreadcrumbList',
 	itemListElement: [
-		{ '@type': 'ListItem', position: 1, name: es ? 'Inicio' : 'Home', item: `https://valdemird.com${homePath}` },
-		{ '@type': 'ListItem', position: 2, name: 'Learn', item: `https://valdemird.com${learnHome}` },
+		{ '@type': 'ListItem', position: 1, name: ui.home, item: `https://valdemird.com${homePath}` },
+		{ '@type': 'ListItem', position: 2, name: ui.learn, item: `https://valdemird.com${learnHome}` },
 		{ '@type': 'ListItem', position: 3, name: courseName, item: `https://valdemird.com${courseHome}` },
 		{ '@type': 'ListItem', position: 4, name: title, item: `https://valdemird.com${currentPath}` },
 	],
@@ -119,7 +132,7 @@ const breadcrumbJsonLd = {
 
 <html lang={lang}>
 	<head>
-		<BaseHead title={`${title} · Learn`} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={articleJsonLd} extraJsonLd={[breadcrumbJsonLd]} />
+		<BaseHead title={title} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={articleJsonLd} extraJsonLd={[breadcrumbJsonLd]} />
 	</head>
 	<body>
 		<a class="skip-link" href="#main-content">{UI_STRINGS[lang].nav.skipToContent}</a>
@@ -132,7 +145,7 @@ const breadcrumbJsonLd = {
 					<details class="sidebar-details" open>
 						<summary class="sidebar-summary">
 							<svg class="chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-							{es ? 'Índice del curso' : 'Course map'}
+							{ui.courseMap}
 						</summary>
 						<div class="sidebar-inner">
 							<LearnSidebar lang={lang} currentSlug={slug} />
@@ -140,18 +153,21 @@ const breadcrumbJsonLd = {
 					</details>
 				</aside>
 				<article class="content-col">
-					<nav class="crumbs" aria-label={es ? 'Migas de pan' : 'Breadcrumb'}>
-						<a href={learnHome}>Learn</a>
+					<nav class="crumbs" aria-label={ui.breadcrumb}>
+						<a href={learnHome}>{ui.learn}</a>
 						<span aria-hidden="true">/</span>
 						<a href={courseHome}>{courseName}</a>
 						<span aria-hidden="true">/</span>
-						<span class="crumb-phase">{es ? 'Fase' : 'Phase'} {String(phase).padStart(2, '0')} · {TIER_LABEL[tier][lang]}</span>
+						<span class="crumb-phase">{ui.phase} {pad2(phase)}</span>
 					</nav>
 
 					<header class="module-header">
 						<p class="module-eyebrow">
-							<span class="phase-num">{String(phase).padStart(2, '0')}</span>
-							{TIER_LABEL[tier][lang]}
+							{moduleNum > 0 && <span class="phase-num">{ui.module} {pad2(moduleNum)}</span>}
+							{moduleNum > 0 && <span aria-hidden="true">·</span>}
+							<span>{ui.phase} {phase}</span>
+							<span aria-hidden="true">·</span>
+							<span>{TIER_LABEL[tier][lang]}</span>
 							{durability && DURABILITY_LABEL[durability] && <span class="dur">· {DURABILITY_LABEL[durability][lang]}</span>}
 						</p>
 						<h1>{title}</h1>
@@ -160,29 +176,31 @@ const breadcrumbJsonLd = {
 							{readingTime && (
 								<span class="meta-read">
 									<svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
-									{readingTime} {es ? 'min de lectura' : 'min read'}
+									{readingTime} {ui.minRead}
 								</span>
 							)}
 							{updatedDate && (
 								<span class="meta-updated">
-									{es ? 'Actualizado' : 'Updated'} <FormattedDate date={updatedDate} locale={lang} />
+									{ui.updated} <FormattedDate date={updatedDate} locale={lang} />
 								</span>
 							)}
 							{moduleNum > 0 && (
-								<span class="meta-progress" title={es ? 'Posición en el curso' : 'Position in the course'}>
-									{es ? `Módulo ${moduleNum} de ${moduleTotal}` : `Module ${moduleNum} of ${moduleTotal}`}
+								<span class="meta-progress" title={ui.positionInCourse}>
+									{ui.moduleOf(moduleNum, moduleTotal)}
 									<span class="prog-track" aria-hidden="true"><span class="prog-fill" style={`width:${Math.round((moduleNum / moduleTotal) * 100)}%`}></span></span>
 								</span>
 							)}
 						</p>
-						<hr />
+						{/* The summary TLDR below brings its own top hairline; a second
+						    rule here would stack two lines. */}
+						{!hasSummary && <hr />}
 					</header>
 
 					{sections.length > 1 && (
 						<details class="page-toc">
 							<summary>
 								<svg class="toc-chev" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-								{es ? 'En esta página' : 'On this page'}
+								{ui.onThisPage}
 								<span class="toc-count">{sections.length}</span>
 							</summary>
 							<ol class="page-toc-list">
@@ -194,9 +212,7 @@ const breadcrumbJsonLd = {
 					)}
 
 					<div class="article-body">
-						{summary && summary.length > 0 && (
-							<TLDR bullets={summary} lang={lang} title={es ? 'EMPIEZA AQUÍ' : 'START HERE'} />
-						)}
+						{hasSummary && <TLDR bullets={summary!} lang={lang} title={ui.startHere} />}
 						<slot />
 					</div>
 
@@ -206,16 +222,16 @@ const breadcrumbJsonLd = {
 
 					<LearnSources sources={sources} lang={lang} slug={slug} />
 
-					<nav class="pager" aria-label={es ? 'Navegación entre módulos' : 'Module navigation'}>
+					<nav class="pager" aria-label={ui.moduleNav}>
 						{prev ? (
 							<a class="pager-link prev" href={moduleHref(baseSlug(prev.id), lang)}>
-								<span class="pager-dir">{es ? '← Anterior' : '← Previous'}</span>
+								<span class="pager-dir">{ui.previous}</span>
 								<span class="pager-title">{prev.data.title}</span>
 							</a>
 						) : <span />}
 						{next ? (
 							<a class="pager-link next" href={moduleHref(baseSlug(next.id), lang)}>
-								<span class="pager-dir">{es ? 'Siguiente →' : 'Next →'}</span>
+								<span class="pager-dir">{ui.next}</span>
 								<span class="pager-title">{next.data.title}</span>
 							</a>
 						) : <span />}
@@ -272,10 +288,24 @@ const breadcrumbJsonLd = {
 				history.replaceState(null, '', '#' + id);
 			}
 
+			// Skip the heading hide/reveal when the URL carries a hash (a deep link
+			// must show its target and everything above it right away) or when a
+			// language switch is about to restore the reading position mid-article.
+			// Otherwise the headings above the landing point stay at opacity 0.
+			// Same guard as BlogPost.astro.
+			function landsMidArticle() {
+				if (location.hash) return true;
+				try {
+					return sessionStorage.getItem('langScrollHeading') !== null;
+				} catch {
+					return false;
+				}
+			}
+
 			function init() {
 				syncCourseMap();
 				keepActiveModuleVisible();
-				if (isReducedMotion()) return;
+				if (isReducedMotion() || landsMidArticle()) return;
 				initScrollReveals('.article-body h2, .article-body h3');
 				document.addEventListener('astro:before-swap', cleanupAll, { once: true });
 			}

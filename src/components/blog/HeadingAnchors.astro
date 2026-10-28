@@ -1,82 +1,106 @@
 ---
 /**
- * HeadingAnchors — adds a "copy link to section" button to every h2/h3 that
- * has an id inside `.article-body`. Rendered once by the blog layout (like
- * ReadingProgress); it injects the buttons client-side so it works for both
- * Astro-slugged markdown headings and explicit `<h2 id>` headings in MDX.
+ * HeadingAnchors — makes every h2/h3 with an id inside `.article-body` a
+ * self-link that copies the section URL. Rendered once by the blog and learn
+ * layouts (like ReadingProgress); it upgrades headings client-side so it works
+ * for both Astro-slugged markdown headings and explicit `<h2 id>` in MDX.
  *
- * Click → copies the absolute section URL to the clipboard, updates the hash
- * without a jarring jump, and shows a brief confirmation. The button stays
- * hidden until the heading is hovered or the button itself is focused.
+ * The heading text itself becomes the link (`<h2><a href="#id">Title</a></h2>`),
+ * so the heading's accessible name stays the title. The link icon is decorative
+ * and only shows on hover or keyboard focus. Click → copies the absolute
+ * section URL, updates the hash without a jump, and announces the copy through
+ * a polite live region.
+ *
+ * Headings that already contain interactive content (a link, a glossary
+ * tooltip button) are left alone: nesting interactive elements is invalid.
  */
 interface Props {
 	lang?: 'en' | 'es';
 }
 const { lang = 'en' } = Astro.props;
-const labelCopy = lang === 'es' ? 'Copiar enlace a esta sección' : 'Copy link to this section';
-const labelCopied = lang === 'es' ? '¡Enlace copiado!' : 'Link copied!';
+const labelCopied = lang === 'es' ? 'Enlace a la sección copiado' : 'Section link copied';
 ---
 
-<span class="heading-anchors-i18n" data-copy={labelCopy} data-copied={labelCopied} hidden></span>
+<span class="sr-only" role="status" data-heading-anchor-status data-copied={labelCopied}></span>
 
 <script>
-	function buildAnchors() {
-		const i18n = document.querySelector<HTMLElement>('.heading-anchors-i18n');
-		const labelCopy = i18n?.dataset.copy ?? 'Copy link to this section';
-		const labelCopied = i18n?.dataset.copied ?? 'Link copied!';
+	const ICON = `<span class="heading-anchor__icon" aria-hidden="true"><svg class="heading-anchor__link" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg><svg class="heading-anchor__check" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>`;
 
+	const INTERACTIVE = 'a, button, input, select, textarea, details, [tabindex], [role="button"]';
+
+	function buildAnchors() {
 		const headings = document.querySelectorAll<HTMLHeadingElement>(
 			'.article-body h2[id], .article-body h3[id]',
 		);
 
 		headings.forEach((h) => {
-			if (h.querySelector('.heading-anchor')) return; // already processed
+			if (h.dataset.anchorReady) return;
+			h.dataset.anchorReady = '1';
+			if (h.querySelector(INTERACTIVE)) return;
 
 			const a = document.createElement('a');
 			a.className = 'heading-anchor';
 			a.href = `#${h.id}`;
-			a.setAttribute('aria-label', labelCopy);
-			a.title = labelCopy;
-			a.innerHTML = `
-				<svg class="heading-anchor__link" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-				<svg class="heading-anchor__check" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-			`;
-
-			a.addEventListener('click', async (e) => {
-				e.preventDefault();
-				const url = `${location.origin}${location.pathname}#${h.id}`;
-				try {
-					await navigator.clipboard.writeText(url);
-				} catch {
-					/* clipboard blocked — fall through, hash still updates */
-				}
-				history.replaceState(null, '', `#${h.id}`);
-				h.scrollIntoView({ behavior: 'smooth', block: 'start' });
-				a.classList.add('is-copied');
-				a.setAttribute('aria-label', labelCopied);
-				a.title = labelCopied;
-				window.setTimeout(() => {
-					a.classList.remove('is-copied');
-					a.setAttribute('aria-label', labelCopy);
-					a.title = labelCopy;
-				}, 1600);
-			});
-
+			while (h.firstChild) a.appendChild(h.firstChild);
+			a.insertAdjacentHTML('beforeend', ICON);
 			h.appendChild(a);
 		});
 	}
 
-	buildAnchors();
-	document.addEventListener('astro:after-swap', buildAnchors);
+	async function onClick(event: MouseEvent) {
+		if (event.button !== 0) return;
+		if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+		const a = (event.target as Element | null)?.closest<HTMLAnchorElement>('a.heading-anchor');
+		const h = a?.parentElement;
+		if (!a || !h?.id) return;
+
+		// Must stay synchronous (before the first await): the client router's own
+		// click listener sees defaultPrevented and leaves this hash link alone,
+		// so no history entry is pushed.
+		event.preventDefault();
+		const url = `${location.origin}${location.pathname}#${h.id}`;
+		let copied = true;
+		try {
+			await navigator.clipboard.writeText(url);
+		} catch {
+			copied = false; // clipboard blocked: the hash still updates
+		}
+		history.replaceState(history.state, '', `#${h.id}`);
+		h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		if (!copied) return;
+
+		a.classList.add('is-copied');
+		const status = document.querySelector<HTMLElement>('[data-heading-anchor-status]');
+		if (status) status.textContent = status.dataset.copied ?? '';
+		window.setTimeout(() => {
+			a.classList.remove('is-copied');
+			if (status) status.textContent = '';
+		}, 1600);
+	}
+
+	// One delegated click listener for the whole session (the document survives
+	// View Transition swaps); headings are upgraded on every page load. It runs
+	// in the capture phase so it fires before the client router's bubble-phase
+	// document listener, which is registered earlier from <head> and would
+	// otherwise turn the click into a navigation.
+	const w = window as unknown as { __headingAnchorsBound?: boolean };
+	if (!w.__headingAnchorsBound) {
+		w.__headingAnchorsBound = true;
+		document.addEventListener('click', onClick, { capture: true });
+	}
+	document.addEventListener('astro:page-load', buildAnchors);
 </script>
 
 <style is:global>
-	.article-body h2:has(.heading-anchor),
-	.article-body h3:has(.heading-anchor) {
-		position: relative;
+	/* Specificity beats the layouts' `.article-body a` underline rules. */
+	.article-body h2 > a.heading-anchor,
+	.article-body h3 > a.heading-anchor {
+		color: inherit;
+		text-decoration: none;
+		border-radius: var(--radius-sm);
 	}
 
-	.heading-anchor {
+	.heading-anchor__icon {
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
@@ -86,7 +110,6 @@ const labelCopied = lang === 'es' ? '¡Enlace copiado!' : 'Link copied!';
 		vertical-align: middle;
 		border-radius: var(--radius-sm);
 		color: var(--color-text-muted);
-		text-decoration: none;
 		opacity: 0;
 		transition:
 			opacity var(--duration-fast) var(--ease-smooth),
@@ -94,30 +117,26 @@ const labelCopied = lang === 'es' ? '¡Enlace copiado!' : 'Link copied!';
 			background var(--duration-fast) var(--ease-smooth);
 	}
 
-	/* Reveal on heading hover or when the button itself is focused. */
-	.article-body h2:hover .heading-anchor,
-	.article-body h3:hover .heading-anchor,
-	.heading-anchor:focus-visible {
+	/* Reveal on hover or keyboard focus of the heading link. */
+	.heading-anchor:hover .heading-anchor__icon,
+	.heading-anchor:focus-visible .heading-anchor__icon {
 		opacity: 1;
-	}
-
-	.heading-anchor:hover,
-	.heading-anchor:focus-visible {
 		color: var(--color-accent);
 		background: var(--color-accent-subtle);
-		outline: none;
 	}
 
-	.heading-anchor:focus-visible {
-		box-shadow: 0 0 0 2px oklch(from var(--color-accent) l c h / 0.4);
+	.article-body h2 > a.heading-anchor:focus-visible,
+	.article-body h3 > a.heading-anchor:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 
 	.heading-anchor__check {
 		display: none;
-		color: var(--color-success);
+		color: var(--color-success-text, var(--color-success));
 	}
 
-	.heading-anchor.is-copied {
+	.heading-anchor.is-copied .heading-anchor__icon {
 		opacity: 1;
 		background: oklch(from var(--color-success) l c h / 0.12);
 	}
@@ -128,15 +147,15 @@ const labelCopied = lang === 'es' ? '¡Enlace copiado!' : 'Link copied!';
 		display: block;
 	}
 
-	/* Touch devices have no hover — keep the anchor faintly visible there. */
+	/* Touch devices have no hover — keep the icon faintly visible there. */
 	@media (hover: none) {
-		.heading-anchor {
+		.heading-anchor__icon {
 			opacity: 0.45;
 		}
 	}
 
 	@media (prefers-reduced-motion: reduce) {
-		.heading-anchor {
+		.heading-anchor__icon {
 			transition: none;
 		}
 	}

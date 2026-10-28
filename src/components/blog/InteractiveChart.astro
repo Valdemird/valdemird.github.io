@@ -1,39 +1,45 @@
 ---
 /**
  * InteractiveChart — multi-type chart with optional annotations and a
- * story-first headline.
+ * story-first lede.
  *
  * Types:
- *   - "bar" (vertical bars, CSS-animated)                    [original]
- *   - "horizontal" (horizontal bars, CSS-animated)          [original]
- *   - "line" (SVG, GSAP entrance; multi-series via `series`) [v2/v3]
- *   - "area" (line + filled area, SVG, GSAP entrance)       [v2]
- *   - "donut" (radial part-of-whole, SVG, GSAP entrance)    [v2]
- *   - "scatter" (x/y points via `points`, SVG)              [v3]
+ *   - "bar"        vertical columns (HTML, CSS-animated)
+ *   - "horizontal" ranked rows (HTML, CSS-animated)
+ *   - "line"       SVG, GSAP entrance; multi-series via `series`
+ *   - "area"       line + filled area
+ *   - "donut"      part-of-whole ring with a legend
+ *   - "scatter"    x/y points via `points`
  *
- * v3 — scales/paths come from d3-scale/d3-shape at BUILD time (zero d3 on
- * the client; src/lib/chart/*), and SVG types gain client interactivity
- * from src/lib/chart/interact.ts:
- *   - hover scrub: crosshair + floating readout snapped to the nearest x
- *   - keyboard: focus the SVG, ←/→/Home/End walk the points, aria-live
- *     announces values, Escape dismisses
- *   - legend toggling for multi-series lines
+ * Layout rules:
+ *   - The header is a figure header, not a page headline: a mono eyebrow
+ *     (`title`) over a Fraunces lede (`story`) sized for a figure.
+ *   - Bars share one baseline. Horizontal rows sit on a subgrid, so the label
+ *     column is as wide as the longest label (capped) and every bar starts at
+ *     the same x; values get their own right-aligned tabular column. On narrow
+ *     containers labels move above their bar (container query).
+ *   - Annotations never overlap marks: horizontal → a note line under the
+ *     bar; vertical → a numbered marker on the value plus a notes list;
+ *     line/area → placed at build time inside the plot (edge-aware anchors,
+ *     above/below, collision-stepped) with a surface halo.
+ *   - SVG types render a wide and a narrow variant; a container query shows
+ *     the one that fits, and `--u` keeps SVG text at a readable on-screen
+ *     size while the viewBox scales.
  *
- * New props (all optional, existing posts unchanged):
- *   - series: multi-series lines `{ name, color?, data }[]`. Line type only;
- *     x labels come from the first series. `annotations` target the first
- *     series in this mode.
- *   - points: scatter data `{ x, y, label?, color? }[]` ("scatter" only).
- *   - thresholds: dashed reference lines `{ value, label? }[]` on
- *     line/area/scatter.
- *   - curve: "linear" (default) | "monotone" smooth interpolation.
- *   - interactive: set false to opt out of the hover/keyboard layer.
+ * All geometry is computed at BUILD time (src/lib/chart/*, d3-scale/d3-shape);
+ * nothing d3 ships to the client. Client code: entrance animation (GSAP for
+ * SVG, CSS transitions for bars) and src/lib/chart/interact.ts (hover scrub,
+ * ←/→/Home/End keyboard walk with aria-live, legend toggling).
  *
  * Respects prefers-reduced-motion: bars snap via the global CSS rule; SVG
  * types skip GSAP entrance and render at final state immediately.
  */
 import { linearScale, pointPositions, valueDomain, formatTick } from "../../lib/chart/scales";
 import { linePath as buildLinePath, areaPath as buildAreaPath, type CurveKind } from "../../lib/chart/geometry";
+import { VARIANTS, TEXT_PX, niceMax, plotPad, thinLabels, placeNotes, textWidthEm, boxHitsLines, type Variant, type PlacedNote } from "../../lib/chart/layout";
+
+/** Semantic tones: for meaning only (good / risky / bad), never for decoration. */
+type Tone = "accent" | "success" | "warning" | "destructive" | "muted";
 
 interface DataPoint {
   label: string;
@@ -51,6 +57,8 @@ interface Annotation {
 interface Series {
   name: string;
   color?: string;
+  /** Semantic color for a series whose meaning is good/bad (wins over the palette). */
+  tone?: Tone;
   data: DataPoint[];
 }
 interface ScatterPoint {
@@ -58,6 +66,8 @@ interface ScatterPoint {
   y: number;
   label?: string;
   color?: string;
+  /** Call this point out: accent ink, larger mark, and its label drawn beside it. */
+  highlight?: boolean;
 }
 interface Threshold {
   value: number;
@@ -65,15 +75,20 @@ interface Threshold {
 }
 interface Props {
   type?: "bar" | "horizontal" | "line" | "area" | "donut" | "scatter";
-  /** Small meta label shown in the chart header bar (not the story). */
+  /** Small mono eyebrow above the story (what is measured). */
   title?: string;
-  /** Finding-first headline. Editorial voice. */
+  /** Finding-first lede. Editorial voice. */
   story?: string;
-  /** Optional attribution shown below the chart in muted mono. */
+  /** Optional attribution shown below the chart. Use the `source` slot for inline markup. */
   source?: string;
   data?: DataPoint[];
   /** Multi-series lines. Line type only. */
   series?: Series[];
+  /**
+   * Series colors. "categorical" (default): distinct brand hues for unrelated
+   * series. "sequential": one hue, light → dark, for ordered series (levels).
+   */
+  palette?: "categorical" | "sequential";
   /** Scatter points. Scatter type only. */
   points?: ScatterPoint[];
   /** Per-point callouts (first series in multi-series mode). */
@@ -84,10 +99,16 @@ interface Props {
   curve?: CurveKind;
   /** Hover/keyboard layer on SVG types. Default true. */
   interactive?: boolean;
-  /** Y-axis / value axis label for line and area charts. */
+  /** Value axis label (line/area/scatter). */
   yLabel?: string;
-  /** X-axis / category axis label for line and area charts. */
+  /** Category / x axis label (line/area/scatter). */
   xLabel?: string;
+  /** Suffix appended to printed values, readouts and (when short) y ticks, e.g. "%" or " min". */
+  unit?: string;
+  /** Suffix for x values in the readout header, e.g. " steps" → "10 steps". */
+  xUnit?: string;
+  /** Donut: small caption under the center total, e.g. "hours". */
+  totalLabel?: string;
 }
 
 const {
@@ -97,6 +118,7 @@ const {
   source,
   data = [],
   series,
+  palette = "categorical",
   points = [],
   annotations = [],
   thresholds = [],
@@ -104,352 +126,526 @@ const {
   interactive = true,
   yLabel,
   xLabel,
+  unit = "",
+  xUnit = "",
+  totalLabel,
 } = Astro.props;
 
-const maxValue = data.length ? Math.max(...data.map((d) => d.value)) : 0;
-const chartId = `chart-${Math.random().toString(36).slice(2, 7)}`;
+const fmt = (v: number) => `${v}${unit}`;
+// Short units ("%", "s") ride on the y ticks too; long ones (" min") stay in
+// the readout so the tick column doesn't balloon.
+const tickUnit = unit.trim().length <= 2 ? unit : "";
+const fmtTick = (v: number) => `${formatTick(v)}${tickUnit}`;
 
-/** Series palette — design tokens only, in narrative-priority order. */
-const PALETTE = [
-  "var(--color-accent)",
-  "var(--color-success)",
-  "var(--color-warning)",
-  "var(--color-destructive)",
-];
+const TONES: Record<Tone, string> = {
+  accent: "var(--color-accent)",
+  success: "var(--color-success)",
+  warning: "var(--color-warning)",
+  destructive: "var(--color-destructive)",
+  muted: "var(--chart-mute)",
+};
+/** Brand categorical ramp: accent-anchored hues at matched lightness/chroma. */
+const CATEGORICAL = ["var(--chart-cat-1)", "var(--chart-cat-2)", "var(--chart-cat-3)", "var(--chart-cat-4)"];
+/** Single-hue ramp, faint → strong; ordered series spread across it. */
+const SEQUENTIAL = ["var(--chart-seq-1)", "var(--chart-seq-2)", "var(--chart-seq-3)", "var(--chart-seq-4)", "var(--chart-seq-5)"];
 
-// --- SVG layout (line/area/scatter) ---
-const SVG_W = 720;
-const SVG_H = 320;
-const PAD = { top: 16, right: 32, bottom: 40, left: 48 };
-const plotW = SVG_W - PAD.left - PAD.right;
-const plotH = SVG_H - PAD.top - PAD.bottom;
-
-// Multi-series normalization: single-series line/area become one unnamed series.
-const isLineish = type === "line" || type === "area";
-const seriesMode = isLineish && !!series && series.length > 0;
-const seriesList: Series[] = seriesMode
-  ? series!
-  : isLineish
-    ? [{ name: "", data }]
-    : [];
-
-const xLabels = seriesList[0]?.data.map((d) => d.label) ?? [];
-const xs = pointPositions(xLabels.length, PAD.left, PAD.left + plotW);
-
-const lineValues = seriesList.flatMap((s) => s.data.map((d) => d.value));
-const yScale = isLineish
-  ? linearScale(valueDomain([...lineValues, ...thresholds.map((t) => t.value)]), [PAD.top + plotH, PAD.top])
-  : null;
-
-interface RenderedSeries {
-  name: string;
-  color: string;
-  linePath: string;
-  areaPath: string;
-  dots: { cx: number; cy: number; label: string; value: number; color: string }[];
+function seriesColor(s: Series, i: number, n: number): string {
+  if (s.color) return s.color;
+  if (s.tone) return TONES[s.tone];
+  if (palette === "sequential") {
+    const k = n <= 1 ? SEQUENTIAL.length - 1 : Math.round((i * (SEQUENTIAL.length - 1)) / (n - 1));
+    return SEQUENTIAL[k];
+  }
+  return CATEGORICAL[i % CATEGORICAL.length];
 }
-const renderedSeries: RenderedSeries[] = seriesList.map((s, si) => {
-  const color = s.color ?? PALETTE[si % PALETTE.length];
-  const pts = s.data.map((d, i) => [xs[i] ?? PAD.left + plotW / 2, yScale!(d.value)] as [number, number]);
+
+const annotationMap = new Map<number, Annotation>();
+for (const a of annotations) annotationMap.set(a.targetIndex, a);
+const hasFocus = annotations.some((a) => a.emphasize);
+
+// ---------------------------------------------------------------------------
+// Bars. Horizontal: a nice 0-anchored domain (percent data ends at 100).
+// Vertical: the tallest bar fills the plot; the value label sits in the
+// plot's top padding, so there's no rounded-up headroom.
+// ---------------------------------------------------------------------------
+const barMax = type === "bar" ? Math.max(1e-9, ...data.map((d) => d.value)) : niceMax(data.map((d) => d.value));
+const barPct = (v: number) => Math.max(0, Math.min(100, (v / barMax) * 100));
+// Bars annotate with one voice: a numbered marker on the mark, the note in
+// sans beside the same marker (under the plot for columns, under the row for
+// horizontal bars).
+const barNotes = type === "bar" || type === "horizontal"
+  ? [...annotationMap.entries()].sort((a, b) => a[0] - b[0]).map(([i, a], n) => ({ i, n: n + 1, ...a }))
+  : [];
+const barNoteNo = new Map(barNotes.map((b) => [b.i, b.n]));
+
+// ---------------------------------------------------------------------------
+// SVG types (line / area / scatter): one model per layout variant.
+// ---------------------------------------------------------------------------
+const isLineish = type === "line" || type === "area";
+const isScatter = type === "scatter" && points.length > 0;
+const seriesMode = isLineish && !!series && series.length > 0;
+const seriesList: Series[] = seriesMode ? series! : isLineish ? [{ name: "", data, tone: "accent" }] : [];
+const xLabels = seriesList[0]?.data.map((d) => d.label) ?? [];
+
+const yDomain: [number, number] | null = isLineish
+  ? valueDomain([...seriesList.flatMap((s) => s.data.map((d) => d.value)), ...thresholds.map((t) => t.value)])
+  : isScatter
+    ? [
+        Math.min(...points.map((p) => p.y), ...thresholds.map((t) => t.value)),
+        Math.max(...points.map((p) => p.y), ...thresholds.map((t) => t.value)),
+      ]
+    : null;
+const xDomain: [number, number] | null = isScatter
+  ? [Math.min(...points.map((p) => p.x)), Math.max(...points.map((p) => p.x))]
+  : null;
+
+interface SvgModel {
+  v: Variant;
+  plotTop: number;
+  plotBottom: number;
+  plotLeft: number;
+  plotRight: number;
+  yTicks: { y: number; label: string }[];
+  xTicks: { x: number; label: string }[];
+  thresholds: { y: number; label?: string; x: number; dy: string; anchor: "start" | "end" }[];
+  series: {
+    name: string;
+    color: string;
+    linePath: string;
+    areaPath: string;
+    dots: { cx: number; cy: number; label: string; value: number; color: string; emph: boolean }[];
+  }[];
+  scatter: { cx: number; cy: number; label: string; x: number; value: number; color: string; highlight: boolean; tx: number; ty: number; anchor: "start" | "end" }[];
+  notes: PlacedNote[];
+}
+
+/** Keep a centred x label inside the plot: clamp its centre by half its width. */
+function clampLabel(x: number, label: string, v: Variant, left: number, right: number): number {
+  const half = (textWidthEm(label) * v.tickFontMax) / 2;
+  return Math.max(left + half, Math.min(right - half, x));
+}
+
+function buildModel(v: Variant): SvgModel {
+  const tickProbe = linearScale(yDomain!, [0, 1]);
+  const pad = plotPad(v, tickProbe.ticks.map(fmtTick));
+  const plotLeft = pad.left;
+  const plotRight = v.w - pad.right;
+  const plotTop = pad.top;
+  const plotBottom = v.h - pad.bottom;
+  const y = linearScale(yDomain!, [plotBottom, plotTop]);
+  const yTicks = y.ticks.map((t) => ({ y: y(t), label: fmtTick(t) }));
+  // Threshold labels sit at the right end above their line, unless a series
+  // crosses that spot: then below it, then at the left end.
+  const thFont = v.tickFontMax * (TEXT_PX.threshold / TEXT_PX.tick);
+  const placeThresholds = (lines: [number, number][][]) =>
+    thresholds.map((t) => {
+      const ty = y(t.value);
+      if (!t.label) return { y: ty, label: t.label, x: plotRight, dy: "-0.55em", anchor: "end" as const };
+      const w = textWidthEm(t.label) * thFont;
+      const spots = [
+        { x: plotRight, anchor: "end" as const, dy: "-0.55em", box: [plotRight - w, ty - thFont * 1.3, plotRight, ty - 2] },
+        { x: plotRight, anchor: "end" as const, dy: "1.15em", box: [plotRight - w, ty + 2, plotRight, ty + thFont * 1.4] },
+        { x: plotLeft + 4, anchor: "start" as const, dy: "-0.55em", box: [plotLeft + 4, ty - thFont * 1.3, plotLeft + 4 + w, ty - 2] },
+        { x: plotLeft + 4, anchor: "start" as const, dy: "1.15em", box: [plotLeft + 4, ty + 2, plotLeft + 4 + w, ty + thFont * 1.4] },
+      ];
+      const spot = spots.find((sp) => !boxHitsLines(sp.box as [number, number, number, number], lines)) ?? spots[0];
+      return { y: ty, label: t.label, x: spot.x, dy: spot.dy, anchor: spot.anchor };
+    });
+
+  if (isScatter) {
+    const x = linearScale(xDomain!, [plotLeft, plotRight]);
+    const xs = x.ticks.map((t) => x(t));
+    const labels = x.ticks.map(formatTick);
+    const keep = thinLabels(labels, xs, v.tickFontMax);
+    const midX = (plotLeft + plotRight) / 2;
+    return {
+      v, plotTop, plotBottom, plotLeft, plotRight, yTicks,
+      // Scatter points are short "lines" so a label never sits on a dot.
+      thresholds: placeThresholds(points.map((p) => {
+        const px = x(p.x);
+        const py = y(p.y);
+        return [[px - 6, py], [px + 6, py]] as [number, number][];
+      })),
+      xTicks: labels
+        .map((label, i) => ({ x: clampLabel(xs[i], label, v, plotLeft - 8, plotRight + 8), label }))
+        .filter((_, i) => keep.has(i)),
+      series: [],
+      scatter: points.map((p) => {
+        const cx = x(p.x);
+        const cy = y(p.y);
+        const right = cx > midX;
+        return {
+          cx,
+          cy,
+          x: p.x,
+          label: p.label ?? `${p.x}`,
+          value: p.y,
+          color: p.color ?? (p.highlight ? "var(--color-accent)" : points.some((q) => q.highlight) ? "var(--chart-mute)" : "var(--color-accent)"),
+          highlight: !!p.highlight,
+          // Highlight label: beside the point, on the side with room.
+          tx: right ? cx - 11 : cx + 11,
+          ty: cy < plotTop + 18 ? cy + 4 : cy - 9,
+          anchor: right ? "end" as const : "start" as const,
+        };
+      }),
+      notes: [],
+    };
+  }
+
+  // Line / area share one inset so first and last points (and their labels)
+  // never sit on the frame.
+  const inset = v.key === "wide" ? 22 : 14;
+  const xs = pointPositions(xLabels.length, plotLeft + inset, plotRight - inset);
+  const keep = thinLabels(xLabels, xs, v.tickFontMax);
+  const rendered = seriesList.map((s, si) => {
+    const color = seriesColor(s, si, seriesList.length);
+    const pts = s.data.map((d, i) => [xs[i] ?? (plotLeft + plotRight) / 2, y(d.value)] as [number, number]);
+    return {
+      name: s.name,
+      color,
+      pts,
+      linePath: buildLinePath(pts, curve),
+      areaPath: type === "area" ? buildAreaPath(pts, plotBottom, curve) : "",
+      dots: s.data.map((d, i) => ({
+        cx: pts[i][0],
+        cy: pts[i][1],
+        label: d.label,
+        value: d.value,
+        color: d.color ?? color,
+        emph: si === 0 && !!annotationMap.get(i)?.emphasize,
+      })),
+    };
+  });
+  const first = rendered[0];
+  const notes = first
+    ? placeNotes(
+        [...annotationMap.entries()]
+          .filter(([i]) => first.dots[i])
+          .sort((a, b) => a[0] - b[0])
+          .map(([i, a]) => ({ text: a.text, cx: first.dots[i].cx, cy: first.dots[i].cy })),
+        v,
+        pad,
+        {
+          lines: rendered.map((r) => r.pts),
+          hlines: thresholds.map((t) => y(t.value)),
+          dots: rendered.flatMap((r) => r.pts),
+        },
+      )
+    : [];
   return {
-    name: s.name,
-    color,
-    linePath: buildLinePath(pts, curve),
-    areaPath: type === "area" ? buildAreaPath(pts, PAD.top + plotH, curve) : "",
-    dots: s.data.map((d, i) => ({
-      cx: pts[i][0],
-      cy: pts[i][1],
-      label: d.label,
-      value: d.value,
-      color: d.color ?? color,
-    })),
+    v, plotTop, plotBottom, plotLeft, plotRight, yTicks,
+    thresholds: placeThresholds(rendered.map((r) => r.pts)),
+    xTicks: xLabels
+      .map((label, i) => ({ x: clampLabel(xs[i], label, v, plotLeft, plotRight + pad.right - 2), label }))
+      .filter((_, i) => keep.has(i)),
+    series: rendered,
+    scatter: [],
+    notes,
   };
-});
+}
 
-// --- Scatter geometry ---
-const scatterX = type === "scatter" && points.length
-  ? linearScale([Math.min(...points.map((p) => p.x)), Math.max(...points.map((p) => p.x))], [PAD.left, PAD.left + plotW])
-  : null;
-const scatterY = type === "scatter" && points.length
-  ? linearScale(
-      [Math.min(...points.map((p) => p.y), ...thresholds.map((t) => t.value)), Math.max(...points.map((p) => p.y), ...thresholds.map((t) => t.value))],
-      [PAD.top + plotH, PAD.top],
-    )
-  : null;
+const svgModels: SvgModel[] = (isLineish && xLabels.length) || isScatter ? VARIANTS.map(buildModel) : [];
+const isInteractiveSvg = interactive && svgModels.length > 0;
+const scatterAxes = isScatter ? { x: xLabel ?? "", y: yLabel ?? "" } : null;
 
-const yTicks = yScale?.ticks ?? scatterY?.ticks ?? [];
-const yPos = (v: number) => (yScale ?? scatterY)!(v);
-
-// --- Donut geometry ---
+// ---------------------------------------------------------------------------
+// Donut: square viewBox. Slices step down a solid single-hue ramp (every
+// step ≥ 3:1 on the card). With an emphasized slice, it takes the accent and
+// the rest step down a neutral ramp.
+// ---------------------------------------------------------------------------
 const total = data.reduce((s, d) => s + d.value, 0);
-const donutR = 100;
-const donutInner = 62;
-const donutCx = SVG_W / 2;
-const donutCy = 170;
+const DONUT = { size: 240, r: 112, inner: 76 };
 function donutArcs() {
-  if (type !== "donut" || total === 0) return [] as { path: string; color: string; label: string; value: number; pct: number }[];
+  if (type !== "donut" || total === 0) return [] as { path: string; color: string; label: string; value: number; pct: number; emph: boolean }[];
+  const c = DONUT.size / 2;
   let acc = 0;
-  return data.map((d) => {
+  let rest = 0;
+  return data.map((d, i) => {
     const a0 = (acc / total) * Math.PI * 2 - Math.PI / 2;
     acc += d.value;
-    const a1 = (acc / total) * Math.PI * 2 - Math.PI / 2;
-    const x0 = donutCx + donutR * Math.cos(a0);
-    const y0 = donutCy + donutR * Math.sin(a0);
-    const x1 = donutCx + donutR * Math.cos(a1);
-    const y1 = donutCy + donutR * Math.sin(a1);
-    const ix0 = donutCx + donutInner * Math.cos(a0);
-    const iy0 = donutCy + donutInner * Math.sin(a0);
-    const ix1 = donutCx + donutInner * Math.cos(a1);
-    const iy1 = donutCy + donutInner * Math.sin(a1);
+    // A full ring can't be drawn as one arc; nudge the end so it stays visible.
+    const a1 = Math.min((acc / total) * Math.PI * 2 - Math.PI / 2, a0 + Math.PI * 2 - 1e-4);
+    const p = (r: number, a: number) => `${(c + r * Math.cos(a)).toFixed(2)},${(c + r * Math.sin(a)).toFixed(2)}`;
     const large = a1 - a0 > Math.PI ? 1 : 0;
-    const path = `M${x0},${y0} A${donutR},${donutR} 0 ${large} 1 ${x1},${y1} L${ix1},${iy1} A${donutInner},${donutInner} 0 ${large} 0 ${ix0},${iy0} Z`;
+    const emph = !!annotationMap.get(i)?.emphasize;
+    const auto = hasFocus
+      ? emph ? "var(--color-accent)" : `var(--chart-neutral-${Math.min(4, ++rest)})`
+      : `var(--chart-seq-${5 - Math.min(4, i)})`;
     return {
-      path,
-      color: d.color ?? "var(--color-accent)",
+      path: `M${p(DONUT.r, a0)} A${DONUT.r},${DONUT.r} 0 ${large} 1 ${p(DONUT.r, a1)} L${p(DONUT.inner, a1)} A${DONUT.inner},${DONUT.inner} 0 ${large} 0 ${p(DONUT.inner, a0)} Z`,
+      color: d.color ?? auto,
       label: d.label,
       value: d.value,
       pct: d.value / total,
+      emph,
     };
   });
 }
 const arcs = donutArcs();
+const hasSourceSlot = Astro.slots.has("source");
 
-// For bar annotations we need to know which indices carry an annotation.
-const annotationMap = new Map<number, Annotation>();
-for (const a of annotations) annotationMap.set(a.targetIndex, a);
-
-const isInteractiveSvg = interactive && (isLineish || type === "scatter");
+const ariaLabel = story ?? title ?? "chart";
 ---
 
 <figure
   class="chart-container"
-  id={chartId}
   data-chart-type={type}
   data-chart
   data-chart-interactive={isInteractiveSvg ? "" : undefined}
+  data-x-unit={xUnit || undefined}
+  data-x-axis={scatterAxes?.x || undefined}
+  data-y-axis={scatterAxes?.y || undefined}
 >
-  {story && <div class="chart-story">{story}</div>}
-
-  {title && <span class="chart-title">{title}</span>}
-
-  {seriesMode && (
-    <div class="chart-legend" role="group" aria-label="Toggle series">
-      {renderedSeries.map((s) => (
-        <button type="button" class="chart-legend-btn" data-series-toggle={s.name} aria-pressed="true">
-          <span class="chart-legend-swatch" style={`background: ${s.color}`} aria-hidden="true"></span>
-          {s.name}
-        </button>
-      ))}
-    </div>
+  {(title || story || seriesMode) && (
+    <header class="chart-head">
+      {title && <div class="chart-eyebrow">{title}</div>}
+      {story && <div class="chart-story">{story}</div>}
+      {seriesMode && svgModels[0] && (
+        <div class="chart-legend" role="group" aria-label="Toggle series">
+          {svgModels[0].series.map((s) => (
+            <button type="button" class="chart-legend-btn" data-series-toggle={s.name} aria-pressed="true">
+              <span class="chart-legend-swatch" style={`--swatch: ${s.color}`} aria-hidden="true"></span>
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
+    </header>
   )}
 
   <div class="chart-body">
     {type === "bar" && (
-      <div class="chart-bars">
-        {data.map((item, i) => {
-          const ann = annotationMap.get(i);
-          const emphasize = ann?.emphasize ? true : false;
-          return (
-            <div class="chart-col" data-emphasize={emphasize ? "true" : undefined}>
-              {ann && <div class="chart-bar-annotation">{ann.text}</div>}
-              <div class="chart-tooltip" aria-hidden="true">
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-              </div>
+      <div class="vbar" style={`--n: ${data.length}`} data-focus={hasFocus ? "" : undefined}>
+        <div class="vbar-plot">
+          {data.map((item, i) => {
+            const no = barNoteNo.get(i);
+            return (
               <div
-                class="chart-bar"
-                style={`--bar-height: ${(item.value / maxValue) * 100}%; --bar-color: ${item.color || "var(--color-accent)"}; --bar-delay: ${i * 0.08}s;`}
-              ></div>
-              <span class="chart-label">{item.label}</span>
-            </div>
-          );
-        })}
+                class="vbar-col"
+                tabindex="0"
+                role="img"
+                aria-label={`${item.label}: ${fmt(item.value)}`}
+                data-emphasize={annotationMap.get(i)?.emphasize ? "" : undefined}
+              >
+                <div
+                  class="vbar-fill"
+                  style={`--h: ${barPct(item.value)}%; --bar-color: ${item.color || "var(--color-accent)"}; --bar-delay: ${i * 0.07}s;`}
+                >
+                  <span class="vbar-value" aria-hidden="true">
+                    {fmt(item.value)}
+                    {no && <span class="chart-mark">{no}</span>}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div class="vbar-labels" aria-hidden="true">
+          {data.map((item) => <span class="vbar-label">{item.label}</span>)}
+        </div>
       </div>
     )}
 
     {type === "horizontal" && (
-      <div class="chart-rows">
+      <div class="hbar" data-focus={hasFocus ? "" : undefined}>
         {data.map((item, i) => {
           const ann = annotationMap.get(i);
+          const no = barNoteNo.get(i);
           return (
-            <div class="chart-row" data-emphasize={ann?.emphasize ? "true" : undefined}>
-              <span class="chart-row-label">{item.label}</span>
-              <div class="chart-row-track">
-                <div
-                  class="chart-row-bar"
-                  style={`--bar-width: ${(item.value / maxValue) * 100}%; --bar-color: ${item.color || "var(--color-accent)"}; --bar-delay: ${i * 0.1}s;`}
-                ></div>
-                {ann && <div class="chart-row-annotation">{ann.text}</div>}
-              </div>
-              <span class="chart-row-value">{item.value}</span>
+            <div
+              class="hbar-row"
+              tabindex="0"
+              role="img"
+              aria-label={`${item.label}: ${fmt(item.value)}${ann ? `. ${ann.text}` : ""}`}
+              data-emphasize={ann?.emphasize ? "" : undefined}
+            >
+              <span class="hbar-label" aria-hidden="true">{item.label}</span>
+              <span class="hbar-track" aria-hidden="true">
+                <span
+                  class="hbar-fill"
+                  style={`--w: ${barPct(item.value)}%; --bar-color: ${item.color || "var(--color-accent)"}; --bar-delay: ${i * 0.08}s;`}
+                ></span>
+              </span>
+              <span class="hbar-value" aria-hidden="true">{fmt(item.value)}</span>
+              {ann && (
+                <span class="hbar-note" aria-hidden="true">
+                  <span class="chart-mark">{no}</span>
+                  <span>{ann.text}</span>
+                </span>
+              )}
             </div>
           );
         })}
       </div>
     )}
 
-    {(isLineish || type === "scatter") && (
-      <svg
-        class="chart-svg"
-        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-        role="img"
-        aria-label={story ?? title ?? "chart"}
-        preserveAspectRatio="xMidYMid meet"
-        data-pad-top={PAD.top}
-        data-pad-bottom={PAD.bottom}
-      >
-        {/* Gridlines + y-tick labels */}
-        {yTicks.map((t) => (
-          <g class="chart-svg-grid">
-            <line x1={PAD.left} y1={yPos(t)} x2={SVG_W - PAD.right} y2={yPos(t)} />
-            <text x={PAD.left - 8} y={yPos(t) + 4} text-anchor="end">
-              {formatTick(t)}
-            </text>
-          </g>
-        ))}
+    {svgModels.length > 0 && (
+      <>
+        {yLabel && <div class="chart-axis chart-axis-y">{yLabel}</div>}
+        {svgModels.map((m) => (
+          <svg
+            class="chart-svg"
+            data-variant={m.v.key}
+            viewBox={`0 0 ${m.v.w} ${m.v.h}`}
+            role="img"
+            aria-label={ariaLabel}
+            preserveAspectRatio="xMidYMid meet"
+            data-pad-top={m.plotTop}
+            data-pad-bottom={m.v.h - m.plotBottom}
+            data-plot-left={m.plotLeft}
+            data-plot-right={m.plotRight}
+          >
+            {m.yTicks.map((t) => (
+              <g class="chart-svg-grid">
+                <line x1={m.plotLeft} y1={t.y} x2={m.plotRight} y2={t.y} />
+                <text x={m.plotLeft} y={t.y} dx="-0.6em" dy="0.34em" text-anchor="end">{t.label}</text>
+              </g>
+            ))}
 
-        {/* X-axis labels: categories for line/area, numeric ticks for scatter */}
-        {isLineish &&
-          xLabels.map((label, i) => (
-            <text class="chart-svg-xlabel" x={xs[i]} y={SVG_H - PAD.bottom + 22} text-anchor="middle">
-              {label}
-            </text>
-          ))}
-        {type === "scatter" &&
-          scatterX &&
-          scatterX.ticks.map((t) => (
-            <text class="chart-svg-xlabel" x={scatterX(t)} y={SVG_H - PAD.bottom + 22} text-anchor="middle">
-              {formatTick(t)}
-            </text>
-          ))}
+            {m.xTicks.map((t) => (
+              <text class="chart-svg-xlabel" x={t.x} y={m.plotBottom} dy="1.6em" text-anchor="middle">{t.label}</text>
+            ))}
 
-        {/* Threshold reference lines */}
-        {(isLineish || type === "scatter") &&
-          thresholds.map((t) => (
-            <g class="chart-svg-threshold">
-              <line x1={PAD.left} y1={yPos(t.value)} x2={SVG_W - PAD.right} y2={yPos(t.value)} />
-              {t.label && (
-                <text x={SVG_W - PAD.right} y={yPos(t.value) - 6} text-anchor="end">
-                  {t.label}
-                </text>
-              )}
-            </g>
-          ))}
+            {m.thresholds.map((t) => (
+              <g class="chart-svg-threshold">
+                <line x1={m.plotLeft} y1={t.y} x2={m.plotRight} y2={t.y} />
+                {t.label && (
+                  <text x={t.x} y={t.y} dy={t.dy} text-anchor={t.anchor}>{t.label}</text>
+                )}
+              </g>
+            ))}
 
-        {/* Line / area series */}
-        {isLineish &&
-          renderedSeries.map((s, si) => (
-            <g data-series-name={s.name} class="chart-series">
-              {type === "area" && (
-                <path class="chart-svg-area" d={s.areaPath} fill={s.color} fill-opacity="0.12" style="pointer-events: none" />
-              )}
-              <path
-                class="chart-svg-line"
-                d={s.linePath}
-                fill="none"
-                stroke={s.color}
-                stroke-width="2.25"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+            {m.series.map((s) => (
+              <g data-series-name={s.name} class="chart-series">
+                {type === "area" && (
+                  <path class="chart-svg-area" d={s.areaPath} fill={s.color} fill-opacity="0.12" />
+                )}
+                <path
+                  class="chart-svg-line"
+                  d={s.linePath}
+                  pathLength="1"
+                  fill="none"
+                  stroke={s.color}
+                  stroke-width="2.25"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+                {s.dots.map((d) => (
+                  <circle
+                    class:list={["chart-svg-dot", { "is-emph": d.emph }]}
+                    data-pt
+                    data-label={d.label}
+                    data-value={fmt(d.value)}
+                    data-series={s.name || undefined}
+                    cx={d.cx}
+                    cy={d.cy}
+                    r={d.emph ? 5.5 : 3.5}
+                    fill={d.color}
+                  />
+                ))}
+              </g>
+            ))}
+
+            {m.notes.map((n) => n.footnote ? (
+              <g class="chart-svg-footmark" aria-hidden="true">
+                <circle cx={n.cx} cy={n.cy - 16} r="8" />
+                <text x={n.cx} y={n.cy - 16} dy="0.35em" text-anchor="middle">{n.footnote}</text>
+              </g>
+            ) : (
+              <g class="chart-svg-annotation">
+                <line x1={n.cx} y1={n.y1} x2={n.cx} y2={n.y2} />
+                <text
+                  x={n.x}
+                  y={n.y}
+                  dy={n.side === "below" ? "0.9em" : undefined}
+                  text-anchor={n.anchor}
+                >{n.text}</text>
+              </g>
+            ))}
+
+            {m.scatter.map((p) => (
+              <circle
+                class:list={["chart-svg-dot chart-svg-scatter-dot", { "is-highlight": p.highlight }]}
+                data-pt
+                data-label={p.label}
+                data-x={p.x}
+                data-value={fmt(p.value)}
+                cx={p.cx}
+                cy={p.cy}
+                r={p.highlight ? 6 : 4.5}
+                fill={p.color}
               />
-              {s.dots.map((d, i) => {
-                const ann = si === 0 ? annotationMap.get(i) : undefined;
-                return (
-                  <g>
-                    <circle
-                      class="chart-svg-dot"
-                      data-pt
-                      data-label={d.label}
-                      data-value={d.value}
-                      data-series={s.name || undefined}
-                      cx={d.cx}
-                      cy={d.cy}
-                      r={ann?.emphasize ? 5.5 : 3.5}
-                      fill={d.color}
-                      stroke="var(--color-surface)"
-                      stroke-width="2"
-                    />
-                    {ann && (
-                      <g class="chart-svg-annotation">
-                        <line
-                          x1={d.cx}
-                          y1={d.cy - 10}
-                          x2={d.cx}
-                          y2={Math.max(d.cy - 42, PAD.top + 6)}
-                          stroke="var(--color-text-muted)"
-                          stroke-dasharray="2 2"
-                          stroke-width="1"
-                        />
-                        <text x={d.cx} y={Math.max(d.cy - 48, PAD.top + 2)} text-anchor="middle">
-                          {ann.text}
-                        </text>
-                      </g>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
-          ))}
-
-        {/* Scatter points */}
-        {type === "scatter" &&
-          scatterX &&
-          scatterY &&
-          points.map((p) => (
-            <circle
-              class="chart-svg-dot chart-svg-scatter-dot"
-              data-pt
-              data-x={scatterX(p.x)}
-              data-y={scatterY(p.y)}
-              data-label={p.label ?? `${p.x}`}
-              data-value={`${p.y}`}
-              cx={scatterX(p.x)}
-              cy={scatterY(p.y)}
-              r="4.5"
-              fill={p.color ?? "var(--color-accent)"}
-              fill-opacity="0.85"
-              stroke="var(--color-surface)"
-              stroke-width="1.5"
-            />
-          ))}
-
-        {yLabel && (
-          <text class="chart-svg-axislabel" x={12} y={PAD.top + plotH / 2} transform={`rotate(-90 12 ${PAD.top + plotH / 2})`} text-anchor="middle">
-            {yLabel}
-          </text>
-        )}
-        {xLabel && (
-          <text class="chart-svg-axislabel" x={PAD.left + plotW / 2} y={SVG_H - 6} text-anchor="middle">
-            {xLabel}
-          </text>
-        )}
-      </svg>
+            ))}
+            {m.scatter.filter((p) => p.highlight).map((p) => (
+              <text class="chart-svg-callout" x={p.tx} y={p.ty} text-anchor={p.anchor}>{p.label}</text>
+            ))}
+          </svg>
+        ))}
+        {xLabel && <div class="chart-axis chart-axis-x">{xLabel}</div>}
+      </>
     )}
 
     {type === "donut" && (
-      <div class="chart-donut">
-        <svg class="chart-svg" viewBox={`0 0 ${SVG_W} ${SVG_H}`} role="img" aria-label={story ?? title ?? "chart"}>
-          {arcs.map((a) => (
-            <path class="chart-svg-arc" d={a.path} fill={a.color} />
+      <div class="chart-donut" data-focus={hasFocus ? "" : undefined}>
+        <svg class="chart-donut-svg" viewBox={`0 0 ${DONUT.size} ${DONUT.size}`} role="img" aria-label={ariaLabel}>
+          {arcs.map((a, i) => (
+            <path class:list={["chart-svg-arc", { "is-emph": a.emph }]} data-slice={i} d={a.path} fill={a.color} />
           ))}
-          <text class="chart-donut-total" x={donutCx} y={donutCy + 4} text-anchor="middle">
-            {total}
+          <text class="chart-donut-total" x={DONUT.size / 2} y={DONUT.size / 2} dy={totalLabel ? "0.1em" : "0.34em"} text-anchor="middle">
+            {fmt(total)}
           </text>
+          {totalLabel && (
+            <text class="chart-donut-total-label" x={DONUT.size / 2} y={DONUT.size / 2} dy="2.6em" text-anchor="middle">{totalLabel}</text>
+          )}
         </svg>
-        <div class="chart-donut-legend">
-          {arcs.map((a) => (
-            <div class="chart-donut-legend-item">
-              <span class="chart-donut-swatch" style={`background: ${a.color}`}></span>
+        <ul class="chart-donut-legend">
+          {arcs.map((a, i) => (
+            <li
+              class:list={["chart-donut-legend-item", { "is-emph": a.emph }]}
+              data-slice={i}
+              tabindex="0"
+            >
+              <span class="chart-donut-swatch" style={`--swatch: ${a.color}`} aria-hidden="true"></span>
               <span class="chart-donut-label">{a.label}</span>
-              <span class="chart-donut-value">{a.value} · {(a.pct * 100).toFixed(0)}%</span>
-            </div>
+              <span class="chart-donut-value">{fmt(a.value)}</span>
+              <span class="chart-donut-pct">{(a.pct * 100).toFixed(0)}%</span>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     )}
   </div>
 
-  {source && <figcaption class="chart-source">{source}</figcaption>}
+  {type === "bar" && barNotes.length > 0 && (
+    <ol class="chart-notes">
+      {barNotes.map((b) => (
+        <li data-emphasize={b.emphasize ? "" : undefined}>
+          <span class="chart-mark" aria-hidden="true">{b.n}</span>
+          <span>{b.text}</span>
+        </li>
+      ))}
+    </ol>
+  )}
+
+  {svgModels.map((m) => {
+    const foot = m.notes.filter((n) => n.footnote);
+    return foot.length > 0 && (
+      <ol class="chart-notes chart-notes-svg" data-variant={m.v.key}>
+        {foot.map((n) => (
+          <li>
+            <span class="chart-mark" aria-hidden="true">{n.footnote}</span>
+            <span>{n.text}</span>
+          </li>
+        ))}
+      </ol>
+    );
+  })}
+
+  {(source || hasSourceSlot) && (
+    <figcaption class="chart-source">
+      {hasSourceSlot ? <slot name="source" /> : source}
+    </figcaption>
+  )}
 </figure>
 
 <script>
@@ -491,83 +687,86 @@ const isInteractiveSvg = interactive && (isLineish || type === "scatter");
     for (const node of nodes) {
       node.dataset.chartReady = "1";
       const type = node.dataset.chartType;
+      // Plays once. Reversing on scroll-up erased a chart that was still on
+      // screen; the lab's replay button re-runs the entrance on demand.
+      const st = { trigger: node, start: "top 80%", toggleActions: "play none none none" };
 
       if (type === "line" || type === "area") {
-        const linePaths = node.querySelectorAll<SVGPathElement>(".chart-svg-line");
-        const areaPaths = node.querySelectorAll<SVGPathElement>(".chart-svg-area");
-        const dots = node.querySelectorAll<SVGCircleElement>(".chart-svg-dot");
-        const annGroups = node.querySelectorAll<SVGGElement>(".chart-svg-annotation");
-
-        linePaths.forEach((linePath, i) => {
-          const len = linePath.getTotalLength();
-          linePath.style.strokeDasharray = `${len}`;
-          linePath.style.strokeDashoffset = `${len}`;
-          gsap.to(linePath, {
-            strokeDashoffset: 0,
-            duration: 1.1,
-            delay: i * 0.18,
-            ease: "power2.out",
-            scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
-          });
+        // pathLength="1" on every line, so the draw-in is resolution-free and
+        // identical on the hidden layout variant.
+        gsap.fromTo(
+          node.querySelectorAll(".chart-svg-line"),
+          { strokeDasharray: "1 2", strokeDashoffset: 1.02 },
+          { strokeDashoffset: 0, duration: 1.1, stagger: 0.18, ease: "power2.out", scrollTrigger: st },
+        );
+        gsap.from(node.querySelectorAll(".chart-svg-area"), {
+          opacity: 0, duration: 1.1, delay: 0.2, stagger: 0.18, ease: "power2.out", scrollTrigger: st,
         });
-        areaPaths.forEach((areaPath, i) => {
-          gsap.from(areaPath, {
-            opacity: 0,
-            duration: 1.1,
-            delay: 0.2 + i * 0.18,
-            ease: "power2.out",
-            scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
-          });
+        gsap.from(node.querySelectorAll(".chart-svg-dot"), {
+          opacity: 0, scale: 0.4, transformOrigin: "center", duration: 0.4, stagger: 0.03,
+          ease: "back.out(1.8)", delay: 0.7, scrollTrigger: st,
         });
-        gsap.from(dots, {
-          opacity: 0,
-          scale: 0.4,
-          transformOrigin: "center",
-          duration: 0.4,
-          stagger: 0.06,
-          ease: "back.out(1.8)",
-          delay: 0.8,
-          scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
-        });
-        gsap.from(annGroups, {
-          opacity: 0,
-          y: -6,
-          duration: 0.5,
-          ease: "power2.out",
-          stagger: 0.08,
-          delay: 1.0,
-          scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
+        gsap.from(node.querySelectorAll(".chart-svg-annotation"), {
+          opacity: 0, duration: 0.5, ease: "power2.out", stagger: 0.08, delay: 1.0, scrollTrigger: st,
         });
       } else if (type === "scatter") {
-        const dots = node.querySelectorAll<SVGCircleElement>(".chart-svg-scatter-dot");
-        gsap.from(dots, {
-          opacity: 0,
-          scale: 0.3,
-          transformOrigin: "center",
-          duration: 0.45,
-          stagger: { each: 0.025, from: "random" },
-          ease: "back.out(1.8)",
-          scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
+        gsap.from(node.querySelectorAll(".chart-svg-scatter-dot"), {
+          opacity: 0, scale: 0.3, transformOrigin: "center", duration: 0.45,
+          stagger: { each: 0.025, from: "random" }, ease: "back.out(1.8)", scrollTrigger: st,
         });
       } else if (type === "donut") {
-        const arcs = node.querySelectorAll<SVGPathElement>(".chart-svg-arc");
-        gsap.from(arcs, {
-          opacity: 0,
-          scale: 0.7,
-          transformOrigin: `${node.querySelector<SVGSVGElement>(".chart-svg")?.viewBox.baseVal.width! / 2}px 170px`,
-          duration: 0.7,
-          ease: "power2.out",
-          stagger: 0.1,
-          scrollTrigger: { trigger: node, start: "top 80%", toggleActions: "play none none reverse" },
+        gsap.from(node.querySelectorAll(".chart-svg-arc"), {
+          opacity: 0, scale: 0.86, svgOrigin: "120 120", duration: 0.7,
+          ease: "power3.out", stagger: 0.08, scrollTrigger: st,
         });
       }
     }
+  }
+
+  // SVG text and strokes are sized in viewBox units times --u. Writing
+  // --u = viewBox width / rendered width keeps them at fixed on-screen px
+  // (12px ticks, 11px threshold labels, 13px notes) at every column width.
+  // Without JS the container-query --u values are the fallback.
+  let unitObserver: ResizeObserver | null = null;
+  function initUnitScale() {
+    unitObserver?.disconnect();
+    unitObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const svg = entry.target as SVGSVGElement;
+        const w = entry.contentRect.width;
+        if (w > 0) svg.style.setProperty("--u", (svg.viewBox.baseVal.width / w).toFixed(4));
+      }
+    });
+    document.querySelectorAll<SVGSVGElement>("svg.chart-svg").forEach((svg) => unitObserver!.observe(svg));
+  }
+
+  // Donut: a legend row and its slice light up together, from either side.
+  function initDonutLinks() {
+    document.querySelectorAll<HTMLElement>(".chart-donut:not([data-link-ready])").forEach((donut) => {
+      donut.dataset.linkReady = "1";
+      const set = (i: string | null) => {
+        if (i === null) delete donut.dataset.active;
+        else donut.dataset.active = i;
+        donut.querySelectorAll<Element>("[data-slice]").forEach((el) =>
+          el.classList.toggle("is-active", el.getAttribute("data-slice") === i),
+        );
+      };
+      donut.querySelectorAll<HTMLElement | SVGElement>("[data-slice]").forEach((el) => {
+        const i = el.getAttribute("data-slice");
+        el.addEventListener("pointerenter", () => set(i));
+        el.addEventListener("pointerleave", () => set(null));
+        el.addEventListener("focus", () => set(i));
+        el.addEventListener("blur", () => set(null));
+      });
+    });
   }
 
   function initAll() {
     initCssAnimatedCharts();
     initSvgCharts();
     initChartInteractions();
+    initUnitScale();
+    initDonutLinks();
   }
 
   initAll();
@@ -575,65 +774,247 @@ const isInteractiveSvg = interactive && (isLineish || type === "scatter");
 </script>
 
 <style>
+  /* ======================================================================
+     Frame + header
+     ====================================================================== */
   .chart-container {
-    margin: 2em 0;
+    /* Chart palette. Semantic tokens (success/warning/destructive) stay for
+       meaning; series get a brand ramp built from the accent. Every data mark
+       holds ≥ 3:1 against the card and the track (WCAG 1.4.11). */
+    --chart-cat-1: var(--color-accent);
+    --chart-cat-2: oklch(0.56 0.11 195);
+    --chart-cat-3: oklch(0.55 0.15 330);
+    --chart-cat-4: oklch(0.58 0.12 60);
+    /* Ordered series: one hue, faint → strong. */
+    --chart-seq-1: oklch(0.66 0.09 260);
+    --chart-seq-2: oklch(0.59 0.12 260);
+    --chart-seq-3: oklch(0.52 0.15 260);
+    --chart-seq-4: oklch(0.46 0.16 260);
+    --chart-seq-5: oklch(0.4 0.14 260);
+    /* Context slices next to an emphasized one. */
+    --chart-neutral-1: oklch(0.53 0.015 260);
+    --chart-neutral-2: oklch(0.58 0.015 260);
+    --chart-neutral-3: oklch(0.62 0.015 260);
+    --chart-neutral-4: oklch(0.66 0.015 260);
+    /* A mark that steps back (not the story's focus): muted, still 3:1. */
+    --chart-mute: oklch(0.62 0.03 260);
+    --chart-threshold: oklch(0.5 0.03 260);
+    --track: oklch(from var(--color-text) l c h / 0.065);
+    --bar-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    container: chart / inline-size;
+    margin: 2.25em 0;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     overflow: hidden;
     background: var(--color-surface);
+    font-variant-numeric: tabular-nums;
   }
 
-  .chart-story {
-    padding: 1.1rem 1.25rem 0.25rem;
-    font-family: var(--font-serif);
-    font-weight: 500;
-    font-size: clamp(1.15rem, 2vw, 1.4rem);
-    line-height: 1.3;
-    color: var(--color-text);
-    letter-spacing: -0.01em;
+  :global([data-theme='dark']) .chart-container {
+    --chart-cat-2: oklch(0.72 0.1 195);
+    --chart-cat-3: oklch(0.72 0.13 330);
+    --chart-cat-4: oklch(0.76 0.11 65);
+    --chart-seq-1: oklch(0.55 0.08 260);
+    --chart-seq-2: oklch(0.63 0.1 260);
+    --chart-seq-3: oklch(0.71 0.12 260);
+    --chart-seq-4: oklch(0.79 0.1 260);
+    --chart-seq-5: oklch(0.87 0.07 260);
+    --chart-neutral-1: oklch(0.68 0.015 260);
+    --chart-neutral-2: oklch(0.63 0.015 260);
+    --chart-neutral-3: oklch(0.58 0.015 260);
+    --chart-neutral-4: oklch(0.54 0.015 260);
+    --chart-mute: oklch(0.6 0.03 260);
+    --chart-threshold: oklch(0.74 0.03 260);
   }
 
-  .chart-title {
-    display: block;
-    padding: 0.55rem 1rem;
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .chart-container {
+      --chart-cat-2: oklch(0.72 0.1 195);
+      --chart-cat-3: oklch(0.72 0.13 330);
+      --chart-cat-4: oklch(0.76 0.11 65);
+      --chart-seq-1: oklch(0.55 0.08 260);
+      --chart-seq-2: oklch(0.63 0.1 260);
+      --chart-seq-3: oklch(0.71 0.12 260);
+      --chart-seq-4: oklch(0.79 0.1 260);
+      --chart-seq-5: oklch(0.87 0.07 260);
+      --chart-neutral-1: oklch(0.68 0.015 260);
+      --chart-neutral-2: oklch(0.63 0.015 260);
+      --chart-neutral-3: oklch(0.58 0.015 260);
+      --chart-neutral-4: oklch(0.54 0.015 260);
+      --chart-mute: oklch(0.6 0.03 260);
+      --chart-threshold: oklch(0.74 0.03 260);
+    }
+  }
+
+  .chart-head {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 1.15rem 1.25rem 0;
+  }
+
+  .chart-eyebrow {
+    margin: 0;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: 0.68rem;
     font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     color: var(--color-text-muted);
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg-secondary);
   }
 
-  .chart-story + .chart-title {
-    border-top: 1px solid var(--color-border);
+  /* A figure lede, not a page headline: one step above body copy. */
+  .chart-story {
+    margin: 0;
+    max-width: 52ch;
+    font-family: var(--font-serif);
+    font-size: 1.075rem;
+    font-weight: 500;
+    line-height: 1.38;
+    letter-spacing: -0.005em;
+    color: var(--color-text);
+    text-wrap: pretty;
   }
 
   .chart-body {
-    padding: 1.5rem;
+    position: relative;
+    padding: 1.25rem;
+  }
+
+  .chart-source :global(a) {
+    color: var(--color-text-secondary);
+    text-decoration: underline;
+    text-decoration-color: var(--color-border-strong);
+    text-underline-offset: 0.2em;
+    transition: color var(--duration-fast) var(--ease-smooth), text-decoration-color var(--duration-fast) var(--ease-smooth);
+  }
+
+  .chart-source :global(a:hover) {
+    color: var(--color-accent);
+    text-decoration-color: currentColor;
+  }
+
+  .chart-source :global(sup) {
+    font-size: 0.72em;
+    line-height: 0;
   }
 
   .chart-source {
-    padding: 0 1.25rem 0.85rem;
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
+    margin: 0;
+    padding: 0.8rem 1.25rem 1rem;
+    border-top: 1px solid var(--color-border);
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    line-height: 1.5;
     color: var(--color-text-muted);
+    text-wrap: pretty;
   }
 
-  /* ---- Legend (multi-series) ---- */
+  /* Marker shared by vertical-bar values and the notes list. */
+  .chart-mark {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    min-width: 16px;
+    height: 16px;
+    margin-left: 0.35em;
+    padding: 0 0.25em;
+    border-radius: 999px;
+    border: 1px solid oklch(from var(--color-text) l c h / 0.3);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--color-text-secondary);
+  }
+
+  .chart-container .chart-notes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.25rem;
+    margin: 0;
+    padding: 0 1.25rem 1.1rem;
+    list-style: none;
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+  }
+
+  .chart-notes li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+
+  .chart-notes .chart-mark {
+    margin-left: 0;
+  }
+
+  /* Line notes that found no clear spot in the plot: one list per layout
+     variant, shown with the SVG variant it belongs to. */
+  .chart-notes-svg[data-variant="narrow"] { display: none; }
+
+  .chart-notes li[data-emphasize] {
+    color: var(--color-text);
+  }
+
+  .chart-notes li[data-emphasize] .chart-mark,
+  .vbar-col[data-emphasize] .chart-mark {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  @container chart (max-width: 479.98px) {
+    .chart-head { padding: 1rem 1rem 0; }
+    .chart-body { padding: 1.15rem 1rem 1rem; }
+    .chart-source { padding: 0.75rem 1rem 0.9rem; }
+    .chart-container .chart-notes { padding-inline: 1rem; }
+  }
+
+  /* Lists inside the figure: beat the article's prose list spacing. */
+  .chart-container .chart-donut-legend,
+  .chart-container .chart-sr {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .chart-container li {
+    margin: 0;
+  }
+
+  .chart-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ======================================================================
+     Legend (multi-series)
+     ====================================================================== */
   .chart-legend {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
-    padding: 0.85rem 1.25rem 0;
+    margin-top: 0.4rem;
   }
 
   .chart-legend-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.45em;
-    padding: 0.3em 0.7em;
+    gap: 0.5em;
+    padding: 0.32em 0.75em;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
+    border-radius: 999px;
     background: var(--color-surface);
     font-family: var(--font-mono);
     font-size: 0.7rem;
@@ -642,12 +1023,16 @@ const isInteractiveSvg = interactive && (isLineish || type === "scatter");
     transition:
       color var(--duration-fast) var(--ease-smooth),
       border-color var(--duration-fast) var(--ease-smooth),
+      box-shadow var(--duration-fast) var(--ease-smooth),
+      transform var(--duration-fast) var(--ease-spring),
       opacity var(--duration-fast) var(--ease-smooth);
   }
 
   .chart-legend-btn:hover {
     border-color: var(--color-border-strong);
     color: var(--color-text);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px oklch(from var(--color-text) l c h / 0.08);
   }
 
   .chart-legend-btn:focus-visible {
@@ -655,229 +1040,467 @@ const isInteractiveSvg = interactive && (isLineish || type === "scatter");
     outline-offset: 2px;
   }
 
+  /* Off: the chip goes hollow (outline swatch, muted label, no fill). */
   .chart-legend-btn.legend-off {
-    opacity: 0.45;
-    text-decoration: line-through;
+    background: transparent;
+    border-style: dashed;
+    color: var(--color-text-muted);
   }
 
+  /* Line series → a short line swatch, not a box. */
   .chart-legend-swatch {
-    width: 10px;
-    height: 10px;
-    border-radius: 3px;
+    width: 0.9rem;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--swatch);
+    box-shadow: inset 0 0 0 1px var(--swatch);
+    transition: background-color var(--duration-fast) var(--ease-smooth), transform var(--duration-fast) var(--ease-spring);
   }
 
-  /* ---- Vertical bars ---- */
-  .chart-bars {
-    display: flex;
-    align-items: flex-end;
-    gap: 1rem;
-    height: clamp(150px, 30vw, 200px);
-    padding-top: 2rem;
+  .chart-legend-btn.legend-off .chart-legend-swatch {
+    background: transparent;
+    height: 5px;
   }
 
-  .chart-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+  .chart-legend-btn[aria-disabled="true"] {
+    cursor: default;
+  }
+
+  /* ======================================================================
+     Horizontal bars — one subgrid, one baseline x for every bar
+     ====================================================================== */
+  .hbar {
+    display: grid;
+    /* Labels take their natural width up to ~46% before wrapping. */
+    grid-template-columns: fit-content(46%) minmax(0, 1fr) auto;
+    column-gap: 1rem;
+    row-gap: 0.95rem;
+  }
+
+  .hbar-row {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
     align-items: center;
-    height: 100%;
-    justify-content: flex-end;
-    position: relative;
+    row-gap: 0.35rem;
   }
 
-  .chart-bar {
-    width: 100%;
-    max-width: 48px;
-    height: 0;
-    background: var(--bar-color);
-    border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-    transition: height 0.6s var(--ease-spring);
-    transition-delay: var(--bar-delay);
-    cursor: pointer;
-  }
-
-  .chart-container.animate .chart-bar {
-    height: var(--bar-height);
-  }
-
-  .chart-bar:hover {
-    opacity: 0.85;
-  }
-
-  .chart-bar:hover + .chart-label,
-  .chart-col:hover .chart-tooltip {
-    opacity: 1;
-  }
-
-  .chart-col[data-emphasize="true"] .chart-bar {
-    outline: 2px solid oklch(from var(--color-accent) l c h / 0.6);
-    outline-offset: 2px;
-  }
-
-  .chart-bar-annotation {
-    position: absolute;
-    top: -0.25rem;
-    transform: translateY(-100%);
-    max-width: 14ch;
-    padding: 0.35em 0.55em;
-    border-radius: var(--radius-sm);
-    background: var(--color-bg-secondary);
-    border: 1px solid var(--color-border);
+  .hbar-label {
+    grid-column: 1;
     font-family: var(--font-sans);
-    font-size: 0.7rem;
+    font-size: 0.85rem;
     line-height: 1.3;
     color: var(--color-text-secondary);
-    text-align: center;
-    pointer-events: none;
+    text-wrap: balance;
+    transition: color var(--duration-fast) var(--ease-smooth);
   }
 
-  .chart-tooltip {
-    position: absolute;
-    top: -0.5rem;
-    transform: translateY(-100%);
-    background: var(--color-text);
-    color: var(--color-bg);
-    padding: 0.3em 0.6em;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-    font-size: 0.7rem;
-    white-space: nowrap;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--duration-fast) var(--ease-smooth);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.1em;
-  }
-
-  .chart-label {
-    margin-top: 0.5rem;
-    font-family: var(--font-mono);
-    font-size: 0.68rem;
-    color: var(--color-text-muted);
-    text-align: center;
-  }
-
-  /* ---- Horizontal bars ---- */
-  .chart-rows {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .chart-row {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    position: relative;
-  }
-
-  .chart-row-label {
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
-    min-width: 80px;
-    text-align: right;
-  }
-
-  .chart-row-track {
-    flex: 1;
-    height: 24px;
-    background: var(--color-bg-secondary);
-    border-radius: var(--radius-sm);
+  .hbar-track {
+    grid-column: 2;
+    display: block;
+    height: 0.625rem;
+    border-radius: 3px;
+    background: var(--track);
     overflow: hidden;
-    position: relative;
   }
 
-  .chart-row-bar {
+  .hbar-fill {
+    display: block;
     height: 100%;
-    width: 0;
+    width: var(--w);
+    border-radius: 3px;
     background: var(--bar-color);
-    border-radius: var(--radius-sm);
-    transition: width 0.8s var(--ease-spring);
-    transition-delay: var(--bar-delay);
+    transform-origin: left center;
+    transition:
+      transform 0.9s var(--bar-ease) var(--bar-delay),
+      background-color var(--duration-fast) var(--ease-smooth);
   }
 
-  .chart-container.animate .chart-row-bar {
-    width: var(--bar-width);
-  }
-
-  .chart-row[data-emphasize="true"] .chart-row-bar {
-    outline: 2px solid oklch(from var(--color-accent) l c h / 0.5);
-    outline-offset: 1px;
-  }
-
-  .chart-row-annotation {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-family: var(--font-sans);
-    font-size: 0.68rem;
-    color: var(--color-text-muted);
-    font-style: italic;
-    pointer-events: none;
-  }
-
-  .chart-row-value {
+  .hbar-value {
+    grid-column: 3;
+    justify-self: end;
     font-family: var(--font-mono);
-    font-size: 0.75rem;
-    font-weight: 600;
+    font-size: 0.8rem;
+    font-weight: 500;
     color: var(--color-text);
-    min-width: 32px;
   }
 
-  /* ---- SVG (line / area / scatter / donut) ---- */
+  /* Annotation: numbered marker + note on its own line under the bar,
+     aligned to the bar's start (same voice as the column notes). */
+  .hbar-note {
+    grid-column: 2 / -1;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    line-height: 1.4;
+    color: var(--color-text-secondary);
+  }
+
+  .hbar-note .chart-mark {
+    margin-left: 0;
+  }
+
+  .hbar-row[data-emphasize] .hbar-note .chart-mark {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  /* Focus: the emphasized row keeps full ink, the rest step back to a muted
+     tone that still reads at 3:1 against the track. */
+  .hbar[data-focus] .hbar-row:not([data-emphasize]) .hbar-fill {
+    background: var(--chart-mute);
+  }
+
+  /* Hover / keyboard: the row under the pointer lifts to full ink. */
+  .hbar-row {
+    border-radius: var(--radius-sm);
+    outline: none;
+  }
+
+  .hbar:has(.hbar-row:hover, .hbar-row:focus-visible) .hbar-row:not(:hover, :focus-visible) .hbar-fill {
+    background: var(--chart-mute);
+  }
+
+  .hbar .hbar-row:is(:hover, :focus-visible) .hbar-track .hbar-fill {
+    background: var(--bar-color);
+    box-shadow: 0 2px 10px oklch(from var(--bar-color) l c h / 0.3);
+  }
+
+  .hbar-row:focus-visible .hbar-label {
+    color: var(--color-text);
+    text-decoration: underline 2px var(--color-accent);
+    text-underline-offset: 0.3em;
+  }
+
+  .hbar-row[data-emphasize] .hbar-label {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .hbar-row[data-emphasize] .hbar-note {
+    color: var(--color-accent);
+  }
+
+  .hbar-row:hover .hbar-label {
+    color: var(--color-text);
+  }
+
+
+  /* Narrow: label on its own line above the bar, value stays right. */
+  @container chart (max-width: 479.98px) {
+    .hbar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      column-gap: 0.75rem;
+      row-gap: 1.2rem;
+    }
+
+    .hbar-label {
+      grid-column: 1 / -1;
+      font-size: 0.82rem;
+    }
+
+    .hbar-track { grid-column: 1; }
+    .hbar-value { grid-column: 2; }
+    .hbar-note { grid-column: 1 / -1; }
+  }
+
+  /* ======================================================================
+     Vertical bars
+     ====================================================================== */
+  .vbar {
+    --gap: clamp(0.5rem, 4cqi, 1.75rem);
+  }
+
+  .vbar-plot,
+  .vbar-labels {
+    display: grid;
+    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    column-gap: var(--gap);
+  }
+
+  .vbar-plot {
+    height: clamp(9.5rem, 30cqi, 12rem);
+    padding-top: 1.6rem; /* exactly the value label above the tallest bar */
+    background:
+      linear-gradient(var(--color-border-strong), var(--color-border-strong)) bottom / 100% 1px no-repeat;
+  }
+
+  .vbar-col {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    height: 100%;
+  }
+
+  .vbar-col {
+    outline: none;
+  }
+
+  .vbar-fill {
+    position: relative;
+    /* Columns size from their band, so a three-bar chart fills a wide column
+       instead of floating thin bars in wide gutters. */
+    width: min(58%, 7.5rem);
+    min-width: min(100%, 1.75rem);
+    height: var(--h);
+    border-radius: 3px 3px 0 0;
+    background: var(--bar-color);
+    transform-origin: bottom center;
+    transition:
+      transform 0.8s var(--bar-ease) var(--bar-delay),
+      background-color var(--duration-fast) var(--ease-smooth),
+      box-shadow var(--duration-fast) var(--ease-smooth);
+  }
+
+  .vbar-value {
+    position: absolute;
+    bottom: calc(100% + 0.4rem);
+    left: 50%;
+    translate: -50% 0;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--color-text);
+    transition: opacity 0.4s var(--ease-smooth) calc(var(--bar-delay) + 0.35s);
+  }
+
+  .vbar-labels {
+    padding-top: 0.6rem;
+  }
+
+  .vbar-label {
+    font-family: var(--font-sans);
+    font-size: 0.78rem;
+    line-height: 1.3;
+    text-align: center;
+    color: var(--color-text-secondary);
+    text-wrap: balance;
+    overflow-wrap: anywhere;
+  }
+
+  .vbar[data-focus] .vbar-col:not([data-emphasize]) .vbar-fill {
+    background: var(--chart-mute);
+  }
+
+  /* Hover / keyboard: the column under the pointer lifts to full ink. */
+  .vbar-plot:has(.vbar-col:hover, .vbar-col:focus-visible) .vbar-col:not(:hover, :focus-visible) .vbar-fill {
+    background: var(--chart-mute);
+  }
+
+  .vbar .vbar-plot .vbar-col:is(:hover, :focus-visible) .vbar-fill {
+    background: var(--bar-color);
+    box-shadow: 0 -2px 14px oklch(from var(--bar-color) l c h / 0.3);
+  }
+
+  .vbar-col:focus-visible .vbar-value {
+    text-decoration: underline 2px var(--color-accent);
+    text-underline-offset: 0.3em;
+  }
+
+  /* Entrance: only when scripting can trigger it, so no-JS readers still see
+     the data, and only with motion allowed, so reduced-motion readers get
+     every bar and value at first paint (no staggered pop-in). */
+  @media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
+    .chart-container:not(.animate) .hbar-fill { transform: scaleX(0); }
+    .chart-container:not(.animate) .vbar-fill { transform: scaleY(0); }
+    .chart-container:not(.animate) .vbar-value { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .chart-container {
+      --bar-delay: 0s;
+    }
+
+    .vbar-fill,
+    .hbar-fill,
+    .vbar-value,
+    .hbar-value {
+      transition: none !important;
+    }
+  }
+
+  /* ======================================================================
+     SVG types — wide/narrow variants, readable text at any width
+     ====================================================================== */
   .chart-svg {
+    /* --u converts on-screen sizes into viewBox units so text, strokes and
+       dots stay steady while the viewBox scales with the column. The client
+       writes the exact ratio; these container-query values are the no-JS
+       fallback. */
+    --u: 1;
     width: 100%;
-    max-width: 100%;
     height: auto;
     display: block;
+    overflow: visible;
+  }
+
+  .chart-svg[data-variant="narrow"] { display: none; }
+
+  @container chart (min-width: 760px) {
+    .chart-svg { --u: 0.85; }
+  }
+
+  @container chart (min-width: 480px) and (max-width: 599.98px) {
+    .chart-svg { --u: 1.25; }
+  }
+
+  @container chart (max-width: 479.98px) {
+    .chart-svg[data-variant="wide"] { display: none; }
+    .chart-svg[data-variant="narrow"] { display: block; }
+    .chart-notes-svg[data-variant="wide"] { display: none; }
+    .chart-notes-svg[data-variant="narrow"] { display: flex; }
+  }
+
+  @container chart (min-width: 420px) and (max-width: 479.98px) {
+    .chart-svg { --u: 0.88; }
   }
 
   .chart-svg:focus-visible {
     outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
+    outline-offset: 4px;
     border-radius: var(--radius-sm);
+  }
+
+  /* Pointer and touch focus never show the UA ring; keyboard gets the one above. */
+  .chart-svg:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  .chart-svg {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: pan-y;
+  }
+
+  .chart-svg text {
+    font-family: var(--font-mono);
+    font-size: calc(12px * var(--u));
+    fill: var(--color-text-muted);
   }
 
   .chart-svg-grid line {
     stroke: var(--color-border);
-    stroke-width: 0.5;
+    stroke-width: calc(1px * var(--u));
   }
 
-  .chart-svg-grid text,
-  .chart-svg-xlabel {
-    fill: var(--color-text-muted);
-    font-family: var(--font-mono);
-    font-size: 11px;
+  .chart-svg-grid:first-child line {
+    stroke: var(--color-border-strong);
   }
 
-  .chart-svg-annotation text {
-    fill: var(--color-text);
+  .chart-svg-line {
+    stroke-width: calc(2.25px * var(--u));
+  }
+
+  .chart-svg-area {
+    pointer-events: none;
+  }
+
+  .chart-svg-dot {
+    r: calc(3.5px * var(--u));
+    stroke: var(--color-surface);
+    stroke-width: calc(2px * var(--u));
+  }
+
+  .chart-svg-dot.is-emph {
+    r: calc(5.5px * var(--u));
+  }
+
+  .chart-svg-scatter-dot {
+    r: calc(4.5px * var(--u));
+    stroke-width: calc(1.5px * var(--u));
+  }
+
+  .chart-svg-scatter-dot.is-highlight {
+    r: calc(6px * var(--u));
+    stroke-width: calc(2px * var(--u));
+  }
+
+  .chart-svg .chart-svg-callout {
     font-family: var(--font-sans);
-    font-size: 12px;
-    font-style: italic;
+    font-size: calc(13px * var(--u));
+    font-weight: 500;
+    fill: var(--color-text);
+    paint-order: stroke;
+    stroke: var(--color-surface);
+    stroke-width: calc(4px * var(--u));
+    stroke-linejoin: round;
   }
 
-  .chart-svg-axislabel {
-    fill: var(--color-text-muted);
-    font-family: var(--font-mono);
-    font-size: 11px;
+  .chart-svg-footmark circle {
+    r: calc(8px * var(--u));
+    fill: var(--color-surface);
+    stroke: oklch(from var(--color-text) l c h / 0.4);
+    stroke-width: calc(1px * var(--u));
   }
 
+  .chart-svg .chart-svg-footmark text {
+    font-size: calc(11px * var(--u));
+    fill: var(--color-text-secondary);
+  }
+
+  .chart-svg .chart-svg-annotation text {
+    font-family: var(--font-sans);
+    font-size: calc(13px * var(--u));
+    font-weight: 500;
+    fill: var(--color-text);
+    paint-order: stroke;
+    stroke: var(--color-surface);
+    stroke-width: calc(4px * var(--u));
+    stroke-linejoin: round;
+  }
+
+  .chart-svg-annotation line {
+    stroke: var(--color-text-muted);
+    stroke-width: calc(1px * var(--u));
+    stroke-dasharray: calc(2px * var(--u)) calc(2px * var(--u));
+  }
+
+  /* A reference line, not data: its own neutral token, solid enough to hold
+     3:1 on the card in both themes. */
   .chart-svg-threshold line {
-    stroke: var(--color-destructive);
-    stroke-width: 1;
-    stroke-dasharray: 5 4;
-    opacity: 0.55;
+    stroke: var(--chart-threshold);
+    stroke-width: calc(1.25px * var(--u));
+    stroke-dasharray: calc(5px * var(--u)) calc(4px * var(--u));
   }
 
-  .chart-svg-threshold text {
-    fill: var(--color-text-muted);
+  .chart-svg .chart-svg-threshold text {
+    font-size: calc(11px * var(--u));
+    fill: var(--chart-threshold);
+    paint-order: stroke;
+    stroke: var(--color-surface);
+    stroke-width: calc(3px * var(--u));
+    stroke-linejoin: round;
+  }
+
+  /* Axis titles live in HTML so they never scale with the viewBox. */
+  .chart-axis {
+    margin: 0;
     font-family: var(--font-mono);
-    font-size: 10.5px;
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    color: var(--color-text-muted);
+  }
+
+  .chart-axis-y {
+    margin-bottom: 0.6rem;
+  }
+
+  .chart-axis-y::before {
+    content: "↑ ";
+  }
+
+  .chart-axis-x {
+    margin-top: 0.35rem;
+    text-align: right;
+  }
+
+  .chart-axis-x::after {
+    content: " →";
   }
 
   /* Hidden series (legend toggle) — visibility so GSAP inline opacity can't fight it */
@@ -891,37 +1514,84 @@ const isInteractiveSvg = interactive && (isLineish || type === "scatter");
 
   /* Active (scrubbed) point */
   :global(.chart-svg-dot.pt-active) {
-    stroke: var(--color-accent);
-    stroke-width: 3;
+    stroke: var(--color-surface);
+    stroke-width: calc(2.5px * var(--u, 1));
+    r: calc(6px * var(--u, 1));
+  }
+
+  /* Scatter: a short cross through the snapped point, not a full-height rule. */
+  :global(.chart-cross-h) {
+    stroke: var(--color-text-muted);
+    stroke-width: calc(1px * var(--u, 1));
+    stroke-dasharray: calc(3px * var(--u, 1)) calc(3px * var(--u, 1));
+    pointer-events: none;
+  }
+
+  :global(.chart-cross-h[hidden]) {
+    display: none;
   }
 
   /* Crosshair + floating readout, created by interact.ts */
   :global(.chart-cross) {
     stroke: var(--color-text-muted);
-    stroke-width: 1;
-    stroke-dasharray: 3 3;
+    stroke-width: calc(1px * var(--u, 1));
+    stroke-dasharray: calc(3px * var(--u, 1)) calc(3px * var(--u, 1));
     pointer-events: none;
   }
 
   :global(.chart-tip) {
     position: absolute;
-    transform: translate(-50%, -115%);
     display: flex;
     flex-direction: column;
-    gap: 0.12em;
-    padding: 0.4em 0.65em;
+    gap: 0.2em;
+    padding: 0.5em 0.75em;
     border-radius: var(--radius-sm);
     background: var(--color-text);
     color: var(--color-bg);
     font-family: var(--font-mono);
     font-size: 0.7rem;
+    line-height: 1.35;
+    font-variant-numeric: tabular-nums;
     white-space: nowrap;
     pointer-events: none;
+    box-shadow: 0 6px 18px oklch(0 0 0 / 0.18);
     z-index: 2;
   }
 
-  :global(.chart-tip strong) {
+  /* `display: flex` above beats the UA `[hidden] { display: none }`, so the
+     empty readout would sit on the chart as a stray pill. Re-assert it. */
+  :global(.chart-tip[hidden]),
+  :global(.chart-cross[hidden]) {
+    display: none;
+  }
+
+  :global(.chart-tip-head) {
+    margin-bottom: 0.15em;
     font-weight: 600;
+  }
+
+  :global(.chart-tip-row) {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+  }
+
+  :global(.chart-tip-row span) {
+    opacity: 0.75;
+  }
+
+  :global(.chart-tip-row b) {
+    margin-left: auto;
+    padding-left: 0.75em;
+    font-weight: 600;
+    color: inherit;
+  }
+
+  :global(.chart-tip-swatch) {
+    flex: none;
+    width: 0.7em;
+    height: 2px;
+    border-radius: 1px;
   }
 
   :global(.sr-only-chart) {
@@ -936,45 +1606,107 @@ const isInteractiveSvg = interactive && (isLineish || type === "scatter");
     border: 0;
   }
 
-  /* ---- Donut ---- */
+  /* ======================================================================
+     Donut
+     ====================================================================== */
   .chart-donut {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 1.5rem;
+    grid-template-columns: minmax(0, 12.5rem) minmax(0, 22rem);
+    gap: 2rem;
     align-items: center;
   }
 
-  @media (max-width: 600px) {
+  @container chart (max-width: 479.98px) {
     .chart-donut {
       grid-template-columns: 1fr;
+      gap: 1.25rem;
+      justify-items: center;
     }
+
+    .chart-donut-svg { max-width: 11rem; }
+    .chart-donut-legend { justify-self: stretch; }
+  }
+
+  .chart-donut-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .chart-svg-arc {
+    stroke: var(--color-surface);
+    stroke-width: 2.5;
+    stroke-linejoin: round;
+    /* fill-opacity, not opacity: GSAP owns opacity for the entrance, and a
+       CSS transition on the same property would freeze it at 0. */
+    transition: fill-opacity var(--duration-fast) var(--ease-smooth);
+  }
+
+  /* Legend row ↔ slice: the pair under the pointer/focus stays, the rest dim. */
+  .chart-donut[data-active] .chart-svg-arc:not(.is-active) {
+    fill-opacity: 0.3;
+  }
+
+  .chart-donut-total-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    fill: var(--color-text-muted);
   }
 
   .chart-donut-total {
     font-family: var(--font-serif);
-    font-size: 36px;
+    font-size: 44px;
     font-weight: 500;
+    font-variant-numeric: lining-nums tabular-nums;
     fill: var(--color-text);
   }
 
   .chart-donut-legend {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
   }
 
   .chart-donut-legend-item {
     display: grid;
-    grid-template-columns: auto 1fr auto;
-    align-items: center;
-    gap: 0.6rem;
+    grid-template-columns: auto minmax(0, 1fr) auto 4ch;
+    align-items: baseline;
+    column-gap: 0.75rem;
+    padding: 0.55rem 0.4rem;
+    border-bottom: 1px solid var(--color-border);
     font-size: 0.85rem;
+    outline: none;
+    cursor: default;
+    transition: background-color var(--duration-fast) var(--ease-smooth);
+  }
+
+  .chart-donut-legend-item.is-active {
+    background: oklch(from var(--color-accent) l c h / 0.06);
+  }
+
+  .chart-donut-legend-item:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--color-accent);
+    border-radius: var(--radius-sm);
+  }
+
+  .chart-donut-legend-item.is-emph .chart-donut-label {
+    font-weight: 600;
+  }
+
+  .chart-donut-legend-item:first-child {
+    border-top: 1px solid var(--color-border);
   }
 
   .chart-donut-swatch {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
+    width: 0.6rem;
+    height: 0.6rem;
+    border-radius: 2px;
+    background: var(--swatch);
+    align-self: center;
   }
 
   .chart-donut-label {
@@ -982,9 +1714,18 @@ const isInteractiveSvg = interactive && (isLineish || type === "scatter");
     color: var(--color-text);
   }
 
-  .chart-donut-value {
+  .chart-donut-value,
+  .chart-donut-pct {
     font-family: var(--font-mono);
-    font-size: 0.75rem;
+    font-size: 0.78rem;
+    text-align: right;
+  }
+
+  .chart-donut-value {
+    color: var(--color-text);
+  }
+
+  .chart-donut-pct {
     color: var(--color-text-muted);
   }
 </style>

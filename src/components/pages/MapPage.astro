@@ -1,0 +1,1701 @@
+---
+/**
+ * MapPage: the knowledge map at /map/ (en) and /es/map/ (es).
+ * Route files are thin shells that pass `lang`; all markup lives here.
+ *
+ * Everything on this page is real, build-time content (src/lib/content-map.ts).
+ * Without JS it is already complete: a terrain poster, every place as a link
+ * positioned over it, and the same graph as a plain list. The client engine
+ * (src/lib/map/engine.ts) only enhances it.
+ */
+import BaseHead from '../BaseHead.astro';
+import Header from '../Header.astro';
+import Footer from '../Footer.astro';
+import { buildContentMap } from '../../lib/content-map';
+import { glossaryHref } from '../../lib/learn-glossary';
+import { MAP_UI, clientStrings } from '../map/strings';
+import { UI_STRINGS } from '../../consts';
+
+interface Props {
+	lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const es = lang === 'es';
+const ui = MAP_UI[lang];
+const nav = UI_STRINGS[lang].nav;
+const G = await buildContentMap(lang);
+const S = G.stats;
+
+const posts = G.nodes.filter((n) => n.type === 'post');
+const modules = G.nodes.filter((n) => n.type === 'module').sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+const lab = G.nodes.filter((n) => n.type === 'lab');
+const terms = G.nodes.filter((n) => n.type === 'term');
+const tags = G.nodes.filter((n) => n.type === 'tag');
+const pad2 = (n?: number) => String(n ?? 0).padStart(2, '0');
+
+// Framing vars: the CSS no-JS layout and the JS camera use the same fit rule.
+const bw = G.bounds.wide;
+const bt = G.bounds.tall;
+const plateVars = [
+	`--ww:${G.world.wide.w}`,
+	`--bw:${bw.x1 - bw.x0}`,
+	`--bh:${bw.y1 - bw.y0}`,
+	`--bcx:${(bw.x0 + bw.x1) / 2}`,
+	`--bcy:${(bw.y0 + bw.y1) / 2}`,
+	`--tww:${G.world.tall.w}`,
+	`--tbw:${bt.x1 - bt.x0}`,
+	`--tbh:${bt.y1 - bt.y0}`,
+	`--tbcx:${(bt.x0 + bt.x1) / 2}`,
+	`--tbcy:${(bt.y0 + bt.y1) / 2}`,
+].join(';');
+const at = (n: { x: number; y: number; px: number; py: number }) => `--x:${n.x};--y:${n.y};--px:${n.px};--py:${n.py}`;
+
+const typeName = { post: es ? 'Ensayo' : 'Essay', module: es ? 'Módulo' : 'Module', lab: es ? 'Componente' : 'Component', term: es ? 'Término' : 'Term', tag: es ? 'Etiqueta' : 'Tag' };
+const minLabel = es ? 'min' : 'min';
+const fmtDate = (d?: string) => d ?? '';
+
+const legend = [
+	{ k: 'post', v: S.posts, label: ui.legend.posts },
+	{ k: 'module', v: S.modules, label: ui.legend.modules },
+	{ k: 'lab', v: S.lab, label: ui.legend.lab },
+	{ k: 'term', v: S.terms, label: ui.legend.terms },
+	{ k: 'edge', v: S.edges, label: ui.legend.edges },
+];
+
+const phasesWithModules = G.phases.map((p) => ({ ...p, modules: modules.filter((m) => String(m.phase) === p.key) }));
+const shelves = G.categories.map((c) => ({ ...c, items: lab.filter((l) => l.category === c.key).sort((a, b) => a.title.localeCompare(b.title)) }));
+const postsNewest = [...posts].sort((a, b) => (a.date! < b.date! ? 1 : -1));
+
+/*
+ * No-JS poster: the engine's greedy label pass, run once at build time at the home
+ * scale of a typical plate per layout (1370x550 landscape, 390x675 portrait), with
+ * estimated label boxes. Essays never hide (they flip to the other side of their
+ * dot); module numbers flip, then drop; marks drop. The classes only act under
+ * `.km-static`, so the live engine (which measures real boxes) ignores them.
+ */
+type Box = { x: number; y: number; w: number; h: number };
+const staticPass = (layout: 'wide' | 'tall', pw: number, ph: number) => {
+	const tall = layout === 'tall';
+	const b = G.bounds[layout];
+	const k = Math.min(pw / (b.x1 - b.x0), ph / (b.y1 - b.y0));
+	const cx = (b.x0 + b.x1) / 2;
+	const cy = (b.y0 + b.y1) / 2;
+	const S = (n: { x: number; y: number; px: number; py: number }) => [((tall ? n.px : n.x) - cx) * k + pw / 2, ((tall ? n.py : n.y) - cy) * k + ph / 2];
+	const placed: Box[] = [];
+	const out = new Map<string, 'flip' | 'off'>();
+	const hit = (r: Box) => placed.some((p) => r.x < p.x + p.w + 3 && r.x + r.w + 3 > p.x && r.y < p.y + p.h + 3 && r.y + r.h + 3 > p.y);
+	for (const n of [...posts, ...modules, ...lab]) {
+		const [x, y] = S(n);
+		placed.push({ x: x - 7, y: y - 7, w: 14, h: 14 });
+	}
+	// balanced lines: the ink is about (text width / lines) wide, not the full measure
+	const textBox = (chars: number, cw: number, maxW: number, lh: number) => {
+		const lines = Math.ceil((chars * cw) / maxW);
+		return { w: (chars * cw) / lines, h: lines * lh };
+	};
+	// above / below the dot, centred: try the default side, then the other one
+	const side = (id: string, x: number, y: number, w: number, h: number, gap: number, below: boolean, keep: boolean) => {
+		const boxes = [below ? { x: x - w / 2, y: y + gap, w, h } : { x: x - w / 2, y: y - gap - h, w, h }];
+		boxes.push(below ? { x: x - w / 2, y: y - gap - h, w, h } : { x: x - w / 2, y: y + gap, w, h });
+		const i = boxes.findIndex((r) => !hit(r));
+		if (i < 0 && !keep) {
+			out.set(id, 'off');
+			return;
+		}
+		if (i === 1) out.set(id, 'flip');
+		placed.push(boxes[Math.max(0, i)]);
+	};
+	posts.forEach((n, i) => {
+		const [x, y] = S(n);
+		const t = textBox(n.short.length, tall ? 6.6 : 8.3, tall ? 130 : 216, tall ? 14.6 : 18.6);
+		if (!tall) return side(n.id, x, y, t.w, t.h + 15, 13, i % 2 === 1, true);
+		// portrait: beside the dot, right first
+		const right = { x: x + 11, y: y - t.h / 2, w: t.w, h: t.h };
+		const left = { x: x - 11 - t.w, y: y - t.h / 2, w: t.w, h: t.h };
+		const flip = hit(right) && !hit(left);
+		if (flip) out.set(n.id, 'flip');
+		placed.push(flip ? left : right);
+	});
+	for (const c of G.categories) {
+		const [x, y] = S(c);
+		const w = ((tall ? c.short ?? c.label : c.label).length + 4) * (tall ? 6 : 7.3);
+		const r = { x: x - w / 2, y, w, h: 12 };
+		if (hit(r)) out.set(`cat:${c.key}`, 'off');
+		else placed.push(r);
+	}
+	if (!tall)
+		for (const p of G.phases) {
+			const [x, y] = S(p);
+			const r = { x: x - 32, y: y - 7, w: 64, h: 13 };
+			if (hit(r)) out.set(`phase:${p.key}`, 'off');
+			else placed.push(r);
+		}
+	modules.forEach((n, i) => {
+		const [x, y] = S(n);
+		side(n.id, x, y, 14, 11, 11, !tall && i % 2 === 1, false);
+	});
+	return out;
+};
+const passWide = staticPass('wide', 1370, 550);
+const passTall = staticPass('tall', 390, 675);
+const stat = (id: string) => [passWide.get(id) && `sw-${passWide.get(id)}`, passTall.get(id) && `st-${passTall.get(id)}`].filter(Boolean) as string[];
+
+const graphHref = es ? '/es/map/graph.json' : '/map/graph.json';
+const strings = JSON.stringify(clientStrings(lang));
+const title = ui.meta.title;
+---
+
+<!doctype html>
+<html lang={lang}>
+	<head>
+		<BaseHead
+			title={title}
+			description={ui.meta.description}
+			image={es ? '/og/map-es.png' : '/og/map.png'}
+			imageAlt={ui.meta.ogAlt}
+			lang={lang}
+			alternates={[
+				{ hreflang: 'en', href: 'https://valdemird.com/map/' },
+				{ hreflang: 'es', href: 'https://valdemird.com/es/map/' },
+			]}
+		/>
+		<link rel="preload" href={graphHref} as="fetch" crossorigin="anonymous" />
+	</head>
+	<body>
+		<a class="skip-link" href="#main-content">{nav.skipToContent}</a>
+		<Header />
+		<main id="main-content" class="km-page">
+			<section class="km-intro" aria-labelledby="km-h1">
+				<p class="km-eyebrow animate-fade-in">{ui.eyebrow}</p>
+				<h1 id="km-h1" class="animate-fade-in">{ui.h1}</h1>
+				<p class="km-lede animate-fade-in delay-1"><span class="long">{ui.lede}</span><span class="short">{ui.ledeShort}</span></p>
+				<dl class="km-legend animate-fade-in delay-2" aria-label={ui.legend.label}>
+					{legend.map((f) => (
+						<div class:list={['km-fact', `f-${f.k}`]}>
+							<dt>{f.label}</dt>
+							<dd><span class:list={['g', `g-${f.k}`]} aria-hidden="true"></span>{f.v}</dd>
+						</div>
+					))}
+				</dl>
+			</section>
+
+			<div
+				class="km-figure"
+				id="km-figure"
+				data-km-root
+				data-graph={graphHref}
+				data-strings={strings}
+			>
+				<div class="km-bar">
+					<p class="km-caption">
+						<span class="fig">{ui.fig}</span>
+						<span class="cap">{ui.caption}</span>
+						<span class="km-readout">{ui.client.hintMouse}</span>
+					</p>
+					<div class="km-search" role="search">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+						<input
+							type="search"
+							id="km-q"
+							role="combobox"
+							aria-expanded="false"
+							aria-controls="km-results"
+							aria-autocomplete="list"
+							aria-label={ui.searchLabel}
+							autocomplete="off"
+							spellcheck="false"
+							placeholder={ui.search}
+							disabled
+						/>
+						<kbd aria-hidden="true">/</kbd>
+						<ul class="km-results" id="km-results" role="listbox" aria-label={ui.search} hidden></ul>
+					</div>
+					<div class="km-tools" role="group" aria-label={ui.zoomGroup}>
+						<button type="button" data-zoom="out" aria-label={ui.zoomOut} title={ui.zoomOut}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+						<button type="button" data-zoom="in" aria-label={ui.zoomIn} title={ui.zoomIn}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+						<button type="button" data-zoom="fit" aria-label={ui.fit} title={ui.fit}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></button>
+						<button type="button" data-zoom="fs" aria-pressed="false" aria-label={ui.fullscreen} title={ui.fullscreen} data-label-enter={ui.fullscreen} data-label-exit={ui.exitFullscreen}>
+							<svg class="i-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path></svg>
+							<svg class="i-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"></path></svg>
+						</button>
+					</div>
+				</div>
+
+				<section class="km-plate km-static" id="km-plate" aria-labelledby="km-map-title" aria-describedby="km-map-help" style={plateVars}>
+					<h2 class="sr-only" id="km-map-title">{ui.mapTitle}</h2>
+					<p class="sr-only" id="km-map-help">{ui.mapHelp}</p>
+					<a class="km-skip" href="#km-index">{ui.skip}</a>
+					<picture class="km-poster">
+						<source media="(max-aspect-ratio: 80/100)" srcset="/map/poster-tall.svg" width={G.world.tall.w} height={G.world.tall.h} />
+						<img src="/map/poster-wide.svg" alt="" width={G.world.wide.w} height={G.world.wide.h} decoding="async" fetchpriority="high" draggable="false" />
+					</picture>
+					<canvas aria-hidden="true"></canvas>
+					<div class="km-labels tier-0">
+						{postsNewest.map((n) => {
+							const i = posts.indexOf(n);
+							return (
+								<a class:list={['nd', 't-post', i % 2 === 0 ? 'r-a' : 'r-b', ...stat(n.id)]} data-id={n.id} href={n.href} style={at(n)}>
+									<span class="lbl" aria-hidden="true">
+										<span class="eb">{fmtDate(n.date)} · {n.minutes} {minLabel}</span>
+										<span class="nm">{n.short}</span>
+									</span>
+									<span class="sr-only">{typeName.post}: {n.title}, {n.date}, {n.minutes} {ui.client.min}</span>
+								</a>
+							);
+						})}
+						{modules.map((n, i) => (
+							<a class:list={['nd', 't-module', i % 2 === 0 ? 'r-a' : 'r-b', ...stat(n.id)]} data-id={n.id} href={n.href} style={at(n)}>
+								<span class="lbl" aria-hidden="true">
+									<span class="num">{pad2(n.order)}</span>
+									<span class="nm">{n.short}</span>
+								</span>
+								<span class="sr-only">{typeName.module} {pad2(n.order)}: {n.title}</span>
+							</a>
+						))}
+						{lab.map((n) => (
+							<a class="nd t-lab" data-id={n.id} href={n.href} style={at(n)}>
+								<span class="lbl" aria-hidden="true"><span class="nm">{n.title}</span></span>
+								<span class="sr-only">{typeName.lab}: {n.title}</span>
+							</a>
+						))}
+						{terms.map((n) => (
+							<a class="nd t-term" data-id={n.id} href={n.href} tabindex="-1" style={at(n)}>
+								<span class="lbl" aria-hidden="true"><span class="nm">{n.title}</span></span>
+								<span class="sr-only">{typeName.term}: {n.title}</span>
+							</a>
+						))}
+						{tags.map((n) => (
+							<button type="button" class="nd t-tag" data-id={n.id} tabindex="-1" style={at(n)}>
+								<span class="lbl" aria-hidden="true">{n.title}</span>
+								<span class="sr-only">{typeName.tag} {n.title}, {n.count} {n.count === 1 ? ui.client.essay : ui.client.essays}</span>
+							</button>
+						))}
+						{G.phases.map((p) => (
+							<span class:list={['mk', 'mk-phase', ...stat(`phase:${p.key}`)]} data-mk={`phase:${p.key}`} style={at(p)} aria-hidden="true">
+								<span class="lbl"><span class="eb">{p.eyebrow}</span><span class="pn">{p.label}</span></span>
+							</span>
+						))}
+						{G.categories.map((c) => (
+							<span class:list={['mk', 'mk-cat', ...stat(`cat:${c.key}`)]} data-mk={`cat:${c.key}`} style={at(c)} aria-hidden="true">
+								<span class="lbl"><span class="full">{c.label}</span><span class="short">{c.short}</span>{'\u00a0·\u00a0'}{c.count}</span>
+							</span>
+						))}
+					</div>
+					<div class="km-gutter" aria-hidden="true">
+						{G.regions.map((r) => (
+							<span class="km-rg" data-r={r.key}>{r.label}</span>
+						))}
+					</div>
+					<p class="km-toast" role="status" aria-live="polite"></p>
+					<p class="sr-only km-live" role="status" aria-live="polite" aria-atomic="true"></p>
+					<div class="km-card" role="region" aria-label={ui.client.selected} tabindex="-1" hidden></div>
+				</section>
+			</div>
+
+			<section class="km-index" id="km-index" aria-labelledby="km-index-title" tabindex="-1">
+				<div class="km-index-head km-reveal">
+					<div>
+						<p class="km-eyebrow">{ui.index.eyebrow}</p>
+						<h2 id="km-index-title">{ui.index.title}</h2>
+					</div>
+					<p class="km-index-body">{ui.index.body}</p>
+				</div>
+				<div class="km-cols">
+					<div class="km-col writing km-reveal">
+						<h3><span class="g g-post" aria-hidden="true"></span>{ui.index.writing}<span class="n">{S.posts}</span></h3>
+						<ol>
+							{postsNewest.map((n) => (
+								<li><a href={n.href}><span class="i">{n.date?.slice(5).replace('-', '·')}</span><span class="t">{n.title}</span><span class="m">{n.minutes} min</span></a></li>
+							))}
+						</ol>
+					</div>
+					<div class="km-col course km-reveal">
+						<h3><span class="g g-module" aria-hidden="true"></span>{ui.index.course}<span class="n">{S.modules}</span></h3>
+						{phasesWithModules.map((p) => (
+							<Fragment>
+								<h4>{p.eyebrow} · {p.label}</h4>
+								<ol>
+									{p.modules.map((n) => (
+										<li><a href={n.href}><span class="i">{pad2(n.order)}</span><span class="t">{n.short}</span><span class="m">{n.minutes} min · {n.sources} {ui.index.sources}</span></a></li>
+									))}
+								</ol>
+							</Fragment>
+						))}
+						<p class="km-more"><a href={glossaryHref(lang)}>{ui.index.glossary(S.terms)} <span aria-hidden="true">→</span></a></p>
+					</div>
+					<div class="km-col lab km-reveal">
+						<h3><span class="g g-lab" aria-hidden="true"></span>{ui.index.lab}<span class="n">{S.lab}</span></h3>
+						{shelves.map((c) => (
+							<Fragment>
+								<h4>{c.label}</h4>
+								<ul>
+									{c.items.map((n) => (
+										<li><a href={n.href}><span class="t">{n.title}</span><span class="m">{n.usedBy ? ui.index.inEssays(n.usedBy) : n.status === 'experimental' ? ui.client.experimental : ''}</span></a></li>
+									))}
+								</ul>
+							</Fragment>
+						))}
+					</div>
+				</div>
+			</section>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<script>
+	import { mountMap } from '../../lib/map/engine';
+
+	// One map per page: mounted on astro:page-load (and the first load), torn
+	// down on astro:before-swap so nothing (GPU device, listeners, rAF) leaks
+	// across View Transitions.
+	let destroy: (() => void) | null = null;
+	let revealIO: IntersectionObserver | null = null;
+
+	function init() {
+		const root = document.querySelector<HTMLElement>('[data-km-root]');
+		if (!root || root.dataset.kmMounted) return;
+		root.dataset.kmMounted = '1';
+		destroy = mountMap(root);
+
+		// Below-the-fold index columns fade in on scroll. Only sections that start
+		// off-screen are armed, so nothing is ever hidden without this script.
+		const els = [...document.querySelectorAll<HTMLElement>('.km-reveal')].filter((el) => el.getBoundingClientRect().top > innerHeight);
+		if (!els.length || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+		revealIO = new IntersectionObserver(
+			(entries) => {
+				for (const e of entries) {
+					if (!e.isIntersecting) continue;
+					e.target.classList.add('visible');
+					revealIO?.unobserve(e.target);
+				}
+			},
+			{ threshold: 0.08, rootMargin: '0px 0px -60px 0px' },
+		);
+		for (const el of els) {
+			el.classList.add('armed');
+			revealIO.observe(el);
+		}
+	}
+
+	function teardown() {
+		destroy?.();
+		destroy = null;
+		revealIO?.disconnect();
+		revealIO = null;
+	}
+
+	init();
+	document.addEventListener('astro:page-load', init);
+	document.addEventListener('astro:before-swap', teardown);
+</script>
+
+<style>
+	/* ================================================================ tokens (all derived from global.css) */
+	.km-page {
+		/* the figure's side gutter; text sits in the site container (same box as the header's nav) */
+		--km-gutter: clamp(16px, 2.4vw, 40px);
+		--km-header: 58px;
+		--km-bar: 56px;
+		--km-intro: 12.75rem;
+		--km-paper: var(--color-bg);
+		--km-ink: var(--color-text);
+		--km-reading: var(--color-reading);
+		--km-muted: var(--color-text-muted);
+		--km-acc: var(--color-accent);
+		--km-warm: var(--color-warning-text);
+		--km-term: var(--color-text-muted);
+		--km-rule: var(--color-border);
+		--km-rule-2: var(--color-border-strong);
+		--km-surface: var(--color-surface);
+		--km-focus: var(--color-accent);
+		padding: 0 0 var(--space-2xl);
+	}
+
+	.km-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--km-acc);
+		margin: 0 0 0.7rem;
+	}
+
+	/* ================================================================ intro: fixed height on desktop so the plate never shifts */
+	.km-intro {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 0.75rem 3rem;
+		align-items: end;
+		align-content: end;
+		min-height: var(--km-intro);
+		box-sizing: border-box;
+		max-width: var(--full-width);
+		margin-inline: auto;
+		padding: 1.6rem 1.5rem 1.25rem;
+	}
+	.km-intro .km-eyebrow,
+	.km-intro h1 {
+		grid-column: 1 / -1;
+	}
+	.km-intro .km-eyebrow {
+		margin: 0;
+	}
+	.km-intro h1 {
+		margin: 0;
+		font-size: clamp(1.75rem, 2.55vw, 2.55rem);
+		font-weight: 560;
+		line-height: 1.08;
+		letter-spacing: -0.022em;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.km-lede {
+		margin: 0;
+		align-self: center;
+		max-width: 86ch;
+		font-size: 0.95rem;
+		line-height: 1.55;
+		color: var(--km-reading);
+		display: -webkit-box;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 3;
+		line-clamp: 3;
+		overflow: hidden;
+		text-wrap: pretty;
+	}
+	.km-lede .short {
+		display: none;
+	}
+
+	/* The floating contact button steps aside while the plate fills the screen (it would sit on the plate's corner). */
+	:global(html.km-plate-inview .ama-floating .ama-fab),
+	:global(html.km-card-open .ama-floating .ama-fab) {
+		opacity: 0;
+		transform: translateY(calc(100% + 1.5rem));
+		pointer-events: none;
+	}
+	/* without scripting the assistant can't open anyway, and it would sit on the poster */
+	@media (scripting: none) {
+		:global(.ama-floating .ama-fab) {
+			display: none;
+		}
+	}
+
+	/* The numbers are the legend: each count carries its map glyph. */
+	.km-legend {
+		display: grid;
+		grid-template-columns: repeat(5, auto);
+		gap: 0.4rem 1.6rem;
+		margin: 0;
+		padding: 0.85rem 0 0.15rem;
+		border-top: 1px solid var(--km-rule);
+	}
+	.km-fact {
+		display: flex;
+		flex-direction: column-reverse;
+		gap: 0.25rem;
+	}
+	.km-fact dt {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+		white-space: nowrap;
+	}
+	.km-fact dd {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin: 0;
+		font-family: var(--font-serif);
+		font-size: clamp(1.35rem, 1.9vw, 1.8rem);
+		font-weight: 520;
+		line-height: 1;
+		color: var(--km-ink);
+		font-variant-numeric: lining-nums tabular-nums;
+	}
+
+	.km-page :global(.g) {
+		display: inline-block;
+		flex: none;
+		width: 11px;
+		height: 11px;
+	}
+	.km-page :global(.g-post) { border-radius: 50%; background: var(--km-ink); }
+	.km-page :global(.g-module) { border-radius: 50%; border: 2px solid var(--km-acc); }
+	.km-page :global(.g-lab) { width: 9px; height: 9px; background: var(--km-warm); rotate: 45deg; }
+	.km-page :global(.g-term) { width: 5px; height: 5px; border-radius: 50%; background: var(--km-term); }
+	.km-page :global(.g-edge) { width: 16px; height: 1.5px; background: var(--km-acc); }
+
+	/* ================================================================ the figure: caption bar + plate */
+	/* The figure breaks out of the text column, symmetrically: up to 1440px wide, never past the gutter. */
+	.km-figure {
+		width: min(100% - 2 * var(--km-gutter), 1440px);
+		margin-inline: auto;
+		background: var(--km-paper);
+	}
+	.km-bar {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		height: var(--km-bar);
+		padding: 0 10px 0 14px;
+		border: 1px solid var(--km-rule);
+		border-bottom: 0;
+		border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+		background: var(--km-paper);
+	}
+	.km-caption {
+		margin: 0 auto 0 0;
+		min-width: 0;
+		font: 500 0.66rem/1.35 var(--font-mono);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+	}
+	.km-caption .fig {
+		color: var(--km-ink);
+		font-weight: 600;
+		margin-right: 0.5rem;
+	}
+	.km-caption .cap {
+		white-space: nowrap;
+	}
+	.km-readout {
+		display: block;
+		/* rewritten every frame while zooming: a fixed-size, contained box, so it never relayouts the page */
+		height: 1.35em;
+		contain: strict;
+		margin-top: 2px;
+		font-size: 0.6rem;
+		letter-spacing: 0.1em;
+		color: var(--km-muted);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.km-readout :global(b) {
+		color: var(--km-acc);
+		font-weight: 600;
+	}
+
+	/* Controls keep their space before the engine boots (no layout shift), shown once it's live. */
+	.km-search,
+	.km-tools {
+		transition: opacity var(--duration-normal) var(--ease-smooth);
+	}
+	.km-figure:not([data-km-state='live']) .km-search,
+	.km-figure:not([data-km-state='live']) .km-tools {
+		visibility: hidden;
+		opacity: 0;
+	}
+	.km-search {
+		position: relative;
+		z-index: 8;
+	}
+	.km-search input {
+		width: 15.5rem;
+		height: 38px;
+		padding: 0 0.9rem 0 2.15rem;
+		font: 400 0.84rem var(--font-sans);
+		color: var(--km-ink);
+		background: var(--km-surface);
+		border: 1px solid var(--km-rule-2);
+		border-radius: 999px;
+		transition: border-color var(--duration-normal) var(--ease-smooth), box-shadow var(--duration-normal) var(--ease-smooth);
+	}
+	.km-search input:hover {
+		border-color: var(--km-acc);
+		box-shadow: var(--shadow-md);
+	}
+	.km-search input:focus-visible {
+		outline: 2px solid var(--km-focus);
+		outline-offset: 2px;
+	}
+	.km-search input::placeholder {
+		color: var(--km-muted);
+	}
+	.km-search > svg {
+		position: absolute;
+		left: 12px;
+		top: 50%;
+		translate: 0 -50%;
+		width: 14px;
+		height: 14px;
+		color: var(--km-muted);
+		pointer-events: none;
+	}
+	.km-search kbd {
+		position: absolute;
+		right: 11px;
+		top: 50%;
+		translate: 0 -50%;
+		font: 500 0.66rem var(--font-mono);
+		color: var(--km-muted);
+		border: 1px solid var(--km-rule-2);
+		border-radius: 4px;
+		padding: 1px 5px;
+		pointer-events: none;
+	}
+	.km-search input:focus ~ kbd,
+	.km-search input:not(:placeholder-shown) ~ kbd {
+		display: none;
+	}
+	.km-results {
+		position: absolute;
+		top: calc(100% + 6px);
+		right: 0;
+		width: min(26rem, calc(100vw - 32px));
+		max-height: 22rem;
+		overflow: auto;
+		margin: 0;
+		padding: 4px;
+		list-style: none;
+		background: var(--km-surface);
+		border: 1px solid var(--km-rule-2);
+		border-radius: var(--radius-md);
+		box-shadow: var(--shadow-lg);
+		/* more results below: a soft fade on the last row, not a hard slice */
+		mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+		transition: opacity 0.18s var(--ease-smooth), visibility 0s;
+	}
+	.km-results:not(:global(.overflows)),
+	.km-results:global(.at-end) {
+		mask-image: none;
+	}
+	/* stays mounted over the canvas; hidden by visibility, not display */
+	.km-results[hidden] {
+		display: block;
+		visibility: hidden;
+		opacity: 0;
+		pointer-events: none;
+		transition: opacity 0.18s var(--ease-smooth), visibility 0s 0.18s;
+	}
+	.km-results :global(li) {
+		display: grid;
+		grid-template-columns: 14px 1fr auto;
+		gap: 10px;
+		align-items: center;
+		padding: 8px 10px;
+		border-radius: var(--radius-sm);
+		cursor: pointer;
+		font-size: 0.86rem;
+		line-height: 1.3;
+		color: var(--km-ink);
+	}
+	.km-results :global(li[aria-selected='true']) {
+		background: oklch(from var(--km-acc) l c h / 0.1);
+	}
+	.km-results :global(li small) {
+		font: 500 0.6rem var(--font-mono);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+	}
+	.km-page .km-results :global(.g) {
+		width: 9px;
+		height: 9px;
+		justify-self: center;
+	}
+	.km-tools {
+		display: flex;
+		gap: 5px;
+	}
+	.km-tools button {
+		display: grid;
+		place-items: center;
+		width: 36px;
+		height: 36px;
+		padding: 0;
+		color: var(--km-ink);
+		background: var(--km-surface);
+		border: 1px solid var(--km-rule-2);
+		border-radius: 50%;
+		cursor: pointer;
+		transition: transform var(--duration-normal) var(--ease-spring), box-shadow var(--duration-normal) var(--ease-smooth), border-color var(--duration-normal) var(--ease-smooth);
+	}
+	.km-tools button:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md);
+		border-color: var(--km-acc);
+	}
+	.km-tools button:active {
+		transform: scale(0.94);
+	}
+	.km-tools button:focus-visible {
+		outline: 2px solid var(--km-focus);
+		outline-offset: 2px;
+	}
+	.km-tools svg {
+		width: 14px;
+		height: 14px;
+	}
+	.km-tools .i-exit,
+	.is-fullscreen .km-tools .i-enter {
+		display: none;
+	}
+	.is-fullscreen .km-tools .i-exit {
+		display: block;
+	}
+
+	/* ---------------------------------------------------------------- the plate */
+	.km-plate {
+		position: relative;
+		height: clamp(460px, calc(100svh - var(--km-header) - var(--km-intro) - var(--km-bar) - var(--km-gutter)), 1800px);
+		/* never taller than a landscape plate needs: the overview is wide, so extra height is just empty paper */
+		max-height: max(460px, calc(min(100vw - 2 * var(--km-gutter), 1440px) / 1.7));
+		/* clip, not hidden: a hidden box can still be scrolled by focus(), which would slide the
+		   canvas and the labels apart. The engine also pins scrollTop/Left at 0 as a fallback. */
+		overflow: hidden;
+		overflow: clip;
+		border: 1px solid var(--km-rule);
+		border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+		background: var(--km-paper);
+		container-type: size;
+		container-name: plate;
+		touch-action: pan-y;
+		user-select: none;
+		-webkit-user-select: none;
+		isolation: isolate;
+		/* fit-to-plate scale, px per world unit; the JS camera uses the same rule */
+		--kk: min(calc(100cqw / var(--bw)), calc(100cqh / var(--bh)));
+		--cx: var(--bcx);
+		--cy: var(--bcy);
+		--w: var(--ww);
+	}
+	.km-plate:global(.km-free) {
+		touch-action: none;
+	}
+	.km-plate:global(.grabbing) {
+		cursor: grabbing;
+	}
+	.km-plate canvas {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		display: block;
+		opacity: 0;
+		transition: opacity 0.45s var(--ease-smooth);
+		/* its own compositor layer, so overlays coming and going never leave stale tiles on it */
+		will-change: transform;
+	}
+	.km-plate:global(.gpu-ready) canvas {
+		opacity: 1;
+	}
+	.km-poster img {
+		position: absolute;
+		left: calc(50% - var(--cx) * var(--kk));
+		top: calc(50% - var(--cy) * var(--kk));
+		width: calc(var(--w) * var(--kk));
+		max-width: none;
+		height: auto;
+		pointer-events: none;
+		transition: opacity 0.45s var(--ease-smooth);
+	}
+	.km-plate:global(.gpu-ready) .km-poster img {
+		opacity: 0;
+	}
+	.km-plate :global(.km-hl) {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		pointer-events: none;
+		fill: none;
+	}
+	.km-plate :global(.km-hl path) {
+		stroke: var(--km-acc);
+		stroke-width: 2;
+		vector-effect: non-scaling-stroke;
+	}
+	.km-plate :global(.km-hl .h-uses),
+	.km-plate :global(.km-hl .h-uses-m) {
+		stroke: var(--km-warm);
+	}
+	.km-plate :global(.km-hl .h-links) {
+		stroke: var(--km-ink);
+	}
+	.km-plate :global(.km-hl .h-term),
+	.km-plate :global(.km-hl .h-term2) {
+		stroke: var(--km-term);
+		stroke-width: 1;
+	}
+	.km-plate :global(.km-hl .h-ring) {
+		stroke: var(--km-acc);
+		stroke-width: 1.5;
+		vector-effect: non-scaling-stroke;
+	}
+
+	.km-skip {
+		position: absolute;
+		z-index: 9;
+		top: 10px;
+		left: 42px;
+		padding: 0.45rem 0.8rem;
+		font: 500 0.74rem var(--font-mono);
+		color: var(--km-ink);
+		background: var(--km-surface);
+		border: 1px solid var(--km-rule-2);
+		border-radius: var(--radius-sm);
+		box-shadow: var(--shadow-md);
+		text-decoration: none;
+		transform: translateY(-160%);
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+	.km-skip:focus {
+		transform: none;
+	}
+
+	/* ---------------------------------------------------------------- labels: real links over the terrain */
+	.km-labels {
+		position: absolute;
+		inset: 0;
+		z-index: 2;
+		overflow: clip;
+		pointer-events: none;
+	}
+	.nd,
+	.mk {
+		position: absolute;
+		left: calc(50% + (var(--x) - var(--cx)) * var(--kk));
+		top: calc(50% + (var(--y) - var(--cy)) * var(--kk));
+		width: 0;
+		height: 0;
+	}
+	.km-plate:global(.is-live) .nd,
+	.km-plate:global(.is-live) .mk {
+		left: 0;
+		top: 0;
+		will-change: transform;
+	}
+	.nd {
+		color: var(--km-ink);
+		text-decoration: none;
+		pointer-events: auto;
+	}
+	button.nd {
+		background: none;
+		border: 0;
+		padding: 0;
+		font: inherit;
+		cursor: pointer;
+	}
+	.nd .lbl,
+	.mk .lbl {
+		position: absolute;
+		display: block;
+		width: max-content;
+		line-height: 1.15;
+		text-shadow:
+			0 0 2px var(--km-paper),
+			0 0 2px var(--km-paper),
+			0 0 4px var(--km-paper),
+			0 0 8px var(--km-paper),
+			0 0 14px var(--km-paper);
+		transition: opacity 0.22s var(--ease-smooth), color 0.2s var(--ease-smooth), scale 0.3s var(--ease-spring);
+	}
+	.nd .lbl {
+		cursor: pointer;
+	}
+	.nd:focus-visible {
+		outline: none;
+	}
+	.nd:focus-visible .lbl {
+		outline: 2px solid var(--km-focus);
+		outline-offset: 3px;
+		border-radius: 3px;
+	}
+	.nd:global(.off) .lbl,
+	.mk:global(.off) .lbl {
+		opacity: 0;
+		visibility: hidden;
+		transition: opacity 0.18s, visibility 0s 0.18s;
+	}
+	.eb {
+		display: block;
+		margin-bottom: 3px;
+		font: 500 0.6rem/1.2 var(--font-mono);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+	}
+
+	.t-post .lbl {
+		/* --nx: the engine's edge nudge, so a title near the plate edge slides instead of hiding */
+		left: var(--nx, 0px);
+		max-width: 13.5rem;
+		text-align: center;
+		translate: -50% calc(-100% - 13px);
+	}
+	.t-post.r-b .lbl {
+		translate: -50% 13px;
+	}
+	/* the other side of the dot, when the default side collides (engine: .flip; no-JS poster: build-time sw-/st- classes) */
+	.t-post:global(.flip) .lbl {
+		translate: -50% 13px;
+	}
+	.t-post.r-b:global(.flip) .lbl {
+		translate: -50% calc(-100% - 13px);
+	}
+	.t-post .nm {
+		display: block;
+		font-family: var(--font-serif);
+		font-size: 1.02rem;
+		font-weight: 560;
+		line-height: 1.14;
+		letter-spacing: -0.008em;
+		text-wrap: balance;
+	}
+	.t-module .lbl {
+		translate: -50% calc(-100% - 11px);
+		text-align: center;
+		max-width: 9.5rem;
+	}
+	.t-module.r-b .lbl {
+		translate: -50% 11px;
+	}
+	.t-module:global(.flip) .lbl {
+		translate: -50% 11px;
+	}
+	.t-module.r-b:global(.flip) .lbl {
+		translate: -50% calc(-100% - 11px);
+	}
+	@media (min-aspect-ratio: 8001/10000) {
+		.km-static .sw-off {
+			display: none;
+		}
+		.km-static .t-post.sw-flip .lbl {
+			translate: -50% 13px;
+		}
+		.km-static .t-post.r-b.sw-flip .lbl {
+			translate: -50% calc(-100% - 13px);
+		}
+		.km-static .t-module.sw-flip .lbl {
+			translate: -50% 11px;
+		}
+		.km-static .t-module.r-b.sw-flip .lbl {
+			translate: -50% calc(-100% - 11px);
+		}
+	}
+	/* beside the ring, when both sides are taken */
+	.nd.t-module:global(.side) .lbl {
+		translate: 9px -50%;
+		text-align: left;
+	}
+	.t-module .num {
+		font: 600 0.66rem/1 var(--font-mono);
+		letter-spacing: 0.06em;
+		color: var(--km-acc);
+	}
+	.t-module .nm {
+		display: block;
+		margin-top: 2px;
+		font: 500 0.8rem/1.15 var(--font-sans);
+		text-wrap: balance;
+	}
+	.tier-0 .t-module .nm {
+		display: none;
+	}
+	.t-lab .lbl {
+		translate: 9px -50%;
+		font: 500 0.7rem/1 var(--font-mono);
+		color: var(--km-warm);
+		letter-spacing: 0.01em;
+	}
+	.t-term .lbl {
+		translate: 7px -50%;
+		max-width: 11rem;
+		font: italic 400 0.76rem/1.1 var(--font-serif);
+		color: var(--km-muted);
+	}
+	.t-tag .lbl {
+		translate: -50% -50%;
+		padding: 6px 4px;
+		font: 500 0.64rem/1 var(--font-mono);
+		letter-spacing: 0.04em;
+		color: var(--km-muted);
+	}
+	.mk-phase .lbl {
+		translate: -50% -50%;
+		text-align: center;
+	}
+	.mk-phase .eb {
+		margin: 0;
+		color: var(--km-acc);
+	}
+	.mk-phase .pn {
+		display: block;
+		max-width: 10rem;
+		font: italic 400 0.8rem/1.15 var(--font-serif);
+		color: var(--km-acc);
+		text-wrap: balance;
+	}
+	.tier-0 .mk-phase .pn {
+		display: none;
+	}
+	.mk-cat .lbl {
+		translate: -50% 0;
+		white-space: nowrap;
+		font: 500 0.62rem/1 var(--font-mono);
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--km-warm);
+	}
+	.mk-cat .short {
+		display: none;
+	}
+	/* Before the engine runs (and without JS) only what stays legible at the home scale is drawn; the index lists the rest. */
+	.km-static .t-lab,
+	.km-static .t-term,
+	.km-static .t-tag {
+		display: none;
+	}
+
+	/* labels follow the GPU state on hover / selection */
+	.km-labels:global(.has-focus) .nd:not(:global(.hot)):not(:global(.sel)) .lbl {
+		opacity: 0.3;
+	}
+	.km-labels:global(.has-focus) .nd:global(.off) .lbl {
+		opacity: 0;
+	}
+	.nd:global(.sel) .lbl {
+		scale: 1.06;
+	}
+	.t-post:global(.sel) .nm {
+		color: var(--km-acc);
+	}
+	.km-labels:global(.diving) .nd:not(:global(.sel)) .lbl,
+	.km-labels:global(.diving) .mk .lbl {
+		opacity: 0 !important;
+		transition: opacity 0.25s;
+	}
+	.km-labels:global(.diving) .nd:global(.sel) .lbl {
+		scale: 1.25;
+	}
+
+	/* labels settle in with the plate (fail-open: an animation always finishes visible) */
+	@media (prefers-reduced-motion: no-preference) {
+		.nd .lbl,
+		.mk .lbl {
+			animation: km-label-in 0.7s var(--ease-smooth) both;
+			animation-delay: 0.35s;
+		}
+		.t-module .lbl,
+		.mk-phase .lbl {
+			animation-delay: 0.5s;
+		}
+		.mk-cat .lbl {
+			animation-delay: 0.62s;
+		}
+	}
+	@keyframes km-label-in {
+		from {
+			opacity: 0;
+		}
+	}
+
+	/* ---------------------------------------------------------------- gutter rulers */
+	.km-gutter {
+		position: absolute;
+		z-index: 3;
+		left: 0;
+		top: 0;
+		bottom: 0;
+		width: 30px;
+		pointer-events: none;
+		border-right: 1px solid var(--km-rule);
+		background: oklch(from var(--km-paper) l c h / 0.86);
+	}
+	.km-rg {
+		position: absolute;
+		left: 50%;
+		top: var(--gy, 50%);
+		writing-mode: vertical-rl;
+		rotate: 180deg;
+		translate: -50% -50%;
+		font: 600 0.6rem/1 var(--font-mono);
+		letter-spacing: 0.22em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+		white-space: nowrap;
+		transition: opacity 0.2s;
+	}
+	.km-rg[data-r='writing'] { --gy: 22%; }
+	.km-rg[data-r='course'] { --gy: 52%; color: var(--km-acc); }
+	.km-rg[data-r='lab'] { --gy: 84%; color: var(--km-warm); }
+	.km-rg:global(.out) {
+		opacity: 0;
+	}
+
+	.km-toast {
+		position: absolute;
+		z-index: 7;
+		left: 50%;
+		bottom: 14px;
+		translate: -50% 0;
+		margin: 0;
+		max-width: calc(100% - 60px);
+		padding: 9px 14px;
+		font: 500 0.7rem/1.35 var(--font-mono);
+		letter-spacing: 0.03em;
+		text-align: center;
+		color: var(--km-ink);
+		background: var(--km-surface);
+		border: 1px solid var(--km-rule-2);
+		border-radius: 999px;
+		box-shadow: var(--shadow-md);
+		pointer-events: none;
+		transition: opacity 0.25s, translate 0.35s var(--ease-smooth);
+	}
+	/* stays mounted (no display toggle over the canvas): it fades instead */
+	.km-toast:empty {
+		visibility: hidden;
+		opacity: 0;
+		translate: -50% 6px;
+		transition: opacity 0.2s, translate 0.3s var(--ease-smooth), visibility 0s 0.2s;
+	}
+
+	/* ---------------------------------------------------------------- info card */
+	.km-card {
+		position: absolute;
+		z-index: 6;
+		top: 12px;
+		right: 12px;
+		width: min(23rem, calc(100% - 60px));
+		max-height: calc(100% - 24px);
+		/* Not a scroller itself: only the body scrolls, the action row stays put.
+		   (A full-card scroller over the WebGL canvas made Chromium drop the canvas on narrow plates.) */
+		display: flex;
+		flex-direction: column;
+		overflow: clip;
+		background: var(--km-surface);
+		border: 1px solid var(--km-rule-2);
+		border-radius: var(--radius-lg);
+		box-shadow: var(--shadow-lg);
+		transition: opacity 0.22s var(--ease-smooth), translate 0.35s var(--ease-spring);
+	}
+	.km-card :global(.km-scroll) {
+		flex: 1 1 auto;
+		min-height: 0;
+		overflow: auto;
+		overscroll-behavior: contain;
+		padding: 16px 18px 4px;
+	}
+	/* a cut-off chip row reads as "more below", not as a broken edge */
+	.km-card :global(.km-scroll.overflows:not(.at-end)) {
+		mask-image: linear-gradient(to bottom, #000 calc(100% - 34px), transparent);
+	}
+	.km-card[hidden] {
+		display: flex;
+		visibility: hidden;
+		opacity: 0;
+		translate: 0 6px;
+		pointer-events: none;
+	}
+	.km-card:focus-visible {
+		outline: 2px solid var(--km-focus);
+		outline-offset: 2px;
+	}
+	.km-card :global(.eyebrow) {
+		margin: 0 0 0.4rem;
+		font: 500 0.64rem/1.7 var(--font-mono);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+	}
+	.km-card :global(.eyebrow span + span::before) {
+		content: '·';
+		margin: 0 0.45rem;
+	}
+	.km-card :global(.eyebrow .k) {
+		color: var(--km-acc);
+		font-weight: 600;
+	}
+	.km-card[data-type='lab'] :global(.eyebrow .k) {
+		color: var(--km-warm);
+	}
+	.km-card[data-type='post'] :global(.eyebrow .k) {
+		color: var(--km-ink);
+	}
+	.km-card :global(h2) {
+		margin: 0 0 0.5rem;
+		font-size: 1.24rem;
+		font-weight: 560;
+		line-height: 1.16;
+		letter-spacing: -0.01em;
+		text-wrap: balance;
+		outline: none;
+	}
+	.km-card :global(h2:focus-visible) {
+		text-decoration: underline;
+		text-decoration-color: var(--km-acc);
+		text-underline-offset: 4px;
+	}
+	.km-card :global(.desc) {
+		margin: 0 0 0.85rem;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--km-reading);
+		text-wrap: pretty;
+	}
+	.km-card :global(.grades) {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px;
+		margin: -0.2rem 0 0.85rem;
+	}
+	.km-card :global(.gr) {
+		padding: 3px 6px;
+		font: 600 0.6rem/1 var(--font-mono);
+		color: var(--grade-ink);
+		border-radius: 4px;
+	}
+	.km-card :global(.gr-a) { background: var(--grade-a); }
+	.km-card :global(.gr-b) { background: var(--grade-b); }
+	.km-card :global(.gr-c) { background: var(--grade-c); }
+	.km-card :global(.gr-d) { background: var(--grade-d); }
+	.km-card :global(.gr-n) {
+		margin-left: 4px;
+		font: 500 0.6rem/1 var(--font-mono);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+	}
+	.km-card :global(.nb-h) {
+		margin: 0 0 0.45rem;
+		font: 500 0.6rem/1 var(--font-mono);
+		letter-spacing: 0.14em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+	}
+	.km-card :global(.nbs) {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 5px;
+		margin: 0 0 0.9rem;
+	}
+	.km-card :global(.nbs button) {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-height: 28px;
+		padding: 5px 9px 5px 8px;
+		font: 500 0.72rem/1.1 var(--font-sans);
+		text-align: left;
+		color: var(--km-ink);
+		background: var(--km-paper);
+		border: 1px solid var(--km-rule);
+		border-radius: 999px;
+		cursor: pointer;
+		transition: border-color var(--duration-normal) var(--ease-smooth), transform var(--duration-normal) var(--ease-spring), box-shadow var(--duration-normal) var(--ease-smooth);
+	}
+	.km-card :global(.nbs button:hover) {
+		border-color: var(--km-acc);
+		transform: translateY(-1px);
+		box-shadow: var(--shadow-md);
+	}
+	.km-page .km-card :global(.nbs .g) {
+		width: 7px;
+		height: 7px;
+	}
+	.km-page .km-card :global(.nbs .g-lab) {
+		width: 6px;
+		height: 6px;
+	}
+	.km-card :global(.act) {
+		flex: none;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.55rem 18px 0.65rem;
+		background: var(--km-surface);
+		border-top: 1px solid var(--km-rule);
+	}
+	.km-card :global(.go) {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		min-height: 34px;
+		font: 600 0.74rem var(--font-mono);
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		text-decoration: none;
+		color: var(--km-acc);
+	}
+	.km-card :global(.go span) {
+		transition: translate var(--duration-normal) var(--ease-spring);
+	}
+	.km-card :global(.go:hover span) {
+		translate: 4px 0;
+	}
+	.km-card :global(.close) {
+		min-height: 34px;
+		padding: 0 4px;
+		font: 500 0.66rem var(--font-mono);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+		background: none;
+		border: 0;
+		cursor: pointer;
+	}
+	.km-card :global(.close:hover) {
+		color: var(--km-ink);
+	}
+
+	/* ---------------------------------------------------------------- full screen */
+	.km-figure:global(.is-fullscreen) {
+		display: flex;
+		flex-direction: column;
+		margin: 0;
+		padding: 12px;
+		height: 100vh;
+		height: 100dvh;
+		background: var(--km-paper);
+	}
+	.km-figure:global(.km-fs) {
+		position: fixed;
+		inset: 0;
+		z-index: 1000;
+		animation: none;
+	}
+	:global(html.km-fs-lock) {
+		overflow: hidden;
+	}
+	.km-figure:global(.is-fullscreen) .km-plate {
+		flex: 1;
+		height: auto;
+		max-height: none;
+	}
+	.km-figure:global(.is-fullscreen) .km-bar {
+		flex: none;
+	}
+
+	/* ================================================================ index: the same map, as a list (also the no-JS path) */
+	.km-index {
+		/* the site container's content box (the header's nav), so the list lines up under the logo */
+		margin: clamp(48px, 7vw, 96px) max(1.5rem, (100% - var(--full-width)) / 2 + 1.5rem) 0;
+		padding-top: clamp(32px, 4vw, 56px);
+		border-top: 1px solid var(--km-rule);
+		scroll-margin-top: 5rem;
+	}
+	.km-index:focus {
+		outline: none;
+	}
+	.km-index-head {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+		gap: 1rem 3rem;
+		align-items: end;
+		margin-bottom: 2.5rem;
+	}
+	.km-index-head h2 {
+		margin: 0;
+		font-size: clamp(1.7rem, 3vw, 2.5rem);
+		line-height: 1.06;
+		letter-spacing: -0.02em;
+		text-wrap: balance;
+	}
+	.km-index-body {
+		margin: 0;
+		max-width: 58ch;
+		font-size: 1rem;
+		line-height: 1.65;
+		color: var(--km-reading);
+	}
+	.km-cols {
+		display: grid;
+		grid-template-columns: 1.2fr 1fr 1fr;
+		gap: 2.75rem;
+	}
+	.km-col h3 {
+		display: flex;
+		align-items: center;
+		gap: 0.6rem;
+		margin: 0 0 0.6rem;
+		padding-bottom: 0.7rem;
+		font: 600 0.7rem var(--font-mono);
+		letter-spacing: 0.16em;
+		text-transform: uppercase;
+		color: var(--km-ink);
+		border-bottom: 1px solid var(--km-ink);
+	}
+	.km-col h3 .n {
+		margin-left: auto;
+		font-weight: 500;
+		color: var(--km-muted);
+	}
+	.km-col h4 {
+		margin: 1.2rem 0 0.3rem;
+		font: 500 0.62rem/1.4 var(--font-mono);
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--km-muted);
+	}
+	.km-col ol,
+	.km-col ul {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+	}
+	.km-col li a {
+		display: grid;
+		grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+		gap: 0.6rem;
+		align-items: baseline;
+		padding: 0.62rem 0.25rem;
+		color: var(--km-ink);
+		text-decoration: none;
+		border-bottom: 1px solid var(--km-rule);
+		transition: color var(--duration-fast) var(--ease-smooth), transform var(--duration-normal) var(--ease-spring), background var(--duration-normal) var(--ease-smooth);
+	}
+	.km-col li a:hover {
+		color: var(--km-acc);
+		transform: translateX(4px);
+		background: oklch(from var(--km-acc) l c h / 0.045);
+	}
+	.km-col .i {
+		font: 500 0.66rem var(--font-mono);
+		color: var(--km-muted);
+	}
+	.km-col .t {
+		font-size: 0.93rem;
+		line-height: 1.32;
+	}
+	.km-col.writing .t {
+		font-family: var(--font-serif);
+		font-size: 1.04rem;
+		font-weight: 520;
+	}
+	.km-col .m {
+		font: 500 0.64rem var(--font-mono);
+		color: var(--km-muted);
+		white-space: nowrap;
+	}
+	.km-col.lab li a {
+		grid-template-columns: minmax(0, 1fr) auto;
+		padding: 0.46rem 0.25rem;
+	}
+	.km-col.lab .t {
+		font-family: var(--font-mono);
+		font-size: 0.8rem;
+	}
+	.km-more {
+		margin: 1.1rem 0 0;
+	}
+	.km-more a {
+		font: 600 0.7rem var(--font-mono);
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		text-decoration: none;
+		color: var(--km-acc);
+	}
+	.km-more a span {
+		display: inline-block;
+		transition: translate var(--duration-normal) var(--ease-spring);
+	}
+	.km-more a:hover span {
+		translate: 4px 0;
+	}
+	.km-reveal:global(.armed) {
+		opacity: 0;
+		transform: translateY(24px);
+		transition: opacity 0.7s var(--ease-smooth), transform 0.7s var(--ease-smooth);
+	}
+	.km-reveal:global(.armed.visible) {
+		opacity: 1;
+		transform: none;
+	}
+	.km-col.course:global(.armed) { transition-delay: 0.08s; }
+	.km-col.lab:global(.armed) { transition-delay: 0.16s; }
+
+	/* ================================================================ responsive */
+	@media (max-width: 1240px) {
+		.km-intro {
+			grid-template-columns: 1fr;
+		}
+		.km-page {
+			--km-intro: 18rem;
+		}
+		.km-legend {
+			justify-content: start;
+		}
+		.km-caption .cap {
+			display: none;
+		}
+	}
+	/* Portrait plates (phones, tablets upright): the tall layout, sized to explore rather than to fit the first screen. */
+	@media (max-aspect-ratio: 80/100) {
+		.km-plate {
+			height: clamp(440px, 80svh, 860px);
+			max-height: none;
+			--kk: min(calc(100cqw / var(--tbw)), calc(100cqh / var(--tbh)));
+			--cx: var(--tbcx);
+			--cy: var(--tbcy);
+			--w: var(--tww);
+		}
+		.nd,
+		.mk {
+			left: calc(50% + (var(--px) - var(--cx)) * var(--kk));
+			top: calc(50% + (var(--py) - var(--cy)) * var(--kk));
+		}
+		/* portrait: two columns of essays, each title beside its dot (the other side when that collides) */
+		.t-post .lbl,
+		.t-post.r-b .lbl {
+			left: 0;
+			translate: 11px -50%;
+			text-align: left;
+		}
+		.t-post:global(.flip) .lbl,
+		.t-post.r-b:global(.flip) .lbl,
+		.km-static .t-post.st-flip .lbl {
+			translate: calc(-100% - 11px) -50%;
+			text-align: right;
+		}
+		.t-module.r-b .lbl {
+			translate: -50% calc(-100% - 11px);
+		}
+		.t-module:global(.flip) .lbl,
+		.t-module.r-b:global(.flip) .lbl,
+		.km-static .t-module.st-flip .lbl {
+			translate: -50% 11px;
+		}
+		.km-static .st-off {
+			display: none;
+		}
+		/* phones: lighter labels so all eight essays and every shelf read at the overview */
+		.t-post .lbl {
+			max-width: 8.1rem;
+		}
+		.t-post .nm {
+			font-size: 0.8rem;
+		}
+		.tier-0 .t-post .eb,
+		.tier-0 .mk-phase {
+			display: none;
+		}
+		/* shelves: a one-word name hung below the diamonds, count glued to it */
+		.mk-cat .lbl {
+			font-size: 0.56rem;
+			letter-spacing: 0.1em;
+		}
+		.mk-cat .full {
+			display: none;
+		}
+		.mk-cat .short {
+			display: inline;
+		}
+		.km-toast {
+			top: 12px;
+			bottom: auto;
+		}
+	}
+	@media (max-width: 760px) {
+		.km-page {
+			--km-gutter: 16px;
+		}
+		/* phones: a compact intro, so the terrain starts inside the first screen */
+		.km-intro {
+			min-height: 0;
+			gap: 0.55rem;
+			padding-top: 1.1rem;
+			padding-bottom: 0.9rem;
+		}
+		.km-intro h1 {
+			white-space: normal;
+			font-size: clamp(1.45rem, 6.4vw, 1.85rem);
+			line-height: 1.1;
+			text-wrap: balance;
+		}
+		.km-lede {
+			font-size: 0.88rem;
+			line-height: 1.5;
+			display: block;
+			overflow: visible;
+		}
+		.km-lede .long {
+			display: none;
+		}
+		.km-lede .short {
+			display: inline;
+		}
+		.km-legend {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 0.6rem 1rem;
+			padding-top: 0.7rem;
+		}
+		/* one row: what you can visit; the glossary and the connections are in the index below */
+		.f-term,
+		.f-edge {
+			display: none;
+		}
+		.km-fact dt {
+			font-size: 0.56rem;
+			letter-spacing: 0.06em;
+			white-space: normal;
+		}
+		.km-fact dd {
+			font-size: 1.3rem;
+		}
+		.km-figure {
+			width: 100%;
+		}
+		.km-bar {
+			padding: 0 10px 0 12px;
+			border-inline: 0;
+			border-radius: 0;
+		}
+		.km-caption {
+			display: none;
+		}
+		.km-search {
+			flex: 1;
+		}
+		.km-search input {
+			width: 100%;
+		}
+		.km-search kbd {
+			display: none;
+		}
+		.km-plate {
+			border-inline: 0;
+			border-radius: 0;
+		}
+		.km-card {
+			top: auto;
+			left: 8px;
+			right: 8px;
+			bottom: 8px;
+			width: auto;
+			max-height: 58%;
+		}
+		.t-post .lbl {
+			max-width: 8.1rem;
+		}
+		.t-post .nm {
+			font-size: 0.8rem;
+		}
+		.km-skip {
+			left: 40px;
+		}
+		.km-cols {
+			grid-template-columns: 1fr;
+			gap: 2.4rem;
+		}
+		.km-index-head {
+			grid-template-columns: 1fr;
+		}
+	}
+	@media (pointer: coarse) {
+		.km-search kbd {
+			display: none;
+		}
+	}
+</style>

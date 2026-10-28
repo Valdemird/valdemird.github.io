@@ -1,8 +1,10 @@
 ---
 title: "Git worktrees: cómo corrí tres agentes de Claude en paralelo"
-description: "Tres agentes de Claude sobre tres bugs en una sola tarde, y solo porque cada uno corría en su propio git worktree. La disciplina de aislamiento que vuelve seguros a los agentes en paralelo, y el error que me la enseñó."
+description: "Cómo corrí tres agentes de Claude Code sobre tres bugs en una tarde: un git worktree por agente, dónde ponerlo y lo que el aislamiento no cubre."
 pubDate: 2026-05-13
-tags: ["ai-tools", "developer-workflow", "git", "claude-code"]
+updatedDate: 2026-10-27
+status: "Actualizado para los worktrees nativos de Claude Code"
+tags: ["herramientas-ia", "agentes-ia", "claude-code", "git", "flujo-de-trabajo"]
 featured: true
 lang: es
 ---
@@ -17,6 +19,8 @@ import GitGraph from '../../../components/blog/GitGraph.astro';
 import AgentLoop from '../../../components/blog/AgentLoop.astro';
 import StepThroughDiagram from '../../../components/blog/StepThroughDiagram.astro';
 import DecisionTree from '../../../components/blog/DecisionTree.astro';
+import CopyableCommand from '../../../components/blog/CopyableCommand.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
 
 <TLDR lang="es" bullets={[
   "Este sábado corrí tres agentes de Claude en paralelo sobre un side project. Tres bugs, tres ramas, tres PRs mergeados en una tarde.",
@@ -33,9 +37,9 @@ Un worktree de git no es un truco de productividad para humanos. Es un límite d
 
 ## Por qué dos agentes en un repo chocan
 
-Empecé por impaciencia, no por sofisticación. Le pedía a Claude algo (un refactor multi-archivo, una pasada de hardening en fases, cualquier cosa que tomara más de unos minutos) y me quedaba mirando cómo las tool calls subían por la pantalla. Después de un rato empecé a preguntarme si no podía abrir otra terminal y arrancar la siguiente tarea en paralelo. Dos Claudes, dos tareas, un yo.
+Empecé por pura impaciencia. Le pedía a Claude algo (un refactor multi-archivo, una pasada de hardening en fases, cualquier cosa que tomara más de unos minutos) y me quedaba mirando cómo las tool calls subían por la pantalla. Después de un rato empecé a preguntarme si no podía abrir otra terminal y arrancar la siguiente tarea en paralelo. Dos Claudes, dos tareas y yo solo en el medio.
 
-Hacerlo así, sin más, es peligroso. Si las dos sesiones comparten el mismo working tree, la segunda está editando archivos sobre los que la primera todavía no terminó de razonar. O peor, la segunda hace stash de los cambios de la primera porque git mira el index y ve trabajo sin commitear. El costo no es teórico. El costo es tu tarde.
+Hacerlo así, sin más, es peligroso. Si las dos sesiones comparten el mismo working tree, la segunda está editando archivos sobre los que la primera todavía no terminó de razonar. O peor, la segunda hace stash de los cambios de la primera porque git mira el index y ve trabajo sin commitear.
 
 Los worktrees son la forma de volver ese mismo impulso seguro. Cada agente tiene su propio checkout, su propia rama, su propio directorio. No pueden ver los archivos en vuelo de los otros. Dos terminales, dos árboles, cero colisiones.
 
@@ -43,14 +47,14 @@ Esa es la teoría limpia. La realidad arranca conmigo rompiéndola.
 
 ## La primera vez que se rompió
 
-La primera vez que le pedí a Claude que creara un worktree, lo creó adentro del repo en el que estaba trabajando. No como directorio hermano, no en algún lugar seguro: adentro del árbol de archivos que Next.js estaba vigilando.
+La primera vez que le pedí a Claude que creara un worktree, lo creó adentro del repo en el que estaba trabajando, justo en el árbol de archivos que Next.js estaba vigilando.
 
 No me di cuenta enseguida. Lo que noté fue que `next dev` empezó a compilar y no paraba. El spinner avanzaba, terminaba, arrancaba de nuevo. Avanzaba, terminaba, arrancaba. No podía cargar la app. No sabía si mi código estaba roto, si el dev server estaba roto, o si mi computadora estaba en llamas.
 
-Lo que estaba pasando, una vez que caí, era casi cómicamente simple. Next.js vigilaba el repo completo para detectar cambios. El worktree que Claude había creado contenía una copia literal de los archivos fuente del repo, metida adentro del directorio vigilado. Cada vez que Next.js terminaba una compilación, los file watchers veían archivos "nuevos" en el worktree (mismo contenido, paths distintos), arrancaban otra compilación, la terminaban, volvían a ver los archivos del worktree, y el loop no terminaba nunca. El repo se estaba vigilando a sí mismo.
+Lo que estaba pasando, una vez que caí, era casi cómicamente simple. Next.js vigilaba el repo para detectar cambios. El worktree que Claude había creado contenía una copia literal de los archivos fuente del repo, metida adentro del directorio vigilado. Cada vez que Next.js terminaba una compilación, los file watchers veían archivos "nuevos" en el worktree (mismo contenido, paths distintos), arrancaban otra compilación, la terminaban, volvían a ver los archivos del worktree, y el loop no terminaba nunca. El repo se estaba vigilando a sí mismo.
 
 <StepThroughDiagram steps={[
-  { id: "watch", label: "next dev vigila cada archivo bajo la raíz del repo para detectar cambios." },
+  { id: "watch", label: "next dev vigila el árbol del proyecto para detectar cambios." },
   { id: "worktree", label: "El agente crea el worktree adentro del repo: una copia completa de los archivos fuente, dentro del árbol vigilado." },
   { id: "detect", label: "Una compilación termina. El watcher ve los archivos del worktree como nuevos y arranca otra compilación." },
   { id: "loop", label: "Esa compilación termina, el watcher vuelve a mirar, ve los mismos archivos otra vez. El repo se vigila a sí mismo." },
@@ -82,7 +86,7 @@ Lo que estaba pasando, una vez que caí, era casi cómicamente simple. Next.js v
   </svg>
 </StepThroughDiagram>
 
-Copié el stream de errores a una sesión nueva de Claude y Claude lo diagnosticó. La misma herramienta que me había metido en el pozo me ayudó a salir. Esa parte no voy a fingir que fue elegante.
+Copié el stream de errores a una sesión nueva de Claude y Claude lo diagnosticó. La misma herramienta que me había metido en el pozo me ayudó a salir. Esa parte no voy a fingir que fue elegante. El diagrama es el loop tal como Claude y yo lo armamos a partir de ese stream de errores, y simplifica la forma en que Next.js vigila archivos de verdad.
 
 <Callout type="warning" title="Dónde pones el worktree importa">
 Si tu dev server usa file watchers (Next.js, Vite, Webpack, cualquier setup de HMR), el worktree tiene que vivir afuera del árbol vigilado. La opción más segura es un directorio hermano: `../worktree-name`, afuera del repo. Subdirectorios escondidos como `.claude/worktrees/` también pueden funcionar, pero tienes que configurar el watcher explícitamente para que los ignore. `.gitignore` por sí solo no alcanza: la mayoría de los watchers no lo leen. Adentro del source root vigilado y sin exclusión, te vas a quedar viendo cómo se recompila a sí mismo para siempre.
@@ -90,7 +94,15 @@ Si tu dev server usa file watchers (Next.js, Vite, Webpack, cualquier setup de H
 
 Después de eso cambié dos cosas. Primero, le dije a Claude en `CLAUDE.md` que pusiera todos los worktrees bajo `.claude/worktrees/<branch-name>` y nunca adentro del árbol fuente. Segundo, agregué esa ruta a `.gitignore` para que nada accidental terminara en un commit.
 
-Ese fue el costo de la lección. Todo lo que sigue pasó por eso.
+Todo lo que sigue pasó por culpa de ese loop.
+
+<Callout type="note" title="Actualización, oct. 2026">
+Cuando escribí esto, armaba los worktrees a punta de reglas en `CLAUDE.md`. Claude Code ya traía un flag para eso (`--worktree`, o `-w`, que llegó en la v2.1.49 en febrero de 2026), y usa la misma ruta que yo había elegido: el comando de abajo crea `.claude/worktrees/fix-db-pool/` en una rama nueva llamada `worktree-fix-db-pool`.
+
+<CopyableCommand command="claude --worktree fix-db-pool" />
+
+Un archivo `.worktreeinclude` en la raíz del repo copia a cada worktree nuevo los archivos ignorados por git, como el `.env`. Desde la v2.1.222 (agosto de 2026), cualquier tipo de sesión en un worktree rechaza las ediciones y los comandos de Bash que apuntan al checkout principal, incluido git redirigido hacia allá con `git -C` o `GIT_DIR`. Los detalles están en la [documentación de worktrees](https://code.claude.com/docs/en/worktrees). Nada de esto cambia lo que vigila el watcher de tu dev server, así que la advertencia de arriba sigue en pie.
+</Callout>
 
 ## El sábado
 
@@ -120,7 +132,7 @@ Tres árboles. Tres ramas. Tres agentes, cada uno editando solo su propio checko
 Al final de la tarde tenía tres PRs mergeados. A grandes rasgos:
 
 - Un reconnect de OAuth estaba redirigiendo antes de que terminara su bootstrap, así que el estado llegaba parcial. El fix movió el await.
-- Una conexión de DB con pool se agotaba bajo carga realista y tiraba `P2037`. El fix puso un tope al tamaño del pool por instancia.
+- Una conexión de DB con pool se agotaba bajo carga realista y tiraba `P2037`.<Sidenote>`P2037` es el error de Prisma para "Too many database connections opened", o sea, demasiadas conexiones abiertas a la base.</Sidenote> El fix puso un tope al tamaño del pool por instancia.
 - Un banner de UI obsoleto estaba disparando una navegación a una vista vacía. El fix hizo el bootstrap del estado correcto antes del redirect.
 
 Esta es la misma tarde contada como historia de git. Dale play, o avanza con las flechas operación por operación. Lo que hay que mirar es lo que no pasa: ningún carril toca a otro hasta los merges del final.
@@ -158,9 +170,9 @@ fb7b925 docs(storybook): note why @/lib/analytics is mocked
 ```
 </CodeBlock>
 
-Tres commits para un solo fix. El patrón es el mismo que escribí el mes pasado con CSS: el agente parchea la superficie visible y se detiene. Las superficies adyacentes (otros imports, otros temas, otros breakpoints) aparecen recién cuando corres la cosa en el ambiente donde falla. Los worktrees me dieron paralelismo. No me dieron una primera pasada más inteligente.
+Tres commits para un solo fix. El patrón es el mismo [que escribí el mes pasado con CSS](/blog/es/tests-gave-me-control/): el agente parchea la superficie visible y se detiene. Las superficies adyacentes (otros imports, otros temas, otros breakpoints) aparecen recién cuando corres la cosa en el ambiente donde falla. Los worktrees me dieron paralelismo. No me dieron una primera pasada más inteligente.
 
-Reproducida como un ciclo, la parte cara de esa sesión salta a la vista. Cada edición tomó minutos. Los pasos de observación — pushear, esperar el CI, leer el fallo nuevo — fueron la tarde entera:
+Reproducida como un [ciclo de agente](/es/learn/agentic-systems/agent-loop/), la parte cara de esa sesión salta a la vista. Cada edición tomó minutos. Los pasos de observación (pushear, esperar el CI, leer el fallo nuevo) fueron la tarde entera:
 
 <AgentLoop
   lang="es"
@@ -177,15 +189,15 @@ Reproducida como un ciclo, la parte cara de esa sesión salta a la vista. Cada e
   caption="Una reconstrucción de la sesión, no una transcripción. Los tokens son ilustrativos, en miles. Las proporciones no."
 />
 
-Actuar es barato. Observar es lo que llena la ventana de contexto, y una sesión que se la quema en dos vueltas de CI es una sesión que empieza a olvidar por qué hizo la primera edición. Ese es el precio real de una primera pasada que no camina el árbol de dependencias.
+Actuar es barato. Observar es lo que [llena la ventana de contexto](/es/learn/agentic-systems/context-engineering/), y una sesión que se la gasta en dos vueltas de CI es una sesión que empieza a olvidar por qué hizo la primera edición. Ese es el precio real de una primera pasada que no recorre el árbol de dependencias.
 
 <Callout type="tip" title="La regla barata que previene esto">
-Antes de declarar un fix de Storybook terminado, pídele al agente que enumere cada import que toca el componente de la story que cambió y confirme que cada uno está real-o-mockeado. La misma idea para cualquier setup de tests. La pregunta "qué otra cosa necesita transitivamente esto" cuesta cinco segundos; la alternativa son dos ciclos de CI por fix.
+Antes de declarar un fix de Storybook terminado, pídele al agente que enumere cada import que toca el componente de la story que cambió y confirme que cada uno sea real o esté mockeado. La misma idea para cualquier setup de tests. La pregunta "qué otra cosa necesita transitivamente esto" cuesta cinco segundos; la alternativa son dos ciclos de CI por fix.
 </Callout>
 
 ## Lo que terminé escribiendo
 
-Después de todo esto agregué tres líneas a mi `CLAUDE.md` para los proyectos donde corro sesiones en paralelo. No son aspiracionales: son las reglas que rompí al menos una vez.
+Después de todo esto agregué tres líneas a mi `CLAUDE.md` para los proyectos donde corro sesiones en paralelo. Son las reglas que rompí al menos una vez.
 
 <CodeBlock filename="CLAUDE.md">
 ```markdown
@@ -196,10 +208,12 @@ Después de todo esto agregué tres líneas a mi `CLAUDE.md` para los proyectos 
 ```
 </CodeBlock>
 
-La primera línea es la que más caro te sale cuando la violas. Si un agente hace stash en el repo principal mientras tienes un dev server corriendo desde ese repo, tu trabajo en progreso desaparece adentro de una entrada de stash cuya existencia no conocías. Aprendí eso una vez por las malas. No lo he tenido que aprender de nuevo.
+La primera línea es la que más caro te sale cuando la violas. Si un agente hace stash en el repo principal mientras tienes un dev server corriendo desde ese repo, tu trabajo en progreso desaparece adentro de una entrada de stash que no sabías que existía. Ya perdí ocho de diez archivos con un stash una vez, y ese lo había pedido yo mismo ([la historia está en el post de los tests](/blog/es/tests-gave-me-control/)). No necesito que un agente me lo haga a mis espaldas.
+
+Hoy Claude Code hace cumplir casi todo lo de las dos primeras líneas por su cuenta, en cualquier sesión que arranque con `--worktree` o que entre a un worktree con `EnterWorktree`. La documentación dice dónde está el hueco: un comando de shell como `cp`, o una redirección simple, que escribe en el checkout principal sin correr git allí no se rechaza. La tercera línea sigue siendo tu responsabilidad.
 
 <Collapsible title="La cosa que casi me olvido de decir">
-Los worktrees en `.claude/worktrees/` me funcionan porque esa ruta está en el `.gitignore` de los proyectos donde hago esto. Si usas otra ubicación, asegúrate de que esté afuera del repo o escondida tanto de git como del file watcher de tu dev server. Si no, vas a terminar shippeando un worktree como parte de tu repo (vergonzoso), o vas a disparar un loop de compilación infinita (humillante). Las dos son posibles.
+En mi setup, `.claude/worktrees/` no volvió a disparar el loop de compilación. No lo tomes como garantía. Meter la ruta en el `.gitignore` mantiene los worktrees fuera de tus commits, y eso es todo lo que hace: que una carpeta escondida quede vigilada o no depende de la configuración del watcher de tu dev server. Si a ti te entra en loop, agrega la ruta a la lista de ignorados del watcher o mueve los worktrees a un directorio hermano. Si no, vas a terminar commiteando un worktree adentro de tu repo (vergonzoso), o vas a disparar un loop de compilación infinita (humillante). Las dos son posibles.
 </Collapsible>
 
 ## Lo que los worktrees no resuelven
@@ -222,7 +236,7 @@ Ese criterio cabe en cuatro preguntas. Esta es la versión que ahora corro en mi
     },
     samefiles: {
       verdict: "Serialízalas.",
-      detail: "Los worktrees van a mantener los diffs separados, pero la fusión va a ser una guerra igual.",
+      detail: "Los worktrees van a mantener los diffs separados, pero el merge va a ser una guerra igual.",
       choices: [{ label: "Volver a empezar", next: "start" }],
     },
     types: {
@@ -257,22 +271,22 @@ Ese criterio cabe en cuatro preguntas. Esta es la versión que ahora corro en mi
   }}
 />
 
-La otra cosa que los worktrees no aíslan: los recursos compartidos en runtime. Tres dev servers quieren el puerto 3000. Tres clientes de Prisma regenerando los mismos archivos. Tres sets de migrations corriendo contra la misma base. Tres `npm install` peleándose por el mismo `node_modules`. Los worktrees le dan a cada agente sus propios archivos. No le dan a cada uno su propio puerto o su propia base. Para todo lo que excede el estado del filesystem (sockets, procesos, caches, servicios compartidos), todavía tienes que pensarlo explícitamente.
+La otra cosa que los worktrees no aíslan: los recursos compartidos en runtime. Tres dev servers quieren el puerto 3000. Tres clientes de Prisma regenerando los mismos archivos. Tres sets de migrations corriendo contra la misma base. Tres `npm install` peleándose por el mismo `node_modules`. Los worktrees le dan a cada agente sus propios archivos, y el puerto y la base siguen siendo compartidos. Para todo lo que excede el estado del filesystem (sockets, procesos, caches, servicios compartidos), todavía tienes que pensarlo explícitamente.
 
-La otra cosa que casi nadie dice en voz alta: el paralelismo cambia adónde va tu tiempo. Esa tarde del sábado no estaba escribiendo código. Estaba leyendo tres diffs, integrando tres ramas, y buscando acoplamiento invisible entre ellas. Los agentes trabajaban en paralelo. El reviewer no. Si antes el cuello de botella era escribir código, ahora es leerlo.
+El paralelismo también cambia adónde se va tu tiempo. Esa tarde del sábado no estaba escribiendo código. Estaba leyendo tres diffs, integrando tres ramas, y buscando acoplamiento invisible entre ellas. Los agentes trabajaban en paralelo. El reviewer no. Si antes el cuello de botella era escribir código, ahora es leerlo.
 
-Eso no hace a los worktrees menos útiles. Los hace más honestos. La historia no es "tres agentes hacen el trabajo de tres ingenieros". Es "tres agentes hacen el trabajo de tres mecanógrafos, y un ingeniero todavía tiene que integrarlos".
+Así que "tres agentes hacen el trabajo de tres ingenieros" es la historia equivocada. Tres agentes hicieron el trabajo de tres mecanógrafos, y un ingeniero todavía tuvo que integrarlos.
 
 ## La restricción real
 
-Este post entero es una secuela de uno que escribí hace un mes sobre los tests. El argumento de allá era que delegar a la IA solo es seguro cuando hay un loop de feedback lo bastante rápido como para atrapar sus errores. Los tests son ese loop sobre el eje del *qué*: el cambio hizo la cosa.
+Este post entero es una secuela de [uno que escribí hace un par de semanas sobre los tests](/blog/es/tests-gave-me-control/). El argumento de allá era que delegar a la IA solo es seguro cuando hay un loop de feedback lo bastante rápido como para atrapar sus errores. Los tests son ese loop sobre el eje del *qué*: el cambio hizo la cosa.
 
-Los worktrees son la misma idea sobre el eje del *dónde*. Me dejan confiar en que los errores del agente quedan contenidos en la rama y el directorio que le di. No contenidos en las buenas intenciones del agente. Contenidos físicamente, por el filesystem.
+Los worktrees son la misma idea sobre el eje del *dónde*. Me dejan confiar en que los errores del agente se quedan en la rama y el directorio que le di. Eso lo hace cumplir el filesystem, así que no tengo que contar con las buenas intenciones del agente.
 
 <PullQuote>
 Los tests me dieron control sobre qué escribe el agente. Los worktrees me dieron control sobre dónde lo escribe.
 </PullQuote>
 
-Hay un tercer eje más allá de esos dos. No es qué escribe el agente, no es dónde. Es lo que cada agente en paralelo cree sobre el sistema a su alrededor: los contratos, los tipos compartidos, los schemas, las convenciones. Mantener eso coherente cuando cada sesión solo ve la parte que le pasaste es el problema de fondo. No lo he resuelto. Tal vez sea el post del mes que viene.
+Hay un tercer eje más allá de esos dos: lo que cada agente en paralelo cree sobre el sistema a su alrededor. Los contratos, los tipos compartidos, los schemas, las convenciones. Mantener eso coherente cuando cada sesión solo ve la parte que le pasaste es el problema de fondo. No lo he resuelto. Lo más cerca que he llegado está en el [módulo de multi-agente de mi wiki de sistemas agénticos](/es/learn/agentic-systems/multi-agent/), que se resume en una regla: paralelizar las lecturas y serializar las escrituras, porque los agentes que escriben estado compartido no ven las decisiones implícitas de los demás. El sábado me salí con la mía con tres escrituras en paralelo porque no compartían ningún contrato, y eso es justo lo que revisa el árbol de decisión de arriba.
 
 Si llevas corriendo una sola sesión de Claude a la vez y te has preguntado si dos sería imprudente, la respuesta es: no si cada una tiene su propio árbol. Lo imprudente es compartir el árbol.

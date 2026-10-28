@@ -5,7 +5,17 @@
  * `meta: DemoMeta` from its frontmatter. The pages glob the demos and use
  * this module to derive slugs and group them for navigation.
  */
-import type { PropDoc } from './PropsTable.astro';
+/**
+ * Hand-authored prop documentation, kept in each demo's `meta.props` for
+ * maintainers (the props ARE the public API; writing them down is the review).
+ * Not rendered on the public lab pages.
+ */
+export interface PropDoc {
+	name: string;
+	type: string;
+	default?: string;
+	description?: string;
+}
 
 export type DemoCategory = 'data' | 'narrative' | 'playful' | 'typographic' | 'utility';
 

@@ -26,7 +26,6 @@ sources:
 ---
 
 import Callout from '../../components/blog/Callout.astro';
-import CodeBlock from '../../components/blog/CodeBlock.astro';
 import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import Tabs from '../../components/blog/Tabs.astro';
@@ -45,7 +44,7 @@ A base model is a token predictor. It completes text with the distribution of th
 <MermaidDiagram title="The post-training pipeline: each layer grabs something different" chart={`
 graph LR
   A["Base model<br/>(token predictor)"] --> B["1. SFT / distillation<br/>(grabs format + behavior)"]
-  B --> C["2. Preference opt.<br/>(RLHF→DPO, CAI)<br/>(aligns style + safety)"]
+  B --> C["2. Preference opt.<br/>(RLHF, then DPO; CAI)<br/>(aligns style + safety)"]
   C --> D["3. RLVR (GRPO)<br/>(reasoning emerges)"]
 `} />
 

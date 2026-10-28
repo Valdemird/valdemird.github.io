@@ -2,10 +2,11 @@
 import BaseHead from '../BaseHead.astro';
 import Header from '../Header.astro';
 import Footer from '../Footer.astro';
-import ProjectCard from '../ProjectCard.astro';
 import PostPreview from '../PostPreview.astro';
-import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PROJECTS, EXPERIMENTS, SOCIAL_LINKS, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, personWithProperties, webPropertyNodes, UI_STRINGS } from '../../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, SOCIAL_LINKS, PERSON, ORGANIZATION, ORGANIZATION_ID, UI_STRINGS } from '../../consts';
 import { getCollection } from 'astro:content';
+import { readingMinutes } from '../../lib/learn';
+import { MAP_UI, mapHref } from '../map/strings';
 
 interface Props {
 	lang: 'en' | 'es';
@@ -28,14 +29,28 @@ const recentPosts = [
 const techStack = ['TypeScript', 'React', 'Next.js', 'Astro', 'Node.js', 'Prisma', 'Tailwind CSS', 'PostgreSQL', 'Vercel AI SDK', 'Claude Code'];
 
 const blogIndexPath = lang === 'es' ? '/es/blog/' : '/blog/';
+
+// Hero terminal transcript. Rendered in its final state so it reads at first
+// paint, without JS and under reduced motion; the client script only replays it.
+const terminalTranscript = lang === 'es'
+	? [
+		{ cmd: '/spec-create auth-jwt', output: ['Guardado en .claude/specs/auth-jwt.md'] },
+		{ cmd: '/spec-audit auth-jwt', output: ['47 archivos analizados, spec enriquecido'] },
+		{ cmd: '/spec-plan auth-jwt', output: ['Plan de 3 fases, listo para implementar'] },
+	]
+	: [
+		{ cmd: '/spec-create auth-jwt', output: ['Saved to .claude/specs/auth-jwt.md'] },
+		{ cmd: '/spec-audit auth-jwt', output: ['Analyzed 47 files, spec enriched'] },
+		{ cmd: '/spec-plan auth-jwt', output: ['3-phase plan, ready to implement'] },
+	];
+
 // Descriptive, branded homepage title. The bare site name ("valdemird") said
 // nothing to a searcher; this names what the site is while keeping the brand.
 const homeTitle = lang === 'es'
 	? 'valdemird — Ingeniero de software y herramientas para devs'
 	: 'valdemird — Software engineer building developer tools';
 
-// Entity graph: WebSite + canonical Person (owning the subdomains) + each owned
-// web property. Ties valdemird.com and its subdomains to one creator entity.
+// Entity graph: WebSite + canonical Person + the Organization that publishes it.
 const homeJsonLd = {
 	'@context': 'https://schema.org',
 	'@graph': [
@@ -47,15 +62,9 @@ const homeJsonLd = {
 			description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
 			inLanguage: lang === 'es' ? ['es', 'en'] : ['en', 'es'],
 			publisher: { '@id': ORGANIZATION_ID },
-			potentialAction: {
-				'@type': 'SearchAction',
-				target: { '@type': 'EntryPoint', urlTemplate: `https://valdemird.com${blogIndexPath}?q={search_term_string}` },
-				'query-input': 'required name=search_term_string',
-			},
 		},
-		personWithProperties(),
+		PERSON,
 		ORGANIZATION,
-		...webPropertyNodes(),
 	],
 };
 ---
@@ -120,13 +129,24 @@ const homeJsonLd = {
 								</div>
 								<span class="terminal-title">{strings.home.terminalTitle}</span>
 							</div>
-							<div class="terminal-body">
-								<div class="terminal-line">
+							<div class="terminal-body" id="terminal-body">
+								{terminalTranscript.map((entry) => (
+									<div class="terminal-entry" data-term-entry>
+										<div class="terminal-line">
+											<span class="terminal-prompt">$</span>
+											<span class="terminal-cmd" data-term-cmd>{entry.cmd}</span>
+										</div>
+										<div class="terminal-output">
+											{entry.output.map((line) => (
+												<div class="output-line" data-term-out>{line}</div>
+											))}
+										</div>
+									</div>
+								))}
+								<div class="terminal-line" data-term-final>
 									<span class="terminal-prompt">$</span>
-									<span class="terminal-cmd" id="typed-cmd"></span>
-									<span class="terminal-cursor">|</span>
+									<span class="terminal-cursor" data-term-cursor>|</span>
 								</div>
-								<div class="terminal-output" id="terminal-output"></div>
 							</div>
 						</div>
 						<div class="float-shape shape-1" id="shape-1"></div>
@@ -148,32 +168,11 @@ const homeJsonLd = {
 				</div>
 			</div>
 
-			<!-- Projects & Experiments -->
-			<section class="section projects-section" id="projects">
-				<div class="section-header">
-					<span class="section-label">01</span>
-					<h2>{strings.home.projectsTitle}</h2>
-					<div class="section-line"></div>
-				</div>
-				<div class="projects-grid">
-					{[...PROJECTS, ...EXPERIMENTS].map((project) => (
-						<ProjectCard
-							title={project.title}
-							description={project.description}
-							url={project.url}
-							tech={project.tech}
-							thumbnail={project.thumbnail}
-							locale={lang}
-						/>
-					))}
-				</div>
-			</section>
-
 			<!-- Recent Posts -->
 			{recentPosts.length > 0 && (
 				<section class="section posts-section" id="posts">
 					<div class="section-header">
-						<span class="section-label">02</span>
+						<span class="section-label">01</span>
 						<h2>{strings.home.recentPostsTitle}</h2>
 						<div class="section-line"></div>
 					</div>
@@ -186,11 +185,13 @@ const homeJsonLd = {
 								pubDate={post.data.pubDate}
 								tags={post.data.tags}
 								locale={lang}
+								readingTime={readingMinutes(post.body)}
 							/>
 						))}
 					</div>
 					<div class="view-all">
 						<a href={blogIndexPath}>{strings.home.viewAllPosts} &rarr;</a>
+						<a class="map-link" href={mapHref(lang)}>{MAP_UI[lang].homeLink} &rarr;</a>
 					</div>
 				</section>
 			)}
@@ -210,45 +211,16 @@ const homeJsonLd = {
 	import { initTerminalAnimation } from '../../lib/terminal-animation';
 	import type { TerminalAnimation } from '../../lib/terminal-animation';
 
+	// One controller per landing visit: every listener registered below takes its
+	// signal, so a single abort on astro:before-swap tears the page down.
+	let controller: AbortController | null = null;
 	let terminalAnim: TerminalAnimation | null = null;
 	let parallaxCleanup: (() => void) | null = null;
 	let sectionObserver: IntersectionObserver | null = null;
 
-	// The hoisted script is shared between locales — pick the command set at
-	// runtime from <html lang>.
-	const TERMINAL_COMMANDS = {
-		en: [
-			{ cmd: '/spec-create auth-jwt', output: '  Creating spec... done\n  Saved to .claude/specs/auth-jwt.md' },
-			{ cmd: '/spec-audit auth-jwt', output: '  Analyzing codebase... 47 files\n  Enriched spec with technical context' },
-			{ cmd: '/spec-plan auth-jwt', output: '  Generated 3-phase plan\n  Ready for implementation' },
-		],
-		es: [
-			{ cmd: '/spec-create auth-jwt', output: '  Creando spec... listo\n  Guardado en .claude/specs/auth-jwt.md' },
-			{ cmd: '/spec-audit auth-jwt', output: '  Analizando codebase... 47 archivos\n  Spec enriquecido con contexto técnico' },
-			{ cmd: '/spec-plan auth-jwt', output: '  Plan de 3 fases generado\n  Listo para implementar' },
-		],
-	};
-
-	function initLandingPage() {
-		const hero = document.getElementById('hero');
-		if (!hero) return;
-
-		// --- Terminal typing ---
-		const lang = document.documentElement.lang === 'es' ? 'es' : 'en';
-		terminalAnim = initTerminalAnimation(TERMINAL_COMMANDS[lang]);
-
-		// Terminal poke — decorative easter egg: a click skips to the next
-		// command. The wrapper keeps aria-hidden; this is not functionality.
-		const terminalEl = document.getElementById('floating-terminal');
-		terminalEl?.addEventListener('click', () => {
-			terminalAnim?.poke();
-			terminalEl.classList.remove('terminal-poked');
-			void terminalEl.offsetWidth;
-			terminalEl.classList.add('terminal-poked');
-		});
-
-		// CSS [data-vt-nav] handles making sections visible instantly on VT nav
-		// --- CSS-based section reveals (no GSAP — keeps elements in DOM for View Transitions) ---
+	function initLandingPage(signal: AbortSignal) {
+		// --- Section reveals (CSS transition, no GSAP: elements stay in the DOM for View Transitions) ---
+		// The hidden pre-reveal state only exists under `@media (scripting: enabled)`.
 		// Runs under reduced motion too: the global media query zeroes the
 		// transition, so the reveal is instant instead of the section staying hidden.
 		sectionObserver = new IntersectionObserver(
@@ -264,7 +236,27 @@ const homeJsonLd = {
 		);
 		document.querySelectorAll('.section').forEach((s) => sectionObserver!.observe(s));
 
+		// The terminal transcript is server-rendered in its final state; with
+		// reduced motion it simply stays that way.
 		if (isReducedMotion()) return;
+
+		// --- Terminal replay: starts once on screen, plays one cycle, then rests ---
+		const terminalEl = document.getElementById('floating-terminal');
+		const terminalBody = document.getElementById('terminal-body');
+		if (terminalBody) terminalAnim = initTerminalAnimation(terminalBody, { cycles: 1 });
+
+		// Terminal poke: decorative easter egg. A click skips to the next command,
+		// or replays the transcript once it has finished. The wrapper keeps aria-hidden.
+		terminalEl?.addEventListener(
+			'click',
+			() => {
+				terminalAnim?.poke();
+				terminalEl.classList.remove('terminal-poked');
+				void terminalEl.offsetWidth;
+				terminalEl.classList.add('terminal-poked');
+			},
+			{ signal }
+		);
 
 		// --- Headline performance + focal wave (skip on VT nav: content renders ready) ---
 		const isVT = document.documentElement.hasAttribute('data-vt-nav');
@@ -274,13 +266,12 @@ const homeJsonLd = {
 		}
 
 		// --- GSAP Mouse parallax ---
-		const terminal = document.getElementById('floating-terminal');
 		const shape1 = document.getElementById('shape-1');
 		const shape2 = document.getElementById('shape-2');
 		const shape3 = document.getElementById('shape-3');
 
 		const targets = [
-			terminal && { element: terminal, x: 14, y: 10, rotateX: 3, rotateY: 3 },
+			terminalEl && { element: terminalEl, x: 14, y: 10, rotateX: 3, rotateY: 3 },
 			shape1 && { element: shape1, x: -22, y: -18 },
 			shape2 && { element: shape2, x: 28, y: 20 },
 			shape3 && { element: shape3, x: -18, y: 25 },
@@ -291,7 +282,26 @@ const homeJsonLd = {
 		}
 	}
 
-	function cleanupLanding() {
+	// On click, dynamically set view-transition-name on the post title
+	// so the forward morph works. On back navigation the home renders fresh
+	// without transition names → clean crossfade instead of confusing morph.
+	function initPostTransitions(signal: AbortSignal) {
+		document.querySelectorAll<HTMLAnchorElement>('.posts-list .post-preview').forEach((link) => {
+			link.addEventListener(
+				'click',
+				() => {
+					const h3 = link.querySelector<HTMLElement>('h3[data-vt-name]');
+					if (h3) h3.style.viewTransitionName = h3.dataset.vtName!;
+				},
+				{ signal }
+			);
+		});
+	}
+
+	function teardownLanding() {
+		if (!controller) return;
+		controller.abort();
+		controller = null;
 		terminalAnim?.stop();
 		terminalAnim = null;
 		parallaxCleanup?.();
@@ -301,36 +311,25 @@ const homeJsonLd = {
 		cleanupAll();
 	}
 
-	// On click, dynamically set view-transition-name on the post title
-	// so the forward morph works. On back navigation the home renders fresh
-	// without transition names → clean crossfade instead of confusing morph.
-	function initPostTransitions() {
-		document.querySelectorAll<HTMLAnchorElement>('.posts-list .post-preview').forEach((link) => {
-			link.addEventListener('click', () => {
-				const h3 = link.querySelector<HTMLElement>('h3[data-vt-name]');
-				if (h3) h3.style.viewTransitionName = h3.dataset.vtName!;
-			});
-		});
+	function initHome() {
+		// The module stays loaded across View Transition navigations, so act only
+		// on the home, and only once per rendered hero (the mark dies with the swap).
+		const hero = document.getElementById('hero');
+		if (!hero || hero.hasAttribute('data-home-ready')) return;
+		teardownLanding();
+		hero.setAttribute('data-home-ready', '');
+		controller = new AbortController();
+		initLandingPage(controller.signal);
+		initPostTransitions(controller.signal);
 	}
 
-	function initAndRegisterCleanup() {
-		initLandingPage();
-		initPostTransitions();
-		document.addEventListener('astro:before-swap', cleanupLanding, { once: true });
-	}
-
-	initAndRegisterCleanup();
-	document.addEventListener('astro:after-swap', initAndRegisterCleanup);
+	// Run as soon as the module evaluates (astro:page-load waits for window load on
+	// the first visit, which would leave the reveal and the terminal idle until every
+	// asset arrives), and again on each client-side navigation.
+	initHome();
+	document.addEventListener('astro:page-load', initHome);
+	document.addEventListener('astro:before-swap', teardownLanding);
 </script>
-
-<style is:global>
-	html:has(.hero) {
-		scrollbar-width: none;
-	}
-	html:has(.hero)::-webkit-scrollbar {
-		display: none;
-	}
-</style>
 
 <style>
 	main {
@@ -444,7 +443,7 @@ const homeJsonLd = {
 		padding: 0.4rem 0.9rem;
 		font-size: 0.76rem;
 		font-weight: 500;
-		color: var(--color-success);
+		color: var(--color-success-text);
 		background: oklch(from var(--color-success) l c h / 0.08);
 		border: 1px solid oklch(from var(--color-success) l c h / 0.15);
 		border-radius: 100px;
@@ -532,7 +531,6 @@ const homeJsonLd = {
 		position: relative;
 		flex-shrink: 0;
 		width: clamp(280px, 35vw, 400px);
-		height: 290px;
 	}
 
 	.floating-terminal {
@@ -586,27 +584,39 @@ const homeJsonLd = {
 		color: var(--color-text-muted);
 	}
 
+	/* The full transcript is server-rendered; the replay script only toggles
+	   visibility, so the box keeps its final size the whole time. */
 	.terminal-body {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
 		padding: 1.1rem 1.25rem;
 		font-family: var(--font-mono);
 		font-size: 0.82rem;
 		line-height: 1.6;
-		min-height: clamp(120px, 20vw, 170px);
 	}
 
-	.terminal-line { display: flex; align-items: center; gap: 0.5rem; }
+	.terminal-line { display: flex; align-items: center; gap: 0.5rem; min-height: 1.6em; }
 	.terminal-prompt { color: var(--color-accent); font-weight: 600; }
 	.terminal-cmd { color: var(--color-text); }
 	.terminal-cursor { color: var(--color-accent); animation: blink 1s step-end infinite; font-weight: 300; }
 	@keyframes blink { 50% { opacity: 0; } }
 
-	.terminal-output { margin-top: 0.5rem; }
-	.terminal-output :global(.output-line) {
+	.terminal-output { margin-top: 0.15rem; }
+	.output-line {
 		color: var(--color-text-muted);
 		font-size: 0.78rem;
-		animation: lineIn 0.3s var(--ease-smooth) both;
+		padding-inline-start: 2ch;
+		white-space: pre-wrap;
 	}
+	.output-line.is-in { animation: lineIn 0.3s var(--ease-smooth) both; }
 	@keyframes lineIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+	.terminal-entry.is-pending,
+	.terminal-line.is-pending,
+	.output-line.is-pending {
+		visibility: hidden;
+	}
 
 	/* Floating accent shapes */
 	.float-shape {
@@ -698,21 +708,21 @@ const homeJsonLd = {
 		max-width: var(--wide-width);
 		margin: 0 auto;
 		padding: 5rem var(--space-lg);
-		opacity: 0;
-		transform: translateY(24px);
-		transition: opacity 0.7s var(--ease-smooth),
-			transform 0.7s var(--ease-smooth);
 	}
 
-	.section.visible {
-		opacity: 1;
-		transform: translateY(0);
-	}
-
-	@media (prefers-reduced-motion: reduce) {
+	/* Pre-reveal state only when scripts run: without JS the sections must stay
+	   visible, since nothing would ever add .visible. */
+	@media (scripting: enabled) and (prefers-reduced-motion: no-preference) {
 		.section {
+			opacity: 0;
+			transform: translateY(24px);
+			transition: opacity 0.7s var(--ease-smooth),
+				transform 0.7s var(--ease-smooth);
+		}
+
+		.section.visible {
 			opacity: 1;
-			transform: none;
+			transform: translateY(0);
 		}
 	}
 
@@ -728,7 +738,6 @@ const homeJsonLd = {
 		font-size: 0.75rem;
 		font-weight: 500;
 		color: var(--color-accent);
-		opacity: 0.6;
 		letter-spacing: 0.05em;
 	}
 
@@ -744,14 +753,6 @@ const homeJsonLd = {
 		background: linear-gradient(90deg, var(--color-border), transparent);
 	}
 
-	.projects-grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-		gap: var(--space-lg);
-		max-width: 860px;
-		margin-inline: auto;
-	}
-
 	.posts-list {
 		display: flex;
 		flex-direction: column;
@@ -760,6 +761,23 @@ const homeJsonLd = {
 	.view-all {
 		margin-top: var(--space-xl);
 		padding-left: var(--space-lg);
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.4rem 1.4rem;
+	}
+
+	/* Quiet secondary route into the knowledge map. */
+	.view-all .map-link {
+		font-family: var(--font-mono);
+		font-size: 0.74rem;
+		font-weight: 500;
+		letter-spacing: 0.04em;
+		color: var(--color-text-muted);
+	}
+
+	.view-all .map-link:hover {
+		color: var(--color-accent);
 	}
 
 	.view-all a {
@@ -791,7 +809,6 @@ const homeJsonLd = {
 		.hero-visual {
 			width: 100%;
 			max-width: 360px;
-			height: 250px;
 		}
 
 		.hero h1 {
@@ -805,10 +822,6 @@ const homeJsonLd = {
 		.float-shape { display: none; }
 
 		.grid-pattern { display: none; }
-
-		.projects-grid {
-			grid-template-columns: 1fr;
-		}
 
 		.section {
 			padding: 3rem var(--space-lg);

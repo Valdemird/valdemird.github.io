@@ -4,7 +4,7 @@
  * src/components/blog/AskMeAnything.astro.
  */
 import { ABOUT_CONTENT, FEATURED_CERT_SHARED, type AboutLocale } from './about';
-import { PERSON, PROJECTS, EXPERIMENTS, SOCIAL_LINKS } from '../consts';
+import { PERSON, SOCIAL_LINKS } from '../consts';
 
 /**
  * Web3Forms access key. Public by design — it only identifies the inbox that
@@ -55,14 +55,12 @@ export const EXPLORING: Record<AboutLocale, readonly string[]> = {
 		"On-device AI in the browser: this very chat runs on Chrome's built-in AI with no server, as an experiment in privacy-first, progressively-enhanced AI features.",
 		'AI-assisted development workflows: spec-driven development, custom slash commands, and running several Claude Code agents in parallel with git worktrees — the blog documents this practice with real stories.',
 		'Web animation and game feel: scroll-driven animations, custom easing curves, and making interfaces feel alive without hurting performance.',
-		'todo.valdemird.com: a task manager with AI scheduling, Pomodoro and drag-and-drop. games.valdemird.com: real-time multiplayer mini-games.',
 	],
 	es: [
 		'Este sitio (valdemird.com): un blog bilingüe en Astro donde cada diagrama es un componente interactivo hecho a mano — más de 30, todos navegables en vivo en /es/lab/ (gráficas, scrollytelling, diagramas paso a paso, un grafo de git, un editor de curvas de easing).',
 		'IA on-device en el navegador: este mismo chat corre sobre la IA integrada de Chrome sin ningún servidor, como experimento de funcionalidades de IA privadas y con mejora progresiva.',
 		'Flujos de desarrollo asistidos por IA: desarrollo guiado por specs, slash commands propios y varios agentes de Claude Code corriendo en paralelo con git worktrees — el blog documenta esta práctica con historias reales.',
 		'Animación web y game feel: animaciones ligadas al scroll, curvas de easing propias y hacer que las interfaces se sientan vivas sin sacrificar rendimiento.',
-		'todo.valdemird.com: un gestor de tareas con agenda por IA, Pomodoro y drag-and-drop. games.valdemird.com: minijuegos multijugador en tiempo real.',
 	],
 };
 
@@ -81,9 +79,6 @@ export function buildSystemPrompt(lang: AboutLocale): string {
 		`${FEATURED_CERT_SHARED.name} — ${FEATURED_CERT_SHARED.issuer}, 2026`,
 		...c.certs.map((x) => `${x.name} (${x.year})`),
 	].join('; ');
-	const projects = [...PROJECTS, ...EXPERIMENTS]
-		.map((p) => `${p.title} (${p.url}): ${p.description[lang]}`)
-		.join('\n');
 	const beliefs = c.beliefs.map((b) => `${b.title}: ${stripHtml(b.desc)}`).join('\n');
 	const story = c.narrative.map(stripHtml).join('\n');
 	const exploring = EXPLORING[lang].map((x) => `- ${x}`).join('\n');
@@ -99,8 +94,6 @@ Trayectoria:
 ${career}
 Educación: ${education}
 Certificaciones: ${certs}
-Proyectos propios:
-${projects}
 Qué está explorando ahora (trabajo público):
 ${exploring}
 En lo que cree:
@@ -126,8 +119,6 @@ Career:
 ${career}
 Education: ${education}
 Certifications: ${certs}
-Side projects:
-${projects}
 What he is exploring right now (public side work):
 ${exploring}
 What he believes:

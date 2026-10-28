@@ -1,0 +1,204 @@
+---
+title: "Evals de LLM con mis propias partidas: cómo destrabé mi DM con IA"
+description: "Un guard por palabras clave de mi DM con IA intervino 3 veces en mis finales de turno y se equivocó las 3. Hice de mis partidas el eval, y a medida que entraban los arreglos estructurales la tasa de aprobación pasó de 56% a 73% con los graders originales (hasta 8 de esos puntos fueron caídas del propio eval)."
+pubDate: 2026-10-27
+tags: ["agentes-ia", "llm", "evals", "fiabilidad", "claude-code"]
+featured: true
+lang: es
+---
+
+import Callout from '../../../components/blog/Callout.astro';
+import TLDR from '../../../components/blog/TLDR.astro';
+import DataTable from '../../../components/blog/DataTable.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
+import PullQuote from '../../../components/blog/PullQuote.astro';
+
+<TLDR lang="es" bullets={[
+  "Mi DM con IA, un proyecto personal que construí con Claude Code, se sentía trabado y aburrido en mis primeras partidas de verdad. Los logs mostraron que los guards en código devolvieron al narrador 8 veces en unos 27 turnos (y recortaron una línea de un reintento), y que la lista de palabras de fin de turno se equivocó 3 de 3 veces.",
+  "El arreglo fue repartir el trabajo: el código se queda con los hechos (reglas, información oculta, estado real), el modelo lee lo que quise decir a través de tools estructurados, y cuando duda lo resuelvo yo con un toque y un deshacer.",
+  "La red de seguridad pasó de los guards a un eval armado con mis propias sesiones, cortadas justo antes de cada cosa que dije. A medida que entraban los arreglos estructurales, la tasa de aprobación pasó de 56% a 73% con los graders originales de la suite. Hasta 8 de esos puntos fueron caídas del propio eval, arregladas después de la línea base, y con los graders que se aflojaron por el camino la misma corrida da 83%. El mismo eval después atrapó dos cambios al prompt que parecían inofensivos y no lo eran.",
+]} />
+
+El domingo pasado por la noche me senté a jugar la primera partida de verdad con DMai, el DM con IA que llevaba diez días construyendo. DMai es un proyecto personal y todavía es privado. Es un motor de reglas determinista de D&D 5e construido sobre el SRD 5.2.1, las reglas abiertas de D&D, más una app de mesa donde Claude Haiku 5.5 narra encima del motor, con voz hablada, una vista para el televisor y mi celular como control. Todo lo construí con Claude Code. El narrador se había sumado al motor el día anterior.
+
+Después de esa primera partida le escribí a Claude Code, entre otras cosas: "se traba no es claro respecto a las acciones..." y "...creo que todo esta muy raro la verdad".
+
+A la mañana siguiente volví a jugar. En mi turno 13 de esa partida se lo dije a la mesa misma, en plena partida: "está muy aburrido". El narrador respondió: "Fuera de la historia: tienes razón en varias cosas. Lo anoto todo para la mesa: menú, movimiento, negociación y lo que ves en el mapa." No tenía forma de hablar fuera de personaje, así que un guard tomó eso como narración. Un guard es un chequeo pequeño en código que se para entre el modelo y la mesa y devuelve o bloquea lo que rompe una regla. Este devolvió la respuesta, porque "menú" no es una palabra que la ficción tenga permitido decir, y el narrador reintentó con "las opciones". Un turno después terminé la sesión.
+
+O sea que una de las últimas cosas que hizo mi segunda partida fue pasarle un guard por encima al narrador mientras me daba la razón. Arreglarlo llevó dos movimientos: sacar del código las adivinanzas y reemplazarlas por una suite de tests cortada de las partidas que de verdad jugué.
+
+<Callout type="important" title="La tesis">
+Una lista de palabras sobre las frases de un jugador es una suposición disfrazada de invariante. Lo que la reemplace tiene que responder una pregunta por cada entrada: dije esto, ¿la mesa lo hizo sin obligarme a repetirlo ni a tocar otra vez?
+</Callout>
+
+## Ocho rebotes de guards en 27 turnos
+
+Claude Code revisó los logs de las dos sesiones antes de proponer nada. En unos 27 turnos míos, los guards habían devuelto al narrador 8 veces (9 veredictos, dos sobre la misma respuesta) y habían recortado una línea directamente.
+
+El guard de fin de turno, `endsTurn`, era una lista de palabras. Bloqueó "termino mi accion", "ya termina" y "acá termina mi turno". Tres intervenciones, las tres equivocadas. Yo había dicho que terminaba, y una lista de frases decidió que no lo decía en serio.
+
+El guard que exige solo ficción devolvió cinco líneas de narración, y del reintento de una de ellas recortó una línea. Cada rebote costaba unos segundos (de 2 a 8 s), y un reintento repitió una línea que la voz ya había dicho. Otra lista de palabras, `isTableQuestion`, debía darse cuenta cuando yo hacía una pregunta de reglas fuera de personaje. Se le escaparon las mías, como cuando pregunté por qué tenía que tirar Percepción si uno de los goblins estaba parado justo enfrente. Esa pregunta le llegó al narrador como si la hubiera dicho mi mago.
+
+El problema no era el costo. El narrador leía cerca del 96% de su entrada desde la caché, y lo jugado en una sesión costaba unos $0.06 (unos $0.12–0.13 contando las llamadas que mantienen viva la caché después de la partida). Al modelo le faltaban dos cosas: información y una forma de expresarse.<Sidenote>El narrador tenía 22 tools y solo 5 usaban schemas estrictos. Uno recibía JSON dentro de un parámetro de texto, `parametros_json`, y en una corrida en vivo Haiku lo dejó vacío seis veces seguidas.</Sidenote> Cuando me moví con palabras, la mesa me corrió una sola casilla, y como el narrador no veía el mapa, lo contó como una trepada que yo no había elegido. No tenía un tool para pasarle una pregunta a la mesa, hablar fuera de personaje o cerrar una negociación.
+
+## Cómo un prompt junta 54 "never"
+
+Las reglas del narrador habían crecido en tres días, un incidente a la vez. Ese lunes por la mañana eran unas 3250 palabras con 54 "never" adentro (el prompt está en inglés, aunque yo juego en español). Cuando las auditamos más tarde ese mismo día, siete reglas aparecían dos veces y un par se contradecía: la primera línea nunca debe repetir mi acción, y la primera línea debe decir lo que estoy a punto de hacer. Cada una de esas líneas era un arreglo real a una falla real. Nada en el prompt decía qué hace de verdad un buen DM.
+
+No me di cuenta, porque cada arreglo venía con su test y los tests pasaban. Las suites automáticas corrían contra un narrador con guion. Claude también jugaba por su cuenta en un navegador headless al final de cada milestone, con el modelo en vivo pero una voz falsa que suena un tono por línea, y la mayor parte de lo que esas corridas marcaron se arregló. Mientras tanto, mis partidas reales, con el modelo real, estaban trabadas.<Sidenote>En la primera, el servicio de voz ni siquiera llegó a arrancar.</Sidenote> Yo estaba revisando checks en verde y llamando a eso progreso.
+
+Claude Code todavía estaba parchando bugs de mi segunda partida cuando le mandé esto:
+
+<PullQuote cite="Yo, a Claude Code, a mitad de sesión (con los errores de tipeo corregidos)">
+Es bueno tener código determinista validando, pero si vamos a crear una cantidad de bloqueos deterministas no tiene sentido usar un LLM.
+</PullQuote>
+
+Claude primero volvió a los logs, y después me respondió con un conteo de los guards y una frase que me guardé: "Mi error fue tratar la intención como si fuera un invariante duro."
+
+Anthropic tiene nombre para la mitad del problema que estaba en el prompt. La [referencia de auditoría de prompts de su skill claude-api](https://github.com/anthropics/skills/blob/main/skills/claude-api/shared/prompt-audit.md) describe la "patch accretion": muchos condicionales estrechos, cada uno rastreable a un incidente, con un modelo que navega un laberinto de casos especiales en lugar de un principio coherente. El mismo archivo advierte que una lista de prohibiciones puede salir al revés, porque prohibir una falla que el modelo no iba a cometer puede *anclarlo hacia* esa falla. Las [buenas prácticas de prompting](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices) cuentan la versión positiva, y su ejemplo es justo de texto a voz: un "NEVER use ellipses" a secas funciona peor que explicar que la respuesta se va a leer en voz alta. Mi narrador se lee en voz alta. Yo tenía 54 "never" a secas.
+
+## Hechos, intención y duda: quién decide qué
+
+La decisión que dejamos por escrito ese día separa cada chequeo según el tipo de cosa que decide.
+
+<DataTable
+  columns={[
+    { key: "kind", label: "Tipo", align: "left" },
+    { key: "examples", label: "Ejemplos en DMai", align: "left" },
+    { key: "who", label: "Lo decide", align: "left" },
+  ]}
+  rows={[
+    { kind: "Hechos", examples: "¿Es legal según las reglas? ¿Esa criatura está oculta? ¿La narración afirma un estado que el motor contradice? ¿Es otra vez la misma llamada rechazada? Schemas, topes de costo, datos privados", who: "El código. Determinista, y se queda" },
+    { kind: "Intención", examples: "¿Terminó mi turno? ¿Esto es una pregunta para la mesa? ¿A quién estoy apuntando? ¿Los enemigos aceptan el trato?", who: "El modelo, a través de tools estructurados" },
+    { kind: "Estilo", examples: "La narración se queda en la ficción, y se queda corta", who: "Un guard en código que devuelve la línea una vez y después recorta las frases que sobran, más un canal aparte para que el modelo diga lo que no es ficción" },
+    { kind: "Duda", examples: "El modelo no está seguro de lo que quise decir", who: "Yo, en el control: un toque para confirmar, o una ventana para deshacer" },
+  ]}
+  caption="Adaptado del registro de decisión. La primera fila la decide el código sin más. Lo que cambió en el estilo es el canal aparte, así que el narrador tiene menos motivos para tropezar con el guard."
+/>
+
+En la práctica, la lista de palabras de fin de turno desapareció. El modelo termina mi turno cuando mis palabras quieren decir eso. Cuando no está seguro, pone en mi celular una propuesta marcada `ambiguous`, y yo la confirmo o la deshago. "Terminar el turno" siempre es un botón, así que el lenguaje natural nunca es la única salida. Un tool nuevo, `a_la_mesa`, le permite al narrador pasarle mi pregunta de reglas a un asistente de reglas aparte, o poner su propia nota fuera de personaje en mi control, como texto que la voz se salta. El cálculo de alcance del mapa ahora prueba primero las rutas caminables, así que si pido ir a un lugar, mi personaje rodea la pendiente cuando hay un camino alrededor.
+
+La negociación pasó a ser una decisión de reglas. Hablar no gasta acción en combate. Cuando les ofrezco un trato a los enemigos, el narrador lo juzga según lo que las notas de la aventura dicen que quieren (hambre, miedo, moral) o pide una prueba de Carisma, y los enemigos que aceptan terminan la pelea. Eso salió directo de mi segunda partida, donde les ofrecí nuestra comida a unos goblins y el narrador se inventó una razón para que yo no pudiera alcanzarlos.
+
+Nada de esto es nuevo como principio. El [módulo de human-in-the-loop](/es/learn/agentic-systems/human-in-the-loop/) de este sitio defiende poner compuertas según qué tan reversible es cada acción, y el de [tools como UX para el modelo](/es/learn/agentic-systems/tools-and-mcp/) defiende darle las acciones que necesita. No había calculado el costo de quitar los guards. El registro de decisión lo dice sin rodeos: un error del modelo ya no lo atrapa una lista de palabras, así que el eval y la ventana de deshacer tienen que existir antes de que el prompt pierda sus parches.
+
+## Cortar mis propias partidas en casos de prueba
+
+DMai ya tenía evals. Escenarios con guion y perfiles de jugador simulados arrancaban sesiones nuevas en una aventura de prueba. Una matriz de capacidades repetía frases contra un narrador con guion. Ninguno preguntaba si la mesa hizo lo que yo dije, en la situación en la que lo dije.
+
+Mi tercera partida, después de la primera ronda de arreglos, dejó ver el hueco. Dije que "mejoro pero todavia tiene problema". El narrador preguntaba "¿qué haces?" después de cada pasito. Cuando dije que me acercaba y le iba a tirar Risa horrible a un enemigo, se comió la mitad. Esperaba una confirmación en viajes que yo había pedido clarito, y se negó a llevarme de vuelta a un pueblo. Cada arreglo para eso iba a cambiar cómo se comporta el modelo, y nada lo medía ni antes ni después.
+
+Así que Claude Code construyó lo que en el proyecto se llama el forks eval. Toma una sesión que jugué de verdad, la corta justo antes de una cosa que dije, la reabre, y vuelve a jugar solo esa entrada con el modelo, los tools, los guards y el motor reales.
+
+<MermaidDiagram title="Un fork, una entrada" chart={`graph TD
+  A["Sesión grabada"] --> B["Corte antes de mi entrada N y reapertura"]
+  B --> C["Repetir N: modelo, tools y motor reales"]
+  C --> D["Un driver responde como yo: confirma, tira, acepta defaults"]
+  D --> E["Hechos calificados en código: expect / forbid"]
+`} />
+
+El corte conserva la situación exacta: el tablero, la pelea y la conversación que el modelo había leído hasta ese punto. El log de la sesión solo crece hacia adelante, así que una copia cortada sigue siendo una sesión válida. Después de la repetición, un driver pequeño le responde a la mesa como lo haría yo: confirma una propuesta pendiente y la cuenta como una espera, o sea, un toque que yo habría tenido que hacer; tira dados con caras intermedias, acepta los valores por defecto en las elecciones y deja que se venzan las ventanas de deshacer. Luego el grader lee hechos del log de la sesión, en código. ¿Se confirmó un comando de este tipo? ¿Mi personaje se movió hacia esa casilla? ¿Hubo una prueba, un cambio de escena, una llamada a un tool? ¿Quién habló? Un caso es una lista de hechos para `expect` y para `forbid`, más un límite opcional de esperas.
+
+Una repetición de una entrada es un intento, y la mayoría de las corridas juega cada entrada 3 veces. Los casos nunca entran al repositorio, porque contienen el contenido privado de mi campaña. Cada corrida en vivo tiene un tope de costo. Un intento cuesta en promedio menos de dos centavos (la mediana, menos de uno) y suele tardar de 5 a 25 segundos (unos 12 s lo típico).
+
+<Collapsible title="¿Por qué no repetir la sesión completa?">
+Esa fue la primera opción sobre la mesa, y se va descarrilando. Repites cada entrada grabada en orden, y en el momento en que el narrador responde la entrada 2 distinto a como respondió en vivo, la entrada 3 cae en una situación en la que yo nunca la dije. Terminas calificando una conversación que nunca pasó.
+
+Los escenarios sintéticos fallan por el otro lado. Reescribir mi queja como un test nuevo sobre una aventura de prueba conserva las palabras y pierde la situación que les daba sentido. "Acá termina mi turno" significa algo concreto cuando es mi turno, en una pelea, después de haberme movido.
+
+Cortar antes de una entrada conserva la situación y deja que el cambio que estás probando decida exactamente una respuesta. La contra es que un fork depende de que la aventura siga siendo compatible con el log grabado del motor. Si un cambio en la aventura rompe la repetición, el intento termina en error.
+</Collapsible>
+
+## Qué mostraron los números
+
+La primera suite tenía 22 entradas, sacadas de mis tres partidas en vivo. Su línea base, sobre el narrador tal como quedó después de la primera ronda de arreglos (las listas de palabras que adivinaban mi intención ya no estaban), fue 36 de 64 intentos. Las fallas eran mis quejas, casi línea por línea: lanzar un hechizo mientras me acercaba, los viajes que yo había pedido (en una corrida limpia aparte todos se quedaban esperando una confirmación), volver a un pueblo, el intento de un compañero que quedaba sin resolver. Los controles de un solo paso pasaron casi todos: terminar mi turno, las preguntas para la mesa y dos de los cuatro hechizos contra un enemigo que nombré.
+
+Después los arreglos estructurales entraron uno por uno, cada uno juzgado con la suite. Las escenas se volvieron lugares entre los que se puede viajar. Moverse con palabras funcionó en todas las escenas con cuadrícula. Y una frase con varios pasos ("me acerco y le tiro") se volvió una sola propuesta con los pasos siguientes adjuntos.
+
+<InteractiveChart
+  type="horizontal"
+  title="% de intentos aprobados"
+  story="Las mismas 22 entradas de mis propias partidas, calificadas en código. La tasa de aprobación subió de 56% a 83% a medida que entraban los arreglos estructurales, con graders que se aflojaron por el camino. Con los graders de la línea base, la última barra queda en 73%, y hasta 8 puntos de la subida son caídas del propio eval."
+  source="Forks eval, corridas en vivo con Claude Haiku 5.5, 26 oct 2026. Intentos por corrida: 64, 62, 40, 66. Las tres primeras se detuvieron al llegar a su tope de costo. Después de la línea base, Claude Code aflojó cinco graders, uno de ellos dos veces; las barras 2 a 4 usan versiones cada vez más flojas (ver abajo)."
+  data={[
+    { label: "Línea base (36/64)", value: 56 },
+    { label: "Tras los arreglos estructurales (53/62)", value: 85 },
+    { label: "Corrida posterior, 2 intentos/caso (36/40)", value: 90 },
+    { label: "Suite completa, 3 intentos/caso (55/66)", value: 83 },
+  ]}
+  annotations={[{ targetIndex: 0, text: "Las fallas eran mis quejas" }, { targetIndex: 3, text: "Los 22 casos, sin tocar el tope", emphasize: true }]}
+/>
+
+Esto es lo que se movió en los casos de los que me había quejado. "Justo tras su arreglo" es la corrida que juzgó ese arreglo. La última columna es la corrida completa de esa tarde, la de la última barra.
+
+<DataTable
+  columns={[
+    { key: "case", label: "Caso", align: "left" },
+    { key: "base", label: "Línea base", align: "right" },
+    { key: "fix", label: "Justo tras su arreglo", align: "right" },
+    { key: "later", label: "Corrida completa, tarde", align: "right" },
+  ]}
+  rows={[
+    { case: "Viajes que pedí y volver al pueblo (3 casos)", base: "0/7 intentos limpios", fix: "9/9, sin toques", later: "9/9" },
+    { case: "Me acerco y lanzo un hechizo, en una sola frase", base: "0/3", fix: "2/3, luego 2/2", later: "3/3" },
+    { case: "La acción de un compañero que el narrador nunca resolvía", base: "1/3", fix: "3/3 en su propia corrida", later: "1/3" },
+    { case: "Turnos que terminan con el narrador preguntándome algo", base: "8%", fix: "2%, luego 8%", later: "8%" },
+  ]}
+  caption="x/y son intentos aprobados. El caso del compañero no se sostuvo, y es uno de los casos del tronco de más abajo. Los turnos que terminan en pregunta se quedaron entre 2% y 8%: ningún cambio claro."
+/>
+
+Los evals de esa mañana costaron menos de $4 de los $5 que yo había aprobado.
+
+<Collapsible title="Cuánto confiar en estos números">
+Poco, si los miras uno por uno. La mayoría de los casos corrió 3 veces, así que un caso que pasa de 1/3 a 2/3 puede ser ruido. La tercera corrida usó 2 y, igual que las dos primeras, se detuvo al llegar a su tope de costo, por eso los denominadores cambian (64, 62, 40). La línea base además contó como fallas 8 intentos que se cayeron dentro del propio eval, así que 8 de sus 28 fallas no eran del narrador. Sin ellas, la línea base queda en 36 de 56, o sea 64%, pero eso es un techo: 6 de las 8 caídas fueron en los dos casos de viaje, que en una corrida limpia aparte fallaron todos sus intentos igual. Sin caídas, la línea base estaría en algún punto entre 56% y 64%.
+
+Después de la línea base, Claude Code también aflojó cinco graders mientras trabajaba en las fallas, y uno de ellos dos veces. El orbe que pedí ahora puede explicarse fuera de personaje en vez de lanzarse, y más tarde también pasa si el narrador pregunta qué energía usar. Una negociación pasa cuando responde un goblin (tres casos). Registrar los cuerpos puede usar la acción de búsqueda de la propia escena en vez de un compañero. Con los criterios de la propia línea base, la corrida del 85% queda en 79% (49/62), la de 2 intentos en 83% (33/40) y la corrida completa de la última barra en 73% (48/66). Lee la gráfica como la tendencia de un solo día de trabajo; ahí no hubo un experimento controlado.
+
+Confío más en la forma de las fallas. La línea base no falló al azar: falló justo en las cosas de las que me había quejado en la mesa, y los controles de un paso pasaron casi todos. Eso fue lo que me dijo que el eval estaba midiendo mi experiencia.
+</Collapsible>
+
+## Lo que el eval atrapó en la reescritura del prompt
+
+La segunda mitad de la decisión fue reescribir el prompt para que abriera con principios en lugar de prohibiciones, pero solo midiéndolo contra el eval. El acuerdo de trabajo de ese día tiene una línea que importa aquí: ningún cambio entra si empeora la evaluación.
+
+El prompt nuevo conserva el protocolo de mesa del que depende el código: la forma del turno, las propuestas, los movimientos, las fases. Abre con diez principios de DM, cada uno con su razón. Algunos de ellos: haz todo lo que dijo el jugador. Tira dados solo cuando fallar cambiaría algo. El resultado es del motor, así que nunca insinúes cómo va antes de que se resuelva. Cuando la escena se estanca, pasa algo. Cada persona del mundo quiere algo, y no cede porque el jugador insista. Las ofertas y amenazas siguen las reglas de influencia (Influence) del SRD 5.2.1: una criatura a la que la oferta le agrada acepta sin tirada, una a la que la oferta perjudica se niega, y solo una que duda vuelve incierto el resultado. El prompt nuevo no es más corto que el viejo, y todavía dice "never" 57 veces. Lo que cambió es que los principios y sus razones van primero.
+
+Prompt viejo contra prompt nuevo, las mismas 22 entradas, 3 intentos cada una. La columna nueva es el segundo borrador. El primero sacó 52/66, y compararlo caso por caso fue lo que destapó la cláusula perdida de más abajo.
+
+<DataTable
+  columns={[
+    { key: "metric", label: "Medida", align: "left" },
+    { key: "old", label: "Prompt viejo", align: "right" },
+    { key: "new", label: "Principios primero", align: "right" },
+  ]}
+  rows={[
+    { metric: "Intentos aprobados", old: "55/66", new: "54/66" },
+    { metric: "Palabras habladas por entrada (mediana)", old: "46", new: "39.5" },
+    { metric: "Latencia por entrada (mediana)", old: "12.5 s", new: "11.5 s" },
+    { metric: "Sobornar a los goblins con monedas (aprueba = responden)", old: "1/3", new: "3/3" },
+    { metric: "Ofrecerles nuestra comida a los goblins", old: "0/3", new: "2/3" },
+    { metric: "Mover un tronco caído (2 casos)", old: "1/3 cada uno", new: "0/3 cada uno" },
+  ]}
+  caption="Las dos columnas usan los graders aflojados. Con ellos, la tasa de aprobación global casi no se movió. La respuesta mediana se acortó, y la oferta de comida ahora funciona."
+/>
+
+Así que la reescritura se quedó, con estos graders: 54 contra 55 está dentro del ruido con tres intentos por caso, la respuesta mediana se acortó y la oferta de comida ahora pasa. El intento mediano dijo 6.5 palabras menos, unos 2.6 segundos a las 2.5 palabras por segundo que el registro de decisión supone para la voz. El promedio casi no se movió (51.4 palabras contra 50.9), y 8 de los 22 casos se alargaron, así que lo que se acortó es la respuesta típica. La fila de la comida es el mismo tipo de oferta que hice en la mesa ese lunes por la mañana, la que el narrador rechazó. La fila de las monedas hay que leerla con cuidado: ahí aprobar significa que los goblins responden la oferta en personaje, y en los tres intentos rechazaron el oro y pidieron nuestra comida. Es una decisión razonable, pero no es que el soborno funcione. Con los graders tal como se escribieron al principio, la brecha es mayor: el prompt viejo saca 48/66 y el nuevo 43/66. Lo que la agranda son solo ofertas que el prompt nuevo responde en personaje sin tirada. Con esos graders, el soborno con monedas pasa de 1/3 a 0/3, y lo mismo mi ruego para que nos perdonaran la vida: el prompt viejo pidió una prueba en 1 de 3 intentos y el nuevo en ninguno, y los goblins simplemente respondieron. El principio de influencia lo permite, y los graders originales no. Aun ahí las ofertas se compensan, porque la de comida gana los dos intentos que pierden las otras dos. La brecha de 5 intentos en sí es el caso del fin de turno dicho con duda que viene más abajo (2 intentos), los dos casos del tronco (1 cada uno) y un intento de ruido. Los del tronco ya fallaban 2 de 3 antes, así que necesitan su propio arreglo.
+
+No esperaba lo siguiente. Estaba en las líneas que la reescritura quitó o reformuló.
+
+<Callout type="warning" title="Dos cambios que parecían inofensivos">
+En el primer borrador, algunos intentos me preguntaron con palabras en vez de poner una propuesta en mi celular. Claude lo atribuyó a una cláusula que había quitado de la regla de confirmación, "Then call proponer (or actuar) in the same response" (luego llama a proponer, o a actuar, en la misma respuesta; `proponer` es el tool que pone ahí la propuesta), y la devolvió palabra por palabra junto con otros cambios, así que esa cláusula nunca se midió sola. En el segundo borrador, un "creo que ahí queda" dicho con duda disparó una confirmación en 3 de 3 intentos. Leyendo los intentos fallidos, Claude le echó la culpa a un solo "only" que había agregado al fusionar dos reglas de fin de turno, aunque el primer borrador tenía la misma línea y pasó ese caso 3 de 3. El eval atrapó los dos. Una reescritura del prompt hecha a ojo los habría dejado pasar.
+</Callout>
+
+El arreglo fue un solo cambio que hizo tres cosas: sacó el "only", nombró la duda ("creo que ahí queda") dentro de la regla y acotó `ambiguous`, que pasó de "cuando no estés seguro" a palabras que "también puedan querer decir otra cosa". Los intentos fallidos habían marcado todos el fin de turno como `ambiguous`, así que quizá no era el "only" lo que pesaba. Después, los cuatro casos de fin de turno quedaron 10 de 10 antes de que esa corrida tocara su tope de costo. Como ahora la regla cita la misma frase que ese caso prueba, ese 10 de 10 confirma que el arreglo entró, pero no es evidencia independiente. La fila de la auditoría de prompts que cité arriba cubre las dos mitades: "test removals, not just additions", o sea, prueba lo que quitas igual que lo que agregas, y que una mejora en el eval por agregar una línea encima de la pila no es evidencia de que la pila deba existir. Lo primero aplica igual a reformular una línea que a borrarla.
+
+## Dónde está ahora la red de seguridad
+
+Cuando escribí [la guía del agente con alta tasa de acierto](/blog/es/high-accuracy-agent-priorities/) en junio, una de sus secciones era "Tu eval es el sistema de control", con el consejo de construir los graders desde un análisis de errores sobre trazas reales. Eso era investigación que había leído. En mi propio proyecto se vio así: graders armados con las frases exactas que dije en una mesa, en las situaciones exactas en que las dije, calificados según lo que quedó en el log de la sesión. El [módulo de evaluación](/es/learn/agentic-systems/evaluation/) tiene la versión general.
+
+También cierra un ciclo que abrí en [el post de los tests](/blog/es/tests-gave-me-control/), donde escribí que los tests atrapan lo que a uno se le ocurrió revisar. Los tests unitarios y las partidas con guion revisaban lo que Claude y yo creíamos que haría un jugador. Los forks revisan lo que yo hice.
+
+La red debajo de todo eso son ahora 23 frases mías: 22 de las tres primeras partidas y una de una cuarta. Es una red de malla gruesa, y el último reporte completo todavía marca como fallidos los dos casos del tronco. La regla ahora es que lo que yo diga cuando la mesa me fastidie se vuelve primero un caso en la suite. El prompt se toca después.
