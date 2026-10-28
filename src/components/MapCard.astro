@@ -1,0 +1,206 @@
+---
+/**
+ * MapCard: the knowledge-map entry on the blog index, beside DeepDiveCard and
+ * LabCard and in the same style. Every count comes from the build-time graph.
+ */
+import { buildContentMap } from '../lib/content-map';
+import { MAP_UI, mapHref } from './map/strings';
+
+interface Props {
+	lang: 'en' | 'es';
+}
+
+const { lang } = Astro.props;
+const ui = MAP_UI[lang];
+const { stats } = await buildContentMap(lang);
+
+const metrics: { value: string; label: string }[] = [
+	{ value: String(stats.posts), label: ui.legend.posts },
+	{ value: String(stats.modules), label: ui.legend.modules },
+	{ value: String(stats.lab), label: ui.legend.lab },
+	{ value: String(stats.terms), label: ui.legend.terms },
+	{ value: String(stats.edges), label: ui.legend.edges },
+];
+---
+
+<a href={mapHref(lang)} class="map-card-feature animate-fade-in delay-1">
+	<img class="terrain" src="/map/poster-wide.svg" alt="" aria-hidden="true" width="2900" height="1360" loading="lazy" decoding="async" />
+	<div class="map-inner">
+		<p class="eyebrow">{ui.card.eyebrow}</p>
+		<h2>{ui.card.title}</h2>
+		<p class="desc">{ui.card.desc}</p>
+		<dl class="metrics" aria-label={ui.card.metricsLabel}>
+			{metrics.map((m) => (
+				<div class="metric">
+					<dt>{m.value}</dt>
+					<dd>{m.label}</dd>
+				</div>
+			))}
+		</dl>
+		<span class="read-arrow">
+			{ui.card.cta}
+			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<line x1="5" y1="12" x2="19" y2="12"></line>
+				<polyline points="12 5 19 12 12 19"></polyline>
+			</svg>
+		</span>
+	</div>
+</a>
+
+<style>
+	.map-card-feature {
+		position: relative;
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+		isolation: isolate;
+		/* Tinted wash marks this as a special block — no left accent bar. */
+		background: oklch(from var(--color-accent) l c h / 0.045);
+		margin-bottom: 3rem;
+		transition: box-shadow var(--duration-normal) var(--ease-smooth),
+			transform var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+
+	.map-card-feature:hover {
+		box-shadow: var(--shadow-lg);
+		transform: translateY(-3px);
+		border-color: var(--color-accent);
+	}
+
+	/* The real terrain, as a quiet plate behind the copy. Decorative: the page it links to is the map. */
+	.terrain {
+		position: absolute;
+		z-index: -1;
+		right: -16%;
+		top: 50%;
+		width: 74%;
+		max-width: none;
+		height: auto;
+		translate: 0 -50%;
+		opacity: 0.5;
+		pointer-events: none;
+		mask-image: linear-gradient(90deg, transparent 0%, transparent 22%, black 62%);
+		transition: opacity var(--duration-slow) var(--ease-smooth), scale var(--duration-slow) var(--ease-smooth);
+	}
+
+	.map-card-feature:hover .terrain {
+		opacity: 0.8;
+		scale: 1.03;
+	}
+
+	.map-inner {
+		padding: 2rem 2.5rem;
+	}
+
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 0.9rem;
+	}
+
+	.map-inner h2 {
+		font-size: clamp(1.5rem, 3vw, 2rem);
+		margin: 0 0 0.55em;
+		line-height: 1.2;
+		letter-spacing: -0.015em;
+		max-width: 22ch;
+		text-wrap: balance;
+	}
+
+	.desc {
+		font-size: 1.05rem;
+		color: var(--color-text-secondary);
+		line-height: 1.65;
+		margin: 0 0 1.6em;
+		max-width: 46ch;
+	}
+
+	.metrics {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.6rem 2.2rem;
+		margin: 0 0 1.6em;
+		padding: 1.1rem 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+
+	.metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+
+	.metric dt {
+		font-family: var(--font-mono);
+		font-size: 1.35rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+	}
+
+	.metric dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
+
+	.read-arrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--color-accent);
+	}
+
+	.read-arrow svg {
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+
+	.map-card-feature:hover .read-arrow svg {
+		transform: translateX(4px);
+	}
+
+	@media (max-width: 640px) {
+		.map-inner {
+			padding: 1.5rem;
+		}
+		.terrain {
+			top: auto;
+			bottom: -8%;
+			right: -40%;
+			width: 150%;
+			translate: none;
+			opacity: 0.3;
+			mask-image: linear-gradient(180deg, transparent 0%, black 70%);
+		}
+		/* A fixed 3-column grid so no stat ends up alone on its own row. */
+		.metrics {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 1.1rem 1rem;
+		}
+		.metric dt {
+			font-size: 1.15rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.terrain {
+			transition: none;
+		}
+	}
+</style>

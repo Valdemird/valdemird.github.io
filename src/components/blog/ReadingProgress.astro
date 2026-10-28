@@ -6,27 +6,48 @@
 </div>
 
 <script>
-	const bar = document.getElementById('reading-progress-bar');
-	const article = document.querySelector('article');
+	// The layout persists across View Transition navigations (post → post via
+	// Read next, module → module via the pager), so query the bar and article on
+	// every page load and tear the listener down before the DOM swaps.
+	let controller: AbortController | null = null;
 
-	if (bar && article) {
-		let ticking = false;
-		window.addEventListener('scroll', () => {
-			if (!ticking) {
-				requestAnimationFrame(() => {
-					const rect = article.getBoundingClientRect();
-					const articleTop = rect.top + window.scrollY;
-					const articleHeight = rect.height;
-					const windowHeight = window.innerHeight;
-					const scrolled = window.scrollY - articleTop + windowHeight * 0.3;
-					const progress = Math.min(Math.max(scrolled / articleHeight, 0), 1);
-					bar.style.transform = `scaleX(${progress})`;
-					ticking = false;
-				});
-				ticking = true;
-			}
-		});
+	function teardown() {
+		controller?.abort();
+		controller = null;
 	}
+
+	function init() {
+		teardown();
+		const bar = document.getElementById('reading-progress-bar');
+		const article = document.querySelector('article');
+		if (!bar || !article) return;
+
+		controller = new AbortController();
+		const { signal } = controller;
+		let ticking = false;
+
+		const update = () => {
+			const rect = article.getBoundingClientRect();
+			const articleTop = rect.top + window.scrollY;
+			const scrolled = window.scrollY - articleTop + window.innerHeight * 0.3;
+			const progress = rect.height > 0 ? Math.min(Math.max(scrolled / rect.height, 0), 1) : 0;
+			bar.style.transform = `scaleX(${progress})`;
+			ticking = false;
+		};
+
+		const onScroll = () => {
+			if (ticking) return;
+			ticking = true;
+			requestAnimationFrame(update);
+		};
+
+		window.addEventListener('scroll', onScroll, { passive: true, signal });
+		window.addEventListener('resize', onScroll, { passive: true, signal });
+		update();
+	}
+
+	document.addEventListener('astro:page-load', init);
+	document.addEventListener('astro:before-swap', teardown);
 </script>
 
 <style>

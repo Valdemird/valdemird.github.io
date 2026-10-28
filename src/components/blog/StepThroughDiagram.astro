@@ -166,16 +166,30 @@ const { steps, exclusive = false } = Astro.props;
     padding-bottom: 50vh;
   }
 
+  /* The numbered index circle marks progress; the active step adds a tinted
+     wash framed by hairline top/bottom rules. No left accent bar. */
   .sdiag-step {
+    --sdiag-wash: 0.045;
     display: grid;
     grid-template-columns: 2.5rem 1fr;
     align-items: start;
     gap: 0.85rem;
     padding: 1rem 1.25rem;
-    border-left: 3px solid var(--color-border);
+    border-top: 1px solid transparent;
+    border-bottom: 1px solid transparent;
     transition:
       border-color 0.4s var(--ease-smooth),
       background 0.4s var(--ease-smooth);
+  }
+
+  :global([data-theme='dark']) .sdiag-step {
+    --sdiag-wash: 0.085;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme='light'])) .sdiag-step {
+      --sdiag-wash: 0.085;
+    }
   }
 
   .sdiag-step-index {
@@ -202,8 +216,8 @@ const { steps, exclusive = false } = Astro.props;
   }
 
   .sdiag-step[data-active="true"] {
-    border-left-color: var(--color-accent);
-    background: oklch(from var(--color-accent) l c h / 0.04);
+    border-color: var(--color-border);
+    background: oklch(from var(--color-accent) l c h / var(--sdiag-wash));
   }
   .sdiag-step[data-active="true"] .sdiag-step-index {
     background: var(--color-accent);

@@ -15,16 +15,20 @@ export const meta = {
 	props: [
 		{ name: 'type', type: '"bar" | "horizontal" | "line" | "area" | "donut" | "scatter"', default: '"bar"', description: 'Chart shape. Bars animate via CSS, SVG types via GSAP + ScrollTrigger.' },
 		{ name: 'data', type: '{ label, value, color? }[]', description: 'Data points. color accepts any CSS color, defaults to the accent token.' },
-		{ name: 'series', type: '{ name, color?, data }[]', description: 'Multi-series lines with legend toggling. Line type only; x labels from the first series.' },
-		{ name: 'points', type: '{ x, y, label?, color? }[]', description: 'Scatter points (type="scatter").' },
+		{ name: 'series', type: '{ name, color?, tone?, data }[]', description: 'Multi-series lines with legend toggling (at least one series stays on). Line type only; x labels from the first series. tone ("accent" | "success" | "warning" | "destructive" | "muted") gives a series semantic meaning.' },
+		{ name: 'palette', type: '"categorical" | "sequential"', default: '"categorical"', description: 'Series colors: distinct brand hues, or one hue light to dark for ordered levels.' },
+		{ name: 'points', type: '{ x, y, label?, color?, highlight? }[]', description: 'Scatter points (type="scatter"). highlight draws the point in accent with its label beside it.' },
 		{ name: 'thresholds', type: '{ value, label? }[]', default: '[]', description: 'Dashed reference lines on line/area/scatter.' },
 		{ name: 'curve', type: '"linear" | "monotone"', default: '"linear"', description: 'Path interpolation for line/area.' },
 		{ name: 'interactive', type: 'boolean', default: 'true', description: 'Hover crosshair + readout and arrow-key navigation on SVG types.' },
-		{ name: 'story', type: 'string', description: 'Finding-first headline above the chart. State the point, not the topic.' },
-		{ name: 'title', type: 'string', description: 'Small mono meta label in the chart header bar.' },
-		{ name: 'annotations', type: '{ targetIndex, text, emphasize? }[]', default: '[]', description: 'Per-point callouts; emphasize outlines the point as the focus.' },
-		{ name: 'source', type: 'string', description: 'Muted mono attribution below the chart.' },
-		{ name: 'yLabel / xLabel', type: 'string', description: 'Axis labels, SVG types only.' },
+		{ name: 'story', type: 'string', description: 'Finding-first lede (Fraunces, figure scale). State the point, not the topic.' },
+		{ name: 'title', type: 'string', description: 'Mono uppercase eyebrow above the story: what is being measured.' },
+		{ name: 'annotations', type: '{ targetIndex, text, emphasize? }[]', default: '[]', description: 'Per-point callouts in a slot that never overlaps marks: a note line under a horizontal bar, a numbered marker + notes list for vertical bars, an edge-aware haloed label on lines. emphasize keeps that point at full ink and steps the rest back.' },
+		{ name: 'unit', type: 'string', default: '""', description: 'Suffix for printed values, readouts and (if 2 chars or less) y ticks, e.g. "%" or " min".' },
+		{ name: 'xUnit', type: 'string', description: 'Suffix for the readout header on line/area charts, e.g. " steps" gives "10 steps".' },
+		{ name: 'totalLabel', type: 'string', description: 'Donut: mono caption under the center total, e.g. "hours".' },
+		{ name: 'source', type: 'string | slot', description: 'Muted attribution below a hairline. Use <span slot="source"> for links or superscripts.' },
+		{ name: 'yLabel / xLabel', type: 'string', description: 'Axis titles (HTML, so they never scale with the SVG). SVG types only.' },
 	],
 };
 
@@ -45,15 +49,15 @@ const barData = es
 
 const horizontalData = es
 	? [
-		{ label: 'scaffold', value: 12 },
-		{ label: 'primera pasada', value: 34 },
-		{ label: 'loop de review', value: 58 },
+		{ label: 'armar el módulo', value: 12 },
+		{ label: 'primera pasada con el agente', value: 34 },
+		{ label: 'loop de review, tres rondas', value: 58 },
 		{ label: 'pulido', value: 21 },
 	]
 	: [
-		{ label: 'scaffold', value: 12 },
-		{ label: 'first pass', value: 34 },
-		{ label: 'review loop', value: 58 },
+		{ label: 'scaffold the module', value: 12 },
+		{ label: 'first pass with the agent', value: 34 },
+		{ label: 'review loop, three rounds', value: 58 },
 		{ label: 'polish', value: 21 },
 	];
 
@@ -79,7 +83,7 @@ const multiSeries = es
 			{ label: 'sem1', value: 2 }, { label: 'sem2', value: 3 },
 			{ label: 'sem3', value: 2 }, { label: 'sem4', value: 4 },
 		] },
-		{ name: 'sin tests', data: [
+		{ name: 'sin tests', tone: 'destructive' as const, data: [
 			{ label: 'sem1', value: 3 }, { label: 'sem2', value: 6 },
 			{ label: 'sem3', value: 9 }, { label: 'sem4', value: 14 },
 		] },
@@ -89,7 +93,7 @@ const multiSeries = es
 			{ label: 'wk1', value: 2 }, { label: 'wk2', value: 3 },
 			{ label: 'wk3', value: 2 }, { label: 'wk4', value: 4 },
 		] },
-		{ name: 'no tests', data: [
+		{ name: 'no tests', tone: 'destructive' as const, data: [
 			{ label: 'wk1', value: 3 }, { label: 'wk2', value: 6 },
 			{ label: 'wk3', value: 9 }, { label: 'wk4', value: 14 },
 		] },
@@ -103,7 +107,7 @@ const scatterPoints = es
 		{ x: 150, y: 42, label: 'feat mediano' },
 		{ x: 240, y: 95, label: 'refactor' },
 		{ x: 320, y: 150, label: 'migración' },
-		{ x: 520, y: 260, label: 'el grandote', color: 'var(--color-destructive)' },
+		{ x: 520, y: 260, label: 'el grandote', highlight: true },
 	]
 	: [
 		{ x: 12, y: 4, label: 'fix typo' },
@@ -112,7 +116,7 @@ const scatterPoints = es
 		{ x: 150, y: 42, label: 'mid feat' },
 		{ x: 240, y: 95, label: 'refactor' },
 		{ x: 320, y: 150, label: 'migration' },
-		{ x: 520, y: 260, label: 'the big one', color: 'var(--color-destructive)' },
+		{ x: 520, y: 260, label: 'the big one', highlight: true },
 	];
 
 const donutData = es
@@ -120,19 +124,19 @@ const donutData = es
 		{ label: 'loop de review', value: 19 },
 		{ label: 'escribir código', value: 11 },
 		{ label: 'escribir tests', value: 8 },
-		{ label: 'pensar', value: 4, color: 'var(--color-warning)' },
+		{ label: 'pensar', value: 4 },
 	]
 	: [
 		{ label: 'review loop', value: 19 },
 		{ label: 'writing code', value: 11 },
 		{ label: 'writing tests', value: 8 },
-		{ label: 'thinking', value: 4, color: 'var(--color-warning)' },
+		{ label: 'thinking', value: 4 },
 	];
 ---
 
 <DemoSection
 	label={es ? 'barras / con anotaciones' : 'bar / annotated'}
-	description={es ? 'Columnas animadas con CSS; la anotación con emphasize delinea el punto de datos de la historia.' : "CSS-animated columns; annotation with emphasize outlines the story's data point."}
+	description={es ? 'Cada columna lleva su valor encima. La anotación es un marcador numerado con su nota debajo, y la columna destacada queda a tinta plena mientras las demás retroceden. Pasa el puntero o entra con Tab para levantar cualquier columna.' : "Every column carries its value. The annotation is a numbered marker with its note below, and the highlighted column stays at full ink while the rest step back. Hover or Tab onto any column to lift it."}
 	usage={`<InteractiveChart
   type="bar"
   story="Review picks up half of what slips past the agent."
@@ -156,14 +160,15 @@ const donutData = es
 
 <DemoSection
 	label="horizontal"
-	description={es ? 'Filas con columna de valores — mejor cuando las etiquetas son largas.' : 'Rows with value column — better when labels are long.'}
+	description={es ? 'La mejor opción cuando las etiquetas son largas. Todas las barras arrancan en la misma línea, los valores van en su propia columna y la nota, con el mismo marcador numerado que las columnas, queda debajo de su barra. En pantallas angostas la etiqueta sube encima de la barra.' : 'The pick for long labels. Every bar starts on the same line, values sit in their own column, and the note, with the same numbered marker the columns use, goes under its bar. On narrow screens the label moves above the bar.'}
 	usage={`<InteractiveChart
   type="horizontal"
-  title="time per task (min)"
+  title="time per task"
+  unit=" min"
   data={[
-    { label: "scaffold", value: 12 },
-    { label: "first pass", value: 34 },
-    { label: "review loop", value: 58 },
+    { label: "scaffold the module", value: 12 },
+    { label: "first pass with the agent", value: 34 },
+    { label: "review loop, three rounds", value: 58 },
     { label: "polish", value: 21 },
   ]}
   annotations={[{ targetIndex: 2, text: "where the day goes", emphasize: true }]}
@@ -171,7 +176,8 @@ const donutData = es
 >
 	<Chart
 		type="horizontal"
-		title={es ? 'tiempo por tarea (min)' : 'time per task (min)'}
+		title={es ? 'tiempo por tarea' : 'time per task'}
+		unit=" min"
 		data={horizontalData}
 		annotations={[{ targetIndex: 2, text: es ? 'donde se va el día' : 'where the day goes', emphasize: true }]}
 	/>
@@ -179,7 +185,7 @@ const donutData = es
 
 <DemoSection
 	label={es ? 'línea / con anotaciones' : 'line / annotated'}
-	description={es ? 'La línea se dibuja sola al entrar en pantalla. Dale replay para verla de nuevo.' : 'The line draws itself in as it enters the view. Replay to watch it again.'}
+	description={es ? 'La línea se dibuja sola al entrar en pantalla, y la nota busca un hueco junto a su punto sin tapar la línea ni salirse del gráfico. Si no hay hueco, el punto lleva un número y la nota baja debajo del gráfico. Dale replay para verla de nuevo.' : "The line draws itself in as it enters the view, and the note looks for a clear spot beside its point without covering the line or running off the plot. When there isn't one, the point gets a number and the note moves under the chart. Replay to watch it again."}
 	usage={`<InteractiveChart
   type="line"
   story="The suite got slower until the fixture rewrite landed."
@@ -229,7 +235,7 @@ const donutData = es
 
 <DemoSection
 	label={es ? 'multiserie / toggle de leyenda / umbrales' : 'multi-series / legend toggle / thresholds'}
-	description={es ? 'Haz hover para mover el crosshair, haz clic en los chips de la leyenda para ocultar una serie, enfoca el SVG y usa las flechas. El umbral se dibuja como una línea de referencia punteada.' : 'Hover to scrub the crosshair, click legend chips to hide a series, focus the SVG and use arrow keys. Threshold renders as a dashed reference line.'}
+	description={es ? 'Pasa el puntero (o toca, en el celular) para leer los valores de cada semana; la lectura se acomoda donde no tape ninguna línea. Los chips de la leyenda ocultan una serie, y siempre queda al menos una. Entra al gráfico con Tab y usa las flechas. La serie sin tests va en rojo porque es la mala noticia, y el tope de errores es una línea de referencia punteada.' : "Hover (or tap, on a phone) to read each week's values; the readout parks where it covers no line. Legend chips hide a series, and at least one always stays on. Tab into the chart and use the arrow keys. The untested series is red because it's the bad news, and the error budget is a dashed reference line."}
 	usage={`<InteractiveChart
   type="line"
   curve="monotone"
@@ -239,7 +245,7 @@ const donutData = es
       { label: "wk1", value: 2 }, { label: "wk2", value: 3 },
       { label: "wk3", value: 2 }, { label: "wk4", value: 4 },
     ]},
-    { name: "no tests", data: [
+    { name: "no tests", tone: "destructive", data: [
       { label: "wk1", value: 3 }, { label: "wk2", value: 6 },
       { label: "wk3", value: 9 }, { label: "wk4", value: 14 },
     ]},
@@ -251,16 +257,16 @@ const donutData = es
 	<Chart
 		type="line"
 		curve="monotone"
-		story={es ? 'El agente entrega más rápido, pero solo la rama con tests se mantiene bajo el presupuesto de errores.' : 'The agent ships faster, but only the tested branch stays under the error budget.'}
+		story={es ? 'El agente entrega más rápido, pero solo la rama con tests se mantiene bajo el tope de errores.' : 'The agent ships faster, but only the tested branch stays under the error budget.'}
 		series={multiSeries}
-		thresholds={[{ value: 8, label: es ? 'presupuesto de errores' : 'error budget' }]}
+		thresholds={[{ value: 8, label: es ? 'tope de errores' : 'error budget' }]}
 		yLabel={es ? 'regresiones' : 'regressions'}
 	/>
 </DemoSection>
 
 <DemoSection
 	label={es ? 'dispersión' : 'scatter'}
-	description={es ? 'Puntos numéricos x/y con ticks limpios en ambos ejes. Recorre los puntos con hover o con las flechas.' : 'Numeric x/y points with nice ticks on both axes. Hover or arrow through points.'}
+	description={es ? 'Puntos numéricos x/y con ticks limpios en ambos ejes. El puntero se engancha al punto más cercano y la lectura da las dos coordenadas. El punto destacado lleva su nombre al lado.' : 'Numeric x/y points with clean ticks on both axes. The pointer snaps to the nearest point and the readout gives both coordinates. The highlighted point carries its name beside it.'}
 	usage={`<InteractiveChart
   type="scatter"
   title="PR size vs review time"
@@ -268,7 +274,7 @@ const donutData = es
     { x: 12, y: 4, label: "fix typo" },
     { x: 80, y: 18, label: "small feat" },
     { x: 240, y: 95, label: "refactor" },
-    { x: 520, y: 260, label: "the big one", color: "var(--color-destructive)" },
+    { x: 520, y: 260, label: "the big one", highlight: true },
   ]}
   thresholds={[{ value: 120, label: "review SLA" }]}
   xLabel="lines changed" yLabel="review minutes"
@@ -286,7 +292,7 @@ const donutData = es
 
 <DemoSection
 	label={es ? 'dona' : 'donut'}
-	description={es ? 'Partes de un todo con leyenda; el total va en serif al centro.' : 'Part-of-whole with legend; total set in serif in the center.'}
+	description={es ? 'Partes de un todo con leyenda. La porción de la historia va en el acento y las demás en grises; el total va en serif al centro con su unidad. Pasa el puntero por una fila o una porción y se iluminan juntas.' : "Part-of-whole with a legend. The story's slice takes the accent and the rest go grey; the total sits in serif at the center with its unit. Hover a row or a slice and they light up together."}
 	usage={`<InteractiveChart
   type="donut"
   story="Most of the month went to the review loop."
@@ -294,13 +300,17 @@ const donutData = es
     { label: "review loop", value: 19 },
     { label: "writing code", value: 11 },
     { label: "writing tests", value: 8 },
-    { label: "thinking", value: 4, color: "var(--color-warning)" },
+    { label: "thinking", value: 4 },
   ]}
+  totalLabel="hours"
+  annotations={[{ targetIndex: 0, text: "the review loop", emphasize: true }]}
 />`}
 >
 	<Chart
 		type="donut"
 		story={es ? 'La mayor parte del mes se fue en el loop de review.' : 'Most of the month went to the review loop.'}
 		data={donutData}
+		totalLabel={es ? 'horas' : 'hours'}
+		annotations={[{ targetIndex: 0, text: es ? 'el loop de review' : 'the review loop', emphasize: true }]}
 	/>
 </DemoSection>

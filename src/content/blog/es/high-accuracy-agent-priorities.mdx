@@ -1,8 +1,9 @@
 ---
-title: "Cómo construir un agente de IA con alta tasa de acierto: qué priorizar y qué ignorar"
-description: "Por qué un agente de IA falla en producción y qué priorizar para subir su tasa de acierto. El harness importa más que el modelo: qué hacer y qué ignorar."
+title: "Agentes de IA fiables: qué priorizar y qué ignorar"
+description: "La fiabilidad de un agente se multiplica paso a paso (p^t). Qué sube de verdad su tasa de acierto (harness, tools, evals, verificación) y qué puedes ignorar."
 pubDate: 2026-06-26
-tags: ["ai-agents", "llm", "production", "reliability", "engineering"]
+updatedDate: 2026-10-27
+tags: ["agentes-ia", "herramientas-ia", "llm", "producción", "fiabilidad", "ingeniería"]
 featured: true
 lang: es
 ---
@@ -13,41 +14,46 @@ import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
 import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
 import DataTable from '../../../components/blog/DataTable.astro';
 import StatGrid from '../../../components/blog/StatGrid.astro';
-import PullQuote from '../../../components/blog/PullQuote.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Tabs from '../../../components/blog/Tabs.astro';
 import TabPanel from '../../../components/blog/TabPanel.astro';
 import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
 
-Pasé las últimas semanas armando una [wiki de 16 módulos sobre sistemas agénticos](/es/learn/agentic-systems/), desde qué es físicamente un LLM hasta lo de frontera con multiagente. No la escribí a mano. Corrí workflows de Claude Code, un pipeline de investigación multiagente, para redactarla y verificarla de forma cruzada, y después la estudié hasta entenderla lo suficiente como para poder discutirle.
+En la segunda mitad de junio armé una [wiki de 16 módulos sobre sistemas agénticos](/es/learn/agentic-systems/), desde qué es físicamente un LLM hasta la frontera de los sistemas multiagente. No la escribí a mano. La construí con workflows de Claude Code, un pipeline de investigación multiagente que la redactó y la verificó de forma cruzada, y después la estudié hasta entenderla lo suficiente como para poder discutirle.
 
-Este post es lo que saqué de ahí. Es la versión condensada y práctica: qué priorizar y qué ignorar si quieres construir agentes que de verdad aguanten. Todo lo que sigue está destilado de esa wiki, y cada sección enlaza al módulo donde vive el argumento completo y las fuentes calificadas.
+La publiqué el 22 de junio. Tres días después hice merge de las correcciones de un segundo pipeline: un fact-check multiagente en el que cada afirmación señalada se contrastaba con la web y la confirmaban votantes independientes. Encontró 20 afirmaciones erróneas y 26 problemas con las fuentes. Una cifra del 70% explicada como si midiera otra cosa. Dos CVE de Cursor descritos como un tipo de ataque distinto. Un término atribuido al laboratorio equivocado. Todo eso ya había pasado por la verificación cruzada del primer pipeline, y la wiki llevaba tres días publicada.
+
+Este post es la versión condensada y práctica de esa wiki: qué priorizar y qué ignorar si quieres construir agentes que de verdad aguanten. Cada sección enlaza al módulo donde vive el argumento completo con sus fuentes calificadas.
 
 La parte incómoda es que casi nada de la lista de prioridades tiene que ver con el modelo.
 
 <TLDR bullets={[
-  "Un agente fiable se gana en el harness, no en el modelo. La fiabilidad se multiplica paso a paso (p^t): una cadena de 20 pasos al 95% por paso aún aterriza cerca del 36%. Acorta la cadena y verifica contra ground truth en vez de buscar un modelo más listo.",
+  "Un agente fiable se gana en el harness. La fiabilidad se multiplica paso a paso (p^t): una cadena de 20 pasos al 95% por paso aún aterriza cerca del 36%. Acorta la cadena y verifica contra ground truth (un dato real, externo al modelo) antes de salir a buscar un modelo más listo.",
   "Prioriza, en orden: controla el loop desde código, diseña los tools como el espacio de acción del agente, cura el contexto como un presupuesto de atención, haz del eval tu sistema de control, y acota el blast radius con arquitectura en vez de prompts.",
   "Ignora las distracciones tentadoras: multiagente por defecto, fine-tuning primero, ventanas de contexto más grandes, una vector DB para un corpus pequeño, y seguridad a nivel de prompt.",
 ]} />
 
 <Callout type="important" title="La tesis">
-La distancia entre un agente fiable al 95% y un demo que se cae es casi por completo **harness, no la inteligencia del modelo**. La fiabilidad se compone de forma geométrica. La subes haciendo que cada paso sea barato y seguro de reintentar, y rompiendo la cadena de error con verificación contra ground truth. No comprando un modelo más listo ni escribiendo un prompt más ingenioso.
+La distancia entre un agente fiable al 95% y un demo que se cae es casi por completo **harness, no la inteligencia del modelo**. La fiabilidad se compone de forma geométrica. La subes haciendo que cada paso sea barato y seguro de reintentar, y rompiendo la cadena de error con verificación contra ground truth. Un modelo más listo o un prompt más ingenioso mueven ese número mucho menos de lo que uno espera.
 </Callout>
 
 ## Haz la aritmética p^t antes de escribir una línea de código
 
 Este es el número que nadie calcula. Si cada paso de tu agente acierta de forma independiente con probabilidad `p`, y la tarea toma `t` pasos, la tarea entera acierta con probabilidad `p^t`. Los errores no se suman. Se multiplican.
 
-Una tarea de 10 pasos donde cada paso es fiable al 90% aterriza en `0.9^10 ≈ 35%`. Sube cada paso al 95%, ponle 20 pasos, y aun así estás en `0.95^20 ≈ 36%`. La intuición humana subestima esto con fuerza, y por eso tantos agentes lucen perfectos en el demo (un happy path corto) y mueren en producción (uno real y largo).
+Una tarea de 10 pasos donde cada paso es fiable al 90% aterriza en `0.9^10 ≈ 35%`. Sube cada paso al 95%, ponle 20 pasos, y aun así estás en `0.95^20 ≈ 36%`. La intuición humana se queda muy corta con esto, y por eso tantos agentes lucen perfectos en el demo (un happy path corto) y mueren en producción (uno real y largo).
 
 <InteractiveChart
   type="line"
   curve="monotone"
-  story="El acierto se desploma de forma geométrica con la longitud de la cadena. La solución casi nunca es un modelo más listo, sino una cadena más corta o un piso por paso más alto."
+  palette="sequential"
+  title="Acierto de la tarea vs longitud de la cadena"
+  unit="%"
+  xUnit=" pasos"
+  story="El acierto se desploma de forma geométrica con la longitud de la cadena. Lo que suele arreglarlo es una cadena más corta o un piso por paso más alto."
   yLabel="acierto de la tarea"
   xLabel="pasos en la cadena"
-  source="p^t para una fiabilidad por paso independiente p. Ver el módulo agente como política."
   series={[
     { name: "90% / paso", data: [
       { label: "1", value: 90 }, { label: "5", value: 59 }, { label: "10", value: 35 }, { label: "15", value: 21 }, { label: "20", value: 12 },
@@ -59,21 +65,23 @@ Una tarea de 10 pasos donde cada paso es fiable al 90% aterriza en `0.9^10 ≈ 3
       { label: "1", value: 99 }, { label: "5", value: 95 }, { label: "10", value: 90 }, { label: "15", value: 86 }, { label: "20", value: 82 },
     ]},
   ]}
-/>
+>
+  <span slot="source">p<sup>t</sup> para una fiabilidad por paso independiente p. Más en el <a href="/es/learn/agentic-systems/agent-as-policy/">módulo del agente como política</a>.</span>
+</InteractiveChart>
 
 Esa única curva orienta todas las demás decisiones. Te da exactamente tres palancas: subir `p` (fiabilidad por paso), reducir `t` (acortar la cadena), o partir la cadena en segmentos que reinicien el error. "Usa un modelo más listo" es una forma débil de mover `p` y no hace nada por `t`. La mayoría de las cosas que "necesitan un agente" funcionan mejor como un workflow determinista o una sola llamada, una vez que ves lo que la aritmética te exige. Esa decisión es lo primero que te obliga a enfrentar el [módulo de agente como política](/es/learn/agentic-systems/agent-as-policy/).
 
 <StatGrid columns={3} stats={[
-  { value: "35%", label: "acierto de una cadena de 10 pasos al 90%/paso", context: "0.9¹⁰ — la aritmética que casi nadie hace antes de construir" },
-  { value: ">90%", label: "de bypass adaptativo a 12 defensas de inyección publicadas", context: "por qué la seguridad a nivel de prompt no es un control" },
-  { value: "~79%", label: "de los fallos multiagente son de coordinación, no del modelo", context: "la arquitectura a la que recurriste es el bug" },
+  { value: "35%", label: "acierto de una cadena de 10 pasos al 90%/paso", context: "0.9¹⁰, la aritmética que casi nadie hace antes de construir" },
+  { value: ">90%", label: "de éxito de ataque contra la mayoría de 12 defensas publicadas contra jailbreaks e inyección", context: "por qué la seguridad a nivel de prompt no es un control" },
+  { value: "~3/4", label: "de los fallos multiagente vienen del diseño del sistema y del desalineamiento entre agentes", context: "la arquitectura a la que recurriste es el bug" },
 ]} />
 
 ## Rompe la cadena: verifica contra ground truth
 
 Si la fiabilidad decae de forma geométrica, lo de mayor palanca que puedes construir (después de conocer tu número) es algo que *reinicie* el error a mitad de la cadena. Pon una compuerta de verificación en medio y un catastrófico `p^20` se vuelve dos segmentos más amables de `p^10`.
 
-El truco está en que la verificación tiene que venir de fuera del modelo. Un resultado real de un tool. Un test que pasó o falló. La fila que de verdad se escribió en la base de datos. Preguntarle al modelo "¿lo lograste?" y creerle no sirve, porque el evaluador comparte los puntos ciegos del generador. La autocorrección intrínseca no mejora el razonamiento de forma fiable y a veces lo empeora. El ground truth es lo único que de verdad reinicia el error por paso, y por eso el [módulo del loop de control](/es/learn/agentic-systems/agent-loop/) trata el feedback observable como la pieza que carga el peso del loop, no el prompt.
+El truco está en que la verificación tiene que venir de fuera del modelo. Un resultado real de un tool. [Un test que pasó o falló](/blog/es/tests-gave-me-control/). La fila que de verdad se escribió en la base de datos. Preguntarle al modelo "¿lo lograste?" y creerle no sirve, porque el evaluador comparte los puntos ciegos del generador. La autocorrección intrínseca no mejora el razonamiento de forma fiable y a veces lo empeora.<Sidenote>Huang et al., "Large Language Models Cannot Self-Correct Reasoning Yet" (ICLR 2024).</Sidenote> Mi wiki es un ejemplo a pequeña escala: el pipeline de investigación ya había verificado su propio trabajo de forma cruzada, y una segunda pasada que contrastó cada afirmación con la web todavía encontró 20 erróneas. El ground truth es lo único que de verdad reinicia el error por paso, y por eso el [módulo del loop de control](/es/learn/agentic-systems/agent-loop/) trata el feedback observable como la pieza que carga el peso del loop.
 
 <Callout type="warning" title="La trampa del autoexamen">
 Un loop donde el modelo revisa su propio razonamiento parece verificación y no lo es. Si la comprobación no puede fallar de forma independiente de lo que comprueba, no es una comprobación. Conéctale un resultado de tool, un test o una lectura de la base de datos.
@@ -92,17 +100,17 @@ graph LR
   T --> V{"Chequeo de ground truth"}
   V -->|pasa| S
   V -->|falla| M
-  S --> G["Guarda de no-progreso / presupuesto"]
+  S --> G["Guarda de progreso<br/>y presupuesto"]
   G -->|para| D["Listo o escala"]
 `} />
 
 La guarda de ese diagrama es la condición que todos saltan. Sin un chequeo de no-progreso, un agente quemará feliz todo su presupuesto de tokens repitiendo una sola llamada que falla. La terminación necesita varias condiciones: objetivo alcanzado, presupuesto agotado *y* sin progreso desde el último turno. Más sobre la forma del loop en el [módulo del agent loop](/es/learn/agentic-systems/agent-loop/).
 
-## Los tools SON el espacio de acción: diséñalos como UX, no como un wrapper de API
+## Los tools son el espacio de acción: diséñalos como UX, no como un wrapper de API
 
-El modelo solo puede ser tan preciso como los tools que le des. Razona sobre los nombres, los schemas y (esta es la parte que la gente pasa por alto) los *strings de error* que tú escribiste. Reacciona a texto. No puede pasar por un debugger.
+El modelo solo puede ser tan preciso como los tools que le des. Razona sobre los nombres, los schemas y (esta es la parte que la gente pasa por alto) los *strings de error* que tú escribiste. Reacciona a texto. No puede depurar paso a paso.
 
-El error más común es espejar tu base de datos: un tool por tabla, UUIDs crudos de ida y vuelta, un bloque de 8K tokens de respuesta. Eso maximiza el número de llamadas secuenciales que el modelo tiene que orquestar, lo que (recuerda la aritmética) maximiza las formas en que puede fallar. Colapsa N llamadas en un tool que complete un workflow entero, devuelve valores que un humano podría leer, y escribe los errores como instrucciones sobre las que el modelo pueda actuar.
+El error más común es espejar tu base de datos: un tool por tabla, UUIDs crudos de ida y vuelta, un bloque de 8K tokens de respuesta. Eso maximiza el número de llamadas secuenciales que el modelo tiene que orquestar, lo que (recuerda la aritmética) maximiza las formas en que puede fallar. Colapsa N llamadas en un tool que complete un workflow entero, devuelve valores que un humano podría leer, y escribe los errores como instrucciones sobre las que el modelo pueda actuar. Las dos pestañas de abajo son bocetos de firmas de tools, no una API real.
 
 <Tabs labels={["Espejo CRUD (frágil)", "Tool de workflow (sólido)"]}>
 <TabPanel>
@@ -112,13 +120,13 @@ El error más común es espejar tu base de datos: un tool por tabla, UUIDs crudo
 // Un tool por tabla. El modelo tiene que orquestar todo el baile,
 // sostener UUIDs en el contexto y adivinar el orden correcto cada vez.
 get_user(id) -> { user_id: "8f3c...", tz_id: 42 }
-list_slots(resource_id, day) -> [ bloque de 5000 tokens de filas crudas ]
+list_slots(resource_id, day) -> [ bloque de 8K tokens de filas crudas ]
 create_booking(user_id, slot_id) -> 201
 // Ante un input malo recibes: 400.
 ```
 </CodeBlock>
 
-Cada flecha es otra `p`. Cinco tablas, cinco oportunidades de soltar la cadena.
+Cada flecha es otra `p`. Tres llamadas, tres oportunidades de soltar la cadena.
 
 </TabPanel>
 <TabPanel>
@@ -130,8 +138,8 @@ Cada flecha es otra `p`. Cinco tablas, cinco oportunidades de soltar la cadena.
 schedule_event({ customer: "Ana", service: "corte", when: "mar 5pm" })
   -> { status: "agendado", with: "Ana", at: "2026-06-30 17:00", id: "evt_91" }
 
-// Ante un input malo, el error ES el siguiente prompt:
-  -> { error: "usa ISO-8601 en `when`; enviaste '5pm'. ¿Querías 17:00?" }
+// Ante un input ambiguo, el error ES el siguiente prompt:
+  -> { error: "'5pm' no tiene día. ¿Querías decir mar 2026-06-30 17:00? Reenvíalo así o con una hora en ISO-8601." }
 ```
 </CodeBlock>
 
@@ -140,45 +148,47 @@ Una flecha. Retornos semánticos. El error le dice al modelo cómo corregirse so
 </TabPanel>
 </Tabs>
 
-Un tool que devuelve 8K tokens no acertó, envenenó los siguientes turnos. Limita y pagina la salida, dale namespace a los catálogos grandes, y haz idempotente cada escritura. El tratamiento completo está en [un tool es UX para un LLM](/es/learn/agentic-systems/tools-and-mcp/).
+Un tool que devuelve 8K tokens envenena los siguientes turnos, aunque técnicamente la llamada haya salido bien. Limita y pagina la salida, dale namespace a los catálogos grandes, y haz idempotente cada escritura. El tratamiento completo está en [un tool es UX para un LLM](/es/learn/agentic-systems/tools-and-mcp/).
 
 ## Gasta el contexto como un presupuesto de atención
 
-Una ventana de 1M de tokens hace que "mételo todo" parezca gratis. No lo es. La atención es aproximadamente O(n²), y la recuperación se hunde en una curva en U bastante antes del límite nominal. Cada token irrelevante diluye la señal a la que el modelo está atendiendo *y* cuadruplica el costo. Más contexto no es más inteligencia.
+Una ventana de 1M de tokens hace que "mételo todo" parezca gratis. No lo es. Cada token irrelevante diluye la señal a la que el modelo está atendiendo, y el cómputo de la atención es aproximadamente O(n²): si duplicas el contexto, el cómputo del prefill se multiplica más o menos por cuatro, mientras que la factura por token de entrada sigue siendo lineal. El [módulo del sustrato del LLM](/es/learn/agentic-systems/llm-substrate/) separa bien esos dos costos. La recuperación también se degrada a medida que crece la longitud, y no de forma pareja: empeora en tareas semánticas y con distractores, bastante antes del límite nominal. La clásica curva en U de "lost in the middle" aparece en algunos montajes y en otros no.
 
-Trata la ventana como el estado de creencia del agente y cúrala en cada turno. Mantén identificadores ligeros dentro de la ventana y trae los datos pesados justo a tiempo a través de un tool. Desaloja salidas de tools que ya quedaron viejas en cuanto destilaste lo que importaba. Pon los hechos que cargan el peso al principio y al final, donde la recuperación es mejor. Cuando el agente empieza a alucinar, a repetir acciones o a perder el hilo, esas son patologías del estado de creencia. Se arreglan desalojando, no agrandando la ventana con la esperanza de que mejore. El [módulo de ingeniería de contexto](/es/learn/agentic-systems/context-engineering/) le pone nombre a cada modo de fallo para que puedas diagnosticar cuál estás viendo.
+Trata la ventana como el estado de creencia del agente y cúrala en cada turno. Mantén identificadores ligeros dentro de la ventana y trae los datos pesados justo a tiempo a través de un tool. Desaloja salidas de tools que ya quedaron viejas en cuanto destilaste lo que importaba. Pon los hechos que cargan el peso donde hayas *medido* que tu modelo los lee mejor. El principio es una primera apuesta barata.<Sidenote>Hasta esta actualización de octubre, este párrafo te decía que los pusieras al principio y al final, donde la recuperación es mejor. Mi propio fact-check ya había corregido en la wiki lo de la posición el día antes de que publicara, y se me pasó.</Sidenote> Cuando el agente empieza a alucinar, a repetir acciones o a perder el hilo, esas son patologías del estado de creencia. Se arreglan desalojando lo que sobra. El [módulo de ingeniería de contexto](/es/learn/agentic-systems/context-engineering/) le pone nombre a cada modo de fallo para que puedas diagnosticar cuál estás viendo.
 
 ## Tu eval es el sistema de control
 
 Tu tasa de acierto está limitada por la fidelidad de tu eval, sin matices. Si el eval lee ruido, manejas a ciegas por más rápido que iteres. Y la parte que sorprende: el grader del eval, la recompensa de RL y cualquier fitness de automejora son matemáticamente el mismo objeto. Un grader que el modelo puede engañar es un grader que entrena activamente a tu agente para engañarte.
 
-Dos reglas cargan casi todo el valor. Primero, construye los graders de abajo hacia arriba, desde un análisis de errores sobre trazas reales (codifica a mano unas 50 en temas de fallo, y luego escribe graders para las categorías frecuentes y costosas) en lugar de hacerlo de arriba hacia abajo contra las métricas que imaginaste. La distribución real de fallos casi nunca coincide con tu modelo mental previo. Segundo, condiciona los releases a **pass^k**, no a pass@1. Una sola corrida en verde no es fiabilidad.
+Dos reglas cargan casi todo el valor. Primero, construye los graders de abajo hacia arriba, desde un análisis de errores sobre trazas reales (codifica a mano unas 50 en temas de fallo, y luego escribe graders para las categorías frecuentes y costosas) en lugar de hacerlo de arriba hacia abajo contra las métricas que imaginaste. La distribución real de fallos casi nunca coincide con tu modelo mental previo. Segundo, condiciona los releases a **pass^k**. Una sola corrida en verde con pass@1 dice muy poco sobre la fiabilidad.
+
+La versión vivida de la primera regla es [cómo mis propias partidas se convirtieron en el eval](/blog/es/my-games-became-the-eval/) de DMai, un director de juego con IA que construí con Claude como proyecto personal y que sigue siendo privado.
 
 <Collapsible title="Por qué pass^k, y por qué cae más rápido de lo que crees">
 
-`pass@1` es un promedio en el mejor caso. `pass^k` pregunta si el agente acierta `k` veces seguidas, que es lo que "fiable" de verdad significa para cualquier cosa irreversible. Decae de forma exponencial: una tarea que pasa el 90% de las veces baja a `0.9^8 ≈ 43%` en ocho corridas consecutivas. Y los errores por paso están correlacionados positivamente en la práctica (un contexto malo envenena cada paso siguiente), así que la realidad suele caer *más rápido* que lo que sugiere la aritmética de errores independientes. Califica el estado persistido (la fila en la base de datos), nunca la afirmación del modelo de que hizo la cosa. El [módulo de evaluación](/es/learn/agentic-systems/evaluation/) recorre la calificación de trayectoria y los graders en código frente al LLM como juez.
+`pass@1` es un promedio en el mejor caso. `pass^k` pregunta si el agente acierta `k` veces seguidas, que es lo que "fiable" de verdad significa para cualquier cosa irreversible (el [glosario](/es/learn/agentic-systems/glossary/) tiene los dos términos lado a lado). Decae de forma exponencial: una tarea que pasa el 90% de las veces baja a `0.9^8 ≈ 43%` en ocho corridas consecutivas. Y los errores por paso están correlacionados positivamente en la práctica (un contexto malo envenena cada paso siguiente), así que la realidad suele caer *más rápido* que lo que sugiere la aritmética de errores independientes. Califica el estado persistido (la fila en la base de datos), nunca la afirmación del modelo de que hizo la cosa. El [módulo de evaluación](/es/learn/agentic-systems/evaluation/) recorre la calificación de trayectoria y los graders en código frente al LLM como juez.
 
 </Collapsible>
 
 ## La seguridad y la aprobación humana son arquitectura, no un mejor prompt
 
-El prompt injection no tiene arreglo a nivel de modelo. El LLM concatena tu system prompt y los datos envenenados en un solo flujo indiferenciado sin frontera de privilegio, el clásico confused deputy. En un estudio sistemático, 12 defensas conductuales publicadas cayeron ante ataques adaptativos con más del 90% de éxito. El spotlighting y el "trata los documentos como datos, no como instrucciones" recortan la inyección medida de ~50% a menos del 2%, lo que suena estupendo hasta que un atacante adaptativo borra el residuo. Útil como defensa en profundidad. Nunca lo único entre el texto no confiable y una escritura.
+El prompt injection no tiene arreglo a nivel de modelo. El LLM concatena tu system prompt y los datos envenenados en un solo flujo indiferenciado sin frontera de privilegio, el clásico confused deputy. En un estudio sistemático, ataques adaptativos rompieron 12 defensas publicadas, con más del 90% de éxito contra la mayoría.<Sidenote>Nasr et al., "The Attacker Moves Second" (arXiv 2510.09023). La mayoría de esas defensas había reportado originalmente un éxito de ataque cercano a cero.</Sidenote> El spotlighting y el "trata los documentos como datos, no como instrucciones" recortan la inyección medida de más del 50% a menos del 2% en modelos GPT,<Sidenote>Hines et al. (Microsoft), "Defending Against Indirect Prompt Injection Attacks With Spotlighting" (arXiv 2403.14720).</Sidenote> lo que suena estupendo hasta que un atacante adaptativo borra el residuo. Útil como defensa en profundidad. Nunca lo único entre el texto no confiable y una escritura.
 
-La frontera tiene que vivir en código determinista. Capacidades default-deny acotadas a la tarea. Una allowlist de egress de salida (a menudo el único borde cuya eliminación parte toda la cadena del ataque). La Regla de Dos de los agentes: nunca dejes al agente sin supervisión con más de dos de estos tres a la vez: input no confiable, datos sensibles, y una acción que cambia estado o hace egress. Defiéndete del adversario en que el modelo podría *convertirse* bajo inyección, no del educado que rinde bien en los benchmarks de hoy.
+La frontera tiene que vivir en código determinista. Capacidades default-deny acotadas a la tarea. Una allowlist de egress de salida (a menudo el único borde cuya eliminación parte toda la cadena del ataque). La Regla de Dos de los agentes: nunca dejes al agente sin supervisión con más de dos de estos tres a la vez: input no confiable, datos sensibles, y una acción que cambia estado o hace egress. Defiéndete del adversario en que el modelo podría *convertirse* bajo inyección.
 
-El human-in-the-loop es la misma disciplina apuntada a la irreversibilidad. No confirmes todo (eso solo entrena al humano a aprobar de forma automática, y la única acción que importaba se aprueba junto con el resto). Pon compuerta solo a la cola del ~1% de escrituras irreversibles. Y cierra el hueco que casi nadie revisa:
+El human-in-the-loop es la misma disciplina apuntada a la irreversibilidad. No confirmes todo (eso solo entrena al humano a aprobar de forma automática, y la única acción que importaba se aprueba junto con el resto). Pon compuerta solo a la cola del ~1% de escrituras irreversibles.<Sidenote>Anthropic midió unas 998K llamadas a tools en despliegues de producción y encontró que cerca del 0.8% de las acciones eran irreversibles. El [módulo de human-in-the-loop](/es/learn/agentic-systems/human-in-the-loop/) tiene los matices.</Sidenote> Y cierra el hueco que casi nadie revisa:
 
 <Callout type="warning" title="El bug TOCTOU de confirmar/ejecutar">
 La aprobación asíncrona implica que pasa tiempo entre el toque y la ejecución. Si vuelves a derivar la acción desde el modelo después de aprobar, el payload puede desviarse: el humano aprueba reservar la sala A y la llamada regenerada reserva la sala B. Normaliza y valida el input, persiste ese registro exacto como fuente de verdad *antes* de mostrar Confirmar, y al tocar ejecuta el registro persistido por id con una transición atómica pendiente→ejecutado. Lo mostrado tiene que ser igual a lo ejecutado.
 </Callout>
 
-Ambas son principios arquitectónicos generales, no features de un framework. El detalle vive en [seguridad agéntica](/es/learn/agentic-systems/security/) y [human-in-the-loop](/es/learn/agentic-systems/human-in-the-loop/).
+Ambas son principios arquitectónicos generales que valen en cualquier framework. El detalle vive en [seguridad agéntica](/es/learn/agentic-systems/security/) y [human-in-the-loop](/es/learn/agentic-systems/human-in-the-loop/).
 
 ## Haz que cada paso sea barato y seguro de reintentar
 
 La entrega distribuida es at-least-once. Un worker puede terminar una escritura y morir antes de registrar que la hizo, la cola la reentrega, y el paso corre otra vez. Un reintento ingenuo son dos bombas a la vez: una bomba de costo de tokens (vuelves a cobrar cada paso del modelo) y una bomba de doble reserva (vuelves a cobrar la tarjeta del cliente).
 
-Envuelve cada paso en ejecución durable para que los pasos completados queden memoizados, y deriva una clave de idempotencia determinista de `(workflow_id, step_id)` que pases a cada llamada con efectos secundarios. En el reintento el motor reproduce los resultados cacheados y la API externa deduplica por la clave. Modela una aprobación humana como una suspensión durable, no como un worker bloqueado tres horas. Esto se compone con la aritmética p^t: cuando cada paso es barato y seguro de reintentar, reintentar una cadena inestable deja de dar miedo. El [módulo de producción](/es/learn/agentic-systems/production/) plantea el agente entero como un workflow distribuido durable, que es lo que es.
+Envuelve cada paso en ejecución durable para que los pasos completados queden memoizados, y deriva una clave de idempotencia determinista de `(workflow_id, step_id)` que pases a cada llamada con efectos secundarios. En el reintento el motor reproduce los resultados cacheados y la API externa deduplica por la clave. Modela una aprobación humana como una suspensión durable, para que ningún worker se quede bloqueado tres horas esperando un toque. Esto se compone con la aritmética p^t: cuando cada paso es barato y seguro de reintentar, reintentar una cadena inestable deja de dar miedo. El [módulo de producción](/es/learn/agentic-systems/production/) plantea el agente entero como un workflow distribuido durable, que es lo que es.
 
 ## Qué ignorar (o al menos posponer)
 
@@ -191,18 +201,18 @@ Igual de importante es dónde *no* gastar la tarde. Cada fila de aquí es algo q
     { key: "instead", label: "Haz esto en su lugar", align: "left" },
   ]}
   rows={[
-    { trap: "Recurrir a multiagente 'porque escala'", why: "~79% de los fallos son de coordinación, no del modelo; el fan-out quema ~15× los tokens por cómputo paralelo, no por mejor razonamiento", instead: "Un solo agente lineal + compactación. Haz fan-out solo en exploración de solo lectura; mantén cada escritura en un único hilo" },
-    { trap: "Confiar en el chain-of-thought como bitácora de auditoría", why: "Los modelos actúan sobre pistas que nunca verbalizan y racionalizan después; la cadena visible suele ser no causal", instead: "Construye evals, compuertas y observabilidad sobre la trayectoria de llamadas a tools — lo que HIZO, no lo que dijo" },
-    { trap: "Hacer fine-tuning primero", why: "Enseña forma sobre fondo, ~1.5× de premium en inferencia, y entrenar sobre hechos nuevos sube la alucinación", instead: "Sube la escalera: prompt → few-shot → contexto/harness → RAG → fine-tuning al final. El harness es ~90% del ROI" },
-    { trap: "Comprar una ventana de contexto más grande", why: "La recuperación se hunde en una curva en U antes del límite; los tokens irrelevantes diluyen la atención aunque todo quepa", instead: "Minimiza la densidad de señal, no el encaje. Mide tu ventana efectiva real" },
+    { trap: "Recurrir a multiagente 'porque escala'", why: "Cerca de 3 de cada 4 fallos vienen del diseño del sistema y del desalineamiento entre agentes. El fan-out quema ~15× los tokens, y el gasto en tokens explica por sí solo ~80% de la varianza de rendimiento", instead: "Un solo agente lineal + compactación. Haz fan-out solo en exploración de solo lectura; mantén cada escritura en un único hilo" },
+    { trap: "Confiar en el chain-of-thought como bitácora de auditoría", why: "Los modelos actúan sobre pistas que nunca verbalizan y racionalizan después; la cadena visible suele ser no causal", instead: "Construye evals, compuertas y observabilidad sobre la trayectoria de llamadas a tools: lo que de verdad HIZO" },
+    { trap: "Hacer fine-tuning primero", why: "Enseña forma sobre fondo, ~1.5× de sobrecosto de inferencia en algunos proveedores, y entrenar sobre hechos nuevos sube la alucinación", instead: "Sube la escalera: prompt → few-shot → contexto/harness → RAG → fine-tuning al final. El harness es ~90% del ROI" },
+    { trap: "Comprar una ventana de contexto más grande", why: "La recuperación se degrada de forma desigual a medida que crece la longitud; los tokens irrelevantes diluyen la atención aunque todo quepa", instead: "Gasta tokens en señal: los menos posibles que carguen lo máximo. Mide tu ventana efectiva real" },
     { trap: "Montar una vector DB por defecto", why: "Un pipeline de embeddings para 50 docs es un pasivo de staleness y seguridad a cambio de nada", instead: "Corpus bajo ~200k tokens: cárgalo en contexto con caching. Léxico (BM25/grep) para identificadores y códigos" },
-    { trap: "Tratar el spotlighting como la frontera de seguridad", why: "Recorta la inyección ~50%→<2% pero un atacante adaptativo borra el residuo", instead: "Pon la frontera de privilegio en código determinista; deja el spotlighting solo como defensa en profundidad" },
+    { trap: "Tratar el spotlighting como la frontera de seguridad", why: "Recorta la inyección de >50% a <2% en modelos GPT, pero un atacante adaptativo borra el residuo", instead: "Pon la frontera de privilegio en código determinista; deja el spotlighting solo como defensa en profundidad" },
     { trap: "Subir el thinking/effort al máximo 'por si acaso'", why: "Pasado el codo entras en un régimen de sobrepensar: el acierto se aplana o cae mientras pagas por cada token de razonamiento", instead: "Mide la curva acierto-vs-tokens por ruta y fija el effort en el codo" },
   ]}
-  caption="Gasta la tarde en la escalera de arriba, no en esta lista."
+  caption="Gasta la tarde en la escalera de arriba. Esta lista puede esperar."
 />
 
-El patrón en las siete: cada una es el trabajo del modelo disfrazado de arquitectura, o arquitectura esquivada con un prompt. Las movidas tentadoras apuntan al LLM. Las movidas que funcionan apuntan al código a su alrededor.
+El patrón en las siete: cada una es el trabajo del modelo disfrazado de arquitectura, o arquitectura esquivada con un prompt. Las movidas tentadoras apuntan al LLM. Las movidas que funcionan apuntan al código a su alrededor. Las fuentes detrás de cada fila están en los módulos de [multiagente](/es/learn/agentic-systems/multi-agent/), [razonamiento](/es/learn/agentic-systems/reasoning/), [observabilidad](/es/learn/agentic-systems/observability/), [post-entrenamiento](/es/learn/agentic-systems/post-training-rl/), [recuperación](/es/learn/agentic-systems/retrieval/) y [seguridad](/es/learn/agentic-systems/security/).
 
 ## Las preguntas que de verdad te estás haciendo
 
@@ -210,18 +220,16 @@ El patrón en las siete: cada una es el trabajo del modelo disfrazado de arquite
 Haz primero la aritmética p^t. Si tu fiabilidad por paso y tu número de pasos no alcanzan tu objetivo, descompón el horizonte o baja a un workflow determinista o una sola llamada. La mayoría de las tareas que "necesitan un agente" no lo necesitan.
 
 ### ¿Debería usar un sistema multiagente?
-No por defecto. Cerca del 79% de los fallos multiagente son de coordinación, no límites del modelo, y el fan-out quema unas 15× los tokens por cómputo paralelo, no por mejor razonamiento. Usa un solo agente lineal con compactación, haz fan-out solo en exploración de solo lectura, y mantén cada escritura en un único hilo.
+No por defecto. El estudio MAST, sobre más de 1.600 trazas de 7 frameworks, atribuyó la mayoría de los fallos al diseño del sistema y al desalineamiento entre agentes.<Sidenote>Cemri et al., "Why Do Multi-Agent LLM Systems Fail?" (arXiv 2503.13657). El [módulo multiagente](/es/learn/agentic-systems/multi-agent/) tiene el desglose por categoría.</Sidenote> Haz fan-out solo en exploración de solo lectura y mantén cada escritura en un único hilo. Cuando corro varios agentes de Claude a la vez, cada uno tiene [su propio git worktree](/blog/es/worktrees-let-me-parallelize/) para que ninguno escriba sobre los archivos de otro.
 
 ### ¿Vale la pena el fine-tuning para mi agente?
-Casi siempre es el último recurso, no el primero. Sube la escalera: prompt, few-shot, ingeniería de contexto y harness, RAG, y al final fine-tuning. El harness es cerca del 90% del ROI, y entrenar sobre hechos nuevos en realidad sube la alucinación.
+Casi siempre es el último recurso. Antes vienen el prompt, el few-shot, la ingeniería de contexto y harness, y RAG, y entrenar sobre hechos nuevos en realidad sube la alucinación. El [módulo de post-entrenamiento](/es/learn/agentic-systems/post-training-rl/) recorre la escalera completa.
 
 ### ¿Una ventana de contexto más grande hará a mi agente más fiable?
-No. La recuperación se hunde en una curva en U bastante antes del límite nominal, y los tokens irrelevantes diluyen la atención aunque todo quepa. Minimiza la densidad de señal y mide tu ventana efectiva real.
+Rara vez. Los tokens irrelevantes diluyen la atención aunque todo quepa, y la recuperación se degrada antes del límite nominal. Mide qué parte de la ventana usa bien tu modelo en tu tarea, y llénala de señal.
 
-<PullQuote variant="block">
-Un agente con alta tasa de acierto se gana haciendo que cada paso sea barato y seguro de reintentar, y rompiendo la cadena de error con verificación contra ground truth. No con un prompt más listo, ni con un modelo más listo.
-</PullQuote>
+---
 
-Si mañana te llevas una sola cosa a las manos, que sea la aritmética. Abre un cuaderno, escribe tu `p` y tu `t`, y mira `p^t` antes de arquitecturar nada. El número te dirá si necesitas un agente siquiera, dónde poner la compuerta de verificación, y cuál de estas prioridades es de verdad tuya para arreglar. Todo lo demás en este post está río abajo de esa única multiplicación.
+Si te quedas con una sola cosa, que sea la aritmética. Abre un cuaderno, escribe tu `p` y tu `t`, y mira `p^t` antes de diseñar la arquitectura. El número te dirá si necesitas un agente siquiera, dónde poner la compuerta de verificación, y cuál de estas prioridades es de verdad tuya para arreglar.
 
-La versión completa, con cada fuente calificada y las pruebas detrás de las afirmaciones, es la [wiki de sistemas agénticos](/es/learn/agentic-systems/). Esto fue el mapa. Aquello es el territorio.
+La versión completa, con cada fuente calificada y las pruebas detrás de las afirmaciones, es la [wiki de sistemas agénticos](/es/learn/agentic-systems/). Salió publicada con 20 afirmaciones erróneas que mi propio pipeline ya había revisado una vez. Sea cual sea tu `p`, asume que es más baja de lo que crees hasta que algo externo al modelo la haya comprobado.

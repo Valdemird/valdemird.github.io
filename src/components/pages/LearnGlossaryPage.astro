@@ -5,21 +5,20 @@ import Footer from '../Footer.astro';
 import { GLOSSARY, glossaryHref } from '../../lib/learn-glossary';
 import { courseHomeHref, learnHomeHref, type Lang } from '../../lib/learn';
 import { UI_STRINGS, PERSON } from '../../consts';
+import { learnUi } from '../learn/strings';
 
 interface Props {
 	lang: Lang;
 }
 
 const { lang } = Astro.props;
-const es = lang === 'es';
+const ui = learnUi(lang);
 
 const terms = [...GLOSSARY].sort((a, b) => a.term.localeCompare(b.term, 'en', { sensitivity: 'base' }));
-const courseName = es ? 'Sistemas agénticos' : 'Agentic systems';
+const courseName = ui.courseShort;
 
-const title = es ? 'Glosario' : 'Glossary';
-const description = es
-	? `Los ${terms.length} términos del campo de los sistemas agénticos, definidos en una frase: de la ventana de contexto a la lethal trifecta, de GRPO al horizonte temporal de tarea.`
-	: `The ${terms.length} terms of the agentic-systems field, each defined in one sentence: from the context window to the lethal trifecta, from GRPO to task time-horizon.`;
+const title = ui.glossary;
+const description = ui.glossaryDescription(terms.length);
 
 const alternates = [
 	{ hreflang: 'en', href: `https://valdemird.com${glossaryHref('en')}` },
@@ -29,7 +28,7 @@ const alternates = [
 const jsonLd = {
 	'@context': 'https://schema.org',
 	'@type': 'DefinedTermSet',
-	name: es ? 'Glosario · Ingeniería de sistemas agénticos' : 'Glossary · Engineering agentic systems',
+	name: `${ui.glossary} · ${ui.courseFull}`,
 	description,
 	inLanguage: lang,
 	author: PERSON,
@@ -45,15 +44,15 @@ const jsonLd = {
 
 <html lang={lang}>
 	<head>
-		<BaseHead title={`${title} · ${courseName}`} description={description} lang={lang} alternates={alternates} jsonLd={jsonLd} />
+		<BaseHead title={`${title}: ${courseName.toLowerCase()}`} description={description} lang={lang} alternates={alternates} jsonLd={jsonLd} />
 	</head>
 	<body>
 		<a class="skip-link" href="#main-content">{UI_STRINGS[lang].nav.skipToContent}</a>
 		<Header />
 		<main id="main-content">
 			<div class="wrap">
-				<nav class="crumbs" aria-label={es ? 'Migas de pan' : 'Breadcrumb'}>
-					<a href={learnHomeHref(lang)}>Learn</a>
+				<nav class="crumbs" aria-label={ui.breadcrumb}>
+					<a href={learnHomeHref(lang)}>{ui.learn}</a>
 					<span aria-hidden="true">/</span>
 					<a href={courseHomeHref(lang)}>{courseName}</a>
 					<span aria-hidden="true">/</span>
@@ -61,18 +60,18 @@ const jsonLd = {
 				</nav>
 
 				<header class="hero">
-					<p class="eyebrow">{es ? 'Referencia' : 'Reference'}</p>
+					<p class="eyebrow">{ui.reference}</p>
 					<h1>{title}</h1>
 					<p class="lead">{description}</p>
 					<div class="search">
 						<input
 							type="search"
 							id="gloss-search"
-							placeholder={es ? 'Filtrar términos…' : 'Filter terms…'}
-							aria-label={es ? 'Filtrar términos del glosario' : 'Filter glossary terms'}
+							placeholder={ui.filterPlaceholder}
+							aria-label={ui.filterLabel}
 							autocomplete="off"
 						/>
-						<p class="search-count" id="gloss-count" aria-live="polite">{terms.length} {es ? 'términos' : 'terms'}</p>
+						<p class="search-count" id="gloss-count" aria-live="polite">{terms.length} {ui.terms}</p>
 					</div>
 				</header>
 
@@ -84,7 +83,7 @@ const jsonLd = {
 						</div>
 					))}
 				</dl>
-				<p class="no-results" id="gloss-empty" hidden>{es ? 'Sin coincidencias.' : 'No matches.'}</p>
+				<p class="no-results" id="gloss-empty" hidden>{ui.noMatches}</p>
 			</div>
 		</main>
 		<Footer />
@@ -175,7 +174,8 @@ const jsonLd = {
 		border-radius: var(--radius-md);
 		transition: border-color 0.2s var(--ease-spring);
 	}
-	#gloss-search:focus { outline: none; border-color: var(--color-accent); }
+	#gloss-search:focus { border-color: var(--color-accent); }
+	#gloss-search:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-color: var(--color-accent); }
 	.search-count {
 		font-family: var(--font-mono);
 		font-size: 0.72rem;

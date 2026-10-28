@@ -35,7 +35,7 @@ const steps = es
 
 <DemoSection
 	label={es ? 'revelado acumulativo / pipeline de tests' : 'cumulative reveal / test pipeline'}
-	description={es ? 'Recorre los pasos numerados — cada uno revela su parte del SVG y las anteriores siguen visibles. Con reduced-motion el diagrama completo se muestra de una vez.' : 'Scroll through the numbered steps — each one reveals its part of the SVG and earlier parts stay visible. Reduced-motion shows the full diagram at once.'}
+	description={es ? 'Recorre los pasos numerados. Cada uno revela su parte del SVG, las anteriores siguen visibles, y el paso activo rellena su círculo con el número sobre un fondo tenue. Con reduced motion el diagrama completo se muestra de una vez.' : 'Scroll through the numbered steps. Each one reveals its part of the SVG, earlier parts stay visible, and the active step fills its number circle over a faint wash. Reduced motion shows the full diagram at once.'}
 	usage={`<StepThroughDiagram
   steps={[
     { id: "commit", label: "A commit lands on the branch." },

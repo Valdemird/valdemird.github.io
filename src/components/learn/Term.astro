@@ -14,23 +14,13 @@ const entry = findTerm(name);
 // If the term isn't in the glossary, render the text plainly (fail open).
 const def = entry?.def[lang] ?? '';
 const href = entry ? `${glossaryHref(lang)}#${entry.slug}` : glossaryHref(lang);
+
+// WHITESPACE: this component renders inline, mid-sentence. Any whitespace text
+// node it emits (between tags, or between the markup and the <style>/<script>
+// blocks below) shows up as a space before the punctuation that follows the
+// term ("reducer :"). So the markup is one line and the blocks are glued on.
 ---
-
-{entry ? (
-	<span class="gloss">
-		<button type="button" class="gloss-term" aria-expanded="false">
-			<slot>{name}</slot>
-		</button>
-		<span class="gloss-pop" role="tooltip">
-			<span class="gloss-def">{def}</span>
-			<a class="gloss-more" href={href}>{es ? 'glosario →' : 'glossary →'}</a>
-		</span>
-	</span>
-) : (
-	<slot>{name}</slot>
-)}
-
-<style>
+{entry ? (<span class="gloss"><button type="button" class="gloss-term" aria-expanded="false"><slot>{name}</slot></button><span class="gloss-pop"><span class="gloss-def">{def}</span><a class="gloss-more" href={href}>{es ? 'glosario →' : 'glossary →'}</a></span></span>) : (<slot>{name}</slot>)}<style>
 	.gloss { position: relative; display: inline; }
 	.gloss-term {
 		font: inherit;
@@ -81,17 +71,26 @@ const href = entry ? `${glossaryHref(lang)}#${entry.slug}` : glossaryHref(lang);
 		color: var(--color-accent);
 		text-decoration: none;
 	}
-</style>
-
-<script>
-	// The popover is fixed-positioned and placed/clamped by JS so it never
-	// overflows the viewport — on hover (desktop), focus (keyboard), or tap (touch).
+</style><script>
+	// Disclosure pattern: the term is a button (aria-expanded + aria-controls)
+	// that shows a definition panel with a link to the glossary. Mouse hover
+	// previews it; click/Enter pins it; Tab moves into the link without closing
+	// it; Escape closes it and returns focus to the term. The panel is
+	// fixed-positioned and clamped to the viewport by JS.
 	const MARGIN = 12; // min gap to the viewport edge
-	const GAP = 8; // gap between the term and the popover
+	const GAP = 8; // gap between the term and the panel
+	const CLOSE_DELAY = 150; // ms grace period to cross the gap with the mouse
+
+	let glossController: AbortController | null = null;
+	let glossSeq = 0;
+	const closeTimers = new WeakMap<HTMLElement, number>();
+
+	const termOf = (g: HTMLElement) => g.querySelector<HTMLButtonElement>('.gloss-term');
+	const popOf = (g: HTMLElement) => g.querySelector<HTMLElement>('.gloss-pop');
 
 	function placePop(gloss: HTMLElement) {
-		const btn = gloss.querySelector<HTMLElement>('.gloss-term');
-		const pop = gloss.querySelector<HTMLElement>('.gloss-pop');
+		const btn = termOf(gloss);
+		const pop = popOf(gloss);
 		if (!btn || !pop) return;
 		const r = btn.getBoundingClientRect();
 		const pr = pop.getBoundingClientRect();
@@ -107,61 +106,130 @@ const href = entry ? `${glossaryHref(lang)}#${entry.slug}` : glossaryHref(lang);
 		pop.style.top = `${Math.round(top)}px`;
 	}
 
-	function closeAll(except?: Element | null) {
-		document.querySelectorAll<HTMLElement>('.gloss.is-open').forEach((g) => {
-			if (g === except) return;
-			g.classList.remove('is-open');
-			g.querySelector('.gloss-pop')?.classList.remove('is-open');
-			g.querySelector('.gloss-term')?.setAttribute('aria-expanded', 'false');
-		});
-	}
-
-	function openGloss(gloss: HTMLElement) {
-		closeAll(gloss);
-		placePop(gloss);
-		gloss.classList.add('is-open');
-		gloss.querySelector('.gloss-pop')?.classList.add('is-open');
-		gloss.querySelector('.gloss-term')?.setAttribute('aria-expanded', 'true');
+	function cancelClose(gloss: HTMLElement) {
+		const t = closeTimers.get(gloss);
+		if (t !== undefined) {
+			window.clearTimeout(t);
+			closeTimers.delete(gloss);
+		}
 	}
 
 	function closeGloss(gloss: HTMLElement) {
+		cancelClose(gloss);
+		delete gloss.dataset.pinned;
 		gloss.classList.remove('is-open');
-		gloss.querySelector('.gloss-pop')?.classList.remove('is-open');
-		gloss.querySelector('.gloss-term')?.setAttribute('aria-expanded', 'false');
+		popOf(gloss)?.classList.remove('is-open');
+		termOf(gloss)?.setAttribute('aria-expanded', 'false');
+	}
+
+	function closeAll(except?: Element | null) {
+		document.querySelectorAll<HTMLElement>('.gloss.is-open').forEach((g) => {
+			if (g !== except) closeGloss(g);
+		});
+	}
+
+	function openGloss(gloss: HTMLElement, pin = false) {
+		cancelClose(gloss);
+		closeAll(gloss);
+		if (pin) gloss.dataset.pinned = '1';
+		if (gloss.classList.contains('is-open')) return;
+		placePop(gloss);
+		gloss.classList.add('is-open');
+		popOf(gloss)?.classList.add('is-open');
+		termOf(gloss)?.setAttribute('aria-expanded', 'true');
+	}
+
+	function scheduleClose(gloss: HTMLElement) {
+		if (gloss.dataset.pinned) return;
+		cancelClose(gloss);
+		closeTimers.set(gloss, window.setTimeout(() => closeGloss(gloss), CLOSE_DELAY));
 	}
 
 	function initGlossTerms() {
-		document.querySelectorAll<HTMLElement>('.gloss').forEach((gloss) => {
-			if (gloss.dataset.bound) return;
-			gloss.dataset.bound = '1';
-			const btn = gloss.querySelector<HTMLButtonElement>('.gloss-term');
-			if (!btn) return;
-			// Tap / click toggles (primary path on touch, where there's no hover).
-			btn.addEventListener('click', (e) => {
-				e.preventDefault();
-				if (gloss.classList.contains('is-open')) closeGloss(gloss);
-				else openGloss(gloss);
-			});
-			// Hover (desktop) and keyboard focus.
-			gloss.addEventListener('mouseenter', () => openGloss(gloss));
-			gloss.addEventListener('mouseleave', () => closeGloss(gloss));
-			btn.addEventListener('focus', () => openGloss(gloss));
-			btn.addEventListener('blur', () => closeGloss(gloss));
+		glossController?.abort();
+		const controller = new AbortController();
+		glossController = controller;
+		const { signal } = controller;
+
+		const glosses = document.querySelectorAll<HTMLElement>('.gloss');
+		if (!glosses.length) return;
+
+		glosses.forEach((gloss) => {
+			const btn = termOf(gloss);
+			const pop = popOf(gloss);
+			if (!btn || !pop) return;
+			if (!pop.id) pop.id = `gloss-pop-${++glossSeq}`;
+			btn.setAttribute('aria-controls', pop.id);
+
+			// Click / Enter / Space toggles a pinned panel. If a hover preview is
+			// already showing, the click pins it instead of closing it.
+			btn.addEventListener(
+				'click',
+				(e) => {
+					e.preventDefault();
+					if (gloss.classList.contains('is-open') && gloss.dataset.pinned) closeGloss(gloss);
+					else openGloss(gloss, true);
+				},
+				{ signal },
+			);
+			// Mouse hover previews; touch and pen go through click only.
+			gloss.addEventListener(
+				'pointerenter',
+				(e) => {
+					if (e.pointerType === 'mouse') openGloss(gloss);
+				},
+				{ signal },
+			);
+			gloss.addEventListener(
+				'pointerleave',
+				(e) => {
+					if (e.pointerType === 'mouse') scheduleClose(gloss);
+				},
+				{ signal },
+			);
+			// Close only when focus leaves the term *and* its panel.
+			gloss.addEventListener(
+				'focusout',
+				(e) => {
+					const next = e.relatedTarget as Node | null;
+					if (next && gloss.contains(next)) return;
+					closeGloss(gloss);
+				},
+				{ signal },
+			);
 		});
-		if (!(document as any)._glossDismiss) {
-			(document as any)._glossDismiss = true;
-			// Dismiss on outside click, on Escape, and reposition on scroll/resize.
-			document.addEventListener('click', (e) => {
+
+		// Outside click, Escape, and scroll/resize (the panel is fixed, so it
+		// would drift away from its term).
+		document.addEventListener(
+			'click',
+			(e) => {
 				if (!(e.target as HTMLElement).closest?.('.gloss')) closeAll();
-			});
-			document.addEventListener('keydown', (e) => {
-				if ((e as KeyboardEvent).key === 'Escape') closeAll();
-			});
-			const reposition = () => closeAll();
-			window.addEventListener('scroll', reposition, { passive: true });
-			window.addEventListener('resize', reposition, { passive: true });
-		}
+			},
+			{ signal },
+		);
+		document.addEventListener(
+			'keydown',
+			(e) => {
+				if (e.key !== 'Escape') return;
+				const active = document.activeElement as HTMLElement | null;
+				const owner = active?.closest<HTMLElement>('.gloss.is-open') ?? null;
+				closeAll();
+				if (owner) termOf(owner)?.focus();
+			},
+			{ signal },
+		);
+		const dismiss = () => closeAll();
+		window.addEventListener('scroll', dismiss, { passive: true, signal });
+		window.addEventListener('resize', dismiss, { passive: true, signal });
 	}
+
+	function teardownGlossTerms() {
+		glossController?.abort();
+		glossController = null;
+	}
+
 	initGlossTerms();
-	document.addEventListener('astro:after-swap', initGlossTerms);
+	document.addEventListener('astro:page-load', initGlossTerms);
+	document.addEventListener('astro:before-swap', teardownGlossTerms);
 </script>

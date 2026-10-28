@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
-import { SITE_TITLE, SITE_DESCRIPTION, PROJECTS, EXPERIMENTS } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
 
 export const GET: APIRoute = async () => {
 	const all = (await getCollection('blog'))
@@ -52,13 +52,13 @@ export const GET: APIRoute = async () => {
 		'- GitHub: https://github.com/valdemird',
 		'- LinkedIn: https://www.linkedin.com/in/sebastiancaja',
 		'',
-		'## Ecosystem (same author, separate subdomains)',
+		'## Sections',
 		'',
-		'These live on their own servers but are owned and built by the same person:',
-		'',
-		...[...PROJECTS, ...EXPERIMENTS].map(
-			(p) => `- ${p.title}: ${p.url} — ${p.description.en}`,
-		),
+		'- Blog: https://valdemird.com/blog/ (Spanish: https://valdemird.com/es/blog/)',
+		'- Agentic systems course: https://valdemird.com/learn/agentic-systems/ (Spanish: https://valdemird.com/es/learn/agentic-systems/)',
+		'- Course glossary: https://valdemird.com/learn/agentic-systems/glossary/',
+		'- Component lab, every interactive blog component running live: https://valdemird.com/lab/ (Spanish: https://valdemird.com/es/lab/)',
+		'- Knowledge map, every essay, course module and lab component as one navigable map: https://valdemird.com/map/ (Spanish: https://valdemird.com/es/map/). Its build-time graph (nodes, edges drawn from links, components, tags and glossary terms, counts) is published as JSON: https://valdemird.com/map/graph.json (Spanish: https://valdemird.com/es/map/graph.json)',
 		'',
 		'## Blog Posts (English)',
 		'',

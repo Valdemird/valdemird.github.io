@@ -8,10 +8,10 @@ export const meta = {
 	status: 'stable',
 	summary: 'Semantic aside with four types — tip, warning, note, important — marked by mono eyebrow labels, never accent bars.',
 	summaryEs: 'Aparte semántico con cuatro tipos — tip, warning, note, important — marcados con etiquetas eyebrow en mono, nunca con barras de acento.',
-	why: 'Every post has two or three sentences that carry the whole argument, and bold is too weak to hold them. The Callout marks those sentences with an eyebrow label instead of the colored left bar every AI-generated interface reaches for — that bar is banned in this design system on purpose. Four types because a warning earned by a broken Saturday is not the same register as a tip.',
-	whyEs: 'Cada post tiene dos o tres frases que cargan todo el argumento, y la negrita es demasiado débil para sostenerlas. El Callout las marca con una etiqueta eyebrow en vez de la barra izquierda de color a la que recurre toda interfaz generada por IA — esa barra está prohibida en este design system a propósito. Cuatro tipos porque una advertencia que costó un sábado roto no suena igual que un consejo.',
+	why: 'Every post has two or three sentences that carry the whole argument, and bold is too weak to hold them. The Callout marks those sentences with an eyebrow label instead of the colored left bar every AI-generated interface reaches for. I keep that bar off this whole site on purpose. Four types because a warning earned by a broken Saturday is not the same register as a tip.',
+	whyEs: 'Cada post tiene dos o tres frases que cargan todo el argumento, y la negrita es demasiado débil para sostenerlas. El Callout las marca con una etiqueta eyebrow en vez de la barra izquierda de color a la que recurre toda interfaz generada por IA. En este sitio no uso esa barra en ninguna parte, y es a propósito. Cuatro tipos porque una advertencia que costó un sábado roto no suena igual que un consejo.',
 	props: [
-		{ name: 'type', type: '"tip" | "warning" | "note" | "important"', default: '"note"', description: 'Category; drives the eyebrow label, icon and tint.' },
+		{ name: 'type', type: '"tip" | "warning" | "note" | "important"', default: '"note"', description: 'Category; drives the eyebrow label and the tint.' },
 		{ name: 'title', type: 'string', description: 'Optional title after the eyebrow label.' },
 	],
 };
@@ -22,7 +22,7 @@ const es = lang === 'es';
 
 <DemoSection
 	label={es ? 'los cuatro tipos' : 'all four types'}
-	description={es ? 'La etiqueta eyebrow carga la categoría — sin barras de acento a la izquierda, como manda el design system.' : 'The eyebrow label carries the category — no left accent bars, per the design system.'}
+	description={es ? 'La etiqueta eyebrow dice qué tipo de bloque es. No hay barra de color a la izquierda.' : 'The eyebrow label says what kind of block it is. There is no colored bar on the left.'}
 	usage={`<Callout type="tip" title="Cheap insurance">
   Run the suite before you let the agent touch anything.
 </Callout>`}

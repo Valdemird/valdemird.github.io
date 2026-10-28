@@ -66,9 +66,9 @@ Paralelizar agentes de solo lectura (buscar, leer archivos, responder preguntas)
 <MermaidDiagram title="La lectura se paraleliza; la escritura se serializa" chart={`
 graph TD
   R["READ — paraleliza"] --> R1["buscar en N docs, N chequeos de guardrails,<br/>explorar breadth-first"]
-  R1 --> R2["sin estado compartido → sin conflicto<br/>el fan-out baja latencia y mantiene limpio el hilo"]
+  R1 --> R2["sin estado compartido, no hay conflicto<br/>el fan-out baja latencia y mantiene limpio el hilo"]
   W["WRITE — serializa"] --> W1["generar un artefacto único, editar estado,<br/>responder a un cliente"]
-  W1 --> W2["estado mutable compartido → carrera de decisiones<br/>un hilo lineal, una decisión a la vez"]
+  W1 --> W2["estado mutable compartido, las decisiones compiten<br/>un hilo lineal, una decisión a la vez"]
 `} />
 
 La misma asimetría se mapea directo sobre el human-in-the-loop: las lecturas auto-ejecutan (paralelizables, sin riesgo de conflicto), las escrituras se serializan tras una compuerta. Si ya construiste eso por razones de seguridad, ya construiste el principio de orquestación. Solo que no lo habías nombrado.
@@ -109,12 +109,13 @@ El patrón ganador de Anthropic no es "lanzar agentes sin límite". Es un lead q
 
 <MermaidDiagram title="Orquestador-worker con delegación acotada" chart={`
 graph TD
-  L["Lead / orquestador"] -->|"objetivo + formato + allowlist de tools + presupuesto"| W1["Worker (read-only)"]
-  L -->|"objetivo + formato + allowlist de tools + presupuesto"| W2["Worker (read-only)"]
-  L -->|"objetivo + formato + allowlist de tools + presupuesto"| W3["Worker (read-only)"]
-  W1 -->|"solo el destilado"| S["Sintetizar"]
-  W2 -->|"solo el destilado"| S
-  W3 -->|"solo el destilado"| S
+  L["Lead / orquestador"] --> B["Encargo por worker<br/>objetivo · formato · allowlist de tools · presupuesto"]
+  B --> W1["Worker (read-only)"]
+  B --> W2["Worker (read-only)"]
+  B --> W3["Worker (read-only)"]
+  W1 --> S["Sintetizar<br/>(solo destilados)"]
+  W2 --> S
+  W3 --> S
   S --> L
 `} />
 

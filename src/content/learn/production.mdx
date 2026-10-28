@@ -58,7 +58,7 @@ The fix is a clean split. The edge (stateless, fast) only validates, persists, a
 sequenceDiagram
   participant U as Client
   participant E as Edge (stateless)
-  participant DB as Database (source of truth)
+  participant DB as DB (source of truth)
   participant Q as Queue
   participant W as Worker (durable)
   participant M as Model + Tools

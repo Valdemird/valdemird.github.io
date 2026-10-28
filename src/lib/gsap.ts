@@ -34,6 +34,30 @@ export function getGsap() {
     if (!(gsap as any).__vdCoreReady) {
       gsap.registerPlugin(ScrollTrigger);
       (gsap as any).__vdCoreReady = true;
+      // View Transitions swap the whole page but keep this module alive: every
+      // ScrollTrigger (and any tween still running) would otherwise hold the old
+      // page's DOM forever. Components re-create theirs on astro:after-swap /
+      // astro:page-load, which run after this.
+      // ScrollTrigger.batch() keeps its result array alive inside a paused
+      // delayedCall, so the arrays are emptied too, not just their triggers.
+      const batches = new Set<unknown[]>();
+      const batch = ScrollTrigger.batch.bind(ScrollTrigger);
+      ScrollTrigger.batch = ((...args: Parameters<typeof batch>) => {
+        const out = batch(...args);
+        batches.add(out);
+        return out;
+      }) as typeof ScrollTrigger.batch;
+      document.addEventListener("astro:before-swap", () => {
+        ScrollTrigger.getAll().forEach((t) => t.kill());
+        for (const b of batches) b.length = 0;
+        batches.clear();
+      });
+      document.addEventListener("astro:after-swap", () => {
+        for (const tw of gsap.globalTimeline.getChildren(true, true, false)) {
+          const targets = (tw as any).targets?.() as unknown[] | undefined;
+          if (targets?.length && targets.every((el) => el instanceof Node && !el.isConnected)) tw.kill();
+        }
+      });
     }
     return { gsap, ScrollTrigger };
   })();

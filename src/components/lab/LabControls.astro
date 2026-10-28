@@ -10,7 +10,8 @@
  *
  * Replay: kills every ScrollTrigger, strips the `data-*-ready` / `.animate`
  * init guards all interactive components use, then dispatches a real
- * `astro:after-swap`. Components that re-init cleanly replay their entrance;
+ * `astro:after-swap` followed by `astro:page-load` (components hook one or the
+ * other). Components that re-init cleanly replay their entrance;
  * repeated replays double as a manual leak test.
  */
 ---
@@ -74,8 +75,9 @@
 
 		root.querySelector('[data-lab-replay]')?.addEventListener('click', async () => {
 			await killAllScrollTriggers();
-			// Strip the init guards every interactive component sets, so the real
-			// `astro:after-swap` dispatch below re-runs their setup from scratch.
+			// Strip the init guards every interactive component sets, so the
+			// `astro:after-swap` + `astro:page-load` dispatches below re-run their
+			// setup from scratch.
 			const main = document.querySelector('main');
 			if (main) {
 				for (const el of main.querySelectorAll<HTMLElement>('*')) {
@@ -85,7 +87,9 @@
 					if (el.hasAttribute('data-chart')) el.classList.remove('animate');
 				}
 			}
+			// Components init on either event, so fire both.
 			document.dispatchEvent(new Event('astro:after-swap'));
+			document.dispatchEvent(new Event('astro:page-load'));
 		});
 
 		applyTheme(document.documentElement, getOverride());

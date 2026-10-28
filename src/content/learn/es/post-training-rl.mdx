@@ -8,7 +8,7 @@ durability: efimero
 updatedDate: 2026-06-19
 lang: es
 tldr:
-  - "El post-training es lo que convierte un predictor de tokens en un agente: SFT graba el formato, la optimización de preferencias alinea estilo y seguridad, RLVR hace emerger razonamiento largo y tool-use."
+  - "El post-training es lo que convierte un predictor de tokens en un agente: SFT fija el formato, la optimización de preferencias alinea estilo y seguridad, RLVR hace emerger razonamiento largo y tool-use."
   - "Casi nunca vas a entrenar. El punto de entender esto es razonar sobre por qué el modelo miente, adula o se inventa una cadena plausible-pero-falsa, en vez de parchear síntomas con prompts."
   - "El grader que escribiste y una recompensa de entrenamiento son el mismo objeto. Un grader verificable es una recompensa verificable; solo lo consumes distinto."
 sources:
@@ -26,7 +26,6 @@ sources:
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Tabs from '../../../components/blog/Tabs.astro';
@@ -40,12 +39,12 @@ No está en la ruta crítica para construir agentes en 2025-2026. Para el 95% de
 
 ## Tres capas convierten un predictor de tokens en un agente
 
-Un modelo base es un predictor de tokens. Completa texto con la distribución de internet. No es un asistente, no sigue instrucciones de forma fiable, no usa herramientas. El post-training es todo lo que ocurre después del pretraining para convertir ese predictor en algo útil, alineado y agéntico. Conviene separarlo en tres capas, porque cada una graba algo distinto y falla de forma distinta.
+Un modelo base es un predictor de tokens. Completa texto con la distribución de internet. No es un asistente, no sigue instrucciones de forma fiable, no usa herramientas. El post-training es todo lo que ocurre después del pretraining para convertir ese predictor en algo útil, alineado y agéntico. Conviene separarlo en tres capas, porque cada una fija algo distinto y falla de forma distinta.
 
-<MermaidDiagram title="El pipeline de post-training: cada capa graba algo distinto" chart={`
+<MermaidDiagram title="El pipeline de post-training: cada capa fija algo distinto" chart={`
 graph LR
-  A["Modelo base<br/>(predictor de tokens)"] --> B["1. SFT / distillation<br/>(graba formato + comportamiento)"]
-  B --> C["2. Optim. preferencias<br/>(RLHF→DPO, CAI)<br/>(alinea estilo + seguridad)"]
+  A["Modelo base<br/>(predictor de tokens)"] --> B["1. SFT / distillation<br/>(captura formato + comportamiento)"]
+  B --> C["2. Optim. preferencias<br/>(RLHF y luego DPO; CAI)<br/>(alinea estilo + seguridad)"]
   C --> D["3. RLVR (GRPO)<br/>(emerge el reasoning)"]
 `} />
 
@@ -70,7 +69,7 @@ Antes de tocar un gradiente, agota la escalera. Cada peldaño es órdenes de mag
 5. **Fine-tuning**: solo con señal verificable, volumen y ROI claro.
 
 <Callout type="warning" title="Dos errores de coste recurrentes">
-**(1) Fine-tunear como reflejo de primera instancia** es el error de coste número uno. El premium de inferencia es real (típicamente ~1.5x en OpenAI sobre GPT-4o/4.1; nulo en algunos proveedores como Google) más el tiempo y dinero de entrenar, por un beneficio que un mejor prompt o context engineering habría dado. **(2) Creer que el fine-tuning inyecta conocimiento fresco.** El fine-tuning graba comportamiento, estilo y formato. Para datos que cambian cada semana la herramienta es RAG/contexto, no entrenar. Aprender hechos nuevos vía fine-tuning de hecho aumenta la alucinación [C].
+**(1) Fine-tunear como reflejo de primera instancia** es el error de coste número uno. El premium de inferencia es real (típicamente ~1.5x en OpenAI sobre GPT-4o/4.1; nulo en algunos proveedores como Google) más el tiempo y dinero de entrenar, por un beneficio que un mejor prompt o context engineering habría dado. **(2) Creer que el fine-tuning inyecta conocimiento fresco.** El fine-tuning fija comportamiento, estilo y formato. Para datos que cambian cada semana la herramienta es RAG/contexto, no entrenar. Aprender hechos nuevos vía fine-tuning de hecho aumenta la alucinación [C].
 </Callout>
 
 ## Por qué los reasoning models cambiaron el juego: test-time compute

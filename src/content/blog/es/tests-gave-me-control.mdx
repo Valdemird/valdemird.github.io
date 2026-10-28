@@ -2,9 +2,10 @@
 title: "La IA me dio velocidad. Los tests me dieron control."
 description: "Corrí /insights después de un mes con Claude Code en un side project. Los números que esperaba no eran los interesantes. Esto es lo que sí lo era."
 pubDate: 2026-04-27
-reviewedDate: 2026-05-14
+updatedDate: 2026-10-27
+reviewedDate: 2026-10-27
 status: "Sigue reflejando mi flujo"
-tags: ["ai-tools", "testing", "developer-workflow", "claude-code"]
+tags: ["herramientas-ia", "pruebas", "flujo-de-trabajo", "claude-code"]
 featured: true
 lang: es
 ---
@@ -23,14 +24,14 @@ import CodeDiff from '../../../components/blog/CodeDiff.astro';
 
 <TLDR lang="es" bullets={[
   "Trabajé un mes con Claude Code en un side project. /insights me mostró dos cosas: la IA parcha síntomas antes de entender causas, y los tests son lo único que me deja confiar en sus cambios.",
-  "Esto es lo que cambié por culpa de eso.",
+  "De ahí salieron dos cambios: una suite de tests de diez segundos que corro después de cada cambio significativo, y un spec de una pantalla antes de arrancar una feature.",
 ]} />
 
-Construí un side project este último mes. Un calendario/PWA pequeño, un sandbox personal para aprender patrones de Next.js que no uso en mi trabajo en la consultora. Fuera de horas laborales, sin mezcla con clientes, solo un lugar donde romper cosas a propósito.
+Construí un side project este último mes. Un calendario/PWA pequeño, un sandbox personal para aprender patrones de Next.js que no uso en el trabajo. Fuera de horas laborales, sin cruce con proyectos de clientes, solo un lugar donde romper cosas a propósito.
 
-Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando.<Sidenote>`/insights` inspecciona el transcript de la sesión y saca patrones sobre cómo prompteé, dónde iteré y dónde me quedé pegado. Es el tipo de post-mortem que rara vez le haces a tu propio trabajo.</Sidenote> Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
+Al final del mes corrí `/insights` en Claude Code para ver cómo había estado trabajando.<Sidenote>`/insights` lee tus sesiones recientes de Claude Code en tu máquina y arma un reporte HTML: cómo prompteas, dónde iteras, dónde te quedas pegado. Es el tipo de post-mortem que rara vez le haces a tu propio trabajo.</Sidenote> Lo abrí esperando una palmadita en la espalda. Encontré algo más incómodo: las cosas que la IA hacía mal no eran las que yo creía.
 
-Este post es lo que `/insights` me mostró y el cambio que hice por culpa de eso.
+Este post es lo que `/insights` me mostró y los dos hábitos que cambié a raíz de eso.
 
 <Callout type="important" title="La tesis">
 El cuello de botella no era la IA. Era yo, confiando en la IA sin un loop de feedback. Los tests son la forma más barata de comprar ese loop de vuelta.
@@ -51,7 +52,7 @@ Un comportamiento de scroll en una landing page tomó cerca de diez rondas de fe
 Hubo una sesión donde un `git stash` se comió ocho de los diez archivos en los que estaba trabajando. No voy a fingir que fue elegante. Eso fue antes de que apretara la disciplina de tests y commits frecuentes. La recuperación fue de memoria.
 
 <Collapsible title="La historia del git stash (puedes saltarla)">
-A mitad de sesión pedí un stash para pausar trabajo en una rama medio rota. El pop no restauró todo porque había tocado archivos en directorios que el stash no rastreó limpiamente. Perdí toda una tarde de código en progreso que aún no había commiteado. La solución fue aburrida: commit temprano, commit seguido, incluso en ramas WIP basura. La lección fue menos aburrida: había dado por sentado que la IA iba a tratar las operaciones de git con la misma cautela que yo. No lo hace. Git es uno de esos lugares donde "delegar completo" es el default equivocado.
+A mitad de sesión pedí un stash para pausar trabajo en una rama medio rota. El pop no restauró todo porque había tocado archivos en directorios que el stash no rastreó limpiamente. Perdí toda una tarde de código en progreso que aún no había commiteado. La solución fue aburrida: commit temprano, commit seguido, incluso en ramas WIP basura. La lección fue menos aburrida: el pedido fue mío, y di por sentado que la IA lo iba a correr con la misma cautela que yo. No lo hace. Git es uno de esos lugares donde "delegar completo" es el default equivocado, porque [los errores caros son los que no se pueden deshacer](/es/learn/agentic-systems/human-in-the-loop/). Esa tarde explica en buena parte por qué después pasé el trabajo de agentes en paralelo a [git worktrees](/blog/es/worktrees-let-me-parallelize/).
 </Collapsible>
 
 Esta es la parte de trabajar con IA que nadie postea en Twitter. Los demos perfectos son reales. Lo que los rodea se parece mucho a ingeniería normal. Estás confundido un rato, hasta que cae la ficha.
@@ -60,7 +61,7 @@ Esta es la parte de trabajar con IA que nadie postea en Twitter. Los demos perfe
 
 El modo de falla interesante no era "la IA se equivocó". Era más sutil. La IA saltaba a una solución antes de tener un diagnóstico.
 
-El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible* antes de subir por la cascada. Ahí se fueron las diez rondas en scroll-snap.
+El layout en CSS fue el ejemplo más claro. Un elemento hijo que se desborda casi nunca es un problema del hijo. Suele ser un padre que olvidó restringir altura, o un eje de flex que nadie definió de forma explícita. La IA tiende a agarrar `items-start`, `max-h-full`, `overflow-hidden`. Propiedades sobre el elemento *visible*. Casi nunca sube primero por la cadena de padres. Ahí se fueron las diez rondas en scroll-snap.
 
 Esta es la forma del problema, reconstruida de la sesión del overflow del kanban, no copiada de un commit:
 
@@ -77,9 +78,9 @@ Esta es la forma del problema, reconstruida de la sesión del overflow del kanba
     { line: 7, text: '</div>' },
   ]}
   after={[
-    { line: 1, text: '<div className="board flex gap-4 min-h-0">' },
-    { line: 2, text: '  <section className="column flex flex-col min-h-0">' },
-    { line: 3, text: '    <ul className="overflow-y-auto">' },
+    { line: 1, text: '<div className="board flex h-full gap-4">' },
+    { line: 2, text: '  <section className="column flex flex-col">' },
+    { line: 3, text: '    <ul className="flex-1 min-h-0 overflow-y-auto">' },
     { line: 4, text: '      {cards.map(renderCard)}' },
     { line: 5, text: '    </ul>' },
     { line: 6, text: '  </section>' },
@@ -87,7 +88,7 @@ Esta es la forma del problema, reconstruida de la sesión del overflow del kanba
   ]}
   removed={[3]}
   added={[1, 2, 3]}
-  note="Los dos parches de la IA cayeron en la línea 3, el elemento visible. La restricción estaba dos padres más arriba: un hijo de flex no se encoge por debajo de su contenido a menos que min-h-0 se lo permita."
+  note="Los dos parches de la IA cayeron en la línea 3, el elemento visible. La restricción estaba más arriba: el board no tenía una altura que heredar, y la columna no era un contenedor flex, así que la lista no tenía dónde encogerse."
 />
 
 El mismo patrón apareció en migraciones de Postgres. Le pedí a la IA que aplicara una migración. Falló. La IA reintentó el mismo `prisma migrate deploy` tres veces, cambiando flags. Cuando paré y miré, el problema era que `.env.local` y `.env` apuntaban a bases distintas, y `dotenv` cargaba el equivocado. La migración nunca había sido el problema. La IA se enfocó en "el comando que falló" en vez de "qué entorno se cargó".
@@ -102,7 +103,7 @@ Si la IA cambia una propiedad sobre el elemento roto y el bug no se mueve, para.
 
 Esto es lo que cambió mi relación con la IA en el side project. Me apoyé fuerte en tests, y dejé de sentir ansiedad por cuánto estaba delegando.
 
-La cantidad de tests no es la historia. Lo que importa es qué superficies están cubiertas y qué tan rápido corre la suite. La suite completa termina en unos diez segundos, y los archivos están organizados por la cosa que cuidan, no por la cosa que ejercitan.
+Lo que importa es qué superficies están cubiertas y qué tan rápido corre la suite. La suite completa termina en unos diez segundos, y los archivos están organizados por la cosa que cuidan, no por la cosa que ejercitan.
 
 <FileTree>
 <div class="folder">
@@ -124,7 +125,7 @@ La cantidad de tests no es la historia. Lo que importa es qué superficies está
 
 Un loop de feedback de diez segundos es lo bastante rápido para correrlo después de cada cambio significativo. La IA puede hacer una suposición equivocada y yo me entero en un respiro, no en un deploy.
 
-Una trampa que tuve que cuidar. Si la IA escribe el código y la IA escribe los tests, la suite pasa porque ambos reflejan la lectura del modelo del spec, no el spec en sí. Para lo que importa — auth, hooks, server actions — el plan de tests lo escribo yo en el spec antes de que la IA toque código. La IA llena las assertions; decidir qué se testea se queda conmigo.
+Una trampa que tuve que cuidar. Si la IA escribe el código y la IA escribe los tests, la suite pasa porque ambos reflejan la lectura del modelo del spec, no el spec en sí.<Sidenote>Es la misma trampa que dejar que un modelo califique su propio resultado: el que revisa comparte los puntos ciegos del que genera. Lo desarrollo más en [mi guía sobre agentes](/blog/es/high-accuracy-agent-priorities/#rompe-la-cadena-verifica-contra-ground-truth).</Sidenote> Para lo que importa — auth, hooks, server actions — el plan de tests lo escribo yo en el spec antes de que la IA toque código. La IA llena las assertions; decidir qué se testea se queda conmigo.
 
 Te muestro dos cosas de la configuración real que hicieron más por mi confianza que cualquier plantilla de prompt.
 
@@ -149,9 +150,9 @@ coverage: {
 ```
 </CodeBlock>
 
-Esos números son bajos a propósito. No son aspiracionales, son el piso de hoy. La pregunta no es "¿cuánta cobertura tienes?", sino "¿puede el número bajar sin que te enteres?". Como piso, no puede. Con números así de bajos solo atrapa regresiones gruesas. Las sutiles necesitan más cobertura para aparecer. Ahora me importa si el número está subiendo, no dónde está.
+Esos números son bajos a propósito. Son el piso de hoy. La pregunta de verdad es si el número puede bajar sin que te enteres. Como piso, no puede. Con números así de bajos solo atrapa regresiones gruesas. Las sutiles necesitan más cobertura para aparecer. Ahora me importa si el número está subiendo, no dónde está.
 
-La segunda es el setup de E2E corriendo contra un Postgres real, no contra un mock:
+La segunda es el setup de E2E corriendo contra un Postgres real:
 
 <CodeBlock filename="playwright.config.ts">
 ```ts
@@ -177,7 +178,7 @@ export default defineConfig({
 
 Los tests E2E insertan una sesión real en la DB para saltarse NextAuth, y después manejan el server real. Nada de mocks. Los dos `@smoke` no hacen nada raro. Uno navega cada página principal, otro crea una tarea. Existen para que si la IA recablea el routing o rompe la auth de una forma que igual compila, me entere en segundos.
 
-Hay una línea de ese config que merece más atención de la que le di cuando la escribí: `retries: process.env.CI ? 2 : 0`. Dos retries en CI son una confesión. Dicen que espero algún fallo de E2E que no tiene nada que ver con mi código, y que prefiero relanzar antes que investigar cada uno. Lo que justifica esa confesión es que la flakiness se multiplica. Un test que flaquea el 3% de las veces pasa el 97% de las corridas. Una suite con cuarenta tests así sale verde en unas tres corridas de cada diez. El mismo 3%, el mismo código, y el build amanece rojo casi todas las mañanas. Haz la cuenta tú mismo:
+Hay una línea de ese config que merece más atención de la que le di cuando la escribí: `retries: process.env.CI ? 2 : 0`. Dos retries en CI son una confesión. Dicen que espero algún fallo de E2E que no tiene nada que ver con mi código, y que prefiero relanzar antes que investigar cada uno. Lo que justifica esa confesión es que la flakiness se multiplica. Un test que flaquea el 3% de las veces pasa el 97% de las corridas. Una suite con cuarenta tests así sale verde en unas tres corridas de cada diez. El mismo 3%, el mismo código, y el build amanece rojo casi todas las mañanas. Es la misma aritmética que hunde las corridas largas de un agente, el cálculo `p^t` de mi [guía sobre agentes](/blog/es/high-accuracy-agent-priorities/#haz-la-aritmética-pt-antes-de-escribir-una-línea-de-código). Haz la cuenta tú mismo:
 
 <FlakySuite
   lang="es"
@@ -219,11 +220,13 @@ El diagrama que ahora tengo en la cabeza:
 
 Sin el loop, le estás preguntando a tu intuición si la IA acertó. En un cambio de una línea, claro, tus ojos lo agarran. En un refactor multi-archivo, tu intuición no leyó el diff completo.
 
+El curso de sistemas agénticos le dedica un módulo entero a esta idea, [la evaluación como loop de control](/es/learn/agentic-systems/evaluation/), y se sostiene incluso cuando el código bajo prueba es un agente. Meses después, en DMai, un director de juego con IA que estoy construyendo con Claude Code como proyecto personal (todavía privado), mis escenarios guionados no medían lo que yo le reclamaba a la mesa. Así que el eval pasó a ser mis propias partidas, cada una cortada justo antes de uno de mis inputs y vuelta a correr desde ahí. Esa historia está en [cómo mis propias partidas se volvieron el eval](/blog/es/my-games-became-the-eval/).
+
 ## Spec primero, código después
 
-La otra cosa que `/insights` dejó obvia: las features que arranqué con un spec escrito terminaron más limpias que las que improvisé en chat.
+El segundo punto de `/insights`, el de los specs, me llevó al otro hábito que cambié.
 
-Un spec no necesita ser largo. Objetivos, no objetivos, casos borde, plan de tests, checklist de aceptación. Quizá un párrafo cada uno. El punto no es el documento. El punto es que ya tomaste las decisiones antes de que el modelo tenga que adivinarlas.
+Un spec no necesita ser largo. Objetivos, no objetivos, casos borde, plan de tests, checklist de aceptación. Quizá un párrafo cada uno. Escribirlo te obliga a tomar las decisiones antes de que el modelo tenga que adivinarlas. En marzo escribí sobre los [slash commands que armé para crear y auditar estos specs](/blog/es/custom-commands-ai-coding/).
 
 Cuando improvisé, la IA adivinó. A veces bien, a veces mal. Las adivinanzas malas aparecieron como las iteraciones de diez rondas.
 

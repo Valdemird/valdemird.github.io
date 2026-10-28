@@ -5,9 +5,9 @@
  * Each instance renders one self-contained demo, chosen by `demo`:
  *   squash | hitstop | shake | particles | sound | combo
  *
- * The motion math and synth parameters are ported from the games.valdemird.com
- * source (apps/web/src/lib/juice.tsx and lib/sfx.ts) so the demos here behave
- * exactly like the shipped game. Everything honors `prefers-reduced-motion`
+ * The motion math and synth parameters were ported from the author's (now
+ * retired) multiplayer games side project (its lib/juice.tsx and lib/sfx.ts),
+ * so the demos keep the tuning that game used. Everything honors `prefers-reduced-motion`
  * for motion and a persisted mute flag for sound.
  *
  *   <JuiceLab demo="shake" caption="Three magnitudes, same impulse." />
@@ -182,7 +182,7 @@ const COPY = {
 </section>
 
 <script>
-	// ----- shared audio (ported from games.valdemird.com lib/sfx.ts) -----
+	// ----- shared audio (ported from the retired games side project's lib/sfx.ts) -----
 	const MUTE_KEY = 'valdemird-blog-muted';
 	let actx: AudioContext | null = null;
 	let master: GainNode | null = null;
@@ -737,8 +737,8 @@ const COPY = {
 	}
 	.jl-btn:hover { transform: translateY(-1px); border-color: var(--color-accent); }
 	.jl-btn:active { transform: translateY(0) scale(0.97); }
-	.jl-btn:focus-visible { outline: 2px solid oklch(from var(--color-accent) l c h / 0.4); outline-offset: 2px; }
-	.jl-btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: oklch(0.99 0.01 280); }
+	.jl-btn:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+	.jl-btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
 	.jl-btn--ghost.is-muted { opacity: 0.6; text-decoration: line-through; }
 	.jl-btn.is-off { opacity: 0.6; }
 

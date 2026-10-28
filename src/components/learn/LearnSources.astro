@@ -111,12 +111,12 @@ const es = lang === 'es';
 		font-weight: 700;
 		/* Fixed near-black text reads on every fill in both themes (light
 		   text on the yellow/grey chips failed AA). */
-		color: oklch(0.21 0.03 265);
+		color: var(--grade-ink);
 	}
-	.grade-a { background: oklch(0.74 0.13 150); }
-	.grade-b { background: oklch(0.74 0.12 235); }
-	.grade-c { background: oklch(0.80 0.13 75); }
-	.grade-d { background: oklch(0.74 0.02 265); }
+	.grade-a { background: var(--grade-a); }
+	.grade-b { background: var(--grade-b); }
+	.grade-c { background: var(--grade-c); }
+	.grade-d { background: var(--grade-d); }
 
 	.src-body { display: flex; flex-direction: column; }
 	.src-body a { color: var(--color-text); text-decoration-color: var(--color-accent); }

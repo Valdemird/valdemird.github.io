@@ -44,12 +44,12 @@ La unidad correcta es la traza de turno, un árbol de spans. Una raíz `invoke_a
 
 <MermaidDiagram title="Una traza de turno es un árbol de spans" chart={`
 graph TD
-  A["invoke_agent (turno · 4.2s · $0.011)"] --> B["chat #1 (1.37s · 3.1k tok)"]
-  B --> C["execute_tool · search (350ms · ok)"]
-  B --> D["execute_tool · read (300ms · ok)"]
-  A --> E["chat #2 (1.3s · 4.8k tok)"]
-  E --> F["execute_tool · create_event (130ms · denegado en gate)"]
-  A --> G["channel.send (330ms)"]
+  A["invoke_agent<br/>turno · 4.2s · $0.011"] --> B["chat #1<br/>1.37s · 3.1k tok"]
+  B --> C["execute_tool · search<br/>350ms · ok"]
+  B --> D["execute_tool · read<br/>300ms · ok"]
+  A --> E["chat #2<br/>1.3s · 4.8k tok"]
+  E --> F["execute_tool ·<br/>create_event<br/>130ms<br/>denegado en gate"]
+  A --> G["channel.send<br/>330ms"]
 `} />
 
 Sin esta jerarquía no puedes medir latencia por paso, atribuir costo a un sub-objetivo ni ver la decisión equivocada. La analogía a la que vuelvo: la traza de turno es la *caja negra del avión*, no el reporte del piloto al aterrizar. El reporte (el output) dice "hubo turbulencia". La caja negra te da cada lectura de sensor y cada decisión en orden temporal. Eso es lo único que permite reconstruir un accidente que no puedes reproducir volando otra vez.

@@ -5,11 +5,13 @@ interface Props {
 }
 
 const { filename } = Astro.props;
-const copyAria = getLocale(Astro.url) === 'es' ? 'Copiar el código' : 'Copy code';
-const blockId = `code-${Math.random().toString(36).slice(2, 9)}`;
+const es = getLocale(Astro.url) === 'es';
+const copyAria = es ? 'Copiar el código' : 'Copy code';
+const copiedText = es ? 'Código copiado' : 'Code copied';
+const failedText = es ? 'No se pudo copiar' : 'Copy failed';
 ---
 
-<div class="code-block" id={blockId}>
+<div class="code-block" data-codeblock data-copied={copiedText} data-failed={failedText}>
 	{filename && (
 		<div class="code-header">
 			<span class="code-filename">
@@ -19,7 +21,7 @@ const blockId = `code-${Math.random().toString(36).slice(2, 9)}`;
 				</svg>
 				{filename}
 			</span>
-			<button class="copy-btn" data-block-id={blockId} type="button" aria-label={copyAria}>
+			<button class="copy-btn" data-codeblock-copy type="button" aria-label={copyAria}>
 				<svg class="icon-copy" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 					<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
 					<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
@@ -31,7 +33,7 @@ const blockId = `code-${Math.random().toString(36).slice(2, 9)}`;
 		</div>
 	)}
 	{!filename && (
-		<button class="copy-btn copy-btn-float" data-block-id={blockId} type="button" aria-label={copyAria}>
+		<button class="copy-btn copy-btn-float" data-codeblock-copy type="button" aria-label={copyAria}>
 			<svg class="icon-copy" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 				<rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect>
 				<path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path>
@@ -44,24 +46,60 @@ const blockId = `code-${Math.random().toString(36).slice(2, 9)}`;
 	<div class="code-content">
 		<slot />
 	</div>
+	<span class="sr-only" role="status" data-codeblock-status></span>
 </div>
 
 <script>
-	document.querySelectorAll('.copy-btn').forEach((btn) => {
-		btn.addEventListener('click', async () => {
-			const blockId = (btn as HTMLElement).dataset.blockId;
-			const block = document.getElementById(blockId!);
-			const code = block?.querySelector('pre code')?.textContent || block?.querySelector('pre')?.textContent || '';
-
+	// One delegated listener on the document. The document survives View
+	// Transition swaps, so copy buttons on the next page work without rebinding,
+	// and nothing piles up across navigations. The module runs once per session.
+	async function copyText(text: string): Promise<boolean> {
+		try {
+			await navigator.clipboard.writeText(text);
+			return true;
+		} catch {
+			// Clipboard API blocked (insecure context, permissions): fall back to
+			// a hidden textarea selection.
+			const ta = document.createElement('textarea');
+			ta.value = text;
+			ta.setAttribute('readonly', '');
+			ta.style.position = 'fixed';
+			ta.style.opacity = '0';
+			document.body.appendChild(ta);
+			ta.select();
+			let ok = false;
 			try {
-				await navigator.clipboard.writeText(code.trim());
-				btn.classList.add('copied');
-				setTimeout(() => btn.classList.remove('copied'), 2000);
+				// Legacy API on purpose: the only copy path left when the Clipboard API is blocked.
+				ok = (document as unknown as { execCommand(cmd: string): boolean }).execCommand('copy');
 			} catch {
-				// Fallback
+				ok = false;
 			}
+			ta.remove();
+			return ok;
+		}
+	}
+
+	if (!(window as unknown as { __codeBlockCopy?: boolean }).__codeBlockCopy) {
+		(window as unknown as { __codeBlockCopy?: boolean }).__codeBlockCopy = true;
+		document.addEventListener('click', async (event) => {
+			const btn = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-codeblock-copy]');
+			if (!btn) return;
+			const block = btn.closest<HTMLElement>('[data-codeblock]');
+			if (!block) return;
+			const code = block.querySelector('pre code')?.textContent || block.querySelector('pre')?.textContent || '';
+			const status = block.querySelector<HTMLElement>('[data-codeblock-status]');
+			const ok = await copyText(code.trim());
+
+			if (status) {
+				status.textContent = ok ? (block.dataset.copied ?? 'Copied') : (block.dataset.failed ?? 'Copy failed');
+			}
+			if (ok) btn.classList.add('copied');
+			window.setTimeout(() => {
+				btn.classList.remove('copied');
+				if (status) status.textContent = '';
+			}, 2000);
 		});
-	});
+	}
 </script>
 
 <style>
@@ -123,13 +161,30 @@ const blockId = `code-${Math.random().toString(36).slice(2, 9)}`;
 			background var(--duration-fast) var(--ease-smooth);
 	}
 
-	.code-block:hover .copy-btn-float {
+	/* Visible on hover, whenever keyboard focus is inside the block, and
+	   always on touch screens (no hover to reveal it there). */
+	.code-block:hover .copy-btn-float,
+	.code-block:focus-within .copy-btn-float,
+	.copy-btn-float:focus-visible {
 		opacity: 1;
+	}
+
+	@media (hover: none) {
+		.copy-btn-float {
+			opacity: 1;
+			background: oklch(from var(--color-surface) l c h / 0.85);
+		}
+	}
+
+	.copy-btn:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+		color: var(--color-text);
 	}
 
 	.icon-check { display: none; }
 	.copy-btn.copied .icon-copy { display: none; }
-	.copy-btn.copied .icon-check { display: block; color: var(--color-success); }
+	.copy-btn.copied .icon-check { display: block; color: var(--color-success-text, var(--color-success)); }
 
 	.code-content :global(pre) {
 		margin: 0;

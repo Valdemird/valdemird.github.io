@@ -2,150 +2,839 @@
 interface Props {
 	title?: string;
 	chart: string;
+	/** UI language for the loading/error text. Defaults to the page's locale. */
+	lang?: 'en' | 'es';
 }
 
 const { title, chart } = Astro.props;
-const mermaidId = `mermaid-${Math.random().toString(36).slice(2, 7)}`;
+const lang: 'en' | 'es' =
+	Astro.props.lang ?? (/(^|\/)es(\/|$)/.test(Astro.url.pathname) ? 'es' : 'en');
+
+const L = {
+	en: { loading: 'Drawing diagram…', error: "Couldn't draw this diagram. Here is its source:", fallback: 'Diagram', scroll: 'Scroll' },
+	es: { loading: 'Dibujando diagrama…', error: 'No se pudo dibujar este diagrama. Este es su código:', fallback: 'Diagrama', scroll: 'Desliza' },
+}[lang];
+
+// Deterministic id: same chart → same id on every build (no Math.random()).
+function hash(str: string): string {
+	let h = 0x811c9dc5;
+	for (let i = 0; i < str.length; i++) {
+		h ^= str.charCodeAt(i);
+		h = Math.imul(h, 0x01000193);
+	}
+	return (h >>> 0).toString(36);
+}
+// Identical diagrams on one page get an occurrence suffix (-2, -3…) so DOM ids
+// and the title's aria-labelledby target stay unique.
+const base = `mermaid-${hash(`${title ?? ''}\u0000${chart}`)}`;
+const locals = (Astro.locals ?? {}) as unknown as { __mermaidSeen?: Map<string, number> };
+const seen = (locals.__mermaidSeen ??= new Map<string, number>());
+const occurrence = (seen.get(base) ?? 0) + 1;
+seen.set(base, occurrence);
+const mermaidId = occurrence === 1 ? base : `${base}-${occurrence}`;
+const titleId = title ? `${mermaidId}-title` : undefined;
 ---
 
-<div class="mermaid-container">
-	{title && <span class="mermaid-title">{title}</span>}
-	<div class="mermaid-diagram" id={mermaidId} data-chart={chart}>
+<div
+	class="mermaid-container"
+	role="figure"
+	aria-labelledby={titleId}
+	aria-label={title ? undefined : L.fallback}
+>
+	{title && (
+		<div class="mermaid-head">
+			<span class="mermaid-title" id={titleId}>{title}</span>
+			<span class="mermaid-hint" aria-hidden="true">{L.scroll} <span class="mermaid-hint-arrow">→</span></span>
+		</div>
+	)}
+	<div
+		class="mermaid-diagram"
+		id={mermaidId}
+		data-chart={chart}
+		data-error={L.error}
+		data-fallback={L.fallback}
+	>
 		<div class="mermaid-loading" aria-hidden="true">
 			<div class="mermaid-spinner"></div>
-			<span>Rendering diagram...</span>
+			<span>{L.loading}</span>
 		</div>
 	</div>
+	{!title && (
+		<span class="mermaid-hint is-floating" aria-hidden="true">{L.scroll} <span class="mermaid-hint-arrow">→</span></span>
+	)}
 </div>
 
 <script>
-	let mermaidLoaded = false;
-	let mermaidPromise: Promise<void> | null = null;
+	// Mermaid is ~860 KB, so it loads only when the first diagram gets close to
+	// the viewport, and each diagram renders only when it gets close itself.
+	// The script tag is added once per session; later pages reuse it.
+	//
+	// Why labels used to clip: Mermaid sizes every box from text it measures
+	// while rendering. Anything that changes the text afterwards (another
+	// font, a CSS `nowrap` that undoes Mermaid's wrapping, an article
+	// `p { margin }` rule) makes the label outgrow its box. So the web fonts
+	// load first, Mermaid gets the real families, the scratch SVG is measured
+	// inside this figure (same inherited CSS as the final render), and every
+	// label style lives in `themeCSS`, which is in place while Mermaid measures.
+	type MermaidApi = {
+		initialize(config: Record<string, unknown>): void;
+		render(id: string, code: string, container?: Element): Promise<{ svg: string }>;
+	};
 
-	function loadMermaid(): Promise<void> {
-		if (mermaidLoaded) return Promise.resolve();
+	let mermaidPromise: Promise<MermaidApi> | null = null;
+	let observer: IntersectionObserver | null = null;
+	let resizer: ResizeObserver | null = null;
+	let themeWatcher: MutationObserver | null = null;
+	// Mermaid renders one diagram at a time; queue ours so they never overlap.
+	let queue: Promise<void> = Promise.resolve();
+	// Mermaid deletes any element that already carries the render id, so two
+	// identical diagrams on one page would clobber each other without this.
+	let renderSeq = 0;
+
+	// Labels never render below this fraction of their designed size. A
+	// diagram that would need to shrink further scrolls inside the figure.
+	const MIN_SCALE = 0.75;
+	// Below this width, flowcharts wrap sooner and pack tighter.
+	const NARROW = 560;
+
+	function loadMermaid(): Promise<MermaidApi> {
+		const existing = (window as unknown as { mermaid?: MermaidApi }).mermaid;
+		if (existing) return Promise.resolve(existing);
 		if (mermaidPromise) return mermaidPromise;
 
-		mermaidPromise = new Promise((resolve) => {
+		mermaidPromise = new Promise((resolve, reject) => {
 			const script = document.createElement('script');
 			// Exact-pinned so the SRI hash below stays valid; bump version + hash together.
 			script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11.15.0/dist/mermaid.min.js';
 			script.integrity = 'sha384-yQ4mmBBT+vhTAwjFH0toJXNYJ6O4usWnt6EPIdWwrRvx2V/n5lXuDZQwQFeSFydF';
 			script.crossOrigin = 'anonymous';
-			script.onload = () => {
-				const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
-					(!document.documentElement.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
-
-				(window as any).mermaid.initialize({
-					startOnLoad: false,
-					theme: isDark ? 'dark' : 'default',
-					fontFamily: 'system-ui, -apple-system, sans-serif',
-					fontSize: 14,
-					flowchart: {
-						htmlLabels: true,
-						useMaxWidth: true,
-						padding: 18,
-						nodeSpacing: 55,
-						rankSpacing: 65,
-						curve: 'basis',
-					},
-				});
-				mermaidLoaded = true;
-				resolve();
+			script.onload = () => resolve((window as unknown as { mermaid: MermaidApi }).mermaid);
+			script.onerror = () => {
+				mermaidPromise = null;
+				script.remove();
+				reject(new Error('mermaid failed to load'));
 			};
 			document.head.appendChild(script);
 		});
-
 		return mermaidPromise;
 	}
 
-	async function renderDiagrams() {
-		const containers = document.querySelectorAll<HTMLElement>('.mermaid-diagram[data-chart]');
-		if (containers.length === 0) return;
+	function isDark(): boolean {
+		const t = document.documentElement.getAttribute('data-theme');
+		if (t === 'dark' || t === 'light') return t === 'dark';
+		return window.matchMedia('(prefers-color-scheme: dark)').matches;
+	}
 
-		await loadMermaid();
+	// --- Site tokens → Mermaid theme ---------------------------------------
+	// Mermaid derives shades from its theme colors with a parser that only
+	// understands hex/rgb/hsl, and the site tokens are OKLch. A 1×1 canvas
+	// converts any CSS color (alpha composited over the figure surface).
+	let ctx2d: CanvasRenderingContext2D | null = null;
+	function toHex(color: string, over = '#ffffff'): string {
+		ctx2d ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+		if (!ctx2d) return over;
+		ctx2d.clearRect(0, 0, 1, 1);
+		ctx2d.fillStyle = over;
+		ctx2d.fillRect(0, 0, 1, 1);
+		ctx2d.fillStyle = over;
+		ctx2d.fillStyle = color; // ignored if unparseable → falls back to `over`
+		ctx2d.fillRect(0, 0, 1, 1);
+		const [r, g, b] = ctx2d.getImageData(0, 0, 1, 1).data;
+		return `#${[r, g, b].map((n) => n.toString(16).padStart(2, '0')).join('')}`;
+	}
 
-		// Wait for fonts to settle before rendering — Mermaid measures text
-		// against the actual rendered font, and stale metrics cause text clipping.
-		if (document.fonts && (document.fonts as any).ready) {
-			try { await (document.fonts as any).ready; } catch {}
+	function readTokens(el: HTMLElement) {
+		const cs = getComputedStyle(el);
+		const v = (name: string) => cs.getPropertyValue(name).trim();
+		const surface = toHex(v('--color-surface') || '#ffffff', '#ffffff');
+		const hex = (name: string) => toHex(v(name), surface);
+		return {
+			sans: v('--font-sans') || 'system-ui, sans-serif',
+			mono: v('--font-mono') || 'ui-monospace, monospace',
+			surface,
+			bg: hex('--color-bg'),
+			bg2: hex('--color-bg-secondary'),
+			text: hex('--color-text'),
+			text2: hex('--color-text-secondary'),
+			muted: hex('--color-text-muted'),
+			border: hex('--color-border'),
+			borderStrong: hex('--color-border-strong'),
+			accent: hex('--color-accent'),
+			accentSubtle: hex('--color-accent-subtle'),
+		};
+	}
+
+	// Typography and shape styling. Mermaid prefixes every rule with the SVG's
+	// id, so these beat both its defaults and article-body rules that would
+	// otherwise leak into the HTML labels (p margins, line-height, max-width).
+	// Colors read the live CSS variables declared on .mermaid-container.
+	const THEME_CSS = `
+		* { transition: none !important; }
+		foreignObject { overflow: visible; }
+		foreignObject div, foreignObject span, foreignObject p {
+			margin: 0; padding: 0; max-width: none; border: 0;
+			font-family: var(--font-sans); font-size: 14px; font-weight: 450;
+			line-height: 1.45; letter-spacing: 0; word-spacing: normal;
+			text-transform: none; text-align: center; color: var(--color-text);
 		}
 
-		for (const container of containers) {
-			if (container.querySelector('.mermaid-rendered')) continue;
+		.node rect, .node path, .node ellipse, .node circle {
+			fill: var(--mm-node-fill); stroke: var(--mm-node-stroke); stroke-width: 1px;
+		}
+		.node rect { rx: 8px; ry: 8px; }
+		.node polygon {
+			fill: var(--mm-decision-fill); stroke: var(--mm-decision-stroke); stroke-width: 1px;
+		}
 
-			// Replace literal \n with actual newlines
-			const code = (container.dataset.chart || '').replace(/\\n/g, '\n');
-			const loading = container.querySelector('.mermaid-loading') as HTMLElement;
+		.cluster rect {
+			fill: var(--mm-cluster-fill); stroke: var(--mm-node-stroke); stroke-width: 1px;
+			stroke-dasharray: 3 4; rx: 12px; ry: 12px;
+		}
+		.cluster-label div, .cluster-label span, .cluster-label p {
+			font-family: var(--font-mono); font-size: 11.5px; font-weight: 500;
+			line-height: 1.4; letter-spacing: 0.02em; color: var(--color-text-muted);
+		}
+		/* Inset the title from the dashed frame (the cluster grows to fit it). */
+		.cluster-label foreignObject > div { padding: 0 14px; }
 
-			try {
-				const { svg } = await (window as any).mermaid.render(
-					`mermaid-svg-${Math.random().toString(36).slice(2, 7)}`,
-					code
-				);
-				const rendered = document.createElement('div');
-				rendered.className = 'mermaid-rendered';
-				rendered.innerHTML = svg;
-				container.appendChild(rendered);
-				if (loading) loading.style.display = 'none';
-			} catch (err) {
-				console.error('Mermaid error:', err);
-				if (loading) loading.innerHTML = '<span style="color:var(--color-destructive)">Diagram rendering failed</span>';
+		.flowchart-link, .edgePath .path, .transition {
+			stroke: var(--mm-edge); stroke-width: 1.25px;
+		}
+		.marker, marker path, .arrowheadPath {
+			fill: var(--mm-edge) !important; stroke: none !important;
+		}
+		.edgeLabel, .edgeLabel div, .edgeLabel span, .edgeLabel p, .labelBkg {
+			background-color: transparent !important;
+			font-family: var(--font-mono); font-size: 11.5px; font-weight: 450;
+			line-height: 1.5; color: var(--color-text-secondary);
+		}
+		/* Labelled edges get a chip: padded wash + hairline, measured in place. */
+		.labelBkg:has(p) {
+			padding: 1px 7px;
+			border-radius: 5px;
+			background-color: var(--mm-chip-fill) !important;
+			box-shadow: inset 0 0 0 1px var(--color-border);
+		}
+		.edgeLabel rect { fill: var(--mm-chip-fill) !important; opacity: 1 !important; rx: 5px; ry: 5px; }
+
+		/* Sequence */
+		rect.actor {
+			fill: var(--mm-node-fill); stroke: var(--mm-node-stroke); stroke-width: 1px; rx: 8px; ry: 8px;
+		}
+		text.actor, text.actor > tspan { fill: var(--color-text); }
+		.actor-line { stroke: var(--mm-edge-soft); stroke-width: 1px; stroke-dasharray: 2 4; }
+		.messageLine0, .messageLine1 { stroke: var(--mm-edge); stroke-width: 1.25px; }
+		.messageText { fill: var(--color-text-secondary); stroke: none; }
+		.loopLine { stroke: var(--mm-decision-stroke); stroke-width: 1px; stroke-dasharray: 3 4; }
+		.labelBox { fill: var(--mm-decision-fill); stroke: var(--mm-decision-stroke); stroke-width: 1px; }
+		.labelText, .labelText > tspan { fill: var(--color-accent); }
+		.loopText, .loopText > tspan { fill: var(--color-text-muted); }
+		.note { fill: var(--mm-note-fill); stroke: var(--mm-node-stroke); stroke-width: 1px; }
+		.noteText, .noteText > tspan { fill: var(--color-text); }
+		.activation0, .activation1, .activation2 {
+			fill: var(--mm-decision-fill); stroke: var(--mm-decision-stroke);
+		}
+
+		/* State: same label voice and box padding as flowchart nodes. */
+		.statediagram-state .label div, .statediagram-state .label span,
+		.statediagram-state .label p, g.stateGroup text {
+			font-family: var(--font-sans); font-size: 14px; font-weight: 450; line-height: 1.45;
+		}
+		.statediagram-state rect.basic, .node.statediagram-state rect {
+			fill: var(--mm-node-fill); stroke: var(--mm-node-stroke); stroke-width: 1px;
+		}
+		.node circle.state-start, .state-start { fill: var(--color-text); stroke: var(--color-text); }
+		.node .state-end, .state-end { fill: var(--color-text); stroke: var(--color-text); }
+		.node .end-state-inner, .end-state-inner { fill: var(--mm-canvas); stroke: var(--mm-canvas); }
+		.statediagram-cluster rect.outer {
+			fill: var(--mm-cluster-fill); stroke: var(--mm-node-stroke); rx: 12px; ry: 12px;
+		}
+		.statediagram-cluster rect.inner { fill: var(--mm-canvas); }
+		.statediagram-state rect.divider { stroke: var(--mm-node-stroke); }
+		.statediagram-note rect, .node.statediagram-note rect {
+			fill: var(--mm-note-fill); stroke: var(--mm-node-stroke);
+		}
+	`;
+
+	function configure(mermaid: MermaidApi, el: HTMLElement, compact: boolean) {
+		const t = readTokens(el);
+		const dark = isDark();
+		mermaid.initialize({
+			startOnLoad: false,
+			suppressErrorRendering: true,
+			theme: 'base',
+			darkMode: dark,
+			fontFamily: t.sans,
+			fontSize: 14,
+			htmlLabels: true,
+			themeCSS: THEME_CSS,
+			themeVariables: {
+				darkMode: dark,
+				fontFamily: t.sans,
+				fontSize: '14px',
+				background: t.surface,
+				mainBkg: t.bg,
+				primaryColor: t.bg,
+				primaryBorderColor: t.borderStrong,
+				primaryTextColor: t.text,
+				secondaryColor: t.bg2,
+				secondaryBorderColor: t.borderStrong,
+				secondaryTextColor: t.text,
+				tertiaryColor: t.surface,
+				tertiaryBorderColor: t.border,
+				tertiaryTextColor: t.text,
+				nodeBorder: t.borderStrong,
+				nodeTextColor: t.text,
+				textColor: t.text,
+				titleColor: t.muted,
+				lineColor: t.muted,
+				clusterBkg: t.bg,
+				clusterBorder: t.borderStrong,
+				edgeLabelBackground: t.surface,
+				// sequence
+				actorBkg: t.bg,
+				actorBorder: t.borderStrong,
+				actorTextColor: t.text,
+				actorLineColor: t.borderStrong,
+				signalColor: t.muted,
+				signalTextColor: t.text2,
+				labelBoxBkgColor: t.accentSubtle,
+				labelBoxBorderColor: t.accent,
+				labelTextColor: t.accent,
+				loopTextColor: t.muted,
+				noteBkgColor: t.bg2,
+				noteBorderColor: t.borderStrong,
+				noteTextColor: t.text,
+				activationBkgColor: t.accentSubtle,
+				activationBorderColor: t.accent,
+				sequenceNumberColor: t.surface,
+				// state
+				stateBkg: t.bg,
+				stateLabelColor: t.text,
+				transitionColor: t.muted,
+				transitionLabelColor: t.text2,
+				compositeBackground: t.bg2,
+				compositeTitleBackground: t.bg2,
+				altBackground: t.bg2,
+				specialStateColor: t.text,
+				innerEndBackground: t.surface,
+			},
+			flowchart: {
+				htmlLabels: true,
+				useMaxWidth: false,
+				// Compact: wrap sooner and pack tighter (narrow figures, wide charts).
+				padding: compact ? 12 : 16,
+				nodeSpacing: compact ? 18 : 36,
+				rankSpacing: compact ? 36 : 44,
+				diagramPadding: 4,
+				wrappingWidth: compact ? 140 : 220,
+				curve: 'basis',
+			},
+			state: {
+				useMaxWidth: false,
+				padding: compact ? 12 : 16,
+				// Paired transitions (A → B, B → A) need room so their labels
+				// don't land on each other's curves.
+				nodeSpacing: compact ? 36 : 56,
+				rankSpacing: compact ? 52 : 64,
+			},
+			sequence: {
+				useMaxWidth: false,
+				mirrorActors: false,
+				// Compact: narrower lifelines and smaller message text, so a
+				// six-actor sequence fits a phone or a reading column.
+				actorMargin: compact ? 12 : 24,
+				boxMargin: 10,
+				boxTextMargin: 6,
+				noteMargin: 12,
+				messageMargin: compact ? 30 : 34,
+				diagramMarginX: 8,
+				diagramMarginY: 8,
+				// Tall enough for a three-line actor name at the relaxed leading.
+				height: 60,
+				width: compact ? 88 : 112,
+				wrap: true,
+				actorFontFamily: t.sans,
+				actorFontSize: compact ? 13 : 14,
+				actorFontWeight: 500,
+				messageFontFamily: t.sans,
+				messageFontSize: compact ? 12 : 13,
+				messageFontWeight: 400,
+				noteFontFamily: t.sans,
+				noteFontSize: compact ? 12 : 13,
+				noteFontWeight: 400,
+			},
+		});
+	}
+
+	// --- Fallback layouts for flowcharts too wide for the figure -------------
+	// Same nodes and edges; only directions change. Listed from closest to the
+	// author's layout to furthest: sibling subgraphs stacked, the whole graph
+	// top-to-bottom, both, and finally a too-wide tree turned sideways.
+	const HEAD = /^(\s*(?:%%[^\n]*\n\s*)*(?:flowchart|graph))(?:[ \t]+(TB|TD|BT|LR|RL))?/;
+
+	function topLevelSubgraphs(code: string): string[] {
+		const ids: string[] = [];
+		let depth = 0;
+		for (const raw of code.split('\n')) {
+			const line = raw.trim();
+			if (/^subgraph\b/.test(line)) {
+				const id = /^subgraph\s+([\w-]+)\s*(?:\[|$)/.exec(line)?.[1];
+				if (depth === 0 && id) ids.push(id);
+				depth++;
+			} else if (/^end\s*$/.test(line)) {
+				depth = Math.max(0, depth - 1);
 			}
 		}
+		return ids;
+	}
+
+	function fallbackLayouts(code: string): { code: string; sideways: boolean }[] {
+		const head = HEAD.exec(code);
+		if (!head) return [];
+		const dir = head[2] ?? 'TB';
+		const setDir = (c: string, d: string) => c.replace(HEAD, `$1 ${d}`);
+		// Invisible links make sibling subgraphs stack instead of sitting side by side.
+		const stack = (c: string) => {
+			const ids = topLevelSubgraphs(c);
+			if (ids.length < 2 || c.includes('~~~')) return null;
+			return `${c}\n${ids.slice(1).map((id, i) => `  ${ids[i]} ~~~ ${id}`).join('\n')}`;
+		};
+		const vertical = setDir(code, 'TD')
+			.replace(/(^|\n)([ \t]*)direction\s+(?:LR|RL)\b/g, '$1$2direction TB')
+			.replace(/(^|\n)([ \t]*)(subgraph\b[^\n]*)/g, '$1$2$3\n$2  direction TB');
+		const sideways = /^(TB|TD)$/.test(dir) && !topLevelSubgraphs(code).length ? setDir(code, 'LR') : null;
+		const out = [stack(setDir(code, 'TD')), vertical, stack(vertical), sideways];
+		return [...new Set(out.filter((c): c is string => !!c && c !== code))].map((c) => ({
+			code: c,
+			// A sideways tree only helps if it fits outright; one that still
+			// scrolls is harder to read than the compact top-down tree.
+			sideways: c === sideways,
+		}));
+	}
+
+	async function ensureFonts(sans: string, mono: string) {
+		if (!document.fonts) return;
+		try {
+			await Promise.all([
+				document.fonts.load(`450 14px ${sans}`),
+				document.fonts.load(`500 14px ${sans}`),
+				document.fonts.load(`450 12px ${mono}`),
+			]);
+			await document.fonts.ready;
+		} catch {}
+	}
+
+	function naturalWidth(svg: SVGSVGElement | null): number {
+		if (!svg) return 0;
+		return svg.viewBox?.baseVal?.width || parseFloat(svg.getAttribute('width') || '0');
+	}
+
+	function available(container: HTMLElement): number {
+		const cs = getComputedStyle(container);
+		return container.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+	}
+
+	// Fit to the figure: never upscale, never shrink labels past MIN_SCALE.
+	// Returns true when the diagram overflows and the figure scrolls.
+	function fit(container: HTMLElement): boolean {
+		const svg = container.querySelector<SVGSVGElement>('.mermaid-rendered svg');
+		if (!svg) return false;
+		const natural = naturalWidth(svg);
+		const room = available(container);
+		// A few pixels short of the floor still fits: scrolling for a sliver is worse.
+		const floor = natural * MIN_SCALE;
+		const width = room >= floor - 16 ? Math.min(natural, room) : floor;
+		svg.style.width = `${Math.round(width)}px`;
+		svg.style.maxWidth = 'none';
+		svg.style.height = 'auto';
+		const scrollable = width > room + 1;
+		container.classList.toggle('is-scrollable', scrollable);
+		// A clipped diagram must be reachable without a pointer: make the
+		// scroll box a named, focusable region only while it actually scrolls.
+		if (scrollable) {
+			const title = container.closest('.mermaid-container')?.querySelector('.mermaid-title')?.textContent?.trim();
+			container.tabIndex = 0;
+			container.setAttribute('role', 'region');
+			container.setAttribute('aria-label', title || container.dataset.fallback || 'Diagram');
+		} else {
+			container.removeAttribute('tabindex');
+			container.removeAttribute('role');
+			container.removeAttribute('aria-label');
+		}
+		return scrollable;
+	}
+
+	// Open a clipped diagram where the reader should start: a top-down tree on
+	// its root (the topmost node), anything else on its middle. Never on a
+	// node cut in half at the right edge.
+	function centerScroll(container: HTMLElement) {
+		const slack = container.scrollWidth - container.clientWidth;
+		if (slack <= 0) return;
+		const holder = container.querySelector<HTMLElement>('.mermaid-rendered');
+		// A sequence reads left to right from its first actor: keep the start.
+		if (holder?.querySelector('svg[aria-roledescription="sequence"]')) return;
+		let target = slack / 2;
+		if (holder?.dataset.dir === 'TD') {
+			const box = container.getBoundingClientRect();
+			let top = Infinity;
+			holder.querySelectorAll('.node').forEach((node) => {
+				const r = node.getBoundingClientRect();
+				if (r.top < top - 1) {
+					top = r.top;
+					target = container.scrollLeft + r.left + r.width / 2 - box.left - container.clientWidth / 2;
+				}
+			});
+		}
+		container.scrollLeft = Math.round(Math.max(0, Math.min(slack, target)));
+	}
+
+	// Mermaid stacks a wrapped actor name as one <text> per line, spaced at
+	// line-height 1.0, so a two-line name touches its box. Re-space the lines
+	// to a 1.25 leading, still centred on the box.
+	function relaxActorLeading(holder: HTMLElement) {
+		holder.querySelectorAll<SVGGElement>('g:has(> text.actor)').forEach((g) => {
+			const lines = Array.from(g.querySelectorAll<SVGTSpanElement>(':scope > text.actor > tspan'));
+			if (lines.length < 2) return;
+			const size = parseFloat((lines[0].parentNode as SVGTextElement).style.fontSize) || 14;
+			const mid = (lines.length - 1) / 2;
+			lines.forEach((tspan, i) => tspan.setAttribute('dy', String(Math.round((i - mid) * size * 1.25 * 10) / 10)));
+		});
+	}
+
+	async function draw(mermaid: MermaidApi, container: HTMLElement, code: string): Promise<HTMLElement> {
+		// Third argument: Mermaid measures its scratch SVG inside this figure.
+		const id = `${container.id}-svg${renderSeq++}`;
+		let svg: string;
+		try {
+			({ svg } = await mermaid.render(id, code, container));
+		} finally {
+			// A failed render can leave its scratch nodes behind.
+			container.querySelector(`#d${id}`)?.remove();
+			container.querySelector(`:scope > #${id}`)?.remove();
+		}
+		const holder = document.createElement('div');
+		holder.className = 'mermaid-rendered';
+		holder.innerHTML = svg;
+		return holder;
+	}
+
+	// On a figure at least NARROW wide, the author's layout must fit at (close
+	// to) full size; a wide layout squeezed to 0.8 reads as cramped next to a
+	// stacked one at 1.0. Narrow figures accept MIN_SCALE before falling back.
+	const AUTHOR_SCALE = 0.9;
+
+	async function renderOne(container: HTMLElement) {
+		const state = container.dataset.mermaidState;
+		if (state === 'rendering' || state === 'done' || state === 'error') return;
+		container.dataset.mermaidState = 'rendering';
+		const code = (container.dataset.chart || '').replace(/\\n/g, '\n');
+
+		try {
+			const mermaid = await loadMermaid();
+			const t = readTokens(container);
+			await ensureFonts(t.sans, t.mono);
+			if (!container.isConnected) return;
+			const room = available(container);
+			const narrow = room < NARROW;
+			const scaleOf = (h: HTMLElement) => Math.min(1, room / (naturalWidth(h.querySelector('svg')) || 1));
+
+			// The author's layout wins when its labels fit at AUTHOR_SCALE (or
+			// MIN_SCALE on a narrow figure). Otherwise tighter wrapping and every
+			// fallback layout are drawn, and the one with the largest text wins
+			// (ties go to the layout closest to the author's). Picking by scale,
+			// not "first that clears the floor", keeps EN and ES of one figure
+			// on the same layout when their labels differ by a few letters.
+			// Tokens are read per render, so a redraw after a theme change matches it.
+			configure(mermaid, container, narrow);
+			const dirOf = (c: string) => HEAD.exec(c)?.[2] ?? (HEAD.test(c) ? 'TB' : '');
+			let best = await draw(mermaid, container, code);
+			let bestScale = scaleOf(best);
+			let chosenDir = dirOf(code);
+			if (bestScale < (narrow ? MIN_SCALE : AUTHOR_SCALE)) {
+				const candidates = [
+					...(narrow ? [] : [{ code, sideways: false }]),
+					...fallbackLayouts(code),
+				];
+				configure(mermaid, container, true);
+				for (const alt of candidates) {
+					let candidate: HTMLElement;
+					try {
+						candidate = await draw(mermaid, container, alt.code);
+					} catch {
+						continue;
+					}
+					const scale = scaleOf(candidate);
+					if (alt.sideways && scale < MIN_SCALE) continue;
+					if (scale > bestScale + 0.02) {
+						best = candidate;
+						bestScale = scale;
+						chosenDir = dirOf(alt.code);
+					}
+					if (bestScale >= 0.98) break;
+				}
+			}
+			relaxActorLeading(best);
+			best.dataset.dir = /^(TB|TD)$/.test(chosenDir) ? 'TD' : chosenDir;
+			if (!container.isConnected) return;
+
+			container.querySelector('.mermaid-loading')?.remove();
+			container.querySelector('.mermaid-rendered')?.remove();
+			// Mermaid's own SVG semantics stay intact so node and edge labels remain
+			// readable by assistive tech; the surrounding figure carries the name.
+			container.appendChild(best);
+			container.dataset.room = String(Math.round(room));
+			container.dataset.theme = isDark() ? 'dark' : 'light';
+			if (fit(container)) centerScroll(container);
+			container.addEventListener('scroll', () => (container.dataset.scrolled = ''), { once: true, passive: true });
+			container.dataset.mermaidState = 'done';
+			resizer?.observe(container);
+		} catch (err) {
+			console.error('Mermaid error:', err);
+			if (!container.isConnected) return;
+			container.querySelector('.mermaid-loading')?.remove();
+			container.querySelector('.mermaid-rendered')?.remove();
+			container.dataset.mermaidState = 'error';
+			showError(container, code);
+		}
+	}
+
+	function showError(container: HTMLElement, code: string) {
+		const box = document.createElement('div');
+		box.className = 'mermaid-error';
+		const msg = document.createElement('p');
+		msg.textContent = container.dataset.error ?? "Couldn't draw this diagram.";
+		const pre = document.createElement('pre');
+		pre.textContent = code;
+		box.append(msg, pre);
+		container.appendChild(box);
+	}
+
+	function rerender(container: HTMLElement) {
+		if (container.dataset.mermaidState !== 'done') return;
+		container.dataset.mermaidState = 'stale';
+		queue = queue.then(() => renderOne(container));
 	}
 
 	function initMermaid() {
-		const observer = new IntersectionObserver((entries) => {
-			entries.forEach((entry) => {
-				if (entry.isIntersecting) {
-					renderDiagrams();
-					observer.unobserve(entry.target);
-				}
-			});
-		}, { rootMargin: '200px' });
+		const containers = document.querySelectorAll<HTMLElement>('.mermaid-diagram[data-chart]:not([data-mermaid-state])');
+		if (!containers.length) return;
 
-		document.querySelectorAll('.mermaid-container').forEach((el) => observer.observe(el));
+		observer?.disconnect();
+		observer = new IntersectionObserver(
+			(entries) => {
+				entries.forEach((entry) => {
+					if (!entry.isIntersecting) return;
+					const el = entry.target as HTMLElement;
+					observer?.unobserve(el);
+					queue = queue.then(() => renderOne(el));
+				});
+			},
+			{ rootMargin: '300px 0px' },
+		);
+		containers.forEach((el) => observer!.observe(el));
+
+		// Width changes refit; a large change (rotation, window resize) lays the
+		// diagram out again, since a different layout or wrap may now fit better.
+		resizer?.disconnect();
+		const timers = new WeakMap<HTMLElement, number>();
+		resizer = new ResizeObserver((entries) => {
+			entries.forEach((entry) => {
+				const el = entry.target as HTMLElement;
+				if (el.dataset.mermaidState !== 'done') return;
+				fit(el);
+				window.clearTimeout(timers.get(el));
+				timers.set(
+					el,
+					window.setTimeout(() => {
+						const was = Number(el.dataset.room) || 0;
+						const now = available(el);
+						const crossed = was < NARROW !== now < NARROW;
+						if (crossed || Math.abs(now - was) > was * 0.2) rerender(el);
+					}, 200),
+				);
+			});
+		});
+
+		// The theme follows the OS live; redraw so Mermaid's derived shades match.
+		themeWatcher?.disconnect();
+		themeWatcher = new MutationObserver(() => {
+			const theme = isDark() ? 'dark' : 'light';
+			document
+				.querySelectorAll<HTMLElement>('.mermaid-diagram[data-mermaid-state="done"]')
+				.forEach((el) => {
+					if (el.dataset.theme !== theme) rerender(el);
+				});
+		});
+		themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 	}
 
 	initMermaid();
-	document.addEventListener('astro:after-swap', () => {
-		mermaidLoaded = false;
-		mermaidPromise = null;
-		initMermaid();
+	document.addEventListener('astro:page-load', initMermaid);
+	document.addEventListener('astro:before-swap', () => {
+		observer?.disconnect();
+		observer = null;
+		resizer?.disconnect();
+		resizer = null;
+		themeWatcher?.disconnect();
+		themeWatcher = null;
 	});
 </script>
 
 <style>
 	.mermaid-container {
+		/* Diagram palette, derived from the site tokens. The SVG reads these
+		   through Mermaid's themeCSS, so they follow light/dark live. */
+		--mm-canvas: var(--color-surface);
+		--mm-node-fill: var(--color-bg);
+		--mm-node-stroke: var(--color-border-strong);
+		--mm-cluster-fill: oklch(from var(--color-bg-secondary) l c h / 0.55);
+		--mm-decision-fill: var(--color-accent-subtle);
+		--mm-decision-stroke: oklch(from var(--color-accent) l c h / 0.7);
+		--mm-note-fill: oklch(from var(--color-accent) l c h / 0.05);
+		--mm-edge: color-mix(in oklch, var(--color-text-muted) 80%, var(--color-surface));
+		--mm-edge-soft: var(--color-border-strong);
+		/* Edge labels are chips: a near-opaque wash plus a hairline, so they
+		   read as deliberate labels, not holes cut in the grid. */
+		--mm-chip-fill: oklch(from var(--mm-canvas) l c h / 0.92);
+
+		position: relative;
 		margin: 2em 0;
 		border: 1px solid var(--color-border);
 		border-radius: var(--radius-md);
 		overflow: hidden;
-		background: var(--color-surface);
+		background: var(--mm-canvas);
 	}
 
-	.mermaid-title {
-		display: block;
+	/* Dark: nodes sit ON the canvas like the site's cards (lighter than the
+	   surface), never punched into it. Decisions get a real accent wash so the
+	   diamonds don't dissolve into the grid. */
+	:global([data-theme='dark']) .mermaid-container {
+		--mm-node-fill: oklch(from var(--color-surface) calc(l + 0.04) c h);
+		--mm-cluster-fill: oklch(from var(--color-bg-secondary) l c h / 0.6);
+		--mm-decision-fill: oklch(from var(--color-accent) l c h / 0.14);
+		--mm-decision-stroke: oklch(from var(--color-accent) l c h / 0.8);
+		--mm-note-fill: oklch(from var(--color-accent) l c h / 0.09);
+		--mm-chip-fill: oklch(from var(--color-surface) calc(l + 0.02) c h / 0.94);
+	}
+
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .mermaid-container {
+			--mm-node-fill: oklch(from var(--color-surface) calc(l + 0.04) c h);
+			--mm-cluster-fill: oklch(from var(--color-bg-secondary) l c h / 0.6);
+			--mm-decision-fill: oklch(from var(--color-accent) l c h / 0.14);
+			--mm-decision-stroke: oklch(from var(--color-accent) l c h / 0.8);
+			--mm-note-fill: oklch(from var(--color-accent) l c h / 0.09);
+			--mm-chip-fill: oklch(from var(--color-surface) calc(l + 0.02) c h / 0.94);
+		}
+	}
+
+	.mermaid-head {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.75rem;
 		padding: 0.55rem 1rem;
-		font-family: var(--font-mono);
-		font-size: 0.75rem;
-		font-weight: 500;
-		color: var(--color-text-muted);
 		border-bottom: 1px solid var(--color-border);
 		background: var(--color-bg-secondary);
 	}
 
+	.mermaid-title {
+		min-width: 0;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--color-text-muted);
+	}
+
 	.mermaid-diagram {
-		padding: 1.5rem;
+		position: relative;
+		padding: 1.75rem 1.5rem;
 		display: flex;
 		justify-content: center;
 		align-items: center;
 		min-height: 120px;
 		overflow-x: auto;
+		overscroll-behavior-x: contain;
+		/* Blueprint grid, faded toward the edges (the page-hero motif). */
+		background-image:
+			linear-gradient(oklch(from var(--color-border) l c h / 0.5) 1px, transparent 1px),
+			linear-gradient(90deg, oklch(from var(--color-border) l c h / 0.5) 1px, transparent 1px);
+		background-size: 24px 24px;
+		background-position: center center;
+	}
+
+	/* Mermaid sizes each label by setting its box and measuring it right away.
+	   Any transition (the global reduced-motion rule turns every property into
+	   a 0.01ms one) makes that measurement read the provisional size, and the
+	   viewBox balloons. Nothing inside a diagram animates, so none apply. */
+	.mermaid-diagram,
+	.mermaid-diagram :global(*) {
+		transition: none !important;
+	}
+
+	/* A clipped diagram is a keyboard scroll region (tabindex set in fit()). */
+	.mermaid-diagram:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: -2px;
+	}
+
+	.mermaid-diagram::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		pointer-events: none;
+		background: radial-gradient(ellipse 80% 75% at 50% 50%, transparent 30%, var(--mm-canvas) 100%);
+	}
+
+	/* A diagram wider than the figure lays out from its left edge (flex
+	   centering would push its start out of reach); the script then scrolls it
+	   to the middle so the first view isn't a node cut in half. */
+	.mermaid-diagram.is-scrollable {
+		justify-content: flex-start;
+	}
+
+	/* Shown only while a too-wide diagram hasn't been scrolled yet. */
+	.mermaid-hint {
+		flex: none;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		font-weight: 500;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: var(--color-text-muted);
+		white-space: nowrap;
+		pointer-events: none;
+		opacity: 0;
+		transition: opacity var(--duration-normal) var(--ease-smooth);
+	}
+
+	.mermaid-hint.is-floating {
+		position: absolute;
+		z-index: 1;
+		top: 0.5rem;
+		right: 0.6rem;
+		padding: 0.15rem 0.45rem;
+		background: var(--color-bg-secondary);
+		border-radius: var(--radius-sm);
+	}
+
+	.mermaid-hint-arrow {
+		display: inline-block;
+		animation: mermaid-nudge 1.6s var(--ease-smooth) infinite;
+	}
+
+	.mermaid-container:has(.is-scrollable:not([data-scrolled])) .mermaid-hint {
+		opacity: 1;
+	}
+
+	@keyframes mermaid-nudge {
+		0%, 100% { transform: translateX(0); }
+		50% { transform: translateX(3px); }
 	}
 
 	.mermaid-loading {
+		position: relative;
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
@@ -165,47 +854,58 @@ const mermaidId = `mermaid-${Math.random().toString(36).slice(2, 7)}`;
 
 	@keyframes spin { to { transform: rotate(360deg); } }
 
-	.mermaid-diagram :global(.mermaid-rendered) {
+	.mermaid-diagram :global(.mermaid-error) {
+		position: relative;
 		width: 100%;
-		display: flex;
-		justify-content: center;
+		font-size: 0.82rem;
+		color: var(--color-text-secondary);
+	}
+
+	.mermaid-diagram :global(.mermaid-error p) {
+		margin: 0 0 0.6rem;
+		font-family: var(--font-mono);
+		font-size: 0.75rem;
+		color: var(--color-destructive);
+	}
+
+	.mermaid-diagram :global(.mermaid-error pre) {
+		margin: 0;
+		padding: 0.75rem 1rem;
+		overflow-x: auto;
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		line-height: 1.5;
+		white-space: pre;
+		background: var(--color-bg-secondary);
+		border-radius: var(--radius-sm);
+	}
+
+	.mermaid-diagram :global(.mermaid-rendered) {
+		position: relative;
+		flex: none;
+		animation: mermaid-in var(--duration-slow) var(--ease-smooth) both;
 	}
 
 	.mermaid-diagram :global(.mermaid-rendered svg) {
-		max-width: 100%;
+		display: block;
 		height: auto;
 	}
 
-	/* Prevent Mermaid HTML labels from being clipped inside foreignObject. */
-	.mermaid-diagram :global(.mermaid-rendered foreignObject) {
-		overflow: visible;
+	@keyframes mermaid-in {
+		from { opacity: 0; transform: translateY(4px); }
+		to { opacity: 1; transform: none; }
 	}
 
-	/*
-	 * Pin label typography to exactly what Mermaid measured (fontSize: 14,
-	 * system-ui — see mermaid.initialize above). The article/learn body CSS
-	 * applies font-size, line-height and letter-spacing to descendants, and
-	 * those inherit into the foreignObject HTML labels — inflating the rendered
-	 * text past the box Mermaid sized for it, so text spills out of the rects.
-	 * Re-pinning the metrics here makes render == measure across every diagram.
-	 */
-	.mermaid-diagram :global(.mermaid-rendered foreignObject),
-	.mermaid-diagram :global(.mermaid-rendered .nodeLabel),
-	.mermaid-diagram :global(.mermaid-rendered .edgeLabel),
-	.mermaid-diagram :global(.mermaid-rendered .label),
-	.mermaid-diagram :global(.mermaid-rendered foreignObject *) {
-		font-family: system-ui, -apple-system, sans-serif;
-		font-size: 14px;
-		font-weight: 400;
-		line-height: 1.4;
-		letter-spacing: normal;
-		word-spacing: normal;
+	@media (max-width: 640px) {
+		.mermaid-diagram {
+			padding: 1.25rem 1rem;
+		}
 	}
 
-	.mermaid-diagram :global(.mermaid-rendered .nodeLabel),
-	.mermaid-diagram :global(.mermaid-rendered .edgeLabel),
-	.mermaid-diagram :global(.mermaid-rendered .label) {
-		white-space: nowrap;
-		overflow: visible;
+	@media (prefers-reduced-motion: reduce) {
+		.mermaid-spinner { animation: none; }
+		.mermaid-diagram :global(.mermaid-rendered) { animation: none; }
+		.mermaid-hint-arrow { animation: none; }
+		.mermaid-hint { transition: none; }
 	}
 </style>

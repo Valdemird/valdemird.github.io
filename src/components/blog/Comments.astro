@@ -36,14 +36,26 @@ const labels = {
 	},
 }[lang];
 
-// Hard-coded repo config — see /tmp/.../README or CLAUDE.md.
+// Hard-coded repo config (see the Comments section in CLAUDE.md). The values
+// travel to the client as data attributes on the section.
 const REPO = 'Valdemird/valdemird-comments';
 const REPO_ID = 'R_kgDOSdgtKg';
 const CATEGORY = 'Announcements';
 const CATEGORY_ID = 'DIC_kwDOSdgtKs4C9DUf';
 ---
 
-<section class="comments" data-comments aria-labelledby="comments-heading" data-pathname={pathname}>
+<section
+	class="comments"
+	data-comments
+	aria-labelledby="comments-heading"
+	data-pathname={pathname}
+	data-repo={REPO}
+	data-repo-id={REPO_ID}
+	data-category={CATEGORY}
+	data-category-id={CATEGORY_ID}
+	data-lang={lang}
+	data-hosted={labels.hosted}
+>
 	<header class="comments-head">
 		<h2 id="comments-heading" class="comments-label">{labels.discussion}</h2>
 		<button class="comments-load" type="button">{labels.cta}</button>
@@ -52,72 +64,89 @@ const CATEGORY_ID = 'DIC_kwDOSdgtKs4C9DUf';
 	<div class="comments-mount" data-mount hidden></div>
 </section>
 
-<script
-	is:inline
-	define:vars={{ REPO, REPO_ID, CATEGORY, CATEGORY_ID, lang, hosted: labels.hosted }}
->
-	function getTheme() {
-		return document.documentElement.dataset.theme === 'dark' || window.matchMedia('(prefers-color-scheme: dark)').matches
-			? 'dark'
-			: 'light';
+<script>
+	// Bundled module: it runs once per session, so every page-level hook below
+	// is registered exactly once. Per-page state (listeners, the theme
+	// observer) hangs off an AbortController that is aborted before each swap.
+	let teardown: AbortController | null = null;
+
+	const darkMq = window.matchMedia('(prefers-color-scheme: dark)');
+
+	function getTheme(): 'dark' | 'light' {
+		const explicit = document.documentElement.dataset.theme;
+		if (explicit === 'dark' || explicit === 'light') return explicit;
+		return darkMq.matches ? 'dark' : 'light';
 	}
 
-	function buildScript(theme) {
+	function buildScript(root: HTMLElement, theme: string): HTMLScriptElement {
+		const d = root.dataset;
 		const s = document.createElement('script');
 		s.src = 'https://giscus.app/client.js';
 		s.async = true;
 		s.crossOrigin = 'anonymous';
-		s.dataset.repo = REPO;
-		s.dataset.repoId = REPO_ID;
-		s.dataset.category = CATEGORY;
-		s.dataset.categoryId = CATEGORY_ID;
+		s.dataset.repo = d.repo ?? '';
+		s.dataset.repoId = d.repoId ?? '';
+		s.dataset.category = d.category ?? '';
+		s.dataset.categoryId = d.categoryId ?? '';
 		s.dataset.mapping = 'pathname';
 		s.dataset.strict = '1';
 		s.dataset.reactionsEnabled = '1';
 		s.dataset.emitMetadata = '0';
 		s.dataset.inputPosition = 'bottom';
 		s.dataset.theme = theme;
-		s.dataset.lang = lang;
+		s.dataset.lang = d.lang === 'es' ? 'es' : 'en';
 		s.dataset.loading = 'lazy';
 		return s;
 	}
 
 	function initComments() {
-		document.querySelectorAll('.comments[data-comments]').forEach((root) => {
-			if (root.dataset.cReady === '1') return;
+		const roots = document.querySelectorAll<HTMLElement>('.comments[data-comments]:not([data-c-ready])');
+		if (!roots.length) return;
+
+		teardown ??= new AbortController();
+		const { signal } = teardown;
+
+		roots.forEach((root) => {
 			root.dataset.cReady = '1';
+			const btn = root.querySelector<HTMLButtonElement>('.comments-load');
+			const mount = root.querySelector<HTMLElement>('[data-mount]');
+			if (!btn || !mount) return;
 
-			const btn = root.querySelector('.comments-load');
-			const mount = root.querySelector('[data-mount]');
-
-			btn?.addEventListener('click', () => {
-				if (mount.dataset.loaded === '1') return;
-				mount.dataset.loaded = '1';
-				mount.hidden = false;
-				root.classList.add('comments-open');
-				btn.disabled = true;
-				btn.textContent = hosted;
-
-				const script = buildScript(getTheme());
-				mount.appendChild(script);
-			});
-
-			// Keep giscus theme in sync if the visitor toggles dark mode after loading.
-			const observer = new MutationObserver(() => {
+			const syncTheme = () => {
 				if (mount.dataset.loaded !== '1') return;
-				const iframe = mount.querySelector('iframe.giscus-frame');
-				if (!iframe) return;
-				iframe.contentWindow?.postMessage(
-					{ giscus: { setConfig: { theme: getTheme() } } },
-					'https://giscus.app',
-				);
-			});
-			observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+				const iframe = mount.querySelector<HTMLIFrameElement>('iframe.giscus-frame');
+				iframe?.contentWindow?.postMessage({ giscus: { setConfig: { theme: getTheme() } } }, 'https://giscus.app');
+			};
+
+			btn.addEventListener(
+				'click',
+				() => {
+					if (mount.dataset.loaded === '1') return;
+					mount.dataset.loaded = '1';
+					mount.hidden = false;
+					root.classList.add('comments-open');
+					btn.disabled = true;
+					btn.textContent = root.dataset.hosted ?? '';
+					mount.appendChild(buildScript(root, getTheme()));
+
+					// Keep the giscus theme in sync if the visitor toggles dark mode
+					// (or the OS flips) after loading. Only watched once loaded.
+					const observer = new MutationObserver(syncTheme);
+					observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+					signal.addEventListener('abort', () => observer.disconnect(), { once: true });
+					darkMq.addEventListener('change', syncTheme, { signal });
+				},
+				{ signal },
+			);
 		});
 	}
 
 	initComments();
-	document.addEventListener('astro:after-swap', initComments);
+	document.addEventListener('astro:page-load', initComments);
+	document.addEventListener('astro:before-swap', () => {
+		teardown?.abort();
+		teardown = null;
+	});
 </script>
 
 <style>
@@ -156,17 +185,25 @@ const CATEGORY_ID = 'DIC_kwDOSdgtKs4C9DUf';
 		color: var(--color-text-secondary);
 		cursor: pointer;
 		transition:
+			transform var(--duration-fast) var(--ease-spring),
+			box-shadow var(--duration-fast) var(--ease-spring),
 			border-color var(--duration-fast) var(--ease-smooth),
 			background var(--duration-fast) var(--ease-smooth),
 			color var(--duration-fast) var(--ease-smooth);
 	}
 
-	.comments-load:hover,
-	.comments-load:focus-visible {
-		border-color: var(--color-border-strong);
+	.comments-load:hover:not(:disabled),
+	.comments-load:focus-visible:not(:disabled) {
+		transform: translateY(-1px);
+		box-shadow: var(--shadow-md);
+		border-color: var(--color-accent);
 		background: var(--color-accent-subtle);
 		color: var(--color-text);
-		outline: none;
+	}
+
+	.comments-load:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
 	}
 
 	.comments-load:disabled {

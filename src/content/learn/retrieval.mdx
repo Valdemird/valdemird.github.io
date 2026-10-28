@@ -23,7 +23,6 @@ sources:
 ---
 
 import Callout from '../../components/blog/Callout.astro';
-import CodeBlock from '../../components/blog/CodeBlock.astro';
 import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 
@@ -40,13 +39,17 @@ They're "I couldn't reformulate the query with what I just read" failures. RAG i
 The analogy I keep using: RAG is an indexed filing cabinet. Someone read the whole corpus once, wrote a summary card per drawer, sorted them by topic. Lookup is instant and cheap. But edit a document and the card lies until you re-file everything. And to answer "compare case A with case C" you have to trust that the cards, written without knowing your question, captured what you need. Agentic search is an investigator with access to the entire archive: no cards to maintain, reads the current documents, and after reading the first decides which to open next. Slower, more "labor hours" (tokens), but never working off stale information and able to chain leads.
 
 <MermaidDiagram title="One-shot vs the loop" chart={`
-graph TD
-  subgraph RAG["RAG: one pass, query fixed at t=0"]
+graph LR
+  subgraph RAG["RAG: one pass, fixed query"]
+    direction TB
     A[corpus] --> B[chunk + embed] --> C["INDEX (lives, goes stale)"] --> D[top-k] --> E[answer]
   end
-  subgraph Agentic["Agentic: loop, query reformulated with prior evidence"]
+  subgraph Agentic["Agentic: a loop"]
+    direction TB
     F[LLM] --> G["grep/read (current bytes)"] --> H[LLM reformulates] --> I[grep/read] --> J[answer]
+    I -.->|new evidence| H
   end
+  RAG ~~~ Agentic
 `} />
 
 The insight a beginner doesn't have: for corpora that fit (or nearly fit) in the window, and for data where exact matching matters (code, IDs, error strings, proper nouns), agentic search or simply "put everything in the prompt with caching" wins on accuracy and operability. Vector RAG wins on high-volume FAQ, low latency, and enormous corpora that don't fit. The embedding isn't dead. It stopped being the architectural default it was in 2023-2024.

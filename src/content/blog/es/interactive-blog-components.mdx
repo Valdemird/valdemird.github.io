@@ -1,8 +1,9 @@
 ---
-title: "Posts interactivos: por qué construí 30 componentes en vez de pegar capturas"
-description: "Por qué este blog corre simuladores en vivo, curvas de easing arrastrables y diagramas paso a paso en vez de capturas estáticas: la idea detrás de sus 30 componentes MDX, lo que cuesta construirlos, y las fuentes — de las explorable explanations de Bret Victor a Distill — que sostienen que una afirmación que puedes arrastrar le gana a una que solo puedes leer."
+title: "Posts interactivos: cuándo un componente le gana a una captura"
+description: "Por qué este blog usa simuladores y diagramas arrastrables en vez de capturas, cuánto cuesta de verdad un componente MDX y la regla para saber cuándo vale."
 pubDate: 2026-06-09
-tags: ["interaction-design", "writing", "frontend"]
+updatedDate: 2026-10-27
+tags: ["diseño-de-interacción", "escritura", "frontend", "astro", "mdx"]
 featured: false
 lang: es
 ---
@@ -17,11 +18,11 @@ import Timeline from '../../../components/blog/Timeline.astro';
 import TLDR from '../../../components/blog/TLDR.astro';
 
 <TLDR lang="es" bullets={[
-  "Este blog corre 30 componentes interactivos (simuladores, gráficas arrastrables, diagramas paso a paso) porque hay afirmaciones que la prosa no puede cargar. Un lector puede descartar una frase; no puede descartar un slider que él mismo acaba de arrastrar.",
-  "La idea no es mía. Bret Victor la nombró en 2011, Distill la midió, The Pudding hizo de ella una publicación entera. Los blogs la ignoraron porque los componentes cuestan. Este post es sobre cuándo valen lo que cuestan.",
+  "Este blog corre 31 componentes interactivos (simuladores, gráficas arrastrables, diagramas paso a paso) porque hay afirmaciones que la prosa no puede cargar.",
+  "La idea no es mía. Bret Victor la nombró en 2011, Distill reunió la evidencia, The Pudding hizo de ella una publicación entera. Los blogs casi siempre la ignoraron porque los componentes cuestan. Este post es sobre cuándo valen lo que cuestan.",
 ]} />
 
-Esta semana volví a un post de hace dos meses sobre testing y le agregué un simulador Monte Carlo al lado de una frase. Una sola frase. El post llevaba en línea desde abril, la gente ya lo había leído, y la línea que me seguía dando vueltas era esta: una tasa de flakes del 3% no es un problema del 3%.
+Esta semana volví a [un post de hace seis semanas sobre testing](/blog/es/tests-gave-me-control/) y le agregué un simulador Monte Carlo al lado de una frase. Una sola frase. El post llevaba en línea desde abril, la gente ya lo había leído, y la línea que me seguía dando vueltas era esta: una tasa de flakes del 3% no es un problema del 3%.
 
 La creía cuando la escribí. Había visto mi propio CI ponerse rojo con cambios que no tocaban nada. Pero podía sentir dónde archiva un lector esa frase: en exageración, junto a todos los demás bloggers que redondean para arriba por efecto. La matemática de fondo es una línea, 0.97^40 ≈ 0.30, y ese es exactamente el problema. Nadie siente un exponente. Puedes imprimir la fórmula en negrita, puedes graficarla, y los ojos del lector le pasan por encima a velocidad de lectura, que es justo la velocidad a la que la acumulación nunca parece grave.
 
@@ -44,26 +45,25 @@ Esta es la máquina. Cada punto es un test; cada test flaquea de forma independi
 
 Ese desplome del 97% verde a un 30% es el exponente, sentido. Ningún párrafo mío te lleva ahí, porque leer es una actividad de espectador y la afirmación solo aterriza cuando fuiste tú quien hizo caer la barra. Las barras de retries cuelan después el segundo punto, el más incómodo: los retries devuelven el build al verde sin hacer que un solo test flaquee menos. El lector lo descubre arrastrando, antes de que yo lo diga. Un argumento al que llegaste solo no necesita defensa.
 
-Esa es la idea completa detrás de la librería de componentes de este sitio. No es decoración. No es "engagement". Es una herramienta específica para un modo de falla específico: la afirmación que es cierta, que importa, y que la prosa físicamente no puede cargar.
+Esa es la idea completa detrás de la librería de componentes de este sitio. Cada componente es una herramienta específica para un modo de falla específico: la afirmación que es cierta, que importa y que la prosa físicamente no puede cargar.
 
-## Veinte años de trabajo previo
+## Quince años de trabajo previo
 
 Nada de esto es idea mía, y fingir lo contrario sería ridículo cuando el linaje se rastrea tan fácil.
 
 <Timeline items={[
   { date: "2011", title: "Explorable Explanations + Ladder of Abstraction", body: "Bret Victor le pone nombre al género en un ensayo y lo actúa en un segundo." },
-  { date: "2016", title: "Nace Distill", body: "Investigación de machine learning publicada como artículos interactivos." },
+  { date: "2017", title: "Nace Distill como revista", body: "Investigación de machine learning publicada como artículos interactivos." },
   { date: "2017", title: "The Pudding", body: "Una publicación entera sobre la premisa de que hay ensayos que se juegan, no se leen." },
   { date: "2020", title: "Communicating with Interactive Articles", body: "Distill repasa la evidencia: la interacción mejora de forma medible la comprensión y el involucramiento.", emphasize: true },
-  { date: "2021", title: "Distill entra en pausa", body: "Producir a ese estándar agotaba a todos los involucrados. El costo es real." },
-  { date: "2026", title: "Este post", body: "Un blog de ingeniería común intenta cerrar la brecha." },
+  { date: "2021", title: "Distill entra en pausa", body: "Los editores nombran el agotamiento como una de las razones. El costo es real." },
 ]} />
 
-La formulación más clara es [*Explorable Explanations*](https://worrydream.com/ExplorableExplanations/) de Bret Victor, de 2011: un documento reactivo, escribió, le permite al lector "jugar con los supuestos y análisis del autor, y ver las consecuencias". Su [*Up and Down the Ladder of Abstraction*](https://worrydream.com/LadderOfAbstraction/) es el mismo argumento actuado en vez de enunciado: aprendes el diseño de un algoritmo de dirección recorriendo con el dedo cada nivel de abstracción. Quince años después, los dos ensayos todavía se leen como una lista de pendientes que la web en general ignoró.
+La formulación más clara es [*Explorable Explanations*](https://worrydream.com/ExplorableExplanations/) de Bret Victor, de 2011: un documento reactivo, escribió, le permite al lector "jugar con los supuestos y análisis del autor, y ver las consecuencias" (la traducción es mía). Su [*Up and Down the Ladder of Abstraction*](https://worrydream.com/LadderOfAbstraction/) es el mismo argumento actuado en vez de enunciado: aprendes el diseño de un algoritmo de dirección recorriendo con el dedo cada nivel de abstracción. Quince años después, los dos ensayos todavía se leen como una lista de pendientes que la web en general ignoró.
 
-En general, no del todo. [Distill](https://distill.pub/) pasó cinco años publicando investigación de machine learning como artículos interactivos, y su pieza de 2020, [*Communicating with Interactive Articles*](https://distill.pub/2020/communicating-with-interactive-articles/), es el mejor repaso que conozco de por qué esto funciona. Recorre la evidencia de que la interacción mejora la comprensión y el involucramiento, la conecta con la investigación sobre aprendizaje activo, y es ella misma interactiva, así que el argumento se demuestra solo mientras lo lees.<Sidenote>Distill entró en pausa en 2021, en parte porque producir artículos a ese estándar agotaba a todos los involucrados. Ese detalle va aquí y no en una nota al final: el costo es real y ahora llego a él.</Sidenote> Nicky Case junta el género completo en [explorabl.es](https://explorabl.es/), y [The Pudding](https://pudding.cool/) construyó una publicación entera sobre la premisa de que hay ensayos que se juegan, no se leen.
+En general, no del todo. Hasta su pausa en 2021, [Distill](https://distill.pub/) publicó investigación de machine learning como artículos interactivos, y su pieza de 2020, [*Communicating with Interactive Articles*](https://distill.pub/2020/communicating-with-interactive-articles/), es el mejor repaso que conozco de por qué esto funciona. Recorre la evidencia de que la interacción mejora la comprensión y el involucramiento, la conecta con la investigación sobre aprendizaje activo, y es ella misma interactiva, así que el argumento se demuestra solo mientras lo lees.<Sidenote>El [anuncio de la pausa](https://distill.pub/2021/distill-hiatus/) nombra el agotamiento como una de las razones: los editores voluntarios solían dedicar 50 horas o más a mejorar un solo artículo. El costo es real, y ahora llego a él.</Sidenote> Nicky Case junta el género completo en [explorabl.es](https://explorabl.es/), y [The Pudding](https://pudding.cool/) armó una publicación entera alrededor de ensayos visuales con los que se juega.
 
-Lo que me llama la atención de esa lista es lo que falta en ella: los blogs de ingeniería comunes. El género vive en el periodismo, en la investigación de ML, en proyectos de arte independientes. Los blogs técnicos personales, el lugar donde alguien le explica worktrees o tests flaky a un colega, siguen pegando capturas. Y no creo que sea porque los bloggers no estén de acuerdo con Victor. Creo que es porque una captura cuesta cero y un simulador no.
+Lo que me llama la atención de esa lista es lo que falta en ella: los blogs de ingeniería comunes. El género vive en el periodismo, en la investigación de ML, en proyectos de arte independientes. Los blogs técnicos personales, el lugar donde alguien le explica worktrees o tests flaky a un colega, en su mayoría siguen pegando capturas. Y no creo que sea porque los bloggers no estén de acuerdo con Victor. Creo que es porque una captura cuesta cero y un simulador no.
 
 <PullQuote>
 Una captura le muestra al lector lo que tú viste. Un componente le deja comprobar si tienes razón.
@@ -71,19 +71,19 @@ Una captura le muestra al lector lo que tú viste. Un componente le deja comprob
 
 ## Lo que cuesta un componente de verdad
 
-Le voy a poner números al costo, porque la versión honesta de este post admite que el costo es la razón entera de que el género sea tan flaco.
+Le voy a poner números al costo, porque el costo es la razón entera de que el género sea tan flaco.
 
 <StatGrid columns={3} stats={[
-  { value: 30, label: "componentes en producción", context: "cada uno con demo en /es/lab/" },
+  { value: 31, label: "componentes en producción", context: "cada uno con demo en /es/lab/" },
   { value: 4, label: "construidos en una sesión", context: "la parte barata" },
   { value: "×5", label: "costos ocultos cada uno", context: "teclado · movimiento reducido · dark mode · etiquetas ES · re-init" },
 ]} />
 
-Este sitio corre hoy 30 componentes. Los cuatro más nuevos (el simulador de suites flaky de arriba, un grafo de git paso a paso, un reproductor del ciclo de un agente, un editor de curvas de easing arrastrable) tomaron una sesión completa de trabajo, y esa fue la parte barata. La cara vino después: cada uno necesita navegación por teclado, comportamiento con movimiento reducido, dark mode, versión en español de cada etiqueta incluyendo las que se generan en el cliente, y reinicialización cuando las transiciones de página del sitio le cambian el DOM por debajo. Nada de eso se ve en un GIF de demo, y todo eso es la diferencia entre un componente y un juguete.
+El lab lista hoy 31 componentes. Cuatro de ellos (el simulador de suites flaky de arriba, un grafo de git paso a paso, un reproductor del [ciclo de un agente](/es/learn/agentic-systems/agent-loop/), un editor de curvas de easing arrastrable) salieron de una sola sesión de trabajo, y esa fue la parte barata. La parte cara vino después: cada uno necesita navegación por teclado, comportamiento con movimiento reducido, dark mode, versión en español de cada etiqueta incluyendo las que se generan en el cliente, y reinicialización cuando las transiciones de página del sitio le cambian el DOM por debajo. Nada de eso se ve en un GIF de demo, y todo eso es la diferencia entre un componente y un juguete.
 
-Y después está la parte que me saltaría si este post fuera marketing. La cuadrícula de puntos de ese simulador, la única parte cuyo propósito entero es ser vista, salió a producción invisible. Astro acota los estilos de un componente con un selector de atributo, los puntos se crean desde un script del cliente, los nodos creados en el cliente no llevan ese atributo, y cada punto se renderizaba con altura cero. Las barras funcionaban, el veredicto funcionaba, la matemática estaba bien, y la pieza central era un hueco. Lo descubrí días después, cuando un screenshot de Playwright volvió con una franja vacía en mitad de la figura.<Sidenote>El arreglo fue un `:global()`, dos minutos. Encontrarlo exigió mirar la página renderizada en vez del código, que era justo lo que yo venía no haciendo con toda confianza.</Sidenote> No voy a fingir que fue elegante. Construí una máquina para hacer cosas visibles y no noté que era invisible.
+Y después está la parte que me saltaría si este post fuera marketing. La cuadrícula de puntos de ese simulador, la única parte cuyo propósito entero es ser vista, quedó invisible en mi build. Astro acota los estilos de un componente con un selector de atributo, los puntos se crean desde un script del cliente, los nodos creados en el cliente no llevan ese atributo, y cada punto se renderizaba con altura cero. Las barras funcionaban, el veredicto funcionaba, la matemática estaba bien, y la pieza central era un hueco. Solo me di cuenta cuando por fin miré la página renderizada en vez del código.<Sidenote>El arreglo fue un `:global()`. El comentario que dejó en el componente todavía explica por qué está ahí.</Sidenote> No voy a fingir que fue elegante. Construí una máquina para hacer cosas visibles y no noté que era invisible.
 
-Este es el arreglo completo:
+Este es el arreglo completo. La versión rota nunca llegó a un commit, así que el lado "antes" está reconstruido a partir del arreglo:
 
 <CodeDiff
   filename="src/components/blog/FlakySuite.astro"
@@ -113,14 +113,14 @@ Este es el arreglo completo:
   note="Astro compila .flaky-dot a .flaky-dot[data-astro-cid-…] al construir el sitio. Los puntos los crea un script del cliente y nunca reciben ese atributo, así que el selector no coincidía con ningún nodo y cada punto se renderizaba con altura cero."
 />
 
-Ese bug se gana su lugar aquí porque es el argumento más fuerte que tengo a favor de todo este enfoque. Yo había leído el código de ese componente varias veces y estaba convencido de que funcionaba. Leer no alcanzó. A mí, el autor, con mi propio código. Esa es exactamente la posición del lector frente a cada afirmación que publicas, y por eso "descríbelo mejor" sigue perdiendo contra "deja que lo corra".
+Ese bug se gana su lugar aquí porque es el argumento más fuerte que tengo a favor de todo este enfoque. Yo había leído el código de ese componente varias veces y estaba convencido de que funcionaba. Leer no alcanzó. A mí, el autor, con mi propio código. Esa es exactamente la posición del lector frente a cada afirmación que publicas.
 
 ## La regla que mantiene esto honesto
 
-Treinta componentes también es la receta para terminar con un blog que parece el demo reel de un vendedor de componentes, así que hay una sola regla que decide si algo se construye: un componente existe solo cuando un post concreto lo necesita para una afirmación que la prosa no podía cargar. El grafo de git existe porque [el post de worktrees](/blog/es/worktrees-let-me-parallelize/) cuenta la historia de tres ramas que no chocan, y "no chocar" es una secuencia, no una imagen. El editor de easing existe porque [un post sobre game feel](/blog/es/game-feel-on-the-web/) le estaba pidiendo al lector que aceptara cuatro números de una curva bezier por fe.
+Treinta y un componentes también son la receta para terminar con un blog que parece el demo reel de un vendedor de componentes, así que hay una sola regla que decide si algo se construye: un componente existe solo cuando un post concreto lo necesita para una afirmación que la prosa no podía cargar. El grafo de git existe porque [el post de worktrees](/blog/es/worktrees-let-me-parallelize/) cuenta la historia de tres ramas que no chocan, y "no chocar" es una secuencia, no una imagen. El editor de easing existe porque [un post sobre game feel](/blog/es/game-feel-on-the-web/) le estaba pidiendo al lector que aceptara cuatro números de una curva bezier por fe.
 
-Cada componente documenta esa razón en su propia página, en una sección que se llama «por qué existe», en los dos idiomas. La librería completa corre en vivo en [/es/lab/](/es/lab/), con los mismos estilos, el mismo dark mode y las mismas transiciones que recibe un post. Nada simulado. Si el párrafo de "por qué existe" de un componente alguna vez se lee como "se veía bonito", ese componente no debió construirse.
+Cada componente documenta esa razón en su propia página, en una sección que se llama "por qué existe", en los dos idiomas. La librería completa corre en vivo en [/es/lab/](/es/lab/), con los mismos estilos, el mismo dark mode y las mismas transiciones que recibe un post. Nada simulado. Si el párrafo de "por qué existe" de un componente alguna vez se lee como "se veía bonito", ese componente no debió construirse.
 
 El corolario corta para el otro lado también, y es la parte que me toca reaprender cada tanto: la mayoría de las afirmaciones no necesita un componente. La mayor parte de cada post de este sitio sigue siendo párrafos, porque la mayoría de las frases se defiende sola. El simulador de arriba existe para la única frase por post que los lectores archivan en exageración. Gastarse una sesión de trabajo en esa frase solo tiene sentido si de verdad quieres que te crean. Sospecho que ese es el filtro real, y es bastante menos cómodo que el costo de construcción.
 
-Yo sé de qué lado estoy. Los puntos fueron invisibles durante tres días, y leer mi propio código me tenía convencido de que no lo eran. Tú estás en esa misma posición con este post, ahora mismo. Sube y arrastra el slider.
+Yo sé de qué lado estoy. Los puntos estaban invisibles, y leer mi propio código me tenía convencido de que no lo estaban. Tú estás en esa misma posición con este post, ahora mismo. Sube y arrastra el slider.

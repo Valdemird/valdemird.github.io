@@ -159,7 +159,12 @@ const metrics: { value: string; label: string }[] = [
 
 	@media (max-width: 640px) {
 		.deep-inner { padding: 1.5rem; }
-		.metrics { gap: 1.1rem 1.6rem; }
+		/* A fixed 3-column grid so no stat ends up alone on its own row. */
+		.metrics {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 1.1rem 1rem;
+		}
 		.metric dt { font-size: 1.15rem; }
 	}
 </style>

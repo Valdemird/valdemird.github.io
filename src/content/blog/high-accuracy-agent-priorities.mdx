@@ -1,8 +1,9 @@
 ---
-title: "Shipping a high-accuracy AI agent: what to prioritize, what to ignore"
-description: "The gap between a 95% agent and a flaky demo is the harness, not the model. What actually raises an AI agent's hit rate, and the distractions to skip."
+title: "High-accuracy AI agents: what to prioritize, what to ignore"
+description: "Agent reliability multiplies per step (p^t). What actually raises an AI agent's hit rate (harness, tools, evals, verification) and which distractions to skip."
 pubDate: 2026-06-26
-tags: ["ai-agents", "llm", "production", "reliability", "engineering"]
+updatedDate: 2026-10-27
+tags: ["ai-agents", "ai-tools", "llm", "production", "reliability", "engineering"]
 featured: true
 lang: en
 ---
@@ -13,26 +14,28 @@ import InteractiveChart from '../../components/blog/InteractiveChart.astro';
 import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
 import DataTable from '../../components/blog/DataTable.astro';
 import StatGrid from '../../components/blog/StatGrid.astro';
-import PullQuote from '../../components/blog/PullQuote.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import Tabs from '../../components/blog/Tabs.astro';
 import TabPanel from '../../components/blog/TabPanel.astro';
 import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
 
-I spent the last few weeks building a [16-module wiki on agentic systems](/learn/agentic-systems/), from what an LLM physically is up to multi-agent frontier work. I didn't write it by hand. I ran Claude Code workflows, a multi-agent research pipeline, to draft and cross-check it, then I studied the result until I understood it well enough to argue with it.
+In the second half of June I built a [16-module wiki on agentic systems](/learn/agentic-systems/), from what an LLM physically is up to multi-agent frontier work. I didn't write it by hand. I built it with Claude Code workflows, a multi-agent research pipeline that drafted and cross-checked it, then I studied the result until I understood it well enough to argue with it.
 
-This post is what I took out of that. It's the condensed, practical version: what to prioritize and what to ignore if you want to build agents that actually hold up. Everything here is distilled from that wiki, and every section links back to the module where the full argument and the graded sources live.
+It went live on June 22. Three days later I merged the fixes from a second pipeline: a multi-agent fact-check where each flagged claim was checked against the web and confirmed by independent voters. It found 20 claim errors and 26 problems with sources. A 70% figure explained as measuring the wrong thing. Two Cursor CVEs described as a different kind of attack. A term credited to the wrong lab. All of it had already been through the first pipeline's cross-check, and the wiki had been public for three days.
+
+This post is the condensed, practical version of that wiki: what to prioritize and what to ignore if you want agents that actually hold up. Every section links back to the module where the full argument and the graded sources live.
 
 The uncomfortable part is that almost nothing on the priority list is about the model.
 
 <TLDR bullets={[
-  "A reliable agent is won in the harness, not the model. Reliability multiplies step by step (p^t): a 20-step chain at 95% per step still lands near 36%. Shorten the chain and verify against ground truth instead of reaching for a smarter model.",
+  "A reliable agent is won in the harness. Reliability multiplies step by step (p^t): a 20-step chain at 95% per step still lands near 36%. Shorten the chain and verify against ground truth (a fact from outside the model) before you shop for a smarter model.",
   "Prioritize, in order: own the control loop in code, design tools as the agent's action space, curate context as an attention budget, make evaluation your control loop, and bound blast radius with architecture instead of prompts.",
   "Ignore the seductive distractions: multi-agent by default, fine-tuning first, bigger context windows, a vector DB for a small corpus, and prompt-level security.",
 ]} />
 
 <Callout type="important" title="The thesis">
-The gap between a 95%-reliable agent and a demo that falls over is almost entirely **harness, not model IQ**. Reliability composes geometrically. You raise it by making every step cheap and safe to re-run and by breaking the error chain with ground-truth verification, not by buying a smarter model or writing a cleverer prompt.
+The gap between a 95%-reliable agent and a demo that falls over is almost entirely **harness, not model IQ**. Reliability composes geometrically. You raise it by making every step cheap and safe to re-run and by breaking the error chain with ground-truth verification. A smarter model or a cleverer prompt moves the number far less than people expect.
 </Callout>
 
 ## Run the p^t arithmetic before you write any code
@@ -44,10 +47,13 @@ A 10-step task where each step is 90% reliable lands at `0.9^10 ≈ 35%`. Push e
 <InteractiveChart
   type="line"
   curve="monotone"
-  story="Success collapses geometrically with chain length. The fix is rarely a smarter model. It's a shorter chain or a higher per-step floor."
+  palette="sequential"
+  title="Task success vs chain length"
+  unit="%"
+  xUnit=" steps"
+  story="Success collapses geometrically with chain length. The fix is usually a shorter chain or a higher per-step floor."
   yLabel="task success"
   xLabel="steps in the chain"
-  source="p^t for independent per-step reliability p. See the agent-as-policy module."
   series={[
     { name: "90% / step", data: [
       { label: "1", value: 90 }, { label: "5", value: 59 }, { label: "10", value: 35 }, { label: "15", value: 21 }, { label: "20", value: 12 },
@@ -59,21 +65,23 @@ A 10-step task where each step is 90% reliable lands at `0.9^10 ≈ 35%`. Push e
       { label: "1", value: 99 }, { label: "5", value: 95 }, { label: "10", value: 90 }, { label: "15", value: 86 }, { label: "20", value: 82 },
     ]},
   ]}
-/>
+>
+  <span slot="source">p<sup>t</sup> for independent per-step reliability p. See the <a href="/learn/agentic-systems/agent-as-policy/">agent-as-policy module</a>.</span>
+</InteractiveChart>
 
 This single curve routes every other decision. It gives you exactly three levers: raise `p` (per-step reliability), shrink `t` (shorten the chain), or break the chain into segments that each reset the error. "Use a smarter model" is a weak way to nudge `p` and does nothing for `t`. Most things that "need an agent" are better off as a deterministic workflow or a single call once you've seen what the math demands of you. That decision is the first thing the [agent-as-policy module](/learn/agentic-systems/agent-as-policy/) makes you confront.
 
 <StatGrid columns={3} stats={[
   { value: "35%", label: "success of a 10-step chain at 90%/step", context: "0.9¹⁰, the arithmetic almost no one runs before building" },
-  { value: ">90%", label: "adaptive bypass of 12 published injection defenses", context: "why prompt-level security is not a control" },
-  { value: "~79%", label: "of multi-agent failures are coordination, not the model", context: "the architecture you reached for is the bug" },
+  { value: ">90%", label: "attack success against most of 12 published jailbreak and injection defenses", context: "why prompt-level security is not a control" },
+  { value: "~3/4", label: "of multi-agent failures come from system design and agent-to-agent misalignment", context: "the architecture you reached for is the bug" },
 ]} />
 
 ## Break the chain: verify against ground truth
 
 If reliability decays geometrically, the highest-impact thing you can build (after knowing your number) is something that *resets* the error mid-chain. Put a verification gate in the middle and one catastrophic `p^20` becomes two friendlier `p^10` segments.
 
-The catch: the verification has to come from outside the model. A real tool result. A test that passed or failed. The row that actually committed to the database. Asking the model "did you succeed?" and trusting the answer does not work, because the evaluator shares the generator's blind spots. Intrinsic self-correction does not reliably improve reasoning and can make it worse. Ground truth is the only thing that genuinely resets the per-step error, which is why the [control-loop module](/learn/agentic-systems/agent-loop/) treats observable feedback as the load-bearing part of the loop, not the prompt.
+The catch: the verification has to come from outside the model. A real tool result. [A test that passed or failed](/blog/tests-gave-me-control/). The row that actually committed to the database. Asking the model "did you succeed?" and trusting the answer does not work, because the evaluator shares the generator's blind spots. Intrinsic self-correction does not reliably improve reasoning and can make it worse.<Sidenote>Huang et al., "Large Language Models Cannot Self-Correct Reasoning Yet" (ICLR 2024).</Sidenote> My wiki is a small example: the research pipeline had already cross-checked its own output, and a second pass that checked each claim against the web still found 20 wrong ones. Ground truth is the only thing that genuinely resets the per-step error, which is why the [control-loop module](/learn/agentic-systems/agent-loop/) treats observable feedback as the load-bearing part of the loop.
 
 <Callout type="warning" title="The self-grading trap">
 A loop where the model reviews its own reasoning feels like verification and isn't. If the check can't fail independently of the thing it's checking, it's not a check. Wire in a tool result, a test, or a DB read.
@@ -92,7 +100,7 @@ graph LR
   T --> V{"Ground-truth check"}
   V -->|pass| S
   V -->|fail| M
-  S --> G["No-progress / budget guard"]
+  S --> G["No-progress /<br/>budget guard"]
   G -->|stop| D["Done or escalate"]
 `} />
 
@@ -102,7 +110,7 @@ The guard in that diagram is the condition everyone skips. Without a no-progress
 
 The model can only be as accurate as the tools you give it. It reasons over the names, schemas, and (this is the part people miss) the *error strings* you wrote. It reacts to text. It cannot step through a debugger.
 
-The most common mistake is mirroring your database: one tool per table, raw UUIDs in and out, an 8K-token blob back. That maximizes the number of sequential calls the model has to orchestrate, which (see the arithmetic) maximizes the ways it can fail. Collapse N calls into one tool that completes a whole workflow, return values a human could read, and write errors as instructions the model can act on.
+The most common mistake is mirroring your database: one tool per table, raw UUIDs in and out, an 8K-token blob back. That maximizes the number of sequential calls the model has to orchestrate, which (see the arithmetic) maximizes the ways it can fail. Collapse N calls into one tool that completes a whole workflow, return values a human could read, and write errors as instructions the model can act on. The two tabs below are sketches of tool signatures, not a real API.
 
 <Tabs labels={["CRUD-mirror (fragile)", "Workflow tool (sturdy)"]}>
 <TabPanel>
@@ -112,13 +120,13 @@ The most common mistake is mirroring your database: one tool per table, raw UUID
 // One tool per table. The model has to orchestrate the whole dance,
 // hold UUIDs in context, and guess the right order every time.
 get_user(id) -> { user_id: "8f3c...", tz_id: 42 }
-list_slots(resource_id, day) -> [ 5000-token blob of raw rows ]
+list_slots(resource_id, day) -> [ 8K-token blob of raw rows ]
 create_booking(user_id, slot_id) -> 201
 // On a bad input you get: 400.
 ```
 </CodeBlock>
 
-Every arrow is another `p`. Five tables, five chances to drop the chain.
+Every arrow is another `p`. Three calls, three chances to drop the chain.
 
 </TabPanel>
 <TabPanel>
@@ -130,8 +138,8 @@ Every arrow is another `p`. Five tables, five chances to drop the chain.
 schedule_event({ customer: "Ana", service: "haircut", when: "Tue 5pm" })
   -> { status: "booked", with: "Ana", at: "2026-06-30 17:00", id: "evt_91" }
 
-// On a bad input, the error IS the next prompt:
-  -> { error: "use ISO-8601 for `when`; you sent '5pm'. Did you mean 17:00?" }
+// On an ambiguous input, the error IS the next prompt:
+  -> { error: "'5pm' has no day. Did you mean Tue 2026-06-30 17:00? Resend with that or an ISO-8601 time." }
 ```
 </CodeBlock>
 
@@ -140,45 +148,47 @@ One arrow. Semantic returns. The error tells the model how to fix itself.
 </TabPanel>
 </Tabs>
 
-A tool that hands back 8K tokens didn't succeed, it poisoned the next several turns. Cap and paginate output, namespace large catalogs, and make every write idempotent. The full treatment is in [a tool is UX for an LLM](/learn/agentic-systems/tools-and-mcp/).
+A tool that hands back 8K tokens poisons the next several turns, even when the call technically succeeded. Cap and paginate output, namespace large catalogs, and make every write idempotent. The full treatment is in [a tool is UX for an LLM](/learn/agentic-systems/tools-and-mcp/).
 
 ## Spend context like an attention budget
 
-A 1M-token window makes "just put it all in" look free. It isn't. Attention is roughly O(n²), and recall sags on a U-curve well before the nominal limit. Every irrelevant token both dilutes the signal the model is attending to *and* quadruples cost. More context is not more intelligence.
+A 1M-token window makes "just put it all in" look free. It isn't. Every irrelevant token dilutes the signal the model attends to, and attention compute is roughly O(n²): double the context and the prefill compute roughly quadruples, while the bill per input token stays linear. The [LLM substrate module](/learn/agentic-systems/llm-substrate/) keeps those two costs apart. Recall also degrades as length grows, unevenly: it gets worse on semantic tasks and with distractors, well before the nominal limit. The classic "lost in the middle" U-curve shows up in some setups and not in others.
 
-Treat the window as the agent's belief state and curate it every turn. Keep lightweight identifiers in-window and pull the heavy data just-in-time through a tool. Evict stale tool outputs once you've distilled what mattered. Put the load-bearing facts at the very start and the very end, where recall is best. When the agent starts hallucinating, repeating actions, or losing the thread, those are belief-state pathologies. You fix them by eviction, not by enlarging the window and hoping. The [context-engineering module](/learn/agentic-systems/context-engineering/) names the failure modes so you can diagnose which one you're looking at.
+Treat the window as the agent's belief state and curate it every turn. Keep lightweight identifiers in-window and pull the heavy data just-in-time through a tool. Evict stale tool outputs once you've distilled what mattered. Put the load-bearing facts where you've *measured* that your model reads them best. The front is a cheap first guess.<Sidenote>Until this October update, this paragraph told you to put them at the very start and the very end, where recall is best. My own fact-check had already walked the position claim back in the wiki the day before I published, and I missed it.</Sidenote> When the agent starts hallucinating, repeating actions, or losing the thread, those are belief-state pathologies. You fix them by evicting what doesn't belong. The [context-engineering module](/learn/agentic-systems/context-engineering/) names the failure modes so you can diagnose which one you're looking at.
 
 ## Your eval is the control loop
 
 Your hit rate is capped by your eval's fidelity, full stop. If the eval reads noise, you're driving blind no matter how fast you iterate. And the part that surprises people: the eval grader, the RL reward, and any self-improvement fitness are mathematically the same object. A grader the model can game is a grader that actively trains your agent to fool you.
 
-Two rules carry most of the value. First, build graders bottom-up from error analysis on real traces (open-code ~50 of them into failure themes, then write graders for the frequent and costly categories) rather than top-down against the metrics you imagined. The observed failure distribution almost never matches your a-priori mental model. Second, gate releases on **pass^k**, not pass@1. One green run is not reliability.
+Two rules carry most of the value. First, build graders bottom-up from error analysis on real traces (open-code ~50 of them into failure themes, then write graders for the frequent and costly categories) rather than top-down against the metrics you imagined. The observed failure distribution almost never matches your a-priori mental model. Second, gate releases on **pass^k**. One green pass@1 run tells you very little about reliability.
+
+The lived version of the first rule is [how my own game sessions became the eval](/blog/my-games-became-the-eval/) for DMai, an AI game master I built with Claude as a personal project that is still private.
 
 <Collapsible title="Why pass^k, and why it falls faster than you'd think">
 
-`pass@1` is a best-case average. `pass^k` asks whether the agent succeeds `k` times in a row, which is what "reliable" actually means for anything irreversible. It decays exponentially: a task that passes 90% of the time drops to `0.9^8 ≈ 43%` over eight consecutive runs. And step errors are positively correlated in practice (a bad context poisons every following step), so reality usually falls *faster* than the independent-error math suggests. Grade the persisted state (the row in the DB), never the model's claim that it did the thing. The [evaluation module](/learn/agentic-systems/evaluation/) walks through trajectory grading and code-based graders versus LLM-as-judge.
+`pass@1` is a best-case average. `pass^k` asks whether the agent succeeds `k` times in a row, which is what "reliable" actually means for anything irreversible (the [glossary](/learn/agentic-systems/glossary/) has both terms side by side). It decays exponentially: a task that passes 90% of the time drops to `0.9^8 ≈ 43%` over eight consecutive runs. And step errors are positively correlated in practice (a bad context poisons every following step), so reality usually falls *faster* than the independent-error math suggests. Grade the persisted state (the row in the DB), never the model's claim that it did the thing. The [evaluation module](/learn/agentic-systems/evaluation/) walks through trajectory grading and code-based graders versus LLM-as-judge.
 
 </Collapsible>
 
 ## Security and human approval are architecture, not a better prompt
 
-Prompt injection has no model-level fix. The LLM concatenates your system prompt and the poisoned data into one undifferentiated stream with no privilege boundary, the classic confused deputy. In one systematic study, 12 published behavioral defenses fell to adaptive attacks at over 90% success. Spotlighting and "treat documents as data, not instructions" cut measured injection from ~50% to under 2%, which sounds great until an adaptive attacker erases the residual. Useful as defense-in-depth. Never the thing standing between untrusted text and a write.
+Prompt injection has no model-level fix. The LLM concatenates your system prompt and the poisoned data into one undifferentiated stream with no privilege boundary, the classic confused deputy. In one systematic study, adaptive attacks broke 12 published defenses, with over 90% success against most of them.<Sidenote>Nasr et al., "The Attacker Moves Second" (arXiv 2510.09023). Most of those defenses had originally reported near-zero attack success.</Sidenote> Spotlighting and "treat documents as data, not instructions" cut measured injection from over 50% to under 2% on GPT models,<Sidenote>Hines et al. (Microsoft), "Defending Against Indirect Prompt Injection Attacks With Spotlighting" (arXiv 2403.14720).</Sidenote> which sounds great until an adaptive attacker erases the residual. Useful as defense-in-depth. Never the thing standing between untrusted text and a write.
 
-The boundary has to live in deterministic code. Default-deny capabilities scoped to the task. An outbound egress allowlist (often the single edge whose removal snaps the whole attack chain). The Agents Rule of Two: never leave the agent unsupervised with more than two of these three at once: untrusted input, sensitive data, and a state-changing or egress action. Defend against the adversary the model could *become* under injection, not the polite one it benchmarks as today.
+The boundary has to live in deterministic code. Default-deny capabilities scoped to the task. An outbound egress allowlist (often the single edge whose removal snaps the whole attack chain). The Agents Rule of Two: never leave the agent unsupervised with more than two of these three at once: untrusted input, sensitive data, and a state-changing or egress action. Defend against the adversary the model could *become* under injection.
 
-Human-in-the-loop is the same discipline pointed at irreversibility. Don't confirm everything (that just trains the human to rubber-stamp, and the one action that mattered gets stamped with the rest). Gate only the roughly 1% irreversible-write tail. And close the gap almost nobody checks:
+Human-in-the-loop is the same discipline pointed at irreversibility. Don't confirm everything (that just trains the human to rubber-stamp, and the one action that mattered gets stamped with the rest). Gate only the roughly 1% irreversible-write tail.<Sidenote>Anthropic measured ~998K tool calls from production deployments and found about 0.8% of actions were irreversible. The [human-in-the-loop module](/learn/agentic-systems/human-in-the-loop/) has the caveats.</Sidenote> And close the gap almost nobody checks:
 
 <Callout type="warning" title="The confirm/execute TOCTOU bug">
 Async approval means time passes between the tap and the execution. If you re-derive the action from the model after approval, the payload can drift: the human approves booking room A, the regenerated call books room B. Normalize and validate the input, persist that exact record as the source of truth *before* showing Confirm, then on tap execute the persisted record by id with an atomic pending→executed transition. Shown must equal executed.
 </Callout>
 
-Both are general architectural principles, not framework features. The detail lives in [agentic security](/learn/agentic-systems/security/) and [human-in-the-loop](/learn/agentic-systems/human-in-the-loop/).
+Both are general architectural principles that hold in any framework. The detail lives in [agentic security](/learn/agentic-systems/security/) and [human-in-the-loop](/learn/agentic-systems/human-in-the-loop/).
 
 ## Make every step cheap and safe to re-run
 
 Distributed delivery is at-least-once. A worker can finish a write and die before recording that it did, the queue redelivers, and the step runs again. A naive retry is two bombs at once: a token-cost bomb (you re-charge every model step) and a double-booking bomb (you re-charge the customer's card).
 
-Wrap every step in durable execution so completed steps are memoized, and derive a deterministic idempotency key from `(workflow_id, step_id)` that you pass to every side-effecting call. On retry the engine replays cached results and the external API dedupes on the key. Model a human approval as a durable suspend, not a worker blocked for three hours. This composes with the p^t math: when every step is cheap and safe to re-run, retrying a flaky chain stops being scary. The [production module](/learn/agentic-systems/production/) frames the whole agent as a durable distributed workflow, which is what it is.
+Wrap every step in durable execution so completed steps are memoized, and derive a deterministic idempotency key from `(workflow_id, step_id)` that you pass to every side-effecting call. On retry the engine replays cached results and the external API dedupes on the key. Model a human approval as a durable suspend so no worker sits blocked for three hours waiting on a tap. This composes with the p^t math: when every step is cheap and safe to re-run, retrying a flaky chain stops being scary. The [production module](/learn/agentic-systems/production/) frames the whole agent as a durable distributed workflow, which is what it is.
 
 ## What to ignore (or at least defer)
 
@@ -191,18 +201,18 @@ Equally important is where *not* to spend the afternoon. Every row here is somet
     { key: "instead", label: "Do instead", align: "left" },
   ]}
   rows={[
-    { trap: "Reach for multi-agent 'because it scales'", why: "~79% of failures are coordination, not model limits; fan-out burns ~15× the tokens for parallel compute, not better reasoning", instead: "Single linear agent + compaction. Fan out only read-only exploration; keep every write on one thread" },
-    { trap: "Trust chain-of-thought as an audit log", why: "Models act on hints they never verbalize and rationalize after the fact; the visible chain is often non-causal", instead: "Build evals, gates, and observability on the trajectory of tool calls (what it DID, not what it said)" },
-    { trap: "Fine-tune first", why: "Teaches form over substance, ~1.5× inference premium, and training on new facts raises hallucination", instead: "Walk the ladder: prompt → few-shot → context/harness → RAG → fine-tune last. The harness is ~90% of ROI" },
-    { trap: "Buy a bigger context window", why: "Recall sags on a U-curve before the limit; irrelevant tokens dilute attention even when it all fits", instead: "Minimize signal density, not fit. Measure your real effective window" },
+    { trap: "Reach for multi-agent 'because it scales'", why: "About 3 in 4 failures come from system design and agent-to-agent misalignment. Fan-out burns ~15× the tokens, and token spend alone explains ~80% of the performance variance", instead: "Single linear agent + compaction. Fan out only read-only exploration; keep every write on one thread" },
+    { trap: "Trust chain-of-thought as an audit log", why: "Models act on hints they never verbalize and rationalize after the fact; the visible chain is often non-causal", instead: "Build evals, gates, and observability on the trajectory of tool calls (what it actually DID)" },
+    { trap: "Fine-tune first", why: "Teaches form over substance, ~1.5× inference premium on some providers, and training on new facts raises hallucination", instead: "Walk the ladder: prompt → few-shot → context/harness → RAG → fine-tune last. The harness is ~90% of ROI" },
+    { trap: "Buy a bigger context window", why: "Recall degrades unevenly as length grows; irrelevant tokens dilute attention even when it all fits", instead: "Spend tokens on signal: the fewest that carry the most. Measure your real effective window" },
     { trap: "Stand up a vector DB by default", why: "An embedding pipeline for 50 docs is a staleness and security liability for nothing", instead: "Corpus under ~200k tokens: load it in-context with caching. Lexical (BM25/grep) for identifiers and codes" },
-    { trap: "Treat spotlighting as the security boundary", why: "Cuts injection ~50%→<2% but an adaptive attacker erases the residual", instead: "Put the privilege boundary in deterministic code; keep spotlighting as defense-in-depth only" },
+    { trap: "Treat spotlighting as the security boundary", why: "Cuts injection from >50% to <2% on GPT models, but an adaptive attacker erases the residual", instead: "Put the privilege boundary in deterministic code; keep spotlighting as defense-in-depth only" },
     { trap: "Crank thinking/effort to max 'just in case'", why: "Past the elbow you hit an overthinking regime: accuracy flattens or drops while you pay per reasoning token", instead: "Measure the accuracy-vs-tokens curve per route and set effort at the elbow" },
   ]}
-  caption="Spend the afternoon on the ladder above, not on this list."
+  caption="Spend the afternoon on the ladder above. This list can wait."
 />
 
-The pattern across all seven: each one is the model's job dressed up as architecture, or architecture dodged with a prompt. The seductive moves point at the LLM. The moves that work point at the code around it.
+The pattern across all seven: each one is the model's job dressed up as architecture, or architecture dodged with a prompt. The seductive moves point at the LLM. The moves that work point at the code around it. The sources behind each row live in the [multi-agent](/learn/agentic-systems/multi-agent/), [reasoning](/learn/agentic-systems/reasoning/), [observability](/learn/agentic-systems/observability/), [post-training](/learn/agentic-systems/post-training-rl/), [retrieval](/learn/agentic-systems/retrieval/) and [security](/learn/agentic-systems/security/) modules.
 
 ## The questions you're actually asking
 
@@ -210,18 +220,16 @@ The pattern across all seven: each one is the model's job dressed up as architec
 Run the p^t math first. If your per-step reliability and step count don't clear your target, decompose the horizon or drop to a deterministic workflow or a single call. Most tasks that "need an agent" don't.
 
 ### Should I use a multi-agent system?
-Not by default. Around 79% of multi-agent failures are coordination, not model limits, and fan-out burns roughly 15× the tokens for parallel compute, not better reasoning. Use a single linear agent with compaction, fan out only read-only exploration, and keep every write on one thread.
+Not by default. The MAST study of 1,600+ traces across 7 frameworks traced most failures to system design and inter-agent misalignment.<Sidenote>Cemri et al., "Why Do Multi-Agent LLM Systems Fail?" (arXiv 2503.13657). The [multi-agent module](/learn/agentic-systems/multi-agent/) has the category breakdown.</Sidenote> Fan out read-only exploration and keep every write on one thread. When I run several Claude agents at once, each one gets [its own git worktree](/blog/worktrees-let-me-parallelize/) so no two of them write to the same files.
 
 ### Is fine-tuning worth it for my agent?
-Usually it's the last resort, not the first. Walk the ladder: prompt, few-shot, context and harness engineering, RAG, then fine-tune. The harness is about 90% of the ROI, and training on new facts actually raises hallucination.
+Usually it's the last resort. Prompt, few-shot, context and harness engineering, and RAG all come before it, and training on new facts actually raises hallucination. The [post-training module](/learn/agentic-systems/post-training-rl/) walks the whole ladder.
 
 ### Will a bigger context window make my agent more reliable?
-No. Recall sags on a U-curve well before the nominal limit, and irrelevant tokens dilute attention even when everything fits. Minimize signal density instead, and measure your real effective window.
+Rarely. Irrelevant tokens dilute attention even when everything fits, and recall degrades before the nominal limit. Measure the window your model actually uses well on your task, and fill it with signal.
 
-<PullQuote variant="block">
-A high hit-rate agent is won by making every step cheap and safe to re-run, and by breaking the error chain with ground-truth verification. Not by a smarter prompt, and not by a smarter model.
-</PullQuote>
+---
 
-If you read only one thing into your hands tomorrow, make it the arithmetic. Open a notebook, write down your `p` and your `t`, and look at `p^t` before you architect anything. The number will tell you whether you need an agent at all, where to put the verification gate, and which of these priorities is actually yours to fix. Everything else in this post is downstream of that one multiplication.
+If you take one thing from this, make it the arithmetic. Open a notebook, write down your `p` and your `t`, and look at `p^t` before you design anything. The number will tell you whether you need an agent at all, where to put the verification gate, and which of these priorities is actually yours to fix.
 
-The full version, with every source graded and the proofs behind the claims, is the [agentic-systems wiki](/learn/agentic-systems/). This was the map. That's the territory.
+The full version, with every source graded and the proofs behind the claims, is the [agentic-systems wiki](/learn/agentic-systems/). It went live with 20 wrong claims that my own pipeline had already checked once. Whatever your `p` is, assume it's lower than you think until something outside the model has checked it.

@@ -5,12 +5,11 @@ interface Props {
 }
 
 const { command } = Astro.props;
-const cmdId = `cmd-${Math.random().toString(36).slice(2, 7)}`;
 
 const copyAria = getLocale(Astro.url) === 'es' ? 'Copiar el comando' : 'Copy command';
 ---
 
-<div class="copyable-command" id={cmdId}>
+<div class="copyable-command">
 	<span class="cmd-prompt">$</span>
 	<code class="cmd-text">{command}</code>
 	<button class="cmd-copy" data-cmd={command} type="button" aria-label={copyAria}>

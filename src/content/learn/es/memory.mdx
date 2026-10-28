@@ -24,7 +24,6 @@ sources:
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Tabs from '../../../components/blog/Tabs.astro';
@@ -86,7 +85,7 @@ graph LR
   A[Input no confiable] --> B["Contexto C (turno)"]
   B --> C{"WRITE-PATH<br/>(frontera de confianza)"}
   C -->|"provenance + política"| D["Memoria durable"]
-  D -->|"se relee como verdad del agente<br/>en turnos futuros"| B
+  D -->|"se relee como<br/>verdad del agente<br/>en turnos futuros"| B
 `} />
 
 La defensa central es **provenance / source-aware memory**: etiquetar cada entrada con su origen y un nivel de confianza, y poner en cuarentena o degradar en el retrieval lo que viene de fuentes no confiables. La política de escritura también pesa: una política estrecha reduce el éxito de ataque casi a la mitad (un sistema con política agresiva muestra 66.67% de éxito de ataque frente a 34.25% de uno más estricto). La memoria pre-aprobada *sin* validación es un riesgo, no una optimización.

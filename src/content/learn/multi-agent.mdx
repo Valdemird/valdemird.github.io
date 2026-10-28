@@ -66,9 +66,9 @@ Parallelizing read-only agents (search, read files, answer questions) is safe be
 <MermaidDiagram title="Read parallelizes; write serializes" chart={`
 graph TD
   R["READ — parallelize"] --> R1["search N docs, N guardrail checks,<br/>breadth-first explore"]
-  R1 --> R2["no shared state → no conflict<br/>fan-out cuts latency, keeps main thread clean"]
+  R1 --> R2["no shared state, so no conflict<br/>fan-out cuts latency, keeps main thread clean"]
   W["WRITE — serialize"] --> W1["generate one artifact, edit state,<br/>answer a customer"]
-  W1 --> W2["shared mutable state → decision race<br/>one linear thread, one decision at a time"]
+  W1 --> W2["shared mutable state, so decisions race<br/>one linear thread, one decision at a time"]
 `} />
 
 The same asymmetry maps straight onto human-in-the-loop: reads auto-execute (parallelizable, no conflict risk), writes serialize behind a gate. If you've already built that for safety reasons, you've already built the orchestration principle. You just hadn't named it.
@@ -109,12 +109,13 @@ Anthropic's winning pattern isn't "spawn agents freely." It's a lead that dictat
 
 <MermaidDiagram title="Orchestrator-worker with bounded delegation" chart={`
 graph TD
-  L["Lead / orchestrator"] -->|"goal + format + tool allowlist + effort budget"| W1["Worker (read-only)"]
-  L -->|"goal + format + tool allowlist + effort budget"| W2["Worker (read-only)"]
-  L -->|"goal + format + tool allowlist + effort budget"| W3["Worker (read-only)"]
-  W1 -->|"distillate only"| S["Synthesize"]
-  W2 -->|"distillate only"| S
-  W3 -->|"distillate only"| S
+  L["Lead / orchestrator"] --> B["Brief per worker<br/>goal · format · tool allowlist · effort budget"]
+  B --> W1["Worker (read-only)"]
+  B --> W2["Worker (read-only)"]
+  B --> W3["Worker (read-only)"]
+  W1 --> S["Synthesize<br/>(distillates only)"]
+  W2 --> S
+  W3 --> S
   S --> L
 `} />
 

@@ -23,7 +23,6 @@ sources:
 ---
 
 import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 
@@ -40,13 +39,17 @@ Son fallos de "no pude reformular la query con lo que acababa de leer". RAG es r
 La analogía a la que vuelvo: RAG es un archivador con fichas. Alguien leyó todo el corpus una vez, escribió una ficha resumen por cajón y las ordenó por tema. Buscar es instantáneo y barato. Pero si editas un documento, la ficha miente hasta que vuelvas a fichar todo. Y para responder "compara el caso A con el caso C" tienes que confiar en que las fichas, escritas sin saber tu pregunta, capturaron lo que necesitas. La búsqueda agéntica es un investigador con acceso al archivo entero: no hay fichas que mantener, lee los documentos actuales, y tras leer el primero decide cuál abrir después. Es más lento y consume más "horas de trabajo" (tokens), pero nunca trabaja sobre información obsoleta y puede encadenar pistas.
 
 <MermaidDiagram title="Una pasada vs el bucle" chart={`
-graph TD
-  subgraph RAG["RAG: una pasada, query fija en t=0"]
+graph LR
+  subgraph RAG["RAG: una pasada, query fija"]
+    direction TB
     A[corpus] --> B[chunk + embed] --> C["ÍNDICE (vive, se desincroniza)"] --> D[top-k] --> E[respuesta]
   end
-  subgraph Agentico["Agéntico: bucle, query reformulada con la evidencia previa"]
+  subgraph Agentico["Agéntico: un bucle"]
+    direction TB
     F[LLM] --> G["grep/read (bytes actuales)"] --> H[LLM reformula] --> I[grep/read] --> J[respuesta]
+    I -.->|evidencia nueva| H
   end
+  RAG ~~~ Agentico
 `} />
 
 El insight que un principiante no tiene: para corpus que caben (o casi) en la ventana, y para datos donde el matching exacto importa (código, IDs, errores, nombres propios), la búsqueda agéntica o el simple "mete todo en el prompt con cache" gana en exactitud y operabilidad. RAG vectorial gana en FAQ de alto volumen, baja latencia y corpus enormes que no caben. El embedding no está muerto. Dejó de ser el default arquitectónico que fue en 2023-2024.

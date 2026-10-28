@@ -5,9 +5,11 @@ import Footer from '../../../components/Footer.astro';
 import PostPreview from '../../../components/PostPreview.astro';
 import DeepDiveCard from '../../../components/DeepDiveCard.astro';
 import LabCard from '../../../components/LabCard.astro';
+import MapCard from '../../../components/MapCard.astro';
 import FormattedDate from '../../../components/FormattedDate.astro';
-import { SITE_TITLE, PERSON_ID, t } from '../../../consts';
+import { SITE_TITLE, PERSON_ID, ORGANIZATION_ID, t } from '../../../consts';
 import { getCollection } from 'astro:content';
+import { readingMinutes } from '../../../lib/learn';
 
 const strings = t(Astro.url);
 const posts = (await getCollection('blog'))
@@ -26,7 +28,7 @@ const blogJsonLd = {
 	inLanguage: 'es',
 	isPartOf: { '@id': 'https://valdemird.com/#website' },
 	author: { '@id': PERSON_ID },
-	publisher: { '@id': PERSON_ID },
+	publisher: { '@id': ORGANIZATION_ID },
 	blogPost: posts.map((p) => {
 		const mod = p.data.reviewedDate ?? p.data.updatedDate;
 		return {
@@ -45,7 +47,7 @@ const blogJsonLd = {
 <!doctype html>
 <html lang="es">
 	<head>
-		<BaseHead title={`${strings.blog.title} | ${SITE_TITLE}`} description={strings.blog.description} image="/og/default-es.png" lang="es" jsonLd={blogJsonLd} alternates={[
+		<BaseHead title={strings.blog.title} description={strings.blog.description} image="/og/default-es.png" lang="es" jsonLd={blogJsonLd} alternates={[
 			{ hreflang: 'en', href: 'https://valdemird.com/blog/' },
 			{ hreflang: 'es', href: 'https://valdemird.com/es/blog/' },
 		]} />
@@ -64,6 +66,7 @@ const blogJsonLd = {
 			<div class="blog-content">
 				<DeepDiveCard lang="es" />
 				<LabCard lang="es" />
+				<MapCard lang="es" />
 				{featuredPost && (
 					<a href={`/blog/${featuredPost.id}/`} class="featured-post animate-fade-in delay-1">
 						<div class="featured-inner">
@@ -89,7 +92,7 @@ const blogJsonLd = {
 					<section class="posts-section animate-fade-in delay-2">
 						<div class="posts-list">
 							{otherPosts.map((post) => (
-								<PostPreview id={post.id} title={post.data.title} description={post.data.description} pubDate={post.data.pubDate} tags={post.data.tags} basePath="/blog" locale="es" enableTransition />
+								<PostPreview id={post.id} title={post.data.title} description={post.data.description} pubDate={post.data.pubDate} tags={post.data.tags} basePath="/blog" locale="es" readingTime={readingMinutes(post.body)} enableTransition />
 							))}
 						</div>
 					</section>
@@ -117,7 +120,7 @@ const blogJsonLd = {
 	.featured-inner h2{font-size:clamp(1.5rem,3vw,2rem);margin:0 0 .6em;line-height:1.25;letter-spacing:-.015em}
 	.featured-inner p{font-size:1.05rem;color:var(--color-text-secondary);line-height:1.7;margin:0 0 1.25em;max-width:600px}
 	.featured-tags{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:1.25rem}
-	.tag{font-size:.72rem;font-weight:500;padding:.2em .6em;background:var(--color-accent-subtle);border-radius:var(--radius-sm);color:var(--color-accent)}
+	.tag{font-family:var(--font-mono);font-size:.7rem;font-weight:500;white-space:nowrap;padding:.2em .6em;background:var(--color-accent-subtle);border-radius:var(--radius-sm);color:var(--color-accent-hover)}
 	.read-arrow{display:inline-flex;align-items:center;gap:.4rem;font-size:.88rem;font-weight:500;color:var(--color-accent)}
 	.read-arrow svg{transition:transform var(--duration-normal) var(--ease-spring)}.featured-post:hover .read-arrow svg{transform:translateX(4px)}
 	.posts-list{display:flex;flex-direction:column}

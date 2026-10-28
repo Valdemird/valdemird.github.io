@@ -46,8 +46,7 @@ El marco más útil viene de MemGPT: trata la ventana de contexto como working m
 
 <MermaidDiagram title="La ventana es RAM, no un buffer infinito" chart={`
 graph LR
-  A["Working memory<br/>(ventana de contexto)"] --- B["Long-term store<br/>(notes.md, DB, ficheros)"]
-  A -.->|el LLM decide el paginado:<br/>cargar / descargar / compactar| B
+  A["Working memory<br/>(ventana de contexto)"] <-.->|el LLM decide el paginado:<br/>cargar / descargar / compactar| B["Long-term store<br/>(notes.md, DB, ficheros)"]
 `} />
 
 ## Context rot: el hallazgo que rompe la intuición

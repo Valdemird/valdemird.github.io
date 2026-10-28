@@ -1,8 +1,9 @@
 ---
 title: "Game feel en la web: squash, shake y el arte del juice"
-description: "Un botón que solo funciona está muerto. Pasé una noche enseñándole a un proyecto paralelo a devolver el golpe, y estas son las seis técnicas que lo lograron. Cada una jugable, sin librerías y respetando tus preferencias."
+description: "Seis técnicas de game feel para la web: squash & stretch, hitstop, screen shake, partículas, audio sintetizado y combos. Todas jugables y sin librerías."
 pubDate: 2026-06-03
-tags: ["game-feel", "animation", "web-audio", "frontend", "interaction-design"]
+updatedDate: 2026-10-27
+tags: ["game-feel", "animación", "web-audio", "frontend", "diseño-de-interacción"]
 featured: true
 lang: es
 ---
@@ -14,7 +15,6 @@ import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import Tabs from '../../../components/blog/Tabs.astro';
 import TabPanel from '../../../components/blog/TabPanel.astro';
 import Timeline from '../../../components/blog/Timeline.astro';
-import PullQuote from '../../../components/blog/PullQuote.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Sidenote from '../../../components/blog/Sidenote.astro';
 import EasingExplorer from '../../../components/blog/EasingExplorer.astro';
@@ -33,25 +33,23 @@ import EasingExplorer from '../../../components/blog/EasingExplorer.astro';
   ]}
 />
 
-El mes pasado estaba [construyendo un pequeño juego multijugador](/blog/es/building-to-learn/) en `games.valdemird.com`. Uno de los modos es una caza de números: una cuadrícula de casillas y tú marcas las correctas antes que tu rival. Funcionó a la primera. Tocabas una casilla, se encendía, el puntaje subía, la ronda terminaba. Correcto, y completamente muerto.
+En mayo de 2026 armé un pequeño juego multijugador como proyecto paralelo, [que es como aprendo casi todo](/blog/es/building-to-learn/). El juego ya está retirado, pero el código que importa está en este artículo. Uno de sus modos era una caza de números: una cuadrícula de casillas y tú marcas las correctas antes que tu rival. Funcionó a la primera. Tocabas una casilla, se encendía, el puntaje subía, la ronda terminaba. Correcto, y completamente muerto.
 
 Me quedé ahí tocando la misma casilla una y otra vez, y se sentía como enviar un formulario. Así que dediqué una noche entera a una sola cosa: hacer que ese toque se sintiera bien. Ninguna función nueva. Ahora la casilla se aplasta cuando la golpeas, lanza unas partículas, el tono del clic sube a medida que crece tu racha, y al llegar a una racha de cincuenta el tablero entero tiembla. La lógica de abajo es la misma. La diferencia es que por fin la interfaz reconoce que hiciste algo.
-
-Esa diferencia tiene nombre.
 
 <Callout type="important" title="La tesis">
 El game feel no son los gráficos. Es la respuesta. El mismo manejador de clic puede sentirse como enviar un formulario o como conectar un puñetazo, y lo único que cambió es lo que hace la interfaz en los 400 milisegundos posteriores a tu acción.
 </Callout>
 
-El término viene de Steve Swink, que escribió el libro sobre esto en 2008: [*Game Feel: A Game Designer's Guide to Virtual Sensation*](http://www.game-feel.com/). Su definición tiene tres partes: control en tiempo real, espacio simulado y pulido. La web te regala las dos primeras. Este artículo trata de la tercera: la capa de pulido, eso que Swink llama el "juice", y lo poco que cuesta en realidad.
+El término viene de Steve Swink, que escribió el libro sobre esto en 2008: [*Game Feel: A Game Designer's Guide to Virtual Sensation*](http://www.game-feel.com/). Su definición tiene tres partes: control en tiempo real, espacio simulado y pulido. La web te regala las dos primeras. Este artículo trata de la tercera, la capa de pulido que los desarrolladores de juegos terminaron llamando "juice"<Sidenote>La palabra es anterior a las charlas de abajo. En un [artículo de Gamasutra de 2005 sobre cómo prototipar un juego en menos de siete días](https://www.gamedeveloper.com/game-platforms/how-to-prototype-a-game-in-under-7-days), el equipo de Carnegie Mellon detrás del Experimental Gameplay Project definía el juice como "our wet little term for constant and bountiful user feedback": su forma informal de nombrar un feedback constante y abundante.</Sidenote>, y de lo poco que cuesta en realidad.
 
-Cada demo de aquí abajo ejecuta las mismas funciones que corren en el juego. Tócalas. [No son videos](/blog/es/interactive-blog-components/).
+Cada demo de aquí abajo, salvo la de hitstop, es un port de las funciones que corrían en el juego. Tócalas. [No son videos](/blog/es/interactive-blog-components/), y cuatro de ellas están además juntas en la [página de JuiceLab](/es/lab/juice-lab/) del laboratorio de componentes.
 
 <Timeline items={[
   { date: "1981", title: "The Illusion of Life", body: "Los animadores de Disney Frank Thomas y Ollie Johnston publican los 12 principios de la animación. Squash & stretch es el principio número uno." },
   { date: "2008", title: "Swink le pone nombre", body: "El libro de Steve Swink le da vocabulario al campo: 'game feel' como control en tiempo real más espacio simulado más pulido." },
   { date: "2012", title: "Juice it or lose it", body: "Martin Jonasson y Petri Purho toman un clon aburrido de Breakout y le apilan efectos en vivo sobre el escenario. La charla se vuelve la referencia canónica del 'juice'.", emphasize: true },
-  { date: "2013", title: "The art of screen shake", body: "Jan Willem Nijman, de Vlambeer, enumera unos 30 trucos que hacen que Nuclear Throne se sienta violento e inmediato." },
+  { date: "2013", title: "The art of screenshake", body: "Jan Willem Nijman, de Vlambeer, toma un shooter soso en el escenario y le va apilando trucos hasta que se siente violento e inmediato." },
 ]} />
 
 <h2 id="squash-stretch">Squash &amp; stretch</h2>
@@ -62,7 +60,7 @@ En la web es una animación de cuatro keyframes sobre un `transform`. Presiona e
 
 <JuiceLab demo="squash" caption="El mismo clic, ~420ms de deformación. El interruptor es el antes/después." />
 
-La trampa es usar un solo `scale()`. Eso es un globo inflándose, no un objeto con peso. El truco está en animar `scaleX` y `scaleY` en oposición, de modo que el elemento conserve su área. En el juego, el tablero usa esto al aparecer: se planta en vez de caer desde arriba.
+La trampa es usar un solo `scale()`. Eso se lee como un globo inflándose. El truco está en animar `scaleX` y `scaleY` en oposición, de modo que el elemento conserve su área. En el juego, el tablero usaba esto al aparecer, para plantarse en la pantalla:
 
 <CodeBlock filename="apps/web/src/styles/theme.css">
 ```css
@@ -77,9 +75,9 @@ La trampa es usar un solo `scale()`. Eso es un globo inflándose, no un objeto c
 ```
 </CodeBlock>
 
-El `transform-origin: 50% 100%` hace un trabajo silencioso ahí. Anclar al borde inferior hace que el squash se lea como el objeto presionando contra el suelo, no flotando en su sitio. Si mueves el origen al centro, los mismos keyframes se sienten como un latido en lugar de un aterrizaje.
+El `transform-origin: 50% 100%` pesa más de lo que parece. Anclar al borde inferior hace que el squash se lea como el objeto presionando contra el suelo. Si mueves el origen al centro, los mismos keyframes se sienten como un latido en lugar de un aterrizaje.
 
-El otro trabajador silencioso es la curva de timing. `cubic-bezier(0.22, 1, 0.36, 1)` es la razón de que el asentamiento se lea como una plantada y no como un deslizamiento: casi todo el recorrido ocurre en el primer tercio, y después viene un frenado largo. Empuja cualquiera de los dos puntos de control por encima del borde superior y el elemento se pasa de su destino y regresa, que es toda la personalidad de "spring" con la que corren los hovers de este sitio. Agarra los puntos de control y mira la bola:
+La curva de timing importa igual. `cubic-bezier(0.22, 1, 0.36, 1)` es la razón de que el asentamiento se lea como una plantada y no como un deslizamiento: casi todo el recorrido ocurre en el primer tercio, y después viene un frenado largo. Empuja cualquiera de los dos puntos de control por encima del borde superior y el elemento se pasa de su destino y regresa, que es toda la personalidad de "spring" con la que corren los hovers de este sitio. Agarra los puntos de control y mira la bola:
 
 <EasingExplorer
   lang="es"
@@ -91,7 +89,7 @@ Cada demo de esta página que se mueve depende de una curva como esa. Los keyfra
 
 <h2 id="hitstop">Hitstop</h2>
 
-Confesión honesta: esta es la única técnica que todavía no está en el juego. Construí la demo de abajo para este artículo, porque ninguna lista de game feel está completa sin ella, y una vez que la notas ya no puedes dejar de verla.
+El hitstop nunca llegó a entrar al juego. Construí la demo de abajo para este artículo, porque ninguna lista de game feel está completa sin ella, y una vez que la notas ya no puedes dejar de verla.
 
 El hitstop es una congelación. En el fotograma exacto del impacto, el juego detiene el tiempo durante unas pocas decenas de milisegundos y luego sigue. Los juegos de pelea viven de esto. Cuando Ryu conecta un puñetazo fuerte en Street Fighter, ambos personajes se bloquean durante un puñado de fotogramas. Smash Bros lo llama freeze frames; el término general es [hitlag](https://glossary.infil.net/?t=Hitstop), definido para los juegos de pelea en el glosario de Infil. La pausa vende la colisión como algo que costó energía. Sin ella, dos objetos se atraviesan con toda cortesía.
 
@@ -113,7 +111,7 @@ Tres magnitudes. Pequeña para una acción rutinaria, grande para un evento de v
 
 <JuiceLab demo="shake" caption="Pequeña / mediana / grande. Fíjate en la rotación que se va colando a medida que crece el impulso." />
 
-Las variantes mediana y grande añaden una fracción de grado de rotación. Esa rotación es justo lo que la mayoría de las implementaciones web se saltan. La traslación pura se lee como un glitch. Unas décimas de grado de rotación se leen como fuerza. Este es el código que está en producción, incluida la línea que todo el mundo olvida:
+Las variantes mediana y grande añaden una fracción de grado de rotación. Esa rotación es justo lo que la mayoría de las implementaciones web se saltan. La traslación pura se lee como un glitch. Unas décimas de grado de rotación se leen como fuerza. Este es el código del juego, incluida la línea que todo el mundo olvida:
 
 <CodeBlock filename="apps/web/src/lib/juice.tsx">
 ```ts
@@ -131,15 +129,11 @@ function shake(intensity: ShakeIntensity = 'md') {
 
 `void el.offsetWidth` es la línea que sostiene todo. Si quitas y vuelves a poner la misma clase en el mismo fotograma, el navegador lo fusiona y la animación nunca se reinicia. Leer `offsetWidth` fuerza un reflow síncrono, que confirma la eliminación de la clase, de modo que al volver a añadirla arranca desde cero. Sin esa línea, los golpes rápidos dejan de temblar tras el primero. Perdí veinte minutos en exactamente esto antes de acordarme de que es un truco viejo.
 
-<PullQuote cite="Jan Willem Nijman, Vlambeer — 'The art of screen shake' (2013)" variant="block">
-Más es más. Si se ve bien con un poco de screen shake, probablemente se vea mejor con mucho.
-</PullQuote>
-
-Tiene razón casi siempre, con un matiz en el que la charla no se detiene: sacudir todo el viewport en la web es un disparador de mareo para algunas personas. El `if (reduced()) return` al inicio de esa función no es decoración. Es la diferencia entre tener juice y tener una queja de accesibilidad.
+Una vez que lo sientes, la tentación es sacudirlo todo más fuerte. En la web eso tiene un costo: sacudir todo el viewport le provoca mareo a algunas personas. El `if (reduced()) return` al inicio de esa función es lo que evita que el temblor termine en una queja de accesibilidad.
 
 <h2 id="particles">Partículas</h2>
 
-Las partículas son la firma de [*Juice it or lose it*](https://www.youtube.com/watch?v=Fy0aCDmgnxg). En esa charla de 2012, Martin Jonasson y Petri Purho toman un clon gris de Breakout y, efecto a efecto, lo entierran en escombros de colores hasta dejarlo eufórico. Su versión es [jugable en el navegador](http://grapefrukt.com/f/games/juicy-breakout/) con un deslizador por cada efecto, que es lo más parecido a una demo canónica que tiene el campo. Los ladrillos explotan en decenas de pedazos. La pantalla se llena de movimiento que no significa nada mecánicamente y todo emocionalmente.
+Las partículas son la firma de [*Juice it or lose it*](https://www.youtube.com/watch?v=Fy0aCDmgnxg). En esa charla de 2012, Martin Jonasson y Petri Purho toman un clon gris de Breakout y, efecto a efecto, lo entierran en escombros de colores hasta dejarlo eufórico. El [código de su Breakout](https://github.com/grapefrukt/juicy-breakout) está en GitHub. Es ActionScript escrito para Flash, que los navegadores modernos ya no ejecutan, pero sigue siendo lo más parecido a una demo canónica que tiene el campo. Los ladrillos explotan en decenas de pedazos. La pantalla se llena de movimiento que no significa nada mecánicamente y todo emocionalmente.
 
 Haz clic en cualquier parte del escenario. Mueve el deslizador para cambiar la cantidad.
 
@@ -175,7 +169,7 @@ Para unas pocas decenas de partículas de vida corta, los elementos del DOM con 
 
 <h2 id="synthesized-audio">Audio sintetizado</h2>
 
-Esta es la que sorprende a la gente. No hay archivos de sonido en el juego. Ni un `.mp3`, ni un `.wav`. Cada sonido se genera en el navegador con la [Web Audio API](https://developer.mozilla.org/es/docs/Web/API/Web_Audio_API): un oscilador, una envolvente de ganancia y unos cuantos números.
+El juego no tenía archivos de sonido. Ni un `.mp3`, ni un `.wav`. Cada sonido se generaba en el navegador con la [Web Audio API](https://developer.mozilla.org/es/docs/Web/API/Web_Audio_API): un oscilador, una envolvente de ganancia y unos cuantos números.
 
 <JuiceLab demo="sound" caption="Todo sintetizado en vivo. Pulsa 'pop' varias veces y el tono trepa con tu racha." />
 
@@ -200,7 +194,7 @@ function tone(freq: number, { type = 'triangle', dur = 0.12, gain = 0.14, glideT
 ```
 </CodeBlock>
 
-Dos detalles hacen que el audio sintetizado se sienta vivo en lugar de robótico. El primero es la variación de tono: cada clic se multiplica por un pequeño factor aleatorio, así que no hay dos iguales. Diez clics idénticos seguidos suenan a máquina; diez clics desafinados cada uno un par de por ciento suenan a persona. El segundo es que la racha alimenta la frecuencia de forma directa:
+Dos detalles evitan que el audio sintetizado suene robótico. El primero es la variación de tono: cada clic se multiplica por un pequeño factor aleatorio, así que no hay dos iguales. Diez clics idénticos seguidos suenan a máquina; diez clics desafinados cada uno un par de por ciento suenan a persona. El segundo es que la racha alimenta la frecuencia de forma directa:
 
 <CodeBlock filename="apps/web/src/lib/sfx.ts">
 ```ts
@@ -215,21 +209,21 @@ pop(streak = 0) {
 ```
 </CodeBlock>
 
-Ese tono que sube hace un trabajo psicológico real. Una línea ascendente se lee como acumulación, como *estar llegando a algún lado*. Sientes la racha antes de haberla contado conscientemente. Hay además un truco más discreto que se llama ducking: cuando suena algo grande, la ganancia maestra baja un instante para que el evento importante atraviese todo lo demás, el mismo gesto que hace un locutor de radio al hablar por encima de una canción.
+Ese tono que sube es lo que vende la racha. Una línea ascendente se lee como acumulación, como *estar llegando a algún lado*. Sientes la racha antes de haberla contado conscientemente. Hay además un truco más discreto que se llama ducking: cuando suena algo grande, la ganancia maestra baja un instante para que el evento importante atraviese todo lo demás, el mismo gesto que hace un locutor de radio al hablar por encima de una canción.
 
 <Callout type="warning" title="La regla del autoplay">
-Los navegadores suspenden el AudioContext hasta que el usuario interactúa con la página. Por eso el primer clic de la demo puede llegar un pelín tarde mientras el contexto arranca, y por eso un audio que se dispara solo no va a sonar. Lanza el sonido siempre desde un gesto real, y guarda siempre un interruptor de silencio. El mío vive en localStorage.
+Los navegadores suspenden el AudioContext hasta que el usuario interactúa con la página. Por eso el primer clic de la demo puede llegar un pelín tarde mientras el contexto arranca, y por eso un audio que se dispara solo no va a sonar. Lanza el sonido siempre desde un gesto real, y guarda siempre un interruptor de silencio. El juego lo guardaba en localStorage, y las demos de esta página hacen lo mismo.
 </Callout>
 
 <h2 id="escalating-celebration">Celebración escalada</h2>
 
-Cada técnica de arriba está bien por su cuenta. Apiladas y atadas a una racha, se vuelven un bucle de retroalimentación que no quieres soltar. Este es el sentido entero del modo caza de números, y es la demo a la que llevaría a un escéptico.
+Cada técnica de arriba está bien por su cuenta. Apiladas y atadas a una racha, se vuelven un bucle de retroalimentación que no quieres soltar. Ese era el sentido entero del modo caza de números, y es la demo a la que llevaría a un escéptico.
 
-Toca la moneda. Sigue tocando. El tono trepa, el squash se dispara en cada golpe, las partículas se multiplican, y en los umbrales de tier el escenario empieza a temblar y a teñirse. Para un momento y todo decae hasta cero.
+Toca la moneda. Sigue tocando. El tono trepa, el squash se dispara en cada golpe, las partículas se multiplican, y en cada umbral de nivel el escenario empieza a temblar y a teñirse. Para un momento y todo decae hasta cero.
 
-<JuiceLab demo="combo" caption="Los tiers se desbloquean en 10 / 20 / 30 / 50. Quédate 1.6s sin tocar y la racha se reinicia. El sonido respeta el interruptor." />
+<JuiceLab demo="combo" caption="Los niveles se desbloquean en 10 / 20 / 30 / 50. Quédate 1.6s sin tocar y la racha se reinicia. El sonido respeta el interruptor." />
 
-La escalada no es magia, es una función escalonada. La racha se mapea a un tier, y cada efecto se lee de ese tier: más partículas, más dispersión, un temblor mayor, un tinte más rojo, un tono más agudo.
+La escalada es una función escalonada. La racha se mapea a un nivel, y cada efecto se lee de ese nivel: más partículas, más dispersión, un temblor mayor, un tinte más rojo, un tono más agudo.
 
 <CodeBlock filename="apps/web/src/games/numberhunt/NumberHunt.tsx">
 ```ts
@@ -249,7 +243,7 @@ juice.shake(tier >= 3 ? 'md' : 'sm');                        // el tablero solo 
 ```
 </CodeBlock>
 
-Dos decisiones hacen que esto se sienta bien y no agotador. El tablero solo tiembla de tier tres en adelante, así que el efecto más fuerte se mantiene raro y sigue significando algo. Y la racha decae tras 1.6 segundos de inactividad, lo que convierte un contador en tensión. No solo estás acumulando puntos, estás manteniendo algo con vida. Ese decaimiento es lo que hace que la celebración se sienta ganada, porque se puede perder.
+Dos decisiones evitan que esto se vuelva agotador. El tablero solo tiembla del nivel tres en adelante, así que el efecto más fuerte se mantiene raro y sigue significando algo. Y la racha decae tras 1.6 segundos de inactividad, lo que convierte un contador en tensión: estás manteniendo algo con vida. Ese decaimiento es lo que hace que la celebración se sienta ganada, porque se puede perder.
 
 <Tabs labels={["La versión muerta", "La versión con juice"]}>
 <TabPanel>
@@ -271,6 +265,7 @@ function onMark(cell: Cell, e: PointerEvent) {
   const next = streak + 1;
   setStreak(next);
   setMarked((m) => [...m, cell]);
+  setScore((s) => s + 1);
   sfx.pop(next);
   juice.burst(e.clientX, e.clientY, { count: 6, spread: 64, size: 7 });
   clearTimeout(decay.current);
@@ -278,14 +273,14 @@ function onMark(cell: Cell, e: PointerEvent) {
 }
 ```
 
-Ocho líneas más. La misma corrección, más peso, sonido y una razón para seguir.
+Seis líneas más. La misma corrección, más peso, sonido y una razón para seguir.
 
 </TabPanel>
 </Tabs>
 
 <h2 id="respect">La parte que no es opcional</h2>
 
-Todo lo de aquí está diseñado para captar atención, lo que significa que todo lo de aquí puede volverse un ataque contra alguien que no lo pidió. Los trastornos vestibulares hacen que el screen shake dé náuseas. Hay gente que trabaja en silencio a propósito. La web tiene una señal real para lo primero, la media query [`prefers-reduced-motion`](https://developer.mozilla.org/es/docs/Web/CSS/@media/prefers-reduced-motion), y una cortesía básica para lo segundo, y ambas son una línea.
+Todo lo de aquí está diseñado para captar atención, lo que significa que todo lo de aquí puede volverse un ataque contra alguien que no lo pidió. Los trastornos vestibulares hacen que el screen shake dé náuseas. Hay gente que trabaja en silencio a propósito. La web tiene una señal real para lo primero, la media query [`prefers-reduced-motion`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-reduced-motion), y una cortesía básica para lo segundo, y ambas son una línea.
 
 Mira de nuevo cada función de arriba. Todas empiezan igual:
 
@@ -298,23 +293,23 @@ function reduced(): boolean {
 ```
 </CodeBlock>
 
-Si el sistema operativo pide movimiento reducido, el temblor, el flash y las partículas sencillamente no ocurren. El juego sigue siendo del todo jugable. <Sidenote>Por eso mismo las demos del blog respetan la misma preferencia. Si tu sistema tiene el movimiento reducido activado, las demos de movimiento de esta página también se silencian, y estás leyendo un artículo que sobre todo demuestra su propia ausencia.</Sidenote> El sonido recibe el mismo trato mediante un interruptor de silencio persistente, audible por defecto pero a un clic del silencio y recordado entre sesiones.
+Si el sistema operativo pedía movimiento reducido, el temblor, el flash y las partículas sencillamente no ocurrían, y las demos del blog respetan la misma preferencia<Sidenote>Si tu sistema tiene el movimiento reducido activado, las demos de movimiento de esta página se desactivan solas, y estás leyendo un artículo que sobre todo demuestra su propia ausencia.</Sidenote>. El juego seguía siendo del todo jugable. El sonido recibía el mismo trato mediante un interruptor de silencio persistente, audible por defecto pero a un clic del silencio y recordado entre sesiones.
 
 <Collapsible title="Por qué no confío en 'le pongo juice después' como plan">
-Cada vez que me dije que puliría la sensación cuando la lógica estuviera lista, la lógica se endureció alrededor de no tener ninguna sensación. Los manejadores de clic quedaron escritos dando por sentada una respuesta síncrona e instantánea, y meterles después una ventana de reacción de 400ms implicaba desenredarlos. La noche que describí al principio funcionó porque el juego era pequeño. En algo más grande, la capa de feedback quiere ser hermana de la lógica desde el inicio: un `juice.burst()` junto al `setState`, no atornillado en una pasada posterior.
+Cada vez que me dije que puliría la sensación cuando la lógica estuviera lista, la lógica se endureció alrededor de no tener ninguna sensación. Los manejadores de clic quedaron escritos dando por sentada una respuesta síncrona e instantánea, y meterles después una ventana de reacción de 400ms implicaba desenredarlos. La noche que describí al principio funcionó porque el juego era pequeño. En algo más grande, la capa de feedback quiere ser hermana de la lógica desde el inicio, con un `juice.burst()` justo al lado del `setState`.
 </Collapsible>
 
 <Collapsible title="Para profundizar: las charlas y el libro que definieron esto">
 Casi todo lo de aquí se apoya en un puñado de charlas conocidas y un libro. Si quieres los originales:
 
-- **Steve Swink, *Game Feel: A Game Designer's Guide to Virtual Sensation*** (2008) — el libro que le puso nombre al campo. [game-feel.com](http://www.game-feel.com/), o el ensayo más largo [*Game Feel: The Secret Ingredient*](https://www.gamedeveloper.com/game-platforms/feature-game-feel---the-secret-ingredient-).
-- **Los doce principios de animación de Disney** — squash & stretch es el principio uno, de *The Illusion of Life* de Frank Thomas y Ollie Johnston. [Resumen](https://en.wikipedia.org/wiki/Twelve_basic_principles_of_animation).
-- **Martin Jonasson y Petri Purho, *Juice it or lose it*** (2012) — [la charla](https://www.youtube.com/watch?v=Fy0aCDmgnxg), y el [Breakout jugable](http://grapefrukt.com/f/games/juicy-breakout/) que llenan de juice en vivo.
-- **Jan Willem Nijman / Vlambeer, *The art of screenshake*** (2013) — [la charla](https://www.youtube.com/watch?v=AJdEqssNZ-U). Unos 30 trucos en 25 minutos.
-- **Mark Brown, *Secrets of Game Feel and Juice*** — [el video-ensayo de Game Maker's Toolkit](https://www.youtube.com/watch?v=216_5nu4aVQ), si prefieres ver a leer.
-- **Hitstop / hitlag** — definido para los juegos de pelea en el [glosario de Infil](https://glossary.infil.net/?t=Hitstop).
+- **Steve Swink, *Game Feel: A Game Designer's Guide to Virtual Sensation*** (2008). El libro que le puso nombre al campo. [game-feel.com](http://www.game-feel.com/), o el ensayo más largo [*Game Feel: The Secret Ingredient*](https://www.gamedeveloper.com/game-platforms/feature-game-feel---the-secret-ingredient-).
+- **Los doce principios de animación de Disney.** Squash & stretch es el principio uno, de *The Illusion of Life* de Frank Thomas y Ollie Johnston. [Resumen](https://en.wikipedia.org/wiki/Twelve_basic_principles_of_animation).
+- **Martin Jonasson y Petri Purho, *Juice it or lose it*** (2012). [La charla](https://www.youtube.com/watch?v=Fy0aCDmgnxg), y el [código del Breakout](https://github.com/grapefrukt/juicy-breakout) que llenan de juice en vivo.
+- **Jan Willem Nijman / Vlambeer, *The art of screenshake*** (2013). [La charla](https://www.youtube.com/watch?v=AJdEqssNZ-U), de unos 45 minutos, grabada en INDIGO Classes 2013.
+- **Mark Brown, *Secrets of Game Feel and Juice*** (2015). [El video-ensayo de Game Maker's Toolkit](https://www.youtube.com/watch?v=216_5nu4aVQ), si prefieres ver a leer.
+- **Hitstop / hitlag.** Definido para los juegos de pelea en el [glosario de Infil](https://glossary.infil.net/?t=Hitstop).
 </Collapsible>
 
-La caza de números se juega idéntica con todos los efectos quitados. Nadie pierde la partida por haberla silenciado o por apagar el movimiento. Esa es la línea. El juice es algo que pones encima de algo que ya funciona, nunca una pieza de la que dependa si funciona o no.
+La caza de números se jugaba idéntica con todos los efectos quitados. Nadie perdía una ronda por haberla silenciado o por apagar el movimiento. Esa es la línea. El juice va encima de algo que ya funciona. Que eso funcione nunca puede depender del juice.
 
-Vuelve arriba y machaca la moneda una vez más. Ese tirón que sientes, esa pequeña resistencia a parar, es la razón entera por la que vale la pena escribir todo esto. Son ocho líneas de código entre enviar un formulario y algo que no quieres soltar.
+Vuelve arriba y machaca la moneda una vez más. Ese tirón que sientes, esa pequeña resistencia a parar, es la razón por la que escribí este artículo. Son seis líneas de código entre enviar un formulario y algo que no quieres soltar.

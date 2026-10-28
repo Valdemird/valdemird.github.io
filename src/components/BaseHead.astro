@@ -1,10 +1,16 @@
 ---
 import '../styles/global.css';
 import '@fontsource-variable/fraunces';
+import '@fontsource-variable/fraunces/wght-italic.css'; // real italics for blockquotes / pull-quotes
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
+// Same asset URLs the @font-face rules resolve to; preloaded so the first
+// paint doesn't wait on CSS discovery. Latin subset, upright, variable wght.
+import frauncesLatin from '@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2?url';
+import geistLatin from '@fontsource-variable/geist/files/geist-latin-wght-normal.woff2?url';
+import geistMonoLatin from '@fontsource-variable/geist-mono/files/geist-mono-latin-wght-normal.woff2?url';
 import { ClientRouter } from 'astro:transitions';
-import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PERSON, PERSON_ID, ORGANIZATION, ORGANIZATION_ID } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, PERSON, ORGANIZATION, ORGANIZATION_ID } from '../consts';
 
 interface Alternate {
 	hreflang: string;
@@ -35,7 +41,36 @@ const AUTHOR_NAME = 'Valdemir D.';
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const { title, description, image: imageProp, imageAlt, lang, type = 'website', alternates = [], jsonLd, extraJsonLd = [], publishedTime, modifiedTime, tags, markdownAlternate, noindex = false } = Astro.props;
 const image = imageProp || '/og/default.png';
-const ogImageAlt = imageAlt || title;
+
+// Title pattern: "<Page> — valdemird". Shells may still pass their own brand
+// suffix ("Blog | valdemird", "X · valdemird"); strip it and apply one style.
+// The home title already leads with the brand and is used as-is. Articles keep
+// the brand only while the whole title stays SERP-sized (~65 chars).
+const BRAND_SEP = ' — ';
+const brandSuffix = new RegExp(`\\s*[|·—–-]\\s*${SITE_TITLE}\\s*$`, 'i');
+const pageTitle = title.replace(brandSuffix, '').trim() || SITE_TITLE;
+const isBrandLed = pageTitle === SITE_TITLE || pageTitle.toLowerCase().startsWith(`${SITE_TITLE.toLowerCase()} `);
+const brandedTitle = `${pageTitle}${BRAND_SEP}${SITE_TITLE}`;
+const documentTitle = isBrandLed
+	? pageTitle
+	: type === 'article' && brandedTitle.length > 65
+		? pageTitle
+		: brandedTitle;
+const ogImageAlt = imageAlt || pageTitle;
+
+// og:image:type from the file extension; width/height only for the generated
+// 1200x630 cards under /og/ (a hero image can be any size).
+const IMAGE_MIME: Record<string, string> = {
+	png: 'image/png',
+	jpg: 'image/jpeg',
+	jpeg: 'image/jpeg',
+	webp: 'image/webp',
+	avif: 'image/avif',
+	gif: 'image/gif',
+};
+const imageExt = image.split(/[?#]/)[0].split('.').pop()?.toLowerCase() ?? '';
+const ogImageType = IMAGE_MIME[imageExt];
+const isGeneratedOg = image.startsWith('/og/');
 
 const defaultJsonLd = {
 	'@context': 'https://schema.org',
@@ -48,14 +83,6 @@ const defaultJsonLd = {
 			description: lang === 'es' ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
 			inLanguage: ['en', 'es'],
 			publisher: { '@id': ORGANIZATION_ID },
-			potentialAction: {
-				'@type': 'SearchAction',
-				target: {
-					'@type': 'EntryPoint',
-					urlTemplate: 'https://valdemird.com/blog/?q={search_term_string}',
-				},
-				'query-input': 'required name=search_term_string',
-			},
 		},
 		PERSON,
 		ORGANIZATION,
@@ -73,8 +100,9 @@ const structuredData = jsonLd || defaultJsonLd;
 <link rel="manifest" href="/site.webmanifest" />
 <meta name="generator" content={Astro.generator} />
 <meta name="color-scheme" content="light dark" />
-<meta name="theme-color" content="#fafaf9" media="(prefers-color-scheme: light)" />
-<meta name="theme-color" content="#1a1a2e" media="(prefers-color-scheme: dark)" />
+<!-- sRGB of --color-bg: light oklch(0.99 0 0), dark oklch(0.16 0.01 260) -->
+<meta name="theme-color" content="#fcfcfc" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0b0d12" media="(prefers-color-scheme: dark)" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="mobile-web-app-capable" content="yes" />
@@ -89,6 +117,11 @@ const structuredData = jsonLd || defaultJsonLd;
 <!-- Analytics: Plausible (privacy-friendly, no cookies, <1KB) -->
 <!-- Uncomment when Plausible account is set up at https://plausible.io -->
 <!-- <script defer data-domain="valdemird.com" src="https://plausible.io/js/script.js"></script> -->
+
+<!-- Fonts: preload the latin variable faces every page renders with -->
+<link rel="preload" href={frauncesLatin} as="font" type="font/woff2" crossorigin />
+<link rel="preload" href={geistLatin} as="font" type="font/woff2" crossorigin />
+<link rel="preload" href={geistMonoLatin} as="font" type="font/woff2" crossorigin />
 
 <!-- View Transitions -->
 <ClientRouter />
@@ -210,20 +243,20 @@ const structuredData = jsonLd || defaultJsonLd;
 {markdownAlternate && <link rel="alternate" type="text/markdown" href={markdownAlternate} />}
 
 <!-- Primary Meta Tags -->
-<title>{title}</title>
-<meta name="title" content={title} />
+<title>{documentTitle}</title>
+<meta name="title" content={documentTitle} />
 <meta name="description" content={description} />
 
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content={type} />
 <meta property="og:site_name" content="valdemird" />
 <meta property="og:url" content={Astro.url} />
-<meta property="og:title" content={title} />
+<meta property="og:title" content={pageTitle} />
 <meta property="og:description" content={description} />
 <meta property="og:image" content={new URL(image, Astro.url)} />
-<meta property="og:image:type" content="image/png" />
-<meta property="og:image:width" content="1200" />
-<meta property="og:image:height" content="630" />
+{ogImageType && <meta property="og:image:type" content={ogImageType} />}
+{isGeneratedOg && <meta property="og:image:width" content="1200" />}
+{isGeneratedOg && <meta property="og:image:height" content="630" />}
 <meta property="og:image:alt" content={ogImageAlt} />
 <meta property="og:locale" content={lang === 'es' ? 'es_ES' : 'en_US'} />
 {lang === 'es' && <meta property="og:locale:alternate" content="en_US" />}
@@ -243,7 +276,7 @@ const structuredData = jsonLd || defaultJsonLd;
 <!-- Twitter -->
 <meta property="twitter:card" content="summary_large_image" />
 <meta property="twitter:url" content={Astro.url} />
-<meta property="twitter:title" content={title} />
+<meta property="twitter:title" content={pageTitle} />
 <meta property="twitter:description" content={description} />
 <meta property="twitter:image" content={new URL(image, Astro.url)} />
 <meta property="twitter:image:alt" content={ogImageAlt} />

@@ -23,7 +23,6 @@ const metrics: { value: string; label: string }[] = [
 	{ value: String(entries.length), label: es ? 'componentes' : 'components' },
 	{ value: String(categories), label: es ? 'categorías' : 'categories' },
 	{ value: String(stable), label: es ? 'estables' : 'stable' },
-	{ value: es ? '100%' : '100%', label: es ? 'en vivo' : 'live' },
 ];
 ---
 
@@ -155,7 +154,12 @@ const metrics: { value: string; label: string }[] = [
 
 	@media (max-width: 640px) {
 		.lab-inner { padding: 1.5rem; }
-		.metrics { gap: 1.1rem 1.6rem; }
+		/* A fixed 3-column grid so no stat ends up alone on its own row. */
+		.metrics {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 1.1rem 1rem;
+		}
 		.metric dt { font-size: 1.15rem; }
 	}
 </style>

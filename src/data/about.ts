@@ -6,7 +6,9 @@
 
 export type AboutLocale = 'en' | 'es';
 
-export type TechDomain = { domain: string; tools: readonly string[]; accent: string };
+/** `fill` tints the card wash; `ink` colors the small label and meets 4.5:1 on that wash. */
+export type DomainAccent = { fill: string; ink: string };
+export type TechDomain = { domain: string; tools: readonly string[]; accent: DomainAccent };
 export type TimelineItem = { year: string; title: string; place: string; desc: string; active: boolean };
 export type CredentialItem = { name: string; year: string };
 export type Belief = { title: string; desc: string; postSlug: string; linkLabel: string };
@@ -29,13 +31,14 @@ export const FEATURED_CERT_SHARED = {
 
 export const ABOUT_PHOTO = { src: '/images/about/sebastian.webp', width: 640, height: 640 } as const;
 
-// Accent tokens are shared — same card order in both locales.
+// Accent tokens are shared — same card order in both locales. Fill tokens are
+// too light for small text, so each pairs with its `-text` ink token.
 const ACCENT = {
-	frontend: 'var(--color-accent)',
-	backend: 'var(--color-success)',
-	devops: 'var(--color-warning)',
-	ai: 'oklch(0.6 0.15 300)',
-} as const;
+	frontend: { fill: 'var(--color-accent)', ink: 'var(--color-accent-hover)' },
+	backend: { fill: 'var(--color-success)', ink: 'var(--color-success-text)' },
+	devops: { fill: 'var(--color-warning)', ink: 'var(--color-warning-text)' },
+	ai: { fill: 'var(--color-important)', ink: 'var(--color-important-text)' },
+} as const satisfies Record<string, DomainAccent>;
 
 // Certification names and dates are identical in both locales.
 const CERTS: readonly CredentialItem[] = [
@@ -98,7 +101,7 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 			'My first paid code shipped in 2016, at a small software studio in Cali, straight out of a game development program at SENA. Learning to program by making games left me with a conviction I never dropped: software people enjoy using is a feature, not a luxury.',
 			'Since then I\'ve spent eight-plus years shipping for companies across the Americas. Real-time transaction services, group video calls, dashboards with drag-and-drop, delivery platforms. I went from engineer to senior in under two years at a consulting firm, and today I ship products for international clients as a Senior FullStack Engineer.',
 			'I treated it like a faster autocomplete: vague prompt in, patch out, repeat. One session, a careless <code>git stash</code> ate eight of the ten files I\'d been working on, and I rebuilt them from memory. That week pushed me to specs, tests, and git worktrees — a workflow where the model understands the project before writing a line. The whole story is in <a href="/blog/tests-gave-me-control/">AI Gave Me Speed. Tests Gave Me Control.</a>',
-			'This site is where I show that work. Every diagram in the posts is a live component you can poke (there are 30-plus of them in <a href="/lab/">the lab</a>), <a href="https://todo.valdemird.com">the todo app</a> I plan my days with is mine, and the workflow the blog describes is the same one this site is built with.',
+			'This site is where I show that work. Every diagram in the posts is a live component you can poke (there are 30-plus of them in <a href="/lab/">the lab</a>), and the workflow the blog describes is the same one this site is built with.',
 		],
 		pivotLine: 'I got AI wrong before I got it right.',
 		pivotAfter: 1,
@@ -106,7 +109,6 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 			updatedDisplay: 'Updated June 2026',
 			items: [
 				'Finished my B.Eng. in Systems Engineering and the Claude Certified Architect exam, both this year.',
-				'Building todo.valdemird.com — AI scheduling, Pomodoro, drag-and-drop.',
 				'Exploring on-device AI in the browser. If your Chrome supports it, the chat button in the corner runs locally on your machine.',
 				'Writing about interactive components and running Claude agents in parallel.',
 			],
@@ -150,7 +152,7 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 			blurb: 'Anthropic\'s formal certification on architecting with Claude. The exam version of what the posts here document in practice: specs, agents, and tooling.',
 		},
 		credentialEyebrow: 'Credential',
-		closing: 'I live in Cali, Colombia. Outside client work I build small multiplayer games at <a href="https://games.valdemird.com">games.valdemird.com</a> and tweak this site\'s components more than I should. If you want to talk shop, the form above or any of these works.',
+		closing: 'I live in Cali, Colombia. Outside client work I tweak this site\'s components more than I should. If you want to talk shop, <button type="button" class="closing-cta" data-ama-open="form">send me a message</button> or use any of the links below.',
 		startHere: [
 			{ slug: 'tests-gave-me-control', title: 'AI Gave Me Speed. Tests Gave Me Control.' },
 			{ slug: 'worktrees-let-me-parallelize', title: 'Git Worktrees Let Me Run Three Claude Agents in Parallel' },
@@ -174,7 +176,7 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 			'Mi primer código pagado salió a producción en 2016, en un estudio pequeño de software en Cali, recién salido de un programa de desarrollo de videojuegos del SENA. Aprender a programar haciendo juegos me dejó una convicción que nunca solté: que el software se disfrute usar es una característica, no un lujo.',
 			'Desde entonces llevo más de ocho años lanzando productos para empresas en las Américas. Servicios transaccionales en tiempo real, videollamadas grupales, dashboards con drag-and-drop, plataformas de delivery. Pasé de ingeniero a senior en menos de dos años en una consultora, y hoy construyo productos para clientes internacionales como Senior FullStack Engineer.',
 			'La traté como un autocompletado más rápido: prompt vago, parche, repetir. En una sesión, un <code>git stash</code> descuidado se comió ocho de los diez archivos en los que venía trabajando, y los reconstruí de memoria. Esa semana me empujó hacia los specs, los tests y los git worktrees: un flujo donde el modelo entiende el proyecto antes de escribir una línea. La historia completa está en <a href="/blog/es/tests-gave-me-control/">La IA me dio velocidad. Los tests me dieron control.</a>',
-			'Este sitio es donde muestro ese trabajo. Cada diagrama de los posts es un componente vivo que puedes tocar (hay más de 30 en <a href="/es/lab/">el lab</a>), <a href="https://todo.valdemird.com">la app de tareas</a> con la que planeo mis días es mía, y el flujo que describe el blog es el mismo con el que está construido este sitio.',
+			'Este sitio es donde muestro ese trabajo. Cada diagrama de los posts es un componente vivo que puedes tocar (hay más de 30 en <a href="/es/lab/">el lab</a>), y el flujo que describe el blog es el mismo con el que está construido este sitio.',
 		],
 		pivotLine: 'Me equivoqué con la IA antes de acertar con ella.',
 		pivotAfter: 1,
@@ -182,7 +184,6 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 			updatedDisplay: 'Actualizado junio 2026',
 			items: [
 				'Terminé la Ingeniería de Sistemas y el examen de Claude Certified Architect, ambos este año.',
-				'Construyendo todo.valdemird.com: planificación con IA, Pomodoro y drag-and-drop.',
 				'Explorando IA on-device en el navegador. Si tu Chrome lo admite, el chat del botón de la esquina corre localmente en tu máquina.',
 				'Escribiendo sobre componentes interactivos y agentes de Claude corriendo en paralelo.',
 			],
@@ -226,7 +227,7 @@ export const ABOUT_CONTENT: Record<AboutLocale, AboutContent> = {
 			blurb: 'La certificación formal de Anthropic sobre arquitectura con Claude. La versión con examen de lo que los posts de este blog documentan en la práctica: specs, agentes y tooling.',
 		},
 		credentialEyebrow: 'Credencial',
-		closing: 'Vivo en Cali, Colombia. Fuera del trabajo con clientes construyo juegos multijugador pequeños en <a href="https://games.valdemird.com">games.valdemird.com</a> y ajusto los componentes de este sitio más de lo que debería. Si quieres hablar del oficio, sirve el formulario de arriba o cualquiera de estos.',
+		closing: 'Vivo en Cali, Colombia. Fuera del trabajo con clientes ajusto los componentes de este sitio más de lo que debería. Si quieres hablar del oficio, <button type="button" class="closing-cta" data-ama-open="form">escríbeme aquí</button> o usa cualquiera de los enlaces de abajo.',
 		startHere: [
 			{ slug: 'tests-gave-me-control', title: 'La IA me dio velocidad. Los tests me dieron control.' },
 			{ slug: 'worktrees-let-me-parallelize', title: 'Git worktrees: cómo corrí tres agentes de Claude en paralelo' },

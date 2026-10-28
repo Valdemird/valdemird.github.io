@@ -44,12 +44,12 @@ The right unit is the turn trace, a tree of spans. A root `invoke_agent`, `chat`
 
 <MermaidDiagram title="A turn trace is a tree of spans" chart={`
 graph TD
-  A["invoke_agent (turn · 4.2s · $0.011)"] --> B["chat #1 (1.37s · 3.1k tok)"]
-  B --> C["execute_tool · search (350ms · ok)"]
-  B --> D["execute_tool · read (300ms · ok)"]
-  A --> E["chat #2 (1.3s · 4.8k tok)"]
-  E --> F["execute_tool · create_event (130ms · denied at gate)"]
-  A --> G["channel.send (330ms)"]
+  A["invoke_agent<br/>turn · 4.2s · $0.011"] --> B["chat #1<br/>1.37s · 3.1k tok"]
+  B --> C["execute_tool · search<br/>350ms · ok"]
+  B --> D["execute_tool · read<br/>300ms · ok"]
+  A --> E["chat #2<br/>1.3s · 4.8k tok"]
+  E --> F["execute_tool ·<br/>create_event<br/>130ms<br/>denied at gate"]
+  A --> G["channel.send<br/>330ms"]
 `} />
 
 Without this hierarchy you can't measure latency per step, attribute cost to a sub-goal, or see the wrong decision. The analogy I keep: the turn trace is the *flight data recorder*, not the pilot's report after landing. The report (the output) says "there was turbulence." The black box gives you every sensor reading and every decision in temporal order. That's the only thing that lets you reconstruct an accident you can't reproduce by flying again.
