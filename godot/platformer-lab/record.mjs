@@ -8,12 +8,18 @@
 // recording <seconds off> with it OFF. Same inputs, both outcomes, one clip.
 //
 // Writes public/videos/play/platformer-lab/<plane>-<sheets>.mp4 (H.264, no audio),
-// recorded with MediaRecorder from the Godot canvas: no ffmpeg needed.
-import { mkdir, writeFile } from 'node:fs/promises';
+// recorded with MediaRecorder from the Godot canvas and then re-encoded by ffmpeg
+// into a plain progressive MP4 (lib/media.mjs explains why; set FFMPEG if it
+// isn't on the PATH).
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { withBrowser, PUBLIC, SITE, sleep } from './lib/browser.mjs';
+import { ffmpeg, finalizeClip } from './lib/media.mjs';
 
 const OUT = join(PUBLIC, 'videos/play/platformer-lab');
+// uploadDate and duration of each clip, for PlayableLab's VideoObject (a file's
+// mtime is the checkout time in CI, so it can't be the date).
+const MANIFEST = join(SITE, 'src/data/platformer-lab-clips.json');
 const BITRATE = Number(process.env.BITRATE || 600_000);
 const targets = process.argv.slice(2).map((a) => {
 	const [plane, sheets, on, off, extra = ''] = a.split(':');
@@ -46,6 +52,7 @@ const START = `(() => {
 
 const [W, H] = (process.env.SIZE || '960x540').split('x').map(Number);
 
+ffmpeg(); // fail before recording anything, not after
 await mkdir(OUT, { recursive: true });
 await withBrowser(async (page) => {
 	// The game canvas follows the viewport: a smaller viewport is a lighter video.
@@ -63,7 +70,13 @@ await withBrowser(async (page) => {
 		await sleep(off * 1000);
 		const data = await page.evaluate('window.__stop()');
 		const file = join(OUT, `${plane}-${sheets.replaceAll(',', '+')}.mp4`);
-		await writeFile(file, Buffer.from(data, 'base64'));
-		console.log(`✓ ${file.slice(SITE.length)}  (${(data.length * 0.75 / 1024).toFixed(0)} KB, T at ${on}s)`);
+		const raw = `${file}.raw.mp4`;
+		await writeFile(raw, Buffer.from(data, 'base64'));
+		await finalizeClip(raw, file);
+		await rm(raw);
+		const clips = JSON.parse(await readFile(MANIFEST, 'utf8').catch(() => '{}'));
+		clips[`${plane}-${sheets.replaceAll(',', '+')}`] = { uploadDate: new Date().toISOString().slice(0, 10), duration: `PT${Math.round(on + off)}S` };
+		await writeFile(MANIFEST, JSON.stringify(clips, null, '\t') + '\n');
+		console.log(`✓ ${file.slice(SITE.length)}  (T at ${on}s)`);
 	}
 });

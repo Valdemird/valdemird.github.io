@@ -15,9 +15,10 @@
  * The clip, if it exists, also ships as VideoObject structured data. Only one
  * game runs at a time: starting one closes the others on the page.
  */
-import { existsSync, statSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { getLocale } from '../../consts';
+import clips from '../../data/platformer-lab-clips.json';
 
 type Plane = 'plataformas' | 'combate';
 interface Props {
@@ -43,6 +44,15 @@ const poster = Astro.props.poster ?? `/images/play/platformer-lab/${slug}.webp`;
 const videoPath = Astro.props.video ?? `/videos/play/platformer-lab/${slug}.mp4`;
 const videoFile = join(process.cwd(), 'public', videoPath);
 const hasVideo = existsSync(videoFile);
+const clip = (clips as Record<string, { uploadDate: string; duration: string }>)[slug];
+// The poster is 1280 wide; posters.mjs also writes -640 and -960 copies.
+const variant = (w: number) => poster.replace(/\.webp$/, `-${w}.webp`);
+const posterSrcset = [640, 960].every((w) => existsSync(join(process.cwd(), 'public', variant(w))))
+	? `${variant(640)} 640w, ${variant(960)} 960w, ${poster} 1280w`
+	: undefined;
+// Same width as .pl below: min(900px, 100vw - 2rem).
+const posterSizes = '(min-width: 932px) 900px, calc(100vw - 2rem)';
+const videoPoster = posterSrcset ? variant(960) : poster;
 const lang = getLocale(Astro.url);
 const es = lang === 'es';
 
@@ -55,6 +65,7 @@ const COPY = es
 			watch: 'Míralo',
 			play: 'Juégalo y pruébalo',
 			start: 'Jugar',
+			watchStart: 'Ver el video',
 			startHint: 'Tú llevas el mando desde el primer momento. Los pasos están debajo.',
 			videoNote: Astro.props.videoNote ?? 'Primero con la técnica encendida; a mitad del video se pulsa T y las mismas pulsaciones fallan sin ella.',
 			legendOn: 'con la técnica',
@@ -76,6 +87,7 @@ const COPY = es
 			watch: 'Watch it',
 			play: 'Play it and try it',
 			start: 'Play',
+			watchStart: 'Play the clip',
 			startHint: "You're in control from the first frame. The steps are below.",
 			videoNote: Astro.props.videoNote ?? 'First with the technique on; halfway through, T is pressed and the same inputs fail without it.',
 			legendOn: 'technique on',
@@ -117,7 +129,9 @@ const videoLd = hasVideo
 			description: COPY.videoNote,
 			thumbnailUrl: [new URL(poster, site).href],
 			contentUrl: new URL(videoPath, site).href,
-			uploadDate: statSync(videoFile).mtime.toISOString(),
+			// From the clip manifest (record.mjs), not the file's mtime: in CI that is the checkout time.
+			uploadDate: clip?.uploadDate ?? '2026-11-18',
+			...(clip?.duration ? { duration: clip.duration } : {}),
 			inLanguage: lang,
 		})
 	: '';
@@ -145,7 +159,17 @@ const videoLd = hasVideo
 	{hasVideo && (
 		<div class="pl-panel" role="tabpanel" id={`${uid}-watch`} aria-labelledby={`${uid}-tab-watch`} data-pl-panel="watch">
 			<div class="pl-frame">
-				<video class="pl-video" src={videoPath} poster={poster} muted loop playsinline controls preload="none" aria-label={COPY.videoTitle} data-pl-video></video>
+				{/* The 960 poster: the clip itself is 960×540, so a bigger one buys nothing. A video
+				    poster can't load lazily, so the script sets it when the clip nears the screen;
+				    without JS there is no poster, only the native controls. (An <img> under the
+				    video would be lazy for free, but Chrome's controls paint over it.) */}
+				<video class="pl-video" src={videoPath} data-poster={videoPoster} muted loop playsinline controls preload="none" aria-label={COPY.videoTitle} data-pl-video></video>
+				{/* Revealed by the script when the clip won't start on its own: reduced motion, or
+				    autoplay refused. Without JS the native controls are enough. */}
+				<button class="pl-play pl-watch-start" type="button" data-pl-watch-start hidden>
+					<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
+					<span>{COPY.watchStart}</span>
+				</button>
 			</div>
 			<p class="pl-legend">
 				<span class="pl-chip pl-chip--on">1 · {COPY.legendOn}</span>
@@ -157,7 +181,7 @@ const videoLd = hasVideo
 
 	<div class="pl-panel" role={hasVideo ? 'tabpanel' : undefined} id={`${uid}-play`} aria-labelledby={hasVideo ? `${uid}-tab-play` : undefined} data-pl-panel="play" hidden={hasVideo}>
 		<div class="pl-frame" data-pl-frame data-frame-title={COPY.frameTitle}>
-			<img class="pl-poster" src={poster} alt={COPY.posterAlt} width="1280" height="720" loading="lazy" decoding="async" />
+			<img class="pl-poster" src={poster} srcset={posterSrcset} sizes={posterSizes} alt={COPY.posterAlt} width="1280" height="720" loading="lazy" decoding="async" />
 			<div class="pl-cover">
 				<button class="pl-play" type="button" data-pl-play>
 					<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
@@ -217,13 +241,34 @@ const videoLd = hasVideo
 		}
 	}
 
+	/** Muted autoplay. If the browser refuses (power saving, a site setting), the big play button appears. */
+	function autoplay(video: HTMLVideoElement) {
+		video.play().catch(() => {
+			const button = video.parentElement?.querySelector<HTMLButtonElement>('[data-pl-watch-start]');
+			if (button && video.paused) button.hidden = false;
+		});
+	}
+
+	// Posters load a screen and a half ahead of the clip, not with the page.
+	const posterObserver = new IntersectionObserver(
+		(entries) => {
+			for (const entry of entries) {
+				if (!entry.isIntersecting) continue;
+				const video = entry.target as HTMLVideoElement;
+				if (video.dataset.poster) video.poster = video.dataset.poster;
+				posterObserver.unobserve(video);
+			}
+		},
+		{ rootMargin: '150% 0px' },
+	);
+
 	// Clips play muted while on screen (and never on their own with reduced motion).
 	const videoObserver = new IntersectionObserver(
 		(entries) => {
 			for (const entry of entries) {
 				const video = entry.target as HTMLVideoElement;
 				if (entry.isIntersecting && !reduceMotion() && !video.closest('[hidden]')) {
-					video.play().catch(() => {});
+					autoplay(video);
 				} else if (!entry.isIntersecting) {
 					video.pause();
 				}
@@ -242,7 +287,18 @@ const videoLd = hasVideo
 		const refocus = root.querySelector<HTMLButtonElement>('[data-pl-refocus]')!;
 		const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-pl-tab]'));
 		const video = root.querySelector<HTMLVideoElement>('[data-pl-video]');
+		const watchStart = root.querySelector<HTMLButtonElement>('[data-pl-watch-start]');
 		let iframe: HTMLIFrameElement | null = null;
+
+		if (video && watchStart) {
+			if (reduceMotion()) watchStart.hidden = false;
+			// Once the clip is playing, its own controls take over from the big button.
+			video.addEventListener('playing', () => (watchStart.hidden = true));
+			watchStart.addEventListener('click', () => {
+				watchStart.hidden = true;
+				video.play().catch(() => (watchStart.hidden = false));
+			});
+		}
 
 		function url() {
 			const u = new URL(root.dataset.src!, location.origin);
@@ -289,7 +345,7 @@ const videoLd = hasVideo
 			}
 			if (name === 'watch') {
 				stop();
-				if (video && !reduceMotion()) video.play().catch(() => {});
+				if (video && !reduceMotion()) autoplay(video);
 			} else {
 				video?.pause();
 			}
@@ -331,7 +387,10 @@ const videoLd = hasVideo
 			location.href = url();
 		});
 
-		if (video) videoObserver.observe(video);
+		if (video) {
+			posterObserver.observe(video);
+			videoObserver.observe(video);
+		}
 		controllers.add({ root, stop });
 	}
 
@@ -346,6 +405,7 @@ const videoLd = hasVideo
 		for (const c of controllers) c.stop();
 		controllers.clear();
 		videoObserver.disconnect();
+		posterObserver.disconnect();
 	});
 	document.addEventListener('astro:after-swap', init);
 	init();
@@ -457,6 +517,19 @@ const videoLd = hasVideo
 	.pl-poster,
 	.pl-video {
 		object-fit: cover;
+	}
+	.pl-watch-start {
+		white-space: nowrap;
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		translate: -50% -50%;
+	}
+	.pl-watch-start:hover {
+		transform: translateY(-2px) scale(1.03);
+	}
+	.pl-watch-start[hidden] {
+		display: none;
 	}
 	.pl-poster {
 		transition: filter var(--duration-slow) var(--ease-smooth);

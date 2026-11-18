@@ -1,0 +1,86 @@
+{
+	"combate-c_anatomy": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT12S"
+	},
+	"combate-c_boxes": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT12S"
+	},
+	"combate-c_confirm": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT12S"
+	},
+	"combate-c_dodge": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT12S"
+	},
+	"combate-c_hazard": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT12S"
+	},
+	"combate-c_health": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT13S"
+	},
+	"combate-c_pogo": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT14S"
+	},
+	"combate-c_telegraph": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT14S"
+	},
+	"plataformas-accel": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT10S"
+	},
+	"plataformas-apex": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT13S"
+	},
+	"plataformas-buffer": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT12S"
+	},
+	"plataformas-camera": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT13S"
+	},
+	"plataformas-corner": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT13S"
+	},
+	"plataformas-coyote": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT13S"
+	},
+	"plataformas-dash": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT14S"
+	},
+	"plataformas-gravity": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT14S"
+	},
+	"plataformas-juice": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT14S"
+	},
+	"plataformas-movers": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT14S"
+	},
+	"plataformas-slopes": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT12S"
+	},
+	"plataformas-variable": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT15S"
+	},
+	"plataformas-wall": {
+		"uploadDate": "2026-11-18",
+		"duration": "PT16S"
+	}
+}
