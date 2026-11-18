@@ -1,0 +1,63 @@
+---
+import Timing from '../../blog/TimingDiagram.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'TimingDiagram',
+	category: 'narrative',
+	status: 'experimental',
+	summary: 'A technique as windows of milliseconds on one axis, with a marker you drag: press here, and this is what happens with the technique and without it.',
+	summaryEs: 'Una técnica como ventanas de milisegundos sobre un eje, con un marcador que arrastras: si pulsas aquí, esto pasa con la técnica y esto sin ella.',
+	why: 'Coyote time is a sentence anyone can repeat and almost nobody can picture: a window that opens when the ground ends and closes 100 ms later. An ASCII sketch shows where it sits but not what it does. Dragging the moment you press through floor, air and the two windows makes the rule visible in a few seconds: inside the window you jump, one step outside and you fall. The same axis fits attack startup and recovery, invincibility frames or a hitstop, anything whose whole idea is a span of time.',
+	whyEs: 'El coyote time es una frase que cualquiera repite y casi nadie se imagina: una ventana que se abre cuando se acaba el suelo y se cierra 100 ms después. Un dibujo en ASCII enseña dónde está, pero no lo que hace. Arrastrar el momento en que pulsas por el suelo, el aire y las dos ventanas deja ver la regla en unos segundos: dentro de la ventana saltas, un paso fuera y caes. El mismo eje sirve para el arranque y la recuperación de un ataque, los fotogramas de invencibilidad o un hitstop, cualquier cosa cuya idea entera sea un tramo de tiempo.',
+	props: [
+		{ name: 'title', type: 'string', description: 'Name shown above the axis.' },
+		{ name: 'duration', type: 'number', description: 'Length of the axis, in ms.' },
+		{ name: 'phases', type: 'Phase[]', description: 'Consecutive spans (floor, air…): from, to, label, tone, and the outcome of a press there (on, optional off).' },
+		{ name: 'events', type: '{ at, label }[]', description: 'Instants marked on the axis, like "the ledge ends".' },
+		{ name: 'windows', type: 'TimingWindow[]', description: 'Spans a technique opens: from, to, label, detail, measure ("since" | "until") and on/off outcomes; {ms} in their text is filled in.' },
+		{ name: 'start', type: 'number', default: '0', description: 'Where the marker starts; the intro sweep stops there.' },
+		{ name: 'probe', type: 'string', description: 'What the marker stands for, e.g. "you press jump".' },
+		{ name: 'onLabel / offLabel', type: 'string', description: 'Headings of the two outcomes.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label={es ? 'coyote time y jump buffer' : 'coyote time and jump buffer'}
+	description={es
+		? 'Arrastra el marcador por el suelo, el aire y las dos ventanas. Abajo, lo que hace la pulsación con la técnica y sin ella.'
+		: 'Drag the marker through floor, air and the two windows. Below, what the press does with the technique and without it.'}
+	usage={`<TimingDiagram title="…" duration={600} phases={[…]} events={[…]} windows={[…]} />`}
+>
+	<Timing
+		title={es ? 'Coyote time y jump buffer' : 'Coyote time and jump buffer'}
+		duration={600}
+		start={250}
+		probe={es ? 'pulsas saltar' : 'you press jump'}
+		phases={[
+			{ from: 0, to: 200, label: es ? 'suelo' : 'floor', tone: 'solid', on: { ok: true, text: es ? 'Estás en el suelo: saltas.' : "You're on the floor: you jump." } },
+			{ from: 200, to: 480, label: es ? 'aire' : 'air', tone: 'air', on: { ok: null, text: es ? 'Estás en el aire: la pulsación no hace nada.' : "You're in the air: the press does nothing." } },
+			{ from: 480, to: 600, label: es ? 'suelo' : 'floor', tone: 'solid', on: { ok: true, text: es ? 'Estás en el suelo: saltas.' : "You're on the floor: you jump." } },
+		]}
+		events={[
+			{ at: 200, label: es ? 'se acaba la cornisa' : 'the ledge ends' },
+			{ at: 480, label: es ? 'aterrizas' : 'you land' },
+		]}
+		windows={[
+			{
+				from: 200, to: 300, label: 'coyote time', detail: '100 ms', measure: 'since',
+				on: { ok: true, text: es ? 'Saltas, {ms} ms después de dejar la cornisa.' : 'You jump, {ms} ms after leaving the ledge.' },
+				off: { ok: false, text: es ? 'Caes: llegas {ms} ms tarde.' : 'You fall: {ms} ms too late.' },
+			},
+			{
+				from: 360, to: 480, label: 'jump buffer', detail: '120 ms', measure: 'until',
+				on: { ok: true, text: es ? 'Guardada: saltas al aterrizar, {ms} ms después.' : 'Kept: you jump the moment you land, {ms} ms later.' },
+				off: { ok: false, text: es ? 'Perdida: llegas {ms} ms pronto y aterrizas sin saltar.' : 'Lost: {ms} ms too early, and you land without jumping.' },
+			},
+		]}
+	/>
+</DemoSection>

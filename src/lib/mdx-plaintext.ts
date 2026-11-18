@@ -71,12 +71,32 @@ function tldrToMarkdown(block: string): string {
 }
 
 /** Rewrites fact-carrying components as markdown. Fail-soft: unknown shapes are left for stripping. */
+/** TimingDiagram: its title and each window with what a press inside it does, on and off. */
+function timingToMarkdown(block: string, lang: string): string {
+	const es = lang === 'es';
+	const title = attr(block, 'title');
+	const windows = block.match(/windows=\{\[([\s\S]*)\]\}/)?.[1] ?? '';
+	const items = windows
+		.split(/(?=\{\s*from:)/)
+		.map((w) => {
+			const label = w.match(/label:\s*"([^"]*)"/)?.[1];
+			if (!label) return '';
+			const detail = w.match(/detail:\s*"([^"]*)"/)?.[1];
+			const on = w.match(/on:\s*\{[^}]*text:\s*"([^"]*)"/)?.[1]?.replaceAll('{ms}', 'n');
+			const off = w.match(/off:\s*\{[^}]*text:\s*"([^"]*)"/)?.[1]?.replaceAll('{ms}', 'n');
+			return `- ${label}${detail ? ` (${detail})` : ''}: ${es ? 'con la técnica' : 'with the technique'}, ${on ?? ''} ${es ? 'Sin ella' : 'Without it'}, ${off ?? ''}`;
+		})
+		.filter(Boolean);
+	return `\n${title ? `**${title}.**\n` : ''}${items.join('\n')}\n`;
+}
+
 function componentsToMarkdown(raw: string, lang: string): string {
 	try {
 		return raw
 			.replace(/<TLDR\b([\s\S]*?)\/>/g, (_, block: string) => tldrToMarkdown(block))
 			.replace(/<StatGrid\b([\s\S]*?)\/>/g, (_, block: string) => statsToMarkdown(block))
 			.replace(/<PlayableLab\b([\s\S]*?)\/>/g, (_, block: string) => playableToMarkdown(block, lang))
+			.replace(/<TimingDiagram\b([\s\S]*?)\/>/g, (_, block: string) => timingToMarkdown(block, lang))
 			.replace(/<Callout\b([^>]*)>/g, (_, block: string) => {
 				const title = attr(block, 'title');
 				return title ? `\n**${title}.** ` : '';
