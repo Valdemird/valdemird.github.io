@@ -8,7 +8,18 @@ extends Node
 ##
 ## Láminas con coreografía: las de `SUPPORTED`. En las demás el piloto no hace nada.
 
-const SUPPORTED: Array[StringName] = [&"coyote", &"buffer", &"juice", &"variable", &"gravity", &"apex"]
+const SUPPORTED: Array[StringName] = [&"coyote", &"buffer", &"juice", &"variable", &"gravity", &"apex",
+		&"accel", &"corner", &"slopes", &"movers", &"wall", &"dash", &"camera",
+		&"c_boxes", &"c_anatomy", &"c_confirm", &"c_pogo", &"c_health", &"c_hazard", &"c_dodge", &"c_telegraph"]
+## Combate contra un maniquí: [cuál (por orden de izquierda a derecha), distancia de
+## centro a centro (px), segundos entre golpes]. En «tres cajas», el del pedestal: su
+## caja empieza una casilla por encima del suelo; la hitbox generosa (56 px de grosor)
+## llega, la exacta (28 px) pasa por debajo.
+const DUMMY_DRILLS := {
+	&"c_boxes": [1, 44.0, 0.6],
+	&"c_anatomy": [0, 46.0, 0.22],
+	&"c_confirm": [0, 46.0, 0.5],
+}
 ## Salto variable: saltos guionizados (columna de la lámina donde despegar, segundos
 ## con el botón pulsado). Bajo el techo de pinchos, toques; en el muro, salto entero.
 ## Sin la técnica, todos salen enteros y el primero se clava en los pinchos.
@@ -16,7 +27,15 @@ const SCRIPTED := {
 	# Calculados con la física del jugador (toque: 1,1 × 2,5 casillas; 50 ms: 1,7 × 3;
 	# entero: 3,6 × 6,4) para pasar bajo los pinchos del techo con margen.
 	&"variable": [[18.5, 0.03], [23.9, 0.03], [28.875, 0.05], [34.5, 0.04], [39.0, 0.6]],
+	# Pendientes: el salto del foso justo al acabar la rampa (sin snap, a menudo no hay suelo).
+	&"slopes": [[39.45, 0.6]],
 }
+## Aceleración: correr, soltar, girar, soltar (segundos de cada fase). En bucle.
+const ACCEL_STEPS: Array = [[&"move_right", 0.7], [&"", 0.35], [&"move_left", 0.5], [&"", 0.35]]
+## Corner correction: los huecos de 1 casilla del techo (columna del hueco). Se para
+## 5 px descentrado, para que el salto roce la esquina y la técnica tenga que actuar.
+const CORNER_HOLES: Array[int] = [16, 24, 32]
+const CORNER_OFFSET := 5.0
 const PLAYER_ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"jump", &"dash", &"attack", &"heal"]
 ## Coyote: se salta un instante DESPUÉS de dejar el suelo (la ventana es de 100 ms;
@@ -44,6 +63,12 @@ var _last_x := 0.0
 var _script_next := 0           # siguiente salto guionizado de la lámina
 var _hold_for := -1.0           # segundos que se mantiene el salto (-1 = hasta el ápice)
 var _edge_ahead := INF          # distancia al borde de la superficie que se pisa
+var _phase := 0                 # fase de la coreografía de la lámina
+var _phase_time := 0.0
+var _cooldown := 0.0
+var _stay := false              # quieto en el sitio (la cámara: saltitos sobre la meseta)
+var _mover: Mover               # la plataforma rápida de la lámina de plataformas móviles
+var _mover_last_x := 0.0
 ## Buffer: dónde tiene que caer este salto (x del centro, y de la superficie).
 ## Los pilares están a 4 casillas y un salto completo llega a 6,4: hay que apuntar.
 var _target := Vector2.INF
@@ -60,7 +85,13 @@ func setup(scene_main: Main) -> void:
 	player.bounced.connect(_on_bounced)
 
 
+var _tap_release: Array[StringName] = []
+
+
 func _physics_process(delta: float) -> void:
+	for action: StringName in _tap_release:
+		_release(action)
+	_tap_release.clear()
 	if start_delay > 0.0:
 		start_delay -= delta
 		return
@@ -68,7 +99,13 @@ func _physics_process(delta: float) -> void:
 	if not sheet in SUPPORTED or player.state == PlatformerPlayer.State.DEAD:
 		_release_all()
 		return
-	if _target != Vector2.INF and not player.is_on_floor():
+	if _stay:
+		_release(&"move_left")
+		_release(&"move_right")
+	elif sheet in [&"accel", &"corner", &"wall", &"dash", &"movers", &"c_boxes", &"c_anatomy",
+			&"c_confirm", &"c_pogo", &"c_dodge"]:
+		pass   # estas coreografías llevan las direcciones ellas mismas
+	elif _target != Vector2.INF and not player.is_on_floor():
 		_steer()
 	else:
 		_release(&"move_left")
@@ -83,10 +120,36 @@ func _physics_process(delta: float) -> void:
 		_juice_hop()
 	elif sheet == &"gravity" or sheet == &"apex":
 		_hop()
+	elif sheet == &"camera":
+		_camera_hops(delta)
+	elif sheet == &"accel":
+		_accel(delta)
+	elif sheet == &"corner":
+		_corner(delta)
+	elif sheet == &"wall":
+		_wall_climb(delta)
+	elif sheet == &"dash":
+		_dash_run(delta)
+	elif sheet == &"movers":
+		_movers(delta)
+	elif DUMMY_DRILLS.has(sheet):
+		_dummy_drill(delta, DUMMY_DRILLS[sheet])
+	elif sheet == &"c_pogo":
+		_pogo_run(delta)
+	elif sheet == &"c_health":
+		_loop_after(17.5)
+	elif sheet == &"c_dodge":
+		_dodge_run()
+	elif sheet == &"c_telegraph":
+		_telegraph_run()
 	elif SCRIPTED.has(sheet):
 		_scripted(sheet)
 	_update_jump_hold(delta)
-	_loop_at_end(delta)
+	# Coreografías que se quedan quietas a propósito (esperar una plataforma, pararse
+	# bajo un hueco) no deben confundirse con estar atascado al final del mapa.
+	if sheet != &"movers" and not DUMMY_DRILLS.has(sheet) \
+			and not (sheet == &"corner" and _phase < CORNER_HOLES.size()):
+		_loop_at_end(delta)
 
 
 # --- Coreografías ------------------------------------------------------------------
@@ -202,6 +265,333 @@ func _juice_hop() -> void:
 				return
 
 
+## Cámara: subir la escalera con el saltador y, ya en la meseta, saltar en el sitio una
+## y otra vez. La cámara buena no sube con cada salto (se ancla al último suelo); con T
+## apagado, la cámara sigue cada salto arriba y abajo.
+func _camera_hops(delta: float) -> void:
+	_cooldown -= delta
+	var column := (player.global_position.x - float(main.current_sheet.x0)) / BP.TILE
+	if column >= 22.0 and column < 30.0 and player.is_on_floor():
+		_stay = true
+	if _stay:
+		if player.is_on_floor() and _jump_hold < 0.0 and _cooldown <= 0.0:
+			_press_jump()
+			_cooldown = 0.95
+		return
+	if _target != Vector2.INF or _jump_hold >= 0.0 or not player.is_on_floor():
+		return
+	_hop()
+
+
+## Aceleración: correr, soltar y girar en bucle. El vídeo enseña el inspector: con la
+## técnica la velocidad sube y baja en rampa; sin ella, salta de golpe.
+func _accel(delta: float) -> void:
+	_phase_time += delta
+	var step: Array = ACCEL_STEPS[_phase % ACCEL_STEPS.size()]
+	if _phase_time >= float(step[1]):
+		_phase += 1
+		_phase_time = 0.0
+		step = ACCEL_STEPS[_phase % ACCEL_STEPS.size()]
+	var action: StringName = step[0]
+	for dir: StringName in [&"move_left", &"move_right"]:
+		if dir == action:
+			_hold(dir)
+		else:
+			_release(dir)
+
+
+## Corner correction: parar bajo cada hueco del techo, un poco descentrado, y saltar en
+## vertical. Con la técnica, el juego aparta al héroe y pasa; sin ella, cabezazo.
+func _corner(delta: float) -> void:
+	_phase_time += delta
+	if _phase >= CORNER_HOLES.size():
+		_release(&"move_left")
+		_hold(&"move_right")        # al final del pasillo: el bucle lo devuelve al inicio
+		return
+	var x0 := float(main.current_sheet.x0)
+	var target := x0 + (CORNER_HOLES[_phase] + 0.5) * BP.TILE + CORNER_OFFSET
+	var x := player.global_position.x
+	if _jump_hold >= 0.0 or not player.is_on_floor():
+		_release(&"move_right")
+		_release(&"move_left")
+		return
+	if _cooldown > 0.0:
+		_cooldown -= delta
+		if _cooldown <= 0.0:
+			_phase += 1              # ya saltó en este hueco: al siguiente
+		return
+	if x < target - 12.0:
+		_hold(&"move_right")
+		_phase_time = 0.0
+	elif absf(player.velocity.x) > 1.0 or _phase_time < 0.25:
+		_release(&"move_right")      # frenar y quedarse quieto un instante
+	else:
+		_press_jump(0.6)
+		_cooldown = 0.9
+
+
+## Wall jump: el error de siempre, saltar manteniendo la dirección HACIA la pared, y
+## soltar el stick después. Con las ayudas (bloqueo de control 140 ms, inercia) el salto
+## llega solo a la otra pared y se sube el pozo; sin ellas, mantener hacia la pared
+## anula el impulso en el mismo instante y el héroe no se despega.
+func _wall_climb(delta: float) -> void:
+	_cooldown -= delta
+	_phase_time -= delta
+	var toward := player.wall_dir
+	if toward == 0 and player.is_on_floor() and player.is_on_wall():
+		toward = 1 if _held.has(&"move_right") else -1   # en el suelo, contra el muro
+	if toward != 0 and _cooldown <= 0.0 and _jump_hold < 0.0:
+		var held := &"move_right" if toward > 0 else &"move_left"
+		_release(&"move_left" if toward > 0 else &"move_right")
+		_hold(held)
+		_press_jump(0.18)
+		_cooldown = 0.22
+		_phase_time = 0.15           # el empujón hacia la pared dura lo que el bloqueo
+		return
+	if _phase_time > 0.0:
+		return
+	if player.is_on_floor() and toward == 0:
+		_release(&"move_left")
+		_hold(&"move_right")
+	elif not player.is_on_floor():
+		_release(&"move_left")       # manos fuera: la inercia hace el resto
+		_release(&"move_right")
+
+
+## Dash: saltar y hacer dash en lo alto sobre los 8u de pinchos, salto + dash hacia
+## arriba en el muro de 6u y dash por el túnel de 1u con un foso dentro.
+func _dash_run(delta: float) -> void:
+	_cooldown -= delta
+	var column := (player.global_position.x - float(main.current_sheet.x0)) / BP.TILE
+	match _phase:
+		0:   # carrerilla y salto antes de los pinchos
+			_hold(&"move_right")
+			if player.is_on_floor() and column >= 11.3:
+				_press_jump()
+				_phase = 1
+		1:   # en lo alto, dash a la derecha
+			if not player.is_on_floor() and player.velocity.y >= -40.0:
+				_tap(&"dash")
+				_phase = 2
+		2:   # hasta el muro: pegado a él, salto
+			_hold(&"move_right")
+			if player.is_on_floor() and column >= 29.4:
+				_press_jump()
+				_phase = 3
+		3:   # en lo alto, dash hacia ARRIBA (sin dirección horizontal)
+			if not player.is_on_floor() and player.velocity.y >= -60.0:
+				_release(&"move_right")
+				_hold(&"move_up")
+				_tap(&"dash")
+				_cooldown = 0.2
+				_phase = 4
+		4:   # acabado el dash, a la derecha hasta subir al muro
+			if _cooldown <= 0.0:
+				_release(&"move_up")
+				_hold(&"move_right")
+				if player.is_on_floor() and column > 30.0:
+					_phase = 5
+		5:   # bajar y entrar en el túnel; dash sobre el foso
+			_hold(&"move_right")
+			if player.is_on_floor() and column >= 41.45 and column < 42.0:
+				_tap(&"dash")
+				_phase = 6
+		_:
+			_hold(&"move_right")
+
+
+## Plataformas móviles: subirse a la plataforma rápida y saltar mientras corre hacia el
+## hueco de 8u. Con inercia, se hereda su velocidad y se llega; sin ella, no. Para el
+## vídeo, cada intento empieza en el borde del bloque (se coloca al héroe ahí).
+func _movers(delta: float) -> void:
+	if _mover == null:
+		for node: Node in main.level.get_children():
+			var m := node as Mover
+			if m != null and not m.eased:
+				_mover = m
+		if _mover == null:
+			return
+		_phase = 0
+	var mx := _mover.global_position.x
+	var moving_right := mx > _mover_last_x + 0.01
+	_mover_last_x = mx
+	_cooldown -= delta
+	match _phase:
+		0:   # esperar a que la plataforma arranque y colocar al héroe encima
+			_release(&"move_right")
+			if moving_right and mx < _mover.from.x + 12.0:
+				player.teleport(Vector2(mx + 60.0, _mover.from.y - PlatformerPlayer.HALF_SIZE.y - 1.0))
+				_phase = 3
+		3:   # quieto encima hasta casi el final del recorrido: salto con la derecha pulsada
+			if moving_right and mx > _mover.to.x - 34.0 and player.is_on_floor():
+				_hold(&"move_right")
+				_press_jump()
+				_phase = 4
+		4:   # en el aire hacia el otro bloque; al aterrizar (o caer), otro intento
+			if player.is_on_floor() and _jump_hold < 0.0:
+				_cooldown = 0.9
+				_phase = 5
+		5:
+			if _cooldown <= 0.0:
+				_phase = 0
+
+
+## Maniquí: acercarse a la distancia de la tabla, pararse y golpear a ritmo fijo.
+func _dummy_drill(delta: float, drill: Array) -> void:
+	_cooldown -= delta
+	var dummies: Array[Node2D] = []
+	for node: Node in main.level.get_children():
+		if node is TrainingDummy:
+			dummies.append(node)
+	dummies.sort_custom(func(a: Node2D, b: Node2D) -> bool: return a.global_position.x < b.global_position.x)
+	var index := int(drill[0])
+	if index >= dummies.size():
+		return
+	var dx := dummies[index].global_position.x - player.global_position.x
+	if dx > float(drill[1]) + 4.0:
+		_hold(&"move_right")
+		return
+	_release(&"move_right")
+	if absf(player.velocity.x) > 1.0:
+		return
+	if _cooldown <= 0.0:
+		_tap(&"attack")
+		_cooldown = float(drill[2])
+
+
+## Pogo: golpe hacia arriba a la primera diana y, sobre los pinchos, de diana en diana
+## con el golpe hacia abajo. Con pogo, cada acierto rebota; sin él, a los pinchos.
+func _pogo_run(delta: float) -> void:
+	_cooldown -= delta
+	var targets: Array[Node2D] = []
+	for node: Node in main.level.get_children():
+		if node is FloatingTarget:
+			targets.append(node)
+	targets.sort_custom(func(a: Node2D, b: Node2D) -> bool: return a.global_position.x < b.global_position.x)
+	if targets.size() < 2:
+		return
+	var x := player.global_position.x
+	var x0 := float(main.current_sheet.x0)
+	var column := (x - x0) / BP.TILE
+	# Un pincho devuelve al héroe al suelo de antes de los pinchos: se reintenta.
+	if _phase >= 3 and player.is_on_floor() and column < 16.0:
+		_phase = 2
+		_release(&"move_down")
+	match _phase:
+		0:   # bajo la diana de arriba: salto y golpe hacia arriba
+			var up_target := targets[0]
+			if x < up_target.global_position.x - 2.0:
+				_hold(&"move_right")
+			else:
+				_release(&"move_right")
+				if player.is_on_floor() and _jump_hold < 0.0:
+					_press_jump()
+					_phase = 1
+		1:
+			if not player.is_on_floor() and player.velocity.y > -260.0:
+				_hold(&"move_up")
+				_tap(&"attack")
+				_cooldown = 0.2
+				_phase = 10
+		10:
+			if _cooldown <= 0.0:
+				_release(&"move_up")
+				if player.is_on_floor():
+					_phase = 2
+		2:   # al borde de los pinchos, salto hacia la primera diana
+			_hold(&"move_right")
+			if player.is_on_floor() and column >= 15.4:
+				_script_next = 1
+				_target = _pogo_aim(targets[_script_next])
+				_press_jump()
+				_phase = 3
+		3:   # en el aire: apuntar y, justo encima, golpe hacia abajo
+			var t := targets[_script_next]
+			_target = _pogo_aim(t)
+			_steer()
+			var dy := t.global_position.y - player.global_position.y
+			if player.velocity.y > 0.0 and absf(t.global_position.x - x) < 26.0 and dy > 40.0 and dy < 100.0:
+				_hold(&"move_down")
+				_tap(&"attack")
+				_cooldown = 0.28        # más que el toque de caída rápida (0,2 s)
+				_took_off = false       # aquí: «ya rebotó en esta diana»
+				_phase = 4
+		4:
+			_steer()
+			if player.velocity.y < -150.0:
+				_took_off = true
+			if _cooldown <= 0.0:
+				_release(&"move_down")
+				if _took_off:                         # rebotó: a la siguiente
+					_script_next += 1
+					if _script_next < targets.size():
+						_phase = 3
+					else:
+						_target = Vector2(x0 + 38.5 * BP.TILE, targets[-1].global_position.y + 2.5 * BP.TILE)
+						_phase = 5
+		5:   # la última diana lanza hacia el suelo del otro lado
+			if player.is_on_floor():
+				_target = Vector2.INF
+				_phase = 6
+			else:
+				_steer()
+		_:
+			_release(&"move_left")
+			_hold(&"move_right")
+
+
+func _pogo_aim(t: Node2D) -> Vector2:
+	return Vector2(t.global_position.x, t.global_position.y - 60.0)
+
+
+## Vida y daño: cruzar la placa que hace daño y volver a empezar (la vida no se
+## recupera al volver: el vídeo deja ver cuántas máscaras cuesta cada cruce).
+func _loop_after(column_limit: float) -> void:
+	var column := (player.global_position.x - float(main.current_sheet.x0)) / BP.TILE
+	if column > column_limit and player.is_on_floor():
+		main.go_to_sheet(0)
+
+
+## Dash de esquiva: un dash a través de cada cortina que hace daño. Con los i-frames
+## del dash, pasa sin daño; sin ellos, la misma cortina golpea.
+func _dodge_run() -> void:
+	_hold(&"move_right")
+	var x := player.global_position.x
+	for node: Node in main.level.get_children():
+		var curtain := node as DamageCurtain
+		if curtain == null:
+			continue
+		var left := curtain.global_position.x - curtain.width * 0.5
+		var gap := left - (x + PlatformerPlayer.HALF_SIZE.x)
+		if gap > 0.0 and gap < 26.0 and player.can_dash and player.is_on_floor():
+			_tap(&"dash")
+			return
+	_loop_after(33.0)
+
+
+## Telegrafiar: saltar la embestida cuando el enemigo ya carga y está cerca. Con el
+## aviso, la carga se ve venir medio segundo antes; sin él, llega sin aviso.
+func _telegraph_run() -> void:
+	var x := player.global_position.x
+	for node: Node in main.level.get_children():
+		var charger := node as Charger
+		if charger == null or not player.is_on_floor() or _jump_hold >= 0.0:
+			continue
+		var dx := charger.global_position.x - x
+		if charger.state == &"charge" and dx > 0.0 and dx < 150.0:
+			_press_jump()
+			return
+	_hop()
+
+
+## Pulsar y soltar una acción en el tick siguiente.
+func _tap(action: StringName) -> void:
+	_release(action)
+	Input.action_press(action)
+	_held[action] = true
+	_tap_release.append(action)
+
+
 ## En el aire: ¿dónde caería con la velocidad de ahora? Se corrige con ← y →.
 func _steer() -> void:
 	var t := _time_to_fall_to(_target.y)
@@ -242,7 +632,10 @@ func _time_to_fall_to(surface_y: float) -> float:
 
 
 func _on_respawned() -> void:
+	_stay = false
 	_script_next = 0
+	_phase = 0
+	_phase_time = 0.0
 	_took_off = false
 	_pressed_this_fall = false
 	_jump_in = -1.0

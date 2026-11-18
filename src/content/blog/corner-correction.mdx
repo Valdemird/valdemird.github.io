@@ -1,0 +1,222 @@
+---
+title: "Corner correction in platformers: the pixels the game forgives (with Godot code)"
+description: "Corner correction slides the player up to 9 px sideways when a jump clips a ceiling corner, and up to 7 px onto a ledge it just missed. The Godot code, Celeste's 4 px, and 490 corrections from my own play."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 8
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "Corner correction: when a jump would clip the corner of a ceiling by a few pixels, the game slides the character sideways just enough to get through. In my lab that's up to 9 px for the head, and up to 7 px upward when a fall just misses the lip of a ledge.",
+  "In Godot it's a few test_move() calls before move_and_slide(): if the motion collides, try nudges of 1, 2, 3 px and keep the first one that clears the way.",
+  "Across 130 recorded sessions it fired 490 times, about once every nine jumps. 481 of those were ledges and only 9 were heads. Half of the ledge corrections were a single pixel.",
+]} />
+
+Sheet 07 of my lab is a corridor with a low ceiling. The ceiling has three holes, each one tile wide, and the way forward is up through them. The note drawn next to the first hole does the arithmetic for you: *hole, 40 px. You, 24 px. Clip the corner by less than 9 px and the game moves you aside.*
+
+Sixteen pixels of slack sounds generous. What it means is that to jump straight up through the hole cleanly, the center of the character has to be within 8 px of the center of the hole. Corner correction stretches that to 17 px either way. The window goes from 16 px wide to 34, and the player never sees it stretch.
+
+My own recorded play says how often the correction gets used at all. In the same 130 sessions as the [coyote time post](/blog/coyote-time-jump-buffer/), the correction fired 490 times against 4,595 jumps. The sheet is built around heads. My sessions were almost entirely about the other kind.
+
+<StatGrid columns={2} stats={[
+  { value: "490", label: "Corner corrections", context: "130 sessions, about 1 per 9 jumps" },
+  { value: "481", label: "Were ledges", context: "only 9 were heads against a ceiling" },
+  { value: "52%", label: "By a single pixel", context: "249 of the 481 ledge corrections" },
+  { value: "16 → 34 px", label: "Window through a hole", context: "24 px body, 40 px hole, 9 px of help" },
+]} />
+
+<Callout type="important" title="The thesis">
+Hitting your head by 4 px cuts a jump dead, and the sheet's explanation says how that reads to the player: as a failure of the game. Nobody misses those collisions. The comment above my lab's code is the whole spec for removing them: nobody notices it, and everybody notices when it's missing.
+</Callout>
+
+<h2 id="what-is-corner-correction">What is corner correction?</h2>
+
+Corner correction is a small nudge the game applies when a move would hit the corner of a solid by only a few pixels. Going up into the edge of a ceiling, it shifts the character sideways until the head clears. Falling sideways into the lip of a ledge, it lifts the character onto it. Either way the player sees a jump that worked and never sees the nudge.
+
+My lab allows 9 px sideways for the head (`corner_correction_px`) and 7 px up for a ledge (`ledge_correction_px`). During a [dash](/blog/platformer-dash/) both become 12 px (`dash_correction_px`). At 900 px/s a dash covers 7.5 px every tick.
+
+The head case is the one with the most to lose. A bump on the way up ends the climb on the spot, and in a game with [variable jump height](/blog/variable-jump-height/) that's a jump the player was deliberately holding.
+
+<PlayableLab
+  sheets="corner"
+  title="Corner correction"
+  videoNote="Stops a few pixels off-center under each one-tile hole and jumps straight up. With corner correction the game nudges it through; after T the same jump hits the corner."
+  steps={[
+    "Run right with <kbd>→</kbd> along the corridor and stop under the first hole, a little off-center.",
+    "Jump straight up holding <kbd>Space</kbd>. The game slides you through, and a green «ESQUINA ↔ px» tag says how many pixels it took.",
+    "Press <kbd>T</kbd> and try the same jump from the same spot. Your head hits the corner, and the «× ESQUINA px» tag tells you by how much you missed.",
+  ]}
+/>
+
+<h2 id="corner-correction-godot">How to code corner correction in Godot 4</h2>
+
+It runs every physics tick, after the velocity has been decided and right before `move_and_slide()`. The tool is `test_move()`, which in Godot's words "checks for collisions without moving the body" and returns true "if a collision would stop the body from moving along the whole path".<Sidenote>[PhysicsBody2D.test_move](https://docs.godotengine.org/en/stable/classes/class_physicsbody2d.html) in the Godot docs.</Sidenote> The comments are in Spanish because the whole project is.
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+## CORNER CORRECTION: si el jugador va a chocar por unos pocos píxeles, se le
+## desplaza lo justo para que pase. Nadie lo nota; todos notan cuando falta.
+##   · Cabeza: al subir y rozar la esquina de un techo → empujón lateral.
+##   · Cornisa: al quedarse a unos píxeles de subir a un borde → empujón hacia arriba.
+func _correct_corners(delta: float) -> void:
+	var enabled := Lab.on(&"corner_correction")
+	var dashing := state == State.DASH
+	var p := params
+
+	if velocity.y < 0.0:
+		var up := Vector2(0.0, velocity.y * delta)
+		if test_move(global_transform, up):
+			var limit := p.dash_correction_px if dashing else p.corner_correction_px
+			var px := _find_nudge(up, Vector2.RIGHT, limit, [1.0, -1.0])
+			if px != 0.0:
+				if enabled:
+					global_position.x += px
+					corner_corrected.emit(&"head", int(absf(px)))
+				else:
+					assist_note.emit(&"corner_miss", int(absf(px)))
+
+	if not is_on_floor() and velocity.x != 0.0 and (velocity.y >= 0.0 or dashing):
+		var side := Vector2(velocity.x * delta, 0.0)
+		if test_move(global_transform, side):
+			var limit := p.dash_correction_px if dashing else p.ledge_correction_px
+			var px := _find_nudge(side, Vector2.UP, limit, [1.0])
+			if px != 0.0 and enabled:
+				global_position.y -= px
+				velocity.y = minf(velocity.y, 0.0)
+				corner_corrected.emit(&"ledge", int(px))
+
+
+## Busca el menor desplazamiento (en píxeles, a lo largo de `axis`) que deja libre
+## el movimiento `motion`. Devuelve 0 si no hay ninguno dentro de `max_px`.
+func _find_nudge(motion: Vector2, axis: Vector2, max_px: int, signs: Array) -> float:
+	for i in range(1, max_px + 1):
+		for s: float in signs:
+			var shift := axis * (i * s)
+			if test_move(global_transform, shift):
+				continue  # tampoco cabemos hacia ese lado
+			if not test_move(global_transform.translated(shift), motion):
+				return i * s
+	return 0.0
+```
+</CodeBlock>
+
+Read `_find_nudge` first. For each distance from 1 px up to the limit it tries every allowed direction, so the head check goes 1 px right, 1 px left, 2 px right, 2 px left, and keeps the smallest nudge that works on either side. Before testing the motion it checks that the nudge itself is free: you can't be pushed into a wall to dodge a ceiling.
+
+The head case only runs while rising (`velocity.y < 0.0`) and only moves sideways. The ledge case runs in the air while moving sideways and falling or level, only moves up, and then clamps `velocity.y` to zero so the fall stops right on the lip.
+
+Switching the head correction off with T doesn't skip the search. The lab still runs it, and instead of moving you it reports how many pixels you missed by. That's where the `× ESQUINA` tag comes from.
+
+<Collapsible title="The first corner correction is a smaller hitbox">
+The player's collision box in my lab is 24×36 px, smaller than the 30×40 px drawing. The comment above the constant gives the reason: collisions that are unfair by one pixel are avoided by making the player's box a little smaller. That's corner correction done once, in the data, before any code runs. The 9 px nudge handles whatever is left over.
+</Collapsible>
+
+<h2 id="celeste">How Celeste does it</h2>
+
+Celeste's version is smaller and more opinionated.<Sidenote>From [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub. C#, trimmed to one of the two mirrored halves.</Sidenote> When the player hits a ceiling while moving up, it tries up to `UpwardCornerCorrection = 4` pixels, and only toward the side the player is already moving (both sides only when the horizontal speed is zero). Every attempt also moves the player 1 px up.
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+if (Speed.Y < 0)
+{
+    //Corner Correction
+    {
+        if (Speed.X <= 0)
+        {
+            for (int i = 1; i <= UpwardCornerCorrection; i++)
+            {
+                if (!CollideCheck<Solid>(Position + new Vector2(-i, -1)))
+                {
+                    Position += new Vector2(-i, -1);
+                    return;
+                }
+            }
+        }
+        // ...
+```
+</CodeBlock>
+
+For sideways hits, Celeste's `OnCollideH` only corrects during a dash, by up to `DashCornerCorrection = 4` pixels up or down. Outside a dash there's no ledge correction in that function.
+
+| | My lab | Celeste |
+|---|---|---|
+| Head, while rising | up to 9 px, nearest side | up to 4 px toward the direction of travel, plus 1 px up |
+| Ledge, while falling sideways | up to 7 px up | not in `OnCollideH` outside a dash |
+| During a dash | 12 px | 4 px (`DashCornerCorrection`) |
+
+Pixel counts don't travel well between games drawn at different resolutions, so 4 against 9 says less than it seems. The difference that does travel is direction: Celeste only helps you toward where you were already going.
+
+<h2 id="session-data">What 490 corrections say about where corners are</h2>
+
+The lab logs every correction with its kind and its size in pixels. Of the 490 in my sessions, 481 were ledges and 9 were heads. And the ledge corrections were tiny.
+
+<InteractiveChart
+  type="bar"
+  title="Ledge corrections by size"
+  story="Half of the ledge corrections were a single pixel."
+  data={[
+    { label: "1 px", value: 249 },
+    { label: "2 px", value: 106 },
+    { label: "3 px", value: 42 },
+    { label: "4 px", value: 20 },
+    { label: "5 px", value: 16 },
+    { label: "6 px", value: 10 },
+    { label: "7 px", value: 24 },
+    { label: "8 px", value: 6 },
+    { label: "9 px", value: 3 },
+    { label: "10 px", value: 2 },
+    { label: "12 px", value: 3 },
+  ]}
+  annotations={[
+    { targetIndex: 0, text: "249 of 481", emphasize: true },
+    { targetIndex: 6, text: "the limit outside a dash" },
+  ]}
+  source="481 ledge corrections in 130 recorded sessions, Nov 15–18. Above 7 px they all happened during a dash, where the limit is 12."
+/>
+
+It makes sense once you count corners. Every platform you land on has two, and you reach them falling and moving sideways. A one-pixel miss on a ledge is invisible from the player's side of the screen: it looks like a landing. Without the correction the character would slide down the face of the platform instead, and 408 of these 481 corrections (85%) were followed by a landing less than half a second later.
+
+There's a small bump at 7 px: 24 corrections needed the whole margin. What the data can't tell me is how many needed 8. A ledge the correction doesn't reach isn't logged anywhere.
+
+The head side is lopsided in a different way. The lab also counts the head bumps the correction would have fixed while T has it switched off, and across these 130 sessions that counter is at zero. So every number in this section is a rescue. None of them is a bump.
+
+<h2 id="when-to-use">When corner correction helps, and when it doesn't</h2>
+
+| Situation | Corner correction? |
+|---|---|
+| Jumping up through gaps one tile wide | Yes. It's the case the technique is named after. |
+| Landing on ledges after a fall | Yes. In my sessions this was 98% of all corrections. |
+| Dashing past corners | Yes, with a wider margin: 12 px in my lab. |
+| A gap that's meant to be too tight | No effect. The character still needs 24 px of room. The correction only changes how precisely you have to aim. |
+| Very large limits | Careful. The nudge happens in a single tick, so the bigger it is, the bigger the jump in position in one frame. My lab stops at 9 px on a 24 px body. |
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-many-pixels">How many pixels should corner correction use?</h3>
+
+A few. Celeste uses 4 px for the head. My lab uses 9 px for the head and 7 px for ledges, on a 24 px wide body and 40 px tiles, and 12 px for both during a dash.
+
+<h3 id="only-head">Is corner correction only for the head?</h3>
+
+No. The same idea works sideways: if a fall misses the top of a ledge by a few pixels, lift the character onto it. In my recorded play, 481 of 490 corrections were that kind.
+
+<h3 id="where-in-loop">Where does corner correction go in the physics loop?</h3>
+
+After you've decided the velocity and before `move_and_slide()`. Use `test_move()` to ask whether this tick's motion would collide, and only then search for a nudge.
+
+<h3 id="does-player-notice">Does the player notice corner correction?</h3>
+
+Not when it works. The comment above my lab's function says it best: nobody notices it, everybody notices when it's missing.
+
+Go back to sheet 07, press T and jump under the same hole from the same spot. The tag will tell you exactly how many pixels you missed by. You'll believe it and still feel cheated, and that's the whole case for the technique: the player's eyes measure the hole, not the hitbox.

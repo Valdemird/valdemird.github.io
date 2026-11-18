@@ -1,0 +1,317 @@
+---
+title: "Salto de pared (wall jump): las cinco ayudas que lo hacen justo, con código en Godot"
+description: "Un salto de pared (wall jump) justo necesita cinco ayudas: detección a 5 px, coyote de pared de 100 ms, 140 ms de control bloqueado, inercia y 220 ms de altura mínima. Código en Godot, Celeste y cuánto actuó cada una."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 5
+---
+
+import TLDR from '../../../components/blog/TLDR.astro';
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import StatGrid from '../../../components/blog/StatGrid.astro';
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
+import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "El salto de pared tiene dos mitades. El deslizamiento (wall slide): en el aire, empujando contra una pared, la caída se frena a 130 px/s. El salto: pulsas y sales despedido hacia arriba y hacia el otro lado a 400 px/s.",
+  "La versión cruda falla en cinco sitios. Mi laboratorio los arregla con cinco ayudas (detección a 5 px, coyote time de pared de 100 ms, 140 ms de control bloqueado, inercia y altura mínima de 220 ms), y la T las apaga las cinco a la vez.",
+  "En mis partidas grabadas, el 77 % de 437 saltos de pared cayó en al menos uno de los casos para los que existe una ayuda. En uno de cada tres, el stick volvía a apuntar a la pared justo después de saltar.",
+]} />
+
+La lámina 11 de mi laboratorio es un pozo de cuatro casillas de ancho. Se entra pasando por debajo de una pared que se queda a dos casillas del suelo, y a partir de ahí solo se puede seguir hacia arriba, rebotando de un lado a otro. Al lado hay un foso opcional: si bajas deslizando por él, tienes que salir a base de saltos de pared.
+
+Las partidas grabadas enseñan cómo salto de verdad contra una pared. De 437 saltos de pared, en 144 el stick volvió a empujar hacia la pared que acababa de dejar durante el primer tercio de segundo del salto. Uno de cada tres. Un salto de pared crudo convierte justo ese gesto en una caída.
+
+<StatGrid columns={2} stats={[
+  { value: "437", label: "Saltos de pared", context: "grabados en mi laboratorio, 15–18 nov" },
+  { value: "77 %", label: "Se apoyaron en una ayuda", context: "al menos de una de las cinco" },
+  { value: "18 %", label: "Pulsados ya fuera de la pared", context: "33 ms tarde de mediana, los salvó el coyote de pared" },
+  { value: "33 %", label: "Stick de vuelta hacia la pared", context: "en los 0,35 s siguientes al salto" },
+]} />
+
+<Callout type="important" title="La tesis">
+El salto de pared promete algo sencillo: empujas contra la pared y deslizas, pulsas salto y llegas a la de enfrente. La física cruda rompe esa promesa en cinco puntos pequeños. Cada ayuda arregla uno, y cuando funcionan el jugador no ve ninguna.
+</Callout>
+
+<h2 id="what-is-a-wall-jump">¿Qué es un salto de pared?</h2>
+
+Un salto de pared (wall jump) es un salto que se da desde una pared en lugar de desde el suelo: en el aire, pegado a una pared, pulsas salto y sales impulsado hacia arriba y lejos de ella. Casi siempre va acompañado del deslizamiento: empujar hacia la pared frena la caída y te da tiempo para apuntar. Mega Man X (1993) ya dejaba deslizarse por casi cualquier pared y saltar desde ella.<Sidenote>El [artículo de Wikipedia sobre Mega Man X](https://en.wikipedia.org/wiki/Mega_Man_X_%28video_game%29) lo cuenta entre los rasgos más destacados del juego.</Sidenote>
+
+En mi laboratorio el deslizamiento limita la caída a 130 px/s, frente a los 900 px/s de una caída normal. El salto fija 400 px/s hacia el lado y, hacia arriba, el 85 % de la altura de un salto normal: unas tres casillas.
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+# WALL SLIDE: pegado a una pared y empujando hacia ella, la caída se frena.
+var sliding := not on_floor and wall_dir != 0 and input_x == wall_dir and velocity.y > 0.0
+if sliding:
+	is_fast_falling = false
+	velocity.y = minf(velocity.y, p.wall_slide_speed)
+```
+</CodeBlock>
+
+Fíjate en `input_x == wall_dir`. Solo deslizas mientras empujas hacia la pared. Ahí está la raíz de todo el problema: el gesto que te mantiene en la pared es el mismo que estropea el salto desde ella.
+
+<h2 id="five-ways-it-fails">Cinco maneras de fallar de un salto de pared crudo</h2>
+
+Cada ayuda del laboratorio responde a una forma concreta en que la versión sin ayudas deja tirado al jugador.
+
+| Qué sale mal sin ayuda | La ayuda | En mi laboratorio |
+|---|---|---|
+| Hay que tocar la pared al píxel | Detección con margen | 5 px (1,5 px tras la T) |
+| Te separaste de la pared un instante antes de pulsar | Coyote time de pared | 100 ms |
+| Sigues apretando hacia la pared y el impulso se anula | Bloqueo del control | stick ignorado durante 140 ms |
+| Sueltas el stick y te quedas a medio camino | Inercia | rozamiento del aire ×0,1 hasta que tocas el stick |
+| Un toque corto se recorta y te deja más abajo de donde saliste | Altura mínima | 220 ms antes de poder recortar el salto |
+
+Los 437 saltos grabados se dieron con las ayudas encendidas, así que los datos no pueden decir cuáles habrían fallado sin ellas. Lo que sí dicen es cuántas veces tuvo cada ayuda un caso que atender.
+
+<InteractiveChart
+  type="horizontal"
+  title="% de 437 saltos de pared grabados"
+  story="Todas las ayudas tuvieron trabajo. La que más, el bloqueo del control: un tercio de mis saltos de pared seguía empujando hacia la pared que acababa de dejar."
+  unit=" %"
+  data={[
+    { label: "Stick hacia la pared (bloqueo del control)", value: 33 },
+    { label: "Pulsado ya fuera de la pared (coyote de pared)", value: 18 },
+    { label: "Pulsado a 2–5 px de la pared (detección)", value: 17 },
+    { label: "Botón soltado antes de 220 ms (altura mínima)", value: 15 },
+    { label: "Stick suelto (inercia)", value: 9 },
+  ]}
+  annotations={[{ targetIndex: 0, text: "144 saltos", emphasize: true }]}
+  source="Mis partidas grabadas, 15–18 nov 2026, todas con las ayudas encendidas. Un salto puede contar en varias filas; 335 de 437 cuentan en al menos una."
+/>
+
+Los otros 102 (el 23 %) no necesitaron ninguna. El salto de pared de manual, con el stick empujando hacia fuera y el botón mantenido, es la minoría.
+
+En la lámina jugable, sube el pozo dos veces. La primera, como se pensaron las ayudas. La segunda, después de pulsar T, como fue uno de cada tres de mis saltos.
+
+<PlayableLab
+  sheets="wall"
+  title="Salto de pared"
+  videoNote="El personaje sube el pozo a la manera clásica equivocada: empujando hacia la pared en cada salto y soltando después. Con las ayudas el salto sigue llegando a la otra pared; tras pulsar T, el mismo gesto anula el impulso y no consigue despegarse de la pared."
+  steps={[
+    "Camina hacia la derecha con <kbd>→</kbd>, pasa por debajo de la primera pared y entra en el pozo. Salta con <kbd>Espacio</kbd> y mantén <kbd>→</kbd> contra la pared derecha: la caída se frena y deslizas.",
+    "Pulsa <kbd>Espacio</kbd> mientras deslizas y suelta las flechas. El salto te lleva solo a la otra pared. Alterna lados hasta llegar arriba.",
+    "Pulsa <kbd>T</kbd> y sube a la manera equivocada: deja apretada la flecha hacia la pared al saltar. El impulso muere y vuelves contra la misma pared, que ya no te agarra.",
+  ]}
+/>
+
+<h2 id="wall-jump-godot">Cómo programar el salto de pared en Godot 4</h2>
+
+La comprobación de pared se hace después de `move_and_slide()`. Es una consulta de forma: la propia forma de colisión del jugador, desplazada unos píxeles a cada lado. Con las ayudas el desplazamiento es de 5 px; tras la T, de 1,5. Cada tick que encuentra pared recarga un temporizador de 100 ms, el coyote de pared: la misma idea que el [coyote time en las cornisas](/blog/es/coyote-time-jump-buffer/), pero de lado.
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+# Pared: sólo interesa en el aire.
+wall_spent = false
+wall_dir = 0 if on_floor or not wall_grip or not has_ability(Abilities.WALL) else _detect_wall()
+if wall_dir != 0:
+	_last_wall_dir = wall_dir
+	_last_wall_x = global_position.x
+	_wall_hold = 0            # llegó a otra pared: la mano vuelve a mandar
+	_wall_coyote = params.wall_coyote_time if Lab.on(&"wall_assist") else 0.0
+# ...
+
+func _detect_wall() -> int:
+	var distance := params.wall_check_assist if Lab.on(&"wall_assist") else 1.5
+	var space := get_world_2d().direct_space_state
+	var first := input_x if input_x != 0 else facing
+	for side: int in [first, -first]:
+		_wall_query.transform = Transform2D(0.0, global_position + Vector2(side * distance, 0.0))
+		if space.intersect_shape(_wall_query, 1).is_empty():
+			continue
+		if _wall_is_spent(side):
+			wall_spent = true      # la toca, pero ya no le agarra
+			continue
+		return side
+	return 0
+```
+</CodeBlock>
+
+Los dos números aparecen en las partidas. 76 saltos de pared (el 17 %) se pulsaron con el personaje a entre 2 y 5 px de la pared, fuera del alcance de la comprobación de 1,5 px. Otros 79 (el 18 %) llegaron cuando el personaje ya se había separado: 33 ms tarde de mediana, y el más tardío a 99 ms, un milisegundo dentro de la ventana.
+
+El salto en sí impone la velocidad de golpe y después arma las otras tres ayudas:
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _do_wall_jump(margin: bool = false) -> void:
+	var from_dir := wall_dir if wall_dir != 0 else _last_wall_dir
+	if wall_dir == 0 and not margin:
+		assist_note.emit(&"wall_coyote_hit", int((params.wall_coyote_time - _wall_coyote) * 1000.0))
+	velocity.x = -from_dir * params.wall_jump_speed_x
+	velocity.y = -params.jump_velocity * sqrt(params.wall_jump_height_ratio)
+	facing = -from_dir
+	# ...
+	# BLOQUEO DE CONTROL: durante unos ms se ignora el stick. Sin esto, quien
+	# mantiene pulsado "hacia la pared" anula el impulso y vuelve a ella al instante.
+	_wall_jump_lock = params.wall_jump_lock_time if Lab.on(&"wall_assist") else 0.0
+	# ALTURA MÍNIMA: durante un momento el wall jump no se puede recortar. Quien
+	# aporrea el botón (toques cortos) obtiene casi el salto entero; sin esto,
+	# cada toque contra la pared la devuelve más abajo de donde salió.
+	_wall_jump_hold = params.wall_jump_min_time if Lab.on(&"wall_assist") else 0.0
+	# INERCIA: hasta que se toque el stick, el aire apenas frena este salto.
+	_wall_carry = Lab.on(&"wall_assist")
+	_wall_coyote = 0.0
+	_begin_rise(true)
+	jumped.emit(&"wall")
+```
+</CodeBlock>
+
+`_wall_jump_hold` es la misma variable que, en el código del [salto variable](/blog/es/variable-jump-height/), impide que soltar el botón recorte el salto. En las partidas, 65 saltos de pared (el 15 %) soltaron el botón antes de 220 ms. Simulado con los números del laboratorio, un toque sin altura mínima se recorta casi al instante y sube 0,9 casillas. Con los 220 ms sube 2,7 de las 3.
+
+El bloqueo y la inercia viven en el movimiento horizontal:
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+	if _wall_jump_lock > 0.0:
+		return
+	var input_x := _steer()   # (la dirección que de verdad manda: ver `_steer`)
+	if _root_time > 0.0 and on_floor:
+		input_x = 0           # plantado: ni anda ni se gira (ver `root`)
+	if input_x != 0:
+		facing = input_x
+		_wall_carry = false   # el jugador toma el mando: se acabó la inercia del wall jump
+	# ...
+	var rate: float
+	if input_x == 0:
+		rate = p.max_speed / p.decel_time                 # soltar: frenar rápido
+		if not on_floor:
+			rate *= p.air_friction                         # ...pero conservar inercia en el aire
+			if _wall_carry:
+				# Tras un wall jump y sin tocar el stick, casi no se frena: el salto
+				# llega solo a la otra pared ("saltar y salir despedido al otro lado").
+				rate *= p.wall_jump_air_friction
+```
+</CodeBlock>
+
+El bloqueo es tosco: durante 140 ms la función sale antes siquiera de leer el stick. La inercia es otro tipo de ayuda. No hace nada mientras aprietas una dirección, y mientras no la aprietas reduce el rozamiento del aire a la décima parte, para que el impulso de la pared llegue solo al otro lado. En cuanto tocas el stick se acaba y pasas a dirigir tú. 38 saltos de pared (el 9 %) soltaron el stick justo después de saltar. Sin la inercia, ese impulso se apaga a más o menos una casilla, a un tercio del ancho del pozo.
+
+<h2 id="a-wall-is-not-a-ladder">Una pared no es una escalera</h2>
+
+Si una pared da saltos ilimitados, apretar hacia ella se convierte en trepar: sales impulsado, el stick te devuelve, vuelves a saltar un poco más arriba. Hasta la mañana del 17 de noviembre el laboratorio funcionaba así. En las partidas grabadas de esos días, 46 de 129 saltos de pared (el 36 %) acabaron otra vez en la misma pared, y en todos el stick apuntaba hacia ella.
+
+Ahora cada pared da un salto. Después deja de agarrar, ni deslizar ni saltar, hasta que pisas suelo, rebotas en algo o saltas desde otra pared. Es la misma regla que el resto de la economía de movimiento del laboratorio:
+
+| Recurso | Se gasta | Se recarga |
+|---|---|---|
+| Salto aéreo | `air_jumps` por vuelo | suelo, rebote |
+| Dash | uno por vuelo; en el suelo, uno cada `dash_cooldown` | suelo, rebote |
+| Salto de pared | `wall_jumps_per_wall` por pared (1; 0 es sin límite) | suelo, rebote, saltar desde otra pared |
+
+Esa regla abrió una trampa nueva. Apretar hacia una pared que ya no agarra es caer pegado a ella. Por eso el código del salto busca una chimenea:
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+	# UNA PARED DA LOS SALTOS QUE DIGA SU NÚMERO (de fábrica, uno): se apunta de
+	# cuál se ha saltado. Volver a ESA pared sin haber pisado suelo, rebotado o
+	# saltado desde otra ya no agarra (ver `_wall_is_spent`).
+	if from_dir == _wall_used_side and absf(_last_wall_x - _wall_used_x) <= SAME_WALL:
+		_wall_used += 1
+	else:
+		_wall_used = 1
+	_wall_used_side = from_dir
+	_wall_used_x = _last_wall_x
+	# LA MANO QUE SIGUE APRETANDO HACIA LA PARED. Para deslizar hay que empujar
+	# hacia ella, y mucha gente no suelta al saltar. Antes eso devolvía a la misma
+	# pared, más arriba; ahora esa pared ya no agarra, y volver a ella sería caer.
+	# Si hay OTRA pared enfrente (una chimenea), esa dirección no cuenta hasta que
+	# se suelte: el salto cruza solo, igual que con el stick suelto. Con un muro
+	# aislado no se retiene nada: tras el bloqueo de siempre se puede volver para
+	# subirse a su borde.
+	_wall_hold = 0
+	if Lab.on(&"wall_assist") and input_x == from_dir and _wall_is_spent(from_dir) and _wall_across(-from_dir):
+		_wall_hold = from_dir
+		_wall_hold_time = params.wall_cross_time
+```
+</CodeBlock>
+
+Si hay otra pared a menos de 260 px, la dirección que traías apretada no cuenta hasta que la sueltas, o como mucho durante 0,6 s, y el salto cruza como si el stick estuviera suelto. Va dentro de la misma bandera `wall_assist`, así que la T la apaga junto con las otras cinco. La regla de un salto por pared sigue activa en los dos casos, y por eso la manera equivocada falla tanto después de la T.
+
+<h2 id="celeste-wall-jump">El salto de pared de Celeste, al lado</h2>
+
+El código del jugador que publicó Celeste sirve bien para comparar, porque resuelve los mismos problemas con otras herramientas.<Sidenote>Del [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), el código del jugador que el equipo de Celeste subió a GitHub. Su caja de colisión es `new Hitbox(8, 11, -4, -11)`, de 8 px de ancho. La de mi personaje mide 24 px.</Sidenote>
+
+| | Mi laboratorio | Celeste |
+|---|---|---|
+| Detección de pared | 5 px con un cuerpo de 24 px | 3 px con un cuerpo de 8 px (`WallJumpCheckDist`) |
+| Coyote time de pared | 100 ms | no hay temporizador de pared; el único de gracia es el del suelo, `JumpGraceTime` |
+| Justo después de saltar | stick ignorado durante 140 ms | si se aprieta cualquier dirección, se sustituye por "lejos de la pared" durante 0,16 s (`WallJumpForceTime`) |
+| Impulso desde la pared | 400 px/s, 16,7 anchos de cuerpo por segundo | 130 px/s (`MaxRun + JumpHBoost`), 16,25 anchos de cuerpo por segundo |
+| Deslizamiento | caída limitada a 130 px/s | el límite empieza en 20 px/s y sube hasta 160 en 1,2 s |
+| Otra vez la misma pared | un salto y deja de agarrar | sin límite de saltos de pared; un salto trepando cuesta un cuarto de la resistencia (`ClimbJumpCost = 110 / 4f`) |
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+private const int WallJumpCheckDist = 3;
+private const float WallJumpForceTime = .16f;
+private const float WallJumpHSpeed = MaxRun + JumpHBoost;
+// ...
+private bool WallJumpCheck(int dir)
+{
+    return ClimbBoundsCheck(dir) && CollideCheck<Solid>(Position + Vector2.UnitX * dir * WallJumpCheckDist);
+}
+
+private void WallJump(int dir)
+{
+    // ...
+    if (moveX != 0)
+    {
+        forceMoveX = dir;
+        forceMoveXTimer = WallJumpForceTime;
+    }
+    // ...
+    Speed.X = WallJumpHSpeed * dir;
+    Speed.Y = JumpSpeed;
+```
+</CodeBlock>
+
+Medido respecto al cuerpo, el alcance de Celeste es casi el doble de generoso que el mío: el 37 % de su ancho frente al 21 %. El impulso es prácticamente el mismo. Y su respuesta al stick apuntando a la pared es más lista que mi bloqueo: no ignora lo que pulsas, lo reescribe como lo que deberías haber pulsado.
+
+<h2 id="when-to-use">Cuándo ayudan y cuándo no</h2>
+
+| Situación | ¿Ayudas? |
+|---|---|
+| Pozos que se suben alternando paredes | Sí, las cinco. Están ajustadas para eso. |
+| Un muro aislado al que quieres subirte | Sí, sin la ayuda de chimenea: pasados los 140 ms del bloqueo, el stick vuelve a ser tuyo y puedes girarte para agarrar el borde. |
+| Trepar por una sola pared como poder | Pon `wall_jumps_per_wall` a 0. El código dice que es una decisión de diseño de cada juego, no un detalle. |
+| Fallar la pared es justo el reto | Reduce la detección y la ventana del coyote. Las otras tres solo arreglan pulsaciones que ya eran correctas. |
+| Pulsaciones que se quedan cortas antes de llegar a la pared | El laboratorio tiene una bandera extra, apagada de fábrica: a menos de 12 px de una pared, una pulsación que no iba a hacer nada sale como salto de pared. Según su comentario en el código, nació del registro de partidas, de pulsaciones perdidas a 10–24 px de una pared. |
+
+<Collapsible title="Lo que cambian las ayudas, en píxeles">
+Simulado a 120 Hz con los parámetros del laboratorio. En el pozo de la lámina hay 136 px entre el cuerpo y la pared de enfrente.
+
+| Después del salto | Con ayudas | Tras la T |
+|---|---|---|
+| Stick suelto | llega a la otra pared en 0,36 s | el impulso muere a los 40 px, más o menos una casilla |
+| Stick hacia la pared, en el pozo | cruza igual: la dirección apretada no cuenta | se aleja 16 px y vuelve contra la misma pared |
+| Stick hacia un muro aislado | se aleja 73 px y luego manda el stick | se aleja 16 px y vuelve |
+| Salto tocado en vez de mantenido | sube 2,7 casillas | sube 0,9 casillas |
+
+Esos 16 px son el control en el aire haciendo su trabajo. Darse la vuelta en el aire usa la tasa más rápida del laboratorio, unos 4.500 px/s², que se come un impulso de 400 px/s en menos de una décima de segundo.
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="wall-coyote-time">¿Cuánto debe durar el coyote time de pared?</h3>
+
+100 ms en mi laboratorio, lo mismo que el coyote time en las cornisas. En las partidas grabadas, los saltos de pared tardíos tuvieron una mediana de 33 ms y el más tardío llegó a 99 ms. El código del jugador de Celeste no tiene un temporizador propio para la pared; lo que tiene es más alcance, 3 px con un cuerpo de 8.
+
+<h3 id="back-to-the-same-wall">¿Por qué mi salto de pared me devuelve a la misma pared?</h3>
+
+Porque el stick sigue apuntando a la pared y el control en el aire es más fuerte que el impulso. Ignora el stick un momento después de saltar (140 ms en mi laboratorio) o haz lo que hace Celeste: durante 0,16 s, si se aprieta cualquier dirección, trátala como "lejos de la pared".
+
+<h3 id="wall-slide-speed">¿A qué velocidad debe deslizar el personaje por la pared?</h3>
+
+Lo bastante despacio para apuntar. Mi laboratorio la limita a 130 px/s, más o menos la séptima parte de los 900 px/s de la caída libre. Celeste empieza con un límite de 20 px/s y lo deja subir hasta 160 en 1,2 s, así que un deslizamiento largo se acelera.
+
+<h3 id="single-wall-climbing">¿Se debería poder trepar por una sola pared?</h3>
+
+Decídelo a propósito. Con saltos ilimitados por pared, el 36 % de mis saltos de pared grabados acabó otra vez en la misma pared, que en la práctica es trepar. Mi laboratorio le da a cada pared un salto. Celeste no limita los saltos de pared y en su lugar hace que trepar gaste resistencia.
+
+Vuelve a la lámina 11, pulsa T y sube como te pide la mano, empujando hacia la pared en cada salto. El personaje vuelve a chocar contra la pared que acaba de dejar. Los controles no han cambiado. Lo que ha cambiado es que el juego dejó de perdonar una costumbre que tenía uno de cada tres de mis propios saltos de pared.

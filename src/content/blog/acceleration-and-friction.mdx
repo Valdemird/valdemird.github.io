@@ -1,0 +1,218 @@
+---
+title: "Platformer acceleration and friction: 0.11 s to start, 0.07 s to stop (Godot code)"
+description: "Platformer acceleration and friction in Godot: full speed in 0.11 s, a stop in 0.07 s, a turn in 0.06 s, and less braking in the air. The real move_toward code, Celeste's single rate and a playable sheet."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 7
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "Acceleration and friction: horizontal speed never jumps straight from zero to full. Every physics tick it moves toward a target at a fixed rate, and the rate depends on what the player is doing. In my lab: 0.11 s to reach full speed, 0.07 s to stop, 0.06 s to shed the speed when you turn around.",
+  "Tune it in seconds, not in px/s². The rate is the top speed divided by the time you picked, and one move_toward() call does the rest. In the air the lab keeps 80% of the acceleration but only 40% of the braking.",
+  "In 130 of my recorded sessions, 19% of the jumps from the ground took off at a speed somewhere between standing still and full run. A ramp this short still decides how far those jumps go.",
+]} />
+
+The first sheet of my lab after the cover has a subtitle drawn on the blueprint: *the character is not a cursor*. The level is almost nothing. A strip of floor, then three pits three tiles wide with two platforms two tiles wide between them. The note at the start says what to do and what to watch: run, let go, change direction. Starts in 0.11 s, stops in 0.07 s, turns in 0.06 s.
+
+Those numbers are tiny, small enough to wonder whether the ramp shows up in real play at all. The same recorded sessions from the [coyote time post](/blog/coyote-time-jump-buffer/) answer it, because the lab logs the horizontal speed at the instant of every jump. Of 3,497 jumps pressed while standing on the ground, 44% left at exactly full speed and 36% from a standstill. The other 19% took off somewhere in between, which on the ground mostly means in the middle of starting, stopping or turning.
+
+<StatGrid columns={2} stats={[
+  { value: "0.11 s", label: "To full speed", context: "0 to 340 px/s, holding a direction" },
+  { value: "0.07 s", label: "To stop", context: "from full speed, after letting go" },
+  { value: "0.06 s", label: "To lose speed on a turn", context: "then 0.11 s more the other way" },
+  { value: "19%", label: "Jumps taken mid-ramp", context: "of 3,497 from the ground, 130 sessions" },
+]} />
+
+<Callout type="important" title="The thesis">
+Speed that snaps from zero to full is exact and stiff. A ramp of a few hundredths of a second gives the character weight, as long as stopping is faster than starting and turning is faster still. Tune all three as times, because a time is what the player's hands can feel.
+</Callout>
+
+<h2 id="what-is-acceleration-friction">What are acceleration and friction in a platformer?</h2>
+
+Acceleration is how quickly the character reaches its top running speed. Friction, or deceleration, is how quickly it stops once you let go. In code they are the same operation: every physics tick, move the horizontal speed a fixed amount toward a target. The target is the input direction times the top speed. The fixed amount is the rate, and the rate is the whole design.
+
+My lab uses three rates and picks one by what the player is doing:
+
+| The player... | Rate | Time in my lab |
+|---|---|---|
+| holds a direction | accelerate | 0.11 s from 0 to 340 px/s |
+| lets go | brake | 0.07 s from 340 px/s to 0 |
+| pushes the other way | turn | 0.06 s to lose the speed, then the normal 0.11 s the other way |
+
+The sheet's own explanation is blunt about the trade-off: a few frames of ramp give a sense of weight, but they have to be very few. Braking faster than accelerating, and turning faster still, is what keeps the precision.
+
+Air control is the same idea with two multipliers. In the air the lab keeps 80% of the accelerate and turn rates (`air_control = 0.8`), so you can still steer a jump. It keeps only 40% of the braking (`air_friction = 0.4`), so letting go mid-jump doesn't kill the momentum you jumped with.
+
+Here's what that looks like as a speed trace, with the lab's numbers: hold right, switch to left, let go.
+
+<InteractiveChart
+  type="line"
+  title="Horizontal speed over time: right, then left, then release"
+  story="With the ramp, speed bends at every change. After T it jumps straight between full speed, zero and full speed the other way."
+  xLabel="milliseconds"
+  yLabel="horizontal speed (px/s)"
+  xUnit=" ms"
+  unit=" px/s"
+  series={[
+    { name: "with acceleration and friction", data: [{ label: "0", value: 0 }, { label: "25", value: 77 }, { label: "50", value: 155 }, { label: "75", value: 232 }, { label: "100", value: 309 }, { label: "125", value: 340 }, { label: "150", value: 340 }, { label: "175", value: 340 }, { label: "200", value: 340 }, { label: "225", value: 340 }, { label: "250", value: 340 }, { label: "275", value: 198 }, { label: "300", value: 57 }, { label: "325", value: -64 }, { label: "350", value: -141 }, { label: "375", value: -218 }, { label: "400", value: -295 }, { label: "425", value: -340 }, { label: "450", value: -340 }, { label: "475", value: -340 }, { label: "500", value: -340 }, { label: "525", value: -340 }, { label: "550", value: -340 }, { label: "575", value: -219 }, { label: "600", value: -97 }, { label: "625", value: 0 }, { label: "650", value: 0 }, { label: "675", value: 0 }, { label: "700", value: 0 }] },
+    { name: "after T (instant speed)", data: [{ label: "0", value: 0 }, { label: "25", value: 340 }, { label: "50", value: 340 }, { label: "75", value: 340 }, { label: "100", value: 340 }, { label: "125", value: 340 }, { label: "150", value: 340 }, { label: "175", value: 340 }, { label: "200", value: 340 }, { label: "225", value: 340 }, { label: "250", value: 340 }, { label: "275", value: -340 }, { label: "300", value: -340 }, { label: "325", value: -340 }, { label: "350", value: -340 }, { label: "375", value: -340 }, { label: "400", value: -340 }, { label: "425", value: -340 }, { label: "450", value: -340 }, { label: "475", value: -340 }, { label: "500", value: -340 }, { label: "525", value: -340 }, { label: "550", value: -340 }, { label: "575", value: 0 }, { label: "600", value: 0 }, { label: "625", value: 0 }, { label: "650", value: 0 }, { label: "675", value: 0 }, { label: "700", value: 0 }] },
+  ]}
+  source="Simulated at 120 Hz with the lab's parameters: → held until 250 ms, ← until 550 ms, then nothing."
+/>
+
+Sheet 01 asks you to do exactly that, on platforms two tiles wide where overshooting means falling. The lab's inspector draws the same trace live while you play.
+
+<PlayableLab
+  sheets="accel"
+  title="Acceleration and friction"
+  videoNote="Run, release, turn, release, in a loop, with the lab's inspector on. With the technique the velocity trace ramps up and down; after T it jumps instantly between full speed and zero."
+  steps={[
+    "Press <kbd>I</kbd> to open the inspector. The white line in its oscilloscope is your horizontal speed.",
+    "Run right with <kbd>→</kbd>, let go, then press <kbd>←</kbd>. The line ramps up, bends at every change and comes back to zero on a slope.",
+    "Jump onto the two-tile platforms with <kbd>Space</kbd> and stop on each one by letting go of <kbd>→</kbd> as you land.",
+    "Press <kbd>T</kbd> and do it again. Speed is instant now: exact, but stiff. The line turns into a square wave.",
+  ]}
+/>
+
+<h2 id="acceleration-godot">How to code acceleration and friction in Godot 4</h2>
+
+It starts in the parameter file, which has no accelerations in it, only times. The comments are in Spanish because the whole project is.
+
+<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
+```gdscript
+@export_group("Carrera")
+## Velocidad máxima horizontal.
+@export_range(100.0, 800.0, 5.0, "suffix:px/s") var max_speed := 340.0
+## Tiempo de 0 a velocidad máxima. Corto = responde al instante.
+@export_range(0.01, 0.5, 0.005, "suffix:s") var accel_time := 0.11
+## Tiempo de velocidad máxima a 0 al soltar. Más corto que acelerar = parada precisa.
+@export_range(0.01, 0.5, 0.005, "suffix:s") var decel_time := 0.07
+## Tiempo en perder la velocidad al invertir la dirección (giro rápido).
+@export_range(0.01, 0.5, 0.005, "suffix:s") var turn_time := 0.06
+# ...
+## Fracción de aceleración disponible en el aire.
+@export_range(0.0, 1.0, 0.01) var air_control := 0.8
+## Fracción de frenado en el aire sin entrada (conserva la inercia del salto).
+@export_range(0.0, 1.0, 0.01) var air_friction := 0.4
+```
+</CodeBlock>
+
+The controller turns those times into rates on the spot: rate = top speed / time. With 340 px/s that's 3,091 px/s² to accelerate, 4,857 to brake and 5,667 to turn. Nobody tunes 4,857. You tune 0.07 s and let the division happen. The header of the same file makes the point about gravity: nobody thinks "gravity 1994 px/s²", you think "jumps 3.6 tiles and takes 0.38 s to reach the top".
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+var p := params
+var target := input_x * p.max_speed * _walk_scale(on_floor)
+
+# Versión ingenua: velocidad = dirección × máxima. Preciso pero robótico.
+if not Lab.on(&"accel_curves"):
+	velocity.x = target
+	return
+
+# ACELERACIÓN Y FRICCIÓN: tres tasas distintas según la intención del jugador.
+var rate: float
+if input_x == 0:
+	rate = p.max_speed / p.decel_time                 # soltar: frenar rápido
+	if not on_floor:
+		rate *= p.air_friction                         # ...pero conservar inercia en el aire
+		# ...
+elif velocity.x != 0.0 and signf(velocity.x) != float(input_x):
+	rate = p.max_speed / p.turn_time                  # invertir: giro aún más rápido
+	if not on_floor:
+		rate *= p.air_control
+else:
+	rate = p.max_speed / p.accel_time                 # acelerar
+	if not on_floor:
+		rate *= p.air_control
+	# ...
+if _at_apex(on_floor):
+	rate *= p.apex_accel_mult                         # más control en el ápice
+velocity.x = move_toward(velocity.x, target, rate * delta)
+```
+</CodeBlock>
+
+With T, the function stops at the first `return`. `velocity.x = target` is the entire naive version, one line (`_walk_scale` is 1.0 while running). Everything below it is the technique, and a few details are worth reading twice:
+
+- The turn branch only fires while the speed still points the other way (`signf(velocity.x) != float(input_x)`). Once it crosses zero, the normal acceleration takes over, so a full reversal costs 0.06 + 0.11 = 0.17 s.
+- The air multipliers sit inside each branch, which is how braking gets 0.4 while steering gets 0.8.
+- Near the top of a jump the rate gets one more boost, `apex_accel_mult` (×1.5). That's the apex hang from [the jump gravity post](/blog/jump-gravity-apex-hang/).
+- The two `# ...` gaps are special cases. After a [wall jump](/blog/wall-jump/), letting go barely brakes at all, so the jump carries you to the opposite wall. And speed above the maximum, from a [dash](/blog/platformer-dash/) or a moving platform, bleeds off slowly instead of being cut.
+
+<h2 id="celeste">Three rates or one: my lab against Celeste</h2>
+
+Celeste does it with a single rate.<Sidenote>From [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub. The constants are near the top of the file. C#, lightly trimmed.</Sidenote> `RunAccel = 1000f` is used for starting, stopping and turning, and in the air everything is multiplied by `AirMult = .65f`. A second rate, `RunReduce = 400f`, only applies when you're already above the top speed of `MaxRun = 90f` and still pushing the same way.
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+float mult = onGround ? 1 : AirMult;
+if (onGround && level.CoreMode == Session.CoreModes.Cold)
+    mult *= .3f;
+
+float max = Holding == null ? MaxRun : HoldingMaxRun;
+// ...
+if (Math.Abs(Speed.X) > max && Math.Sign(Speed.X) == moveX)
+    Speed.X = Calc.Approach(Speed.X, max * moveX, RunReduce * mult * Engine.DeltaTime);  //Reduce back from beyond the max speed
+else
+    Speed.X = Calc.Approach(Speed.X, max * moveX, RunAccel * mult * Engine.DeltaTime);   //Approach the max speed
+```
+</CodeBlock>
+
+`Calc.Approach` is Celeste's `move_toward`: the pattern is identical. To compare the tuning, convert to seconds, the only unit that survives the trip between two games. Celeste's character runs at 90 px/s and mine at 340, so 1,000 against 3,091 px/s² tells you nothing.
+
+| | My lab | Celeste |
+|---|---|---|
+| Start, 0 to full speed | 0.11 s | 0.09 s |
+| Stop after letting go | 0.07 s | 0.09 s |
+| Full reversal, full speed to full speed | 0.17 s | 0.18 s |
+| Start in the air | 0.14 s | 0.14 s |
+| Stop in the air | 0.175 s | 0.14 s |
+
+Celeste's times are `MaxRun / RunAccel`, doubled for the reversal and divided by `AirMult` in the air. The numbers come out close. The shape doesn't: Celeste brakes exactly as hard as it accelerates, everywhere. My lab brakes harder than it accelerates on the ground and much softer in the air. In both, a full reversal takes under a fifth of a second.
+
+<h2 id="when-to-use">When acceleration and friction help, and when they hurt</h2>
+
+| Situation | What to do |
+|---|---|
+| Narrow platforms, precise landings | Short ramps, braking faster than accelerating. At 0.07 s the lab's character skids about 10 px after you let go, a quarter of a tile. |
+| Turning around mid-run | Make it the fastest of the three rates: 0.06 s in my lab. |
+| Jumps | Brake less in the air than on the ground, so letting go doesn't kill the jump's momentum. |
+| Ice and slippery floors, on purpose | A long ramp is the point. Celeste multiplies ground acceleration by 0.3 in its cold core mode (`CoreModes.Cold`). |
+| A slow stop in a precision game | No. With 0.3 s to stop, a character at 340 px/s slides 51 px after you let go, more than a whole tile. |
+
+<Collapsible title="Why move_toward and not lerp">
+A common alternative is to write `velocity.x = lerp(velocity.x, target, k)` every tick. It closes a fixed fraction of the gap instead of a fixed amount, so it starts fast, slows down near the target and never quite arrives. There's no "time to full speed" to tune, only a `k` whose meaning changes if the tick rate does. That's a generic sketch, not code from my project.
+
+`move_toward` closes a fixed amount per tick, gets to the target exactly, and the time it takes is the number you wrote in the parameter file. At the lab's 120 Hz, 0.11 s is 13.2 ticks, so in practice the character reaches 340 px/s on the 14th tick.
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-fast-accelerate">How fast should a platformer character accelerate?</h3>
+
+Fast. My lab takes 0.11 s to reach full speed and Celeste 0.09 s. At 60 frames per second that's under seven frames in both.
+
+<h3 id="stop-faster">Should stopping be faster than accelerating?</h3>
+
+On the ground, if your platforms are narrow, yes: my lab brakes in 0.07 s against 0.11 s to start. Celeste uses the same rate for both and plays fine, so treat it as a decision you make on purpose.
+
+<h3 id="air-control">What is air control in a platformer?</h3>
+
+The fraction of the ground acceleration you keep in the air: 0.8 in my lab, 0.65 in Celeste. My lab also gives air braking its own number (0.4), so steering a jump and coasting through one are tuned separately.
+
+<h3 id="time-to-acceleration">How do I turn a time into an acceleration?</h3>
+
+Divide the top speed by the time. 340 px/s in 0.11 s is 3,091 px/s². Then each tick: `velocity.x = move_toward(velocity.x, target, rate * delta)`.
+
+Open sheet 01, press T and stop on the two-tile platforms. You'll stop exactly where you let go, and the sheet's note admits it: instant speed is exact. Then turn around in the middle of the corridor and look at the inspector: a square wave with nothing in between. That's the cursor from the subtitle, and six hundredths of a second is all it takes to turn it back into a body.

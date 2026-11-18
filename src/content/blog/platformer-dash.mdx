@@ -1,0 +1,296 @@
+---
+title: "Platformer dash: fixed distance, eight directions and a 45 ms freeze (with Godot code)"
+description: "A platformer dash you can design levels around: 900 px/s for 0.16 s, always 3.6 tiles, in 8 directions with no gravity, plus a 45 ms freeze and a 100 ms buffer. The Godot code, Celeste's numbers and the cooldown rule."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 6
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "A dash is a short burst at a fixed speed for a fixed time, with gravity switched off. In my lab that's 900 px/s for 0.16 s: 3.6 tiles every time, in any of 8 directions.",
+  "Two small things around it change how it feels: a 45 ms freeze when it starts and a 100 ms buffer that remembers an early press. T switches both off. Celeste freezes its dash for 0.05 s.",
+  "It recharges on the floor or on a bounce, one per flight. On the floor a cooldown applies, and if the dash also protects you, that cooldown has to be at least twice the protection.",
+]} />
+
+Sheet 12 of my lab is three obstacles and one button. Eight tiles of floor spikes, longer than the 6.4 tiles a full jump covers. A wall six tiles high, when a jump reaches 3.6. And a tunnel one tile tall over a pit, with no room to jump at all. The dash gets through all three for the same reason: it always covers 3.6 tiles.
+
+The recorded sessions have 1,351 dashes. Three in four went straight sideways. The other quarter, up, down and diagonal, is where the eight directions earn their place.
+
+<StatGrid columns={2} stats={[
+  { value: "1,351", label: "Dashes", context: "recorded in my lab, Nov 15–18" },
+  { value: "3.6 tiles", label: "Every dash", context: "900 px/s × 0.16 s, no gravity" },
+  { value: "26%", label: "Not horizontal", context: "up, down or diagonal" },
+  { value: "11%", label: "Presses with no dash", context: "148 of 1,375: spent or not back yet" },
+]} />
+
+<Callout type="important" title="The thesis">
+A dash is a ruler. Speed, duration and direction are fixed the instant you press, so the person designing the level can measure gaps against it. Everything that makes it feel good (the freeze, the buffer, the recharge) happens before or after the ruler, never during it.
+</Callout>
+
+<h2 id="what-is-a-dash">What is a dash in a platformer?</h2>
+
+A dash is a short, fast move in a straight line that ignores gravity while it lasts. In Celeste (2018), Madeline can dash in mid-air in any of eight directions, and landing or touching a green gem gives the dash back.<Sidenote>Both details are in the gameplay section of [Wikipedia's Celeste article](https://en.wikipedia.org/wiki/Celeste_%28video_game%29).</Sidenote>
+
+In my lab the dash is 900 px/s for 0.16 s. Distance is speed times time, and with gravity off there's nothing else in the sum: 144 px, 3.6 tiles of 40 px, every time. A diagonal dash is normalized, so it covers the same 3.6 tiles along the diagonal, about 2.5 across and 2.5 up. Jump first and dash at the top, and the reach goes from 6.4 tiles to about 9.5.
+
+<InteractiveChart
+  type="horizontal"
+  title="% of 1,351 recorded dashes, by direction"
+  story="Three dashes in four went sideways. Up and up-diagonal together are one in five."
+  unit="%"
+  data={[
+    { label: "Sideways", value: 74 },
+    { label: "Diagonal up", value: 12 },
+    { label: "Straight up", value: 8 },
+    { label: "Straight down", value: 3 },
+    { label: "Diagonal down", value: 3 },
+  ]}
+  annotations={[{ targetIndex: 0, text: "996 dashes", emphasize: true }]}
+  source="My recorded sessions, Nov 15–18 2026. On the floor the downward part of the direction is dropped, so down dashes only happen in the air."
+/>
+
+The playable sheet has one obstacle per way of using it. Once you've cleared all three, press T and do them again: every distance stays the same.
+
+<PlayableLab
+  sheets="dash"
+  title="Dash"
+  videoNote="Jump and dash at the top over 8 tiles of spikes, jump plus dash upward on the 6-tile wall, and a dash through the 1-tile tunnel over a pit. After T the same dashes lose their 45 ms freeze."
+  steps={[
+    "Run right with <kbd>→</kbd>. At the eight spikes, jump with <kbd>Space</kbd> and, at the top of the jump, dash with <kbd>X</kbd>.",
+    "At the six-tile wall, jump and dash upward: hold <kbd>↑</kbd> and press <kbd>X</kbd> near the top of the jump.",
+    "In the one-tile tunnel there's no room to jump. Dash across the pit with <kbd>X</kbd>.",
+    "Press <kbd>T</kbd> and do all three again. The distances don't change, but the dashes lose their 45 ms freeze, and an <kbd>X</kbd> pressed just before landing no longer waits for the recharge.",
+  ]}
+/>
+
+<h2 id="dash-godot">How to code a dash in Godot 4</h2>
+
+The dash is its own state. While it lasts, `_physics_process` doesn't run the normal step at all, and the normal step is where gravity, air control and jumping live:
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+var was_on_floor := is_on_floor()
+if state == State.DASH:
+	_step_dash()
+else:
+	_step_normal(delta, was_on_floor)
+```
+</CodeBlock>
+
+The direction comes from the stick at the moment of the press, with two corrections: on the floor the downward part is dropped, and with no direction held the dash goes the way the character faces. The velocity is set once in `_start_dash` and again every tick in `_step_dash`, so nothing can bend it.
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _start_dash(on_floor: bool) -> void:
+	var dir := Vector2(input_x, input_y)
+	if on_floor and dir.y > 0.0:
+		dir.y = 0.0
+	if dir == Vector2.ZERO:
+		dir = Vector2(facing, 0.0)
+	dash_dir = dir.normalized()
+	if dash_dir.x != 0.0:
+		facing = int(signf(dash_dir.x))
+
+	state = State.DASH
+	can_dash = false
+	# ...
+	_dash_buffer = 0.0
+	_dash_timer = params.dash_time
+	_dash_cooldown = params.dash_cooldown
+	# ...
+	velocity = dash_dir * params.dash_speed
+	dash_started.emit(dash_dir)
+
+
+func _step_dash() -> void:
+	# Durante el dash la velocidad es constante y la gravedad no actúa:
+	# la distancia recorrida es siempre la misma (predecible = diseñable).
+	velocity = dash_dir * params.dash_speed
+	if _jump_buffer > 0.0 and (is_on_floor() or _coyote > 0.0):
+		# Saltar en mitad de un dash a ras de suelo conserva parte de su velocidad:
+		# un salto largo "avanzado" que premia encadenar acciones.
+		_end_dash(true)
+		_do_jump(&"ground")
+	elif _dash_timer <= 0.0:
+		_end_dash(false)
+```
+</CodeBlock>
+
+The end matters as much as the start. When the 0.16 s run out, the horizontal speed is clamped to the run speed (340 px/s) and any upward speed keeps 40% of itself. Without that cut the character would leave the dash at 900 px/s and slide past the spot the level was measured for. There's one exception, the dash jump: jumping during a dash on the floor keeps 1.4 times the run speed.
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _end_dash(boosted: bool) -> void:
+	state = State.NORMAL
+	# Al terminar se recorta la velocidad: el dash acaba donde el diseñador espera.
+	var limit := params.max_speed * (params.dash_jump_speed_mult if boosted else 1.0)
+	velocity.x = clampf(velocity.x, -limit, limit)
+	if velocity.y < 0.0:
+		velocity.y *= params.dash_end_up_mult
+	dash_ended.emit()
+```
+</CodeBlock>
+
+<h2 id="freeze-and-buffer">The 45 ms freeze and the 100 ms buffer</h2>
+
+The T on sheet 12 doesn't touch any of that. Speed, duration and distance stay the same with the technique on or off. What it switches off are the two things around the dash: a 45 ms freeze when it starts, and a 100 ms memory for a press that came too early.
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+if Input.is_action_just_pressed(&"dash"):
+	_dash_buffer = params.dash_buffer_time if Lab.on(&"dash_freeze") else delta * 0.5
+# ...
+
+func _step_normal(delta: float, on_floor: bool) -> void:
+	if _dash_buffer > 0.0 and can_dash and _dash_cooldown <= 0.0 and has_ability(Abilities.DASH) and not is_flailing:
+		_start_dash(on_floor)
+		return
+```
+</CodeBlock>
+
+A press while the dash isn't available, spent in the air or still cooling down on the floor, is remembered for 100 ms. After T it lasts half a tick. 26 of my recorded dashes (about 2%) came out of that memory, fired between 10 and 100 ms after the press. It's the same trick as the [jump buffer](/blog/coyote-time-jump-buffer/), and like that one you only notice it when it's gone.
+
+The freeze is a hitstop. The player emits `dash_started`, and the feedback layer stops the whole game for 45 ms:
+
+<Tabs labels={["Feedback", "Hitstop"]}>
+<TabPanel>
+
+<CodeBlock filename="addons/platformer_kit/fx/player_feedback.gd">
+```gdscript
+func _on_dash_started(direction: Vector2) -> void:
+	Sfx.play(&"dash")
+	if Lab.on(&"dash_freeze"):
+		Juice.hitstop(player.params.dash_freeze_time)
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+<CodeBlock filename="addons/platformer_kit/autoload/juice.gd">
+```gdscript
+func hitstop(seconds: float) -> void:
+	if not Lab.on(&"juice_hitstop") or seconds <= 0.0:
+		return
+	# Usamos reloj real: con time_scale = 0 los temporizadores del juego no avanzan.
+	_freeze_until_msec = maxi(_freeze_until_msec, Time.get_ticks_msec() + int(seconds * 1000.0))
+	_frozen = true
+	Engine.time_scale = 0.0
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+`Engine.time_scale` drops to 0, so the freeze is timed with the real clock: the game's own timers stop along with everything else. Celeste does the same in `DashBegin`, with `Celeste.Freeze(.05f)`: 50 ms.
+
+<h2 id="recharge-and-cooldown">Recharge and cooldown: what a dash costs</h2>
+
+A dash you can repeat freely stops being a ruler and turns into flight. The lab's rule is one dash per flight: it comes back when you touch the floor or bounce off something. On the floor there's no flight to end, so a cooldown takes over: 0.45 s, counted from when the previous dash started. It's one row of the movement economy that every move in the lab follows:
+
+| Resource | Spent | Recharged |
+|---|---|---|
+| Air jump | `air_jumps` per flight | floor, bounce |
+| Dash | one per flight; on the floor, one per `dash_cooldown` | floor, bounce |
+| Wall jump | `wall_jumps_per_wall` per wall (1; 0 means no limit) | floor, bounce, jumping from another wall |
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+if state == State.NORMAL and _dash_cooldown <= 0.0:
+	can_dash = true  # el dash se recarga al tocar suelo
+```
+</CodeBlock>
+
+The 148 presses that found no dash, 11% of the 1,375 recorded, are this rule doing its job: the dash was already spent, or it wasn't back yet.
+
+The cooldown has a second job when the dash also protects you. In my kit it can: 0.21 s of invulnerability per dash. Then the rule, written down in the kit's README, is that the cooldown must be at least twice the protection, so that between two dashes there's always a window where you can be hit that's as long as the protected one. The recorded session parameters show the change: until the morning of November 17 the cooldown was 0.22 s, and from then on 0.45 s. Under the old value, 43 of 864 dashes (5%) came less than 0.45 s after the one before, the fastest only 0.233 s apart.
+
+<Collapsible title="Cooldown against protection, in numbers">
+Mash the button on the floor and a new dash fires the moment the cooldown allows it. With 0.21 s of protection per dash:
+
+| Cooldown | Protected | Open to hits | Share of time protected |
+|---|---|---|---|
+| 0.22 s | 0.21 s | 0.01 s | 95% |
+| 0.45 s | 0.21 s | 0.24 s | 47% |
+
+At 0.22 s the open window is about one physics tick at 120 Hz. That's invulnerability on a button. The cooldown doesn't fix speed, though: mashing on the floor still averages about 540 px/s with 0.45 s, against the 340 px/s of running. If dash-walking is a problem in your game, that's a separate number to tune.
+</Collapsible>
+
+<h2 id="celeste-dash">My dash and Celeste's</h2>
+
+Celeste's published player code has every number of its dash in one place.<Sidenote>From [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub. Its player hitbox is 8 px wide; mine is 24.</Sidenote>
+
+| | My lab | Celeste |
+|---|---|---|
+| Speed and time | 900 px/s for 0.16 s | 240 px/s for 0.15 s (`DashSpeed`, `DashTime`) |
+| Distance, in body widths | 6 (144 px, 24 px body) | 4.5 (36 px, 8 px body) |
+| Freeze at the start | 45 ms | 50 ms (`Celeste.Freeze(.05f)`) |
+| Cooldown | 0.45 s on the floor | 0.2 s (`DashCooldown`) |
+| Recharge | floor, bounce | floor but not on spikes, from 0.1 s after the dash starts (`DashRefillCooldown`); green gems |
+| Leaving the dash | sideways clamped to run speed, upward ×0.4 | sideways or upward dashes leave at 160 px/s along the dash, upward ×0.75 (`EndDashSpeed`, `EndDashUpMult`) |
+| Speed you had before | thrown away | kept, if it was already faster in the same horizontal direction |
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+private const float DashSpeed = 240f;
+private const float EndDashSpeed = 160f;
+private const float EndDashUpMult = .75f;
+private const float DashTime = .15f;
+private const float DashCooldown = .2f;
+private const float DashRefillCooldown = .1f;
+// ...
+private void DashBegin()
+{
+    // ...
+    if (Engine.TimeRate > 0.25f)
+        Celeste.Freeze(.05f);
+    dashCooldownTimer = DashCooldown;
+    dashRefillCooldownTimer = DashRefillCooldown;
+```
+</CodeBlock>
+
+Celeste buffers the dash press too: `StartDash` calls `Input.Dash.ConsumeBuffer()`. How long that buffer lasts isn't in the published file, so I can't compare it with my 100 ms. The freeze is almost the same. The real difference is in the exit: Celeste lets the dash spill into what comes next, and my lab clips it back to running speed so the landing spot stays where the ruler says.
+
+<h2 id="when-to-use">When a dash helps, and when it doesn't</h2>
+
+| Situation | Dash? |
+|---|---|
+| Gaps longer than a jump | Yes. About 9.5 tiles with jump plus dash in my lab, against 6.4 for a jump. |
+| Low tunnels with no room to jump | Yes. It's the one move that crosses a pit without needing height. |
+| A move earned partway through | Yes, and it can arrive late: in [Mega Man X](https://en.wikipedia.org/wiki/Mega_Man_X_%28video_game%29) it's an upgrade to X's legs. |
+| A dash that also makes you invulnerable | Careful. Cooldown at least twice the protection, or mashing becomes a shield. |
+| Tight corridors and corners | Yes, with more corner correction: 12 px during a dash in my lab, against 9 on a normal jump. |
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="dash-duration">How long should a dash last?</h3>
+
+My lab uses 0.16 s and Celeste 0.15 s. Short enough that it reads as one burst, long enough to cover a few tiles at the speed you pick.
+
+<h3 id="gravity-during-dash">Should gravity apply during a dash?</h3>
+
+No. Without gravity the distance is speed times time and nothing else, which is what makes it measurable. Deal with the vertical after the dash instead: my lab keeps 40% of the upward speed, Celeste 75%.
+
+<h3 id="dash-feel">How do I make a dash feel punchy?</h3>
+
+Freeze the game for a few hundredths of a second when it starts: 45 ms in my lab, 50 ms in Celeste. Then add sound and a small shake on top. Turn the freeze off on sheet 12 with T and the dash still works. It just hits softer.
+
+<h3 id="dash-cooldown">How long should the dash cooldown be?</h3>
+
+If the dash protects the player, at least twice the protection: 0.45 s in my lab for 0.21 s of protection. If it doesn't, the cooldown only limits mashing on the floor. Celeste uses 0.2 s.
+
+Open sheet 12 and press T. Nothing you can measure changes: same 3.6 tiles, same direction, same speed. It still reads weaker, because the 45 ms you lost were the moment the whole game stopped to show you the dash had started. Across my 1,351 recorded dashes those pauses add up to about a minute of the game standing still, 45 ms at a time, and it's the part of the dash I'd miss first.

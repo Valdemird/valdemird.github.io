@@ -26,6 +26,8 @@ var touch_wanted := false
 ## `video=1`: se está grabando el video del blog (`record.mjs`): el piloto juega,
 ## sin rótulo ni botones táctiles, y espera un momento quieto antes de arrancar.
 var video_mode := false
+## `inspector=1`: el inspector del laboratorio (velocidad en osciloscopio) encendido.
+var inspector_wanted := false
 ## Idioma de los rótulos que añade la web (el juego en sí está en español).
 var lang := "es"
 ## El lector ya tomó el control: el piloto no vuelve aunque se reinicie la escena.
@@ -42,6 +44,7 @@ func _enter_tree() -> void:
 	for id: String in String(query.get("lamina", "")).split(",", false):
 		sheets.append(StringName(id.strip_edges()))
 	reduce_motion = query.get("reducir", "") == "1"
+	inspector_wanted = query.get("inspector", "") == "1"
 	pilot_wanted = query.get("piloto", "") == "1"
 	touch_wanted = query.get("tactil", "") == "1"
 	video_mode = query.get("video", "") == "1"
@@ -77,6 +80,8 @@ func _input(event: InputEvent) -> void:
 func _on_scene_changed() -> void:
 	if reduce_motion:
 		Lab.set_flag(&"juice_shake", false)
+	if inspector_wanted:
+		Lab.set_flag(&"debug_overlay", true)
 	var main := get_tree().current_scene as Main
 	if main == null:
 		return
@@ -178,16 +183,32 @@ func filter_maps(maps: Dictionary, defs: Array[Dictionary]) -> Dictionary:
 	for joined: String in rows:
 		if "P" in joined:
 			return maps
+	# El checkpoint de más a la izquierda: el mismo que usa el juego al viajar a la lámina.
+	var best_r := -1
+	var best_c := 1 << 30
 	for r: int in rows.size():
-		var row: String = rows[r]
-		var c := row.find("C")
-		if c < 0:
-			continue
-		var at := c - 1 if c > 0 and row[c - 1] == "." else c + 1
-		rows[r] = row.substr(0, at) + "P" + row.substr(at + 1)
-		break
+		var c := String(rows[r]).find("C")
+		if c >= 0 and c < best_c:
+			best_c = c
+			best_r = r
+	if best_r >= 0:
+		var row: String = rows[best_r]
+		var at := best_c - 1 if best_c > 0 and row[best_c - 1] == "." else best_c + 1
+		rows[best_r] = row.substr(0, at) + "P" + row.substr(at + 1)
 	var out := maps.duplicate()
 	out[first] = rows
+	# En el plano entero, la lámina más alta da margen vertical a la cámara en todas.
+	# Sola, una lámina de una pantalla de alto deja la cámara clavada entre sus
+	# límites: se rellena por arriba hasta la altura de la más alta del plano.
+	var tallest := 0
+	for id: Variant in maps.keys():
+		tallest = maxi(tallest, (maps[id] as Array).size())
+	for def: Dictionary in shown:
+		var sheet_rows: Array = (out[StringName(def.id)] as Array).duplicate()
+		var width := String(sheet_rows[0]).length()
+		while sheet_rows.size() < tallest:
+			sheet_rows.push_front(".".repeat(width))
+		out[StringName(def.id)] = sheet_rows
 	return out
 
 
