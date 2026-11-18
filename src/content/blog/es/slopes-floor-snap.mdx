@@ -1,57 +1,34 @@
 ---
-title: "Pendientes y floor snap en Godot 4: los ajustes de CharacterBody2D que necesita un plataformas"
-description: "El floor snap de Godot 4 pega un CharacterBody2D al suelo en las pendientes: floor_snap_length de 12 px, floor_constant_speed, floor_stop_on_slope y floor_max_angle de unos 50°. Qué hace cada ajuste, con lámina jugable."
+title: "Floor snap: por qué tu personaje da botes en las pendientes"
+description: "El floor snap vuelve a pegar al suelo a un personaje que corre tras cada movimiento, para que baje pendientes sin dar botes. Mira los números y juégalo."
 pubDate: 2026-11-18
 tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 8
+seriesTitle: "Pendientes y floor snap"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
-import Tabs from '../../../components/blog/Tabs.astro';
-import TabPanel from '../../../components/blog/TabPanel.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Floor snap: cuando el suelo desaparece bajo un personaje que corre, en una rampa de bajada o en un escalón pequeño, Godot lo vuelve a pegar a la superficie en lugar de dejarlo salir volando. En CharacterBody2D es una sola propiedad, floor_snap_length, y por defecto vale 1 px.",
-  "Mi laboratorio usa 12 px de snap, velocidad constante en las rampas, nada de resbalar cuando está parado y suelos de hasta unos 50°. Cuatro ajustes que ya vienen en el motor y ni una línea de código extra.",
-  "Sin snap, corriendo a tope, una rampa de 45° baja 2,8 px en cada tick de física mientras la gravedad tira del personaje unos 0,2 px. Baja la cuesta a saltitos, y pulsar salto solo funciona dentro del coyote time o cuando vuelve a tocar la rampa.",
-  "Godot nunca aplica el snap mientras el cuerpo sube, así que no estorba al saltar.",
-]} />
+El **floor snap** vuelve a pegar al personaje al suelo después de cada movimiento, hasta una distancia fija: aquí, 12 px. Es lo que mantiene a un personaje que corre cuesta abajo pegado a la rampa, en lugar de bajarla a saltitos.
 
-La lámina 08 de mi laboratorio son dos colinas hechas con rampas de 45° y cuatro casillas de alto, y un foso de cuatro casillas que se abre justo donde acaba la segunda rampa. La nota que hay encima del foso dice qué sale mal ahí: *salta el foso justo al acabar la rampa: sin snap, muchas veces "no hay suelo".*
+| Corriendo a 340 px/s por una rampa de 45°, a 120 ticks/s | Por tick |
+|---|---|
+| Lo que baja el suelo | 2,8 px |
+| Lo que la gravedad baja al personaje | unos 0,2 px |
+| Lo que puede cerrar el floor snap | 12 px (en Godot, 1 px por defecto) |
 
-El arreglo es el código más corto de todo el laboratorio. La propia explicación de la lámina dice que CharacterBody2D ya lo trae hecho y que solo hay que acordarse de configurarlo. Ese "acordarse" es todo el problema. El snap por defecto de Godot es de 1 px, a la velocidad de un plataformas no alcanza, y nada te avisa. El personaje, sin más, da saltitos.
+<h2 id="why-it-bounces">Por qué un personaje que corre da botes cuesta abajo</h2>
 
-<StatGrid columns={2} stats={[
-  { value: "12 px", label: "Floor snap en mi laboratorio", context: "el valor por defecto de Godot es 1 px" },
-  { value: "2,8 px", label: "Lo que baja el suelo por tick", context: "rampa de 45° a 340 px/s, 120 Hz" },
-  { value: "0,87 rad", label: "Ángulo máximo de suelo", context: "unos 50° (por defecto, 45°)" },
-  { value: "40 px", label: "Una cornisa de verdad", context: "una casilla, muy lejos del snap: te sigues cayendo" },
-]} />
+En una rampa de 45° el suelo baja lo mismo que avanzas de lado, y la gravedad, que arranca desde cero en lo alto, solo cubre una fracción de píxel. Tras un solo tick queda un hueco bajo los pies y el juego cree que estás en el aire. El personaje da saltitos, la animación parpadea y pulsar salto solo funciona dentro del [coyote time](/blog/es/coyote-time-jump-buffer/).
 
-<Callout type="important" title="La tesis">
-Las pendientes en Godot se resuelven con configuración. CharacterBody2D ya sabe mantener a un personaje en el suelo. Con el snap por defecto de 1 px, simplemente no llega lo bastante lejos para un personaje que corre a velocidad de plataformas.
-</Callout>
+<h2 id="what-is-floor-snap">Floor snap: de vuelta a la rampa tras cada movimiento</h2>
 
-<h2 id="what-is-floor-snap">¿Qué es el floor snap?</h2>
-
-El floor snap es la distancia que se permite al cuerpo físico bajar de golpe, después de moverse, para seguir pegado al suelo. La documentación de Godot lo explica así para `floor_snap_length`: si no vale cero, el cuerpo se mantiene pegado a las pendientes al llamar a `move_and_slide()`, siempre que esté en contacto con el suelo y se mueva en contra de `up_direction`.<Sidenote>[CharacterBody2D](https://docs.godotengine.org/en/stable/classes/class_characterbody2d.html) en la documentación de Godot (en inglés), versión 4.7 al escribir esto.</Sidenote>
-
-La frase siguiente de la documentación importa igual: el snap no se aplica si el cuerpo se mueve a lo largo de `up_direction`, es decir, si tiene velocidad de subida. Un salto se despega del suelo con normalidad. El snap solo tira de ti hacia abajo cuando ya vas bajando o en horizontal.
-
-<h2 id="why-it-bounces">Por qué un personaje que corre cuesta abajo se despega del suelo</h2>
-
-El laboratorio calcula la física a 120 Hz. A toda carrera, 340 px/s, el personaje avanza 2,8 px de lado en cada tick, y en una rampa de 45° el suelo baja esos mismos 2,8 px. La gravedad, que arranca desde cero en lo alto de la rampa, tira de él unos 0,2 px en ese tick. Con un solo tick ya queda un hueco de más de 2,5 px bajo los pies, e `is_on_floor()` pasa a ser falso.
-
-A partir de ahí se rompe a la vez todo lo que depende del suelo. La explicación de la lámina lo enumera: cuesta abajo el personaje pasa la mitad del tiempo en el aire, da saltitos, no puede saltar cuando quiere y la animación parpadea. En el aire, pulsar salto solo funciona durante los 100 ms de [coyote time](/blog/es/coyote-time-jump-buffer/) que empiezan cada vez que el personaje deja el suelo, o más tarde, cuando el jump buffer lo dispara en el siguiente contacto. Por eso el fallo es intermitente: algunos saltos al pie de la rampa salen a tiempo y otros no.
+Tras cada movimiento, el floor snap mira hacia abajo hasta su longitud y deja al personaje sobre el suelo que encuentre. No se aplica mientras sube, así que los saltos funcionan como siempre, y es mucho más corto que una casilla de 40 px, así que salir andando de una cornisa de verdad sigue siendo caerse.
 
 <PlayableLab
   sheets="slopes"
@@ -64,48 +41,14 @@ A partir de ahí se rompe a la vez todo lo que depende del suelo. La explicació
   ]}
 />
 
-<h2 id="slopes-godot">Cómo configurar las pendientes en Godot 4: cuatro ajustes de CharacterBody2D</h2>
+<h2 id="how-to-implement">Cómo implementar el floor snap en pendientes</h2>
 
-En mi laboratorio, T cambia dos propiedades mientras juegas, una tercera vive en el archivo de la escena y la cuarta es el valor por defecto de Godot, que no se toca.
+1. **Pega después de moverte, nunca al subir.** Si el personaje estaba en el suelo y no sube, bájalo al suelo que tenga debajo, hasta la longitud del snap.
+2. **Calcúlalo con tu velocidad máxima en el suelo.** En cada tick el suelo baja velocidad × tan(ángulo de la pendiente) ÷ ticks de física por segundo. Supéralo, y quédate por debajo de tu cornisa real más baja.
+3. **Mantén la misma velocidad en las rampas**, para que el personaje no frene al subir ni acelere al bajar.
+4. **Pon el ángulo máximo de suelo un poco por encima de tu rampa más empinada.**
 
-<Tabs labels={["Lo que ejecuta el laboratorio", "Lo que enseña la lámina"]}>
-<TabPanel>
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-## Ajustes de CharacterBody2D que dependen de banderas del laboratorio.
-func _apply_lab() -> void:
-	# FLOOR SNAP: pega al jugador al suelo al bajar pendientes o escalones.
-	var snap := Lab.on(&"floor_snap")
-	floor_snap_length = params.floor_snap_px if snap else 0.0
-	floor_constant_speed = snap
-	# ...
-```
-</CodeBlock>
-
-<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
-```gdscript
-## Distancia de "pegado" al suelo al bajar pendientes.
-@export_range(0.0, 32.0, 1.0, "suffix:px") var floor_snap_px := 12.0
-```
-</CodeBlock>
-
-<CodeBlock filename="addons/platformer_kit/player/player.tscn">
-```ini
-[node name="Player" type="CharacterBody2D"]
-z_index = 5
-collision_layer = 4
-collision_mask = 3
-floor_max_angle = 0.87
-script = ExtResource("1_player")
-params = ExtResource("2_params")
-```
-</CodeBlock>
-
-</TabPanel>
-<TabPanel>
-
-El panel de código de la lámina resume la misma configuración en cuatro líneas, incluido el valor por defecto que el laboratorio nunca toca:
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="game/level/sheets.gd">
 ```gdscript
@@ -116,60 +59,16 @@ floor_max_angle = deg_to_rad(50)
 ```
 </CodeBlock>
 
-</TabPanel>
-</Tabs>
+Los cuatro vienen de serie en `CharacterBody2D`, que por defecto trae 1 px de snap y la velocidad constante apagada.
 
-| Propiedad | Por defecto en Godot | Mi laboratorio | Qué hace |
-|---|---|---|---|
-| `floor_snap_length` | 1 px | 12 px, 0 después de T | Vuelve a pegar el cuerpo al suelo después de moverse, salvo si sube |
-| `floor_constant_speed` | `false` | `true`, `false` después de T | La misma velocidad en el suelo sea cual sea la pendiente. Con `false`, más rápido cuesta abajo y más lento cuesta arriba |
-| `floor_stop_on_slope` | `true` | `true`, sin tocar | Un cuerpo parado en una pendiente no resbala hacia abajo |
-| `floor_max_angle` | 0,785 rad (45°) | 0,87 rad (unos 50°) | La superficie más empinada que todavía cuenta como suelo y no como pared |
-
-T apaga las dos primeras a la vez, y tiene sentido que vayan juntas. La documentación dice que la velocidad constante depende del snap: para pegarse a una pendiente de bajada a velocidad constante hace falta `floor_snap_length`. Y la lámina dice para qué sirve la velocidad constante: en rampa el personaje no debe frenar al subir ni acelerar al bajar.
-
-El ángulo es el ajuste discreto. Las rampas del laboratorio miden exactamente 45°, que es también el límite por defecto de Godot. Con 0,87 rad, las rampas quedan holgadamente dentro del límite en lugar de justo encima de él.
-
-<h2 id="snap-length">¿Cuánto debe medir el floor snap?</h2>
-
-Lo bastante para cubrir lo que baja el suelo en un tick a tu mayor velocidad en el suelo. Y lo bastante poco para que una cornisa de verdad te siga dejando caer.
-
-A 340 px/s en una rampa de 45° el suelo baja 2,8 px por tick, y los 12 px del laboratorio cubren cuatro veces eso. Una cornisa en el laboratorio es una casilla de 40 px, más del triple del snap, así que salir andando de una sigue siendo caerse, y caerse sigue activando el coyote time. Todo lo que mida menos de 12 px, como un escalón pequeño, el personaje lo baja corriendo sin despegarse. Es la definición de la técnica que da la lámina: al bajar una pendiente o un escalón corriendo, el personaje se mantiene pegado al suelo en vez de salir volando.
-
-<Collapsible title="Las cuentas, por si quieres rehacerlas para tu juego">
-Lo que baja el suelo en cada tick es la velocidad en el suelo × tan(ángulo de la pendiente) ÷ ticks de física por segundo. Para el laboratorio: 340 × tan 45° ÷ 120 = 2,83 px.
-
-Lo que tira la gravedad en ese mismo primer tick, partiendo del reposo, es gravedad ÷ ticks², porque la velocidad se actualiza antes de moverse. Con la gravedad de caída del laboratorio: 3.200 ÷ 120² = 0,22 px.
-
-El snap tiene que cubrir la diferencia. Dejando aparte esa fracción de píxel de la gravedad, el 1 px por defecto de Godot aguanta una rampa de 45° solo hasta unos 120 px/s a 120 Hz. Los 12 px del laboratorio aguantan hasta 1.440 px/s, muy por encima de los 900 px/s del [dash](/blog/es/platformer-dash/). Si tu proyecto usa otra frecuencia de ticks, rehaz la división: menos ticks por segundo significa más caída por tick.
 </Collapsible>
-
-<h2 id="when-to-use">Cuándo ayuda el floor snap y cuándo no</h2>
-
-| Situación | ¿Floor snap? |
-|---|---|
-| Bajar rampas corriendo | Sí. Sin él, el personaje va a saltitos. |
-| Escalones pequeños, más bajos que el snap | Sí. Los baja en lugar de caerse. |
-| Saltar | No le afecta. Godot no aplica el snap mientras el cuerpo sube. |
-| Salir andando de una cornisa de verdad | Que el snap sea más corto que tus cornisas. Con 12 px y casillas de 40 px, el personaje del laboratorio sigue cayendo y el coyote time sigue empezando. |
-| Una cima desde la que quieres que el jugador salga volando a toda velocidad | Cuidado. El snap lo pega a la bajada del otro lado. |
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
-<h3 id="what-does-floor-snap-do">¿Qué hace floor_snap_length en Godot?</h3>
+<h3 id="floor-snap-value">¿Cuánto debe medir el floor snap?</h3>
 
-Fija cuánto puede bajar `move_and_slide()` al cuerpo para mantenerlo en el suelo. Solo se aplica cuando el cuerpo no está subiendo, así que los saltos no cambian. Por defecto vale 1 px.
-
-<h3 id="floor-snap-value">¿Qué valor debe tener floor_snap_length?</h3>
-
-Más de lo que baja el suelo en un tick a tu velocidad máxima en el suelo, y menos que tu cornisa real más baja. Mi laboratorio usa 12 px: cuatro veces los 2,8 px que baja una rampa de 45° por tick a toda carrera, y menos de un tercio de una casilla de 40 px.
-
-<h3 id="why-bounce">¿Por qué mi CharacterBody2D va dando botes al bajar pendientes?</h3>
-
-Porque el suelo se aleja más deprisa de lo que la gravedad baja al personaje, y el snap es demasiado corto para cerrar el hueco. Con el 1 px por defecto, una rampa de 45° ya rompe el contacto por encima de unos 120 px/s a 120 Hz.
+Más de lo que baja el suelo en un tick a tu velocidad máxima y menos que tu cornisa real más baja. Aquí, 12 px: cuatro veces los 2,8 px que baja una rampa de 45° por tick a toda carrera, y menos de un tercio de una casilla de 40 px.
 
 <h3 id="max-angle-45">¿Qué floor_max_angle uso para pendientes de 45°?</h3>
 
-Algo por encima de 45°, porque 45° es justo el límite por defecto de Godot. Mi laboratorio usa 0,87 rad, unos 50°.
-
-Pulsa T en la lámina 08 y en el código no cambia nada. El mismo `move_and_slide()`, la misma gravedad, los mismos 340 px/s. Dos propiedades pasan a 0 y a `false`, casi lo mismo con lo que nace un CharacterBody2D nuevo (1 px y `false`), y el personaje empieza a bajar la colina a saltitos. Todos los CharacterBody2D que crees empiezan ahí, así que pon el snap el mismo día que dibujes tu primera rampa, antes de que tus manos se acostumbren a los botes.
+Algo por encima de 45°, porque 45° es justo el límite por defecto de Godot. Esta demo usa 0,87 rad, unos 50°.

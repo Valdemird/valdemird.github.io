@@ -1,85 +1,50 @@
 ---
-title: "Telegrafiar ataques: el aviso de 0,55 segundos que vuelve justo un golpe (con código en Godot)"
-description: "Telegrafiar un ataque es anunciarlo antes de que llegue: una pose, un anillo que se cierra y un sonido, siempre con la misma duración. El embestidor de mi laboratorio en Godot avisa 0,55 s antes; con T, 0,05 s."
+title: "Telegrafiar ataques: el aviso que vuelve justo un golpe"
+description: "Telegrafiar un ataque es anunciarlo antes de que haga daño: una pose, un anillo y un sonido de duración fija. Míralo en una línea de tiempo y juégalo."
 pubDate: 2026-11-18
 tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 17
+seriesTitle: "Telegrafiar ataques"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
-import Tabs from '../../../components/blog/Tabs.astro';
-import TabPanel from '../../../components/blog/TabPanel.astro';
-import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Telegrafiar: todo ataque enemigo se anuncia antes de poder hacerte daño, con una pose, una señal visual y un sonido, y siempre durante el mismo tiempo. En mi laboratorio el embestidor avisa 0,55 s antes de cargar.",
-  "En Godot es un estado más en la máquina de estados del enemigo, el aviso, con su duración. Pulsa T en la lámina y esa duración baja a 0,05 s, tres frames a 60 fps. El mismo ataque, sin tiempo para responderlo.",
-  "La dificultad está en lo que dura el aviso y en cómo se encadenan los ataques. El jefe del laboratorio acorta sus avisos un 15 % en la segunda fase. Nada en el laboratorio ataca sin avisar.",
-]} />
+**Telegrafiar** un ataque es anunciarlo antes de que pueda hacerte daño, y siempre durante el mismo tiempo. El embestidor de abajo avisa **0,55 s** antes de embestir: lo justo para leer el ataque y responderle.
 
-La lámina de telegrafiar de mi laboratorio es un pasillo corto con un embestidor encerrado entre dos muros. Cuando te ve se echa atrás, tiembla, se cierra un anillo sobre su cabeza y suena un pitido que sube. 0,55 segundos después embiste a 520 px/s. Si en vez de a ti le da al muro, se queda aturdido 1,3 s y te toca a ti.
-
-Sumando mis partidas grabadas para este post, los embestidores de esa lámina me alcanzaron con la embestida 14 veces. Todas con el aviso encendido. Y entre todas mis partidas en esa lámina, jugué con el aviso apagado un total de 2,9 segundos. Construí el interruptor, lo apagué dos veces y volví a recibir golpes de la forma justa.
-
-<StatGrid columns={2} stats={[
-  { value: "0,55 s", label: "El aviso del embestidor", context: "idéntico cada vez que ataca" },
-  { value: "0,05 s", label: "Con T pulsada", context: "tres frames a 60 fps" },
-  { value: "14", label: "Embestidas que me dieron", context: "todas con el aviso encendido" },
-  { value: "2,9 s", label: "Jugado sin él", context: "todas mis partidas en la lámina, 15–17 nov" },
-]} />
-
-O sea, el aviso no evita que te den. Lo que cambia es de quién es la culpa del golpe.
-
-<Callout type="important" title="La tesis">
-Un ataque que el jugador no puede ver venir no es difícil, es injusto, y no enseña nada. El aviso convierte la pelea en un diálogo: leo, respondo, castigo. La dificultad se ajusta acortando el aviso o encadenando ataques. Nunca quitándolo.
-</Callout>
-
-<h2 id="what-is-telegraphing">¿Qué es telegrafiar un ataque en diseño de juegos?</h2>
-
-Telegrafiar es anunciar un ataque antes de que sea peligroso. El enemigo enseña una preparación (una pose, un destello, un sonido) durante un tiempo fijo, y sólo entonces se enciende su hitbox. Los animadores tienen nombre para lo mismo: la anticipación, uno de los doce principios de Disney, que la Wikipedia en inglés describe como algo que "se usa para preparar al público para una acción y para que la acción parezca más realista".<Sidenote>Traducido de [Twelve basic principles of animation](https://en.wikipedia.org/wiki/Twelve_basic_principles_of_animation), en la Wikipedia en inglés.</Sidenote> Un juego añade lo que la animación nunca necesitó: que el público tenga que hacer algo con ello.
-
-En mi laboratorio todos los ataques enemigos pasan por la misma función, y todo aviso tiene cuatro propiedades:
-
-- Una pose. El embestidor retrocede un poco mientras prepara la carga, así que la anticipación va en sentido contrario al ataque.
-- Un anillo con un signo de admiración que se cierra sobre el enemigo. Cuando llega al centro, sale el ataque.
-- Un sonido, para poder reaccionar a un enemigo al que no estás mirando.
-- Una duración fija por ataque. La del embestidor es siempre 0,55 s, así que a los dos o tres intentos tus manos ya se la saben.
-
-Aquí están todos los avisos del laboratorio, uno al lado del otro. Son los números del código, no estimaciones.
-
-<InteractiveChart
-  type="horizontal"
-  title="Duración del aviso de cada ataque del laboratorio"
-  story="Los enemigos normales avisan entre 0,45 y 0,65 s. La segunda fase del jefe tiene el aviso real más corto. T deja cualquiera en 0,05 s."
-  unit=" s"
-  data={[
-    { label: "Dron · disparo", value: 0.65 },
-    { label: "Jefe · embestida", value: 0.6 },
-    { label: "Jefe · ráfaga", value: 0.6 },
-    { label: "Embestidor · embestida", value: 0.55 },
-    { label: "Escudero · estocada", value: 0.5 },
-    { label: "Jefe · martillo", value: 0.5 },
-    { label: "Saltador · salto", value: 0.45 },
-    { label: "Jefe fase 2 · martillo", value: 0.425 },
-    { label: "Cualquier ataque, con T", value: 0.05 },
+<TimingDiagram
+  title="El aviso del embestidor"
+  duration={700}
+  start={300}
+  probe="reaccionas"
+  onLabel="Aviso de 0,55 s"
+  offLabel="Con T: 0,05 s"
+  phases={[
+    { from: 0, to: 550, label: "preparación", tone: "neutral", on: { ok: true, text: "A tiempo: el aviso sigue en marcha." }, off: { ok: false, text: "Tarde: con T, la embestida salió a los 50 ms." } },
+    { from: 550, to: 700, label: "embestida", tone: "danger", on: { ok: false, text: "Tarde: la embestida ya ha salido." } },
   ]}
-  annotations={[
-    { targetIndex: 3, text: "El de esta lámina", emphasize: true },
-    { targetIndex: 8, text: "Tres frames" },
+  events={[
+    { at: 0, label: "te ve" },
+    { at: 550, label: "embiste" },
   ]}
-  source="De los scripts de enemigos del addon combat_kit de mi laboratorio. En la fase 2 todos los avisos del jefe se multiplican por 0,85."
+  windows={[
+    { from: 0, to: 550, label: "aviso", detail: "550 ms", measure: "until",
+      on: { ok: true, text: "A tiempo: la embestida sale dentro de {ms} ms." },
+      off: { ok: false, text: "Tarde: con T, la embestida salió a los 50 ms." } },
+    { from: 0, to: 50, label: "con T", detail: "50 ms", measure: "until",
+      on: { ok: true, text: "A tiempo: queda casi todo el aviso por delante." },
+      off: { ok: false, text: "La embestida sale en {ms} ms: demasiado poco para leerla." } },
+  ]}
 />
 
-La lámina de abajo es el juego de verdad. El embestidor del primer corral es el de los números de arriba. Haz que cargue, respóndele, y luego pulsa T e intenta la misma respuesta.
+<h2 id="what-is-telegraphing">Telegrafiar: una pose, un anillo y un sonido</h2>
+
+El aviso es un estado propio con una duración fija, y el ataque sólo sale cuando termina. El cuerpo se echa atrás y tiembla, un anillo se cierra sobre su cabeza para decirte *cuándo*, y un pitido que sube te avisa aunque no estés mirando a ese enemigo. Como la duración no cambia nunca, a los dos o tres intentos tus manos ya se la saben. Pulsa T y el embestidor es igual de rápido, pero deja de decirte lo que va a hacer.
 
 <PlayableLab
   plane="combate"
@@ -94,15 +59,18 @@ La lámina de abajo es el juego de verdad. El embestidor del primer corral es el
   ]}
 />
 
-<h2 id="telegraph-godot">Cómo telegrafiar un ataque enemigo en Godot 4</h2>
+<h2 id="how-to-implement">Cómo implementar un ataque telegrafiado</h2>
 
-Todos los enemigos del laboratorio siguen el mismo esqueleto: patrulla, aviso, ataque, recuperación. El aviso es un estado propio, `windup`, y lo gestiona la clase base `Enemy`. Cada subclase sólo dice qué ataque y cuánto dura.
+1. Haz del aviso un estado propio, con una duración fija para cada ataque. El ataque sólo sale cuando se acaba ese tiempo.
+2. Saca todas las señales de ese mismo temporizador: el anillo se cierra según la parte del aviso que ya ha pasado y el sonido suena en cuanto empieza el estado.
+3. Decide la dirección del ataque al empezar el aviso y no la corrijas. Un ataque que se tuerce después del aviso castiga al jugador por haberlo leído.
+4. Dale aguante al enemigo durante el aviso. Si un golpe pudiera interrumpirlo, aporrear el botón cancelaría todos los ataques.
+
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
 ```gdscript
 ## TELEGRAFIAR: entra en el estado de aviso. El ataque sale cuando `windup_done()`.
-## Con la técnica apagada el aviso dura un parpadeo: así se siente un ataque
-## que no se anuncia.
 func telegraph(attack: StringName, seconds: float) -> void:
 	attack_name = attack
 	set_state(&"windup")
@@ -110,20 +78,10 @@ func telegraph(attack: StringName, seconds: float) -> void:
 	Combat.enemy_telegraphed.emit(self, attack, windup_total)
 
 
-func windup_ratio() -> float:
-	if state != &"windup" or windup_total <= 0.0:
-		return 0.0
-	return clampf(state_time / windup_total, 0.0, 1.0)
-
-
 func windup_done() -> bool:
 	return state == &"windup" and state_time >= windup_total
 ```
 </CodeBlock>
-
-Fíjate en lo que hace T. No quita el estado de aviso: lo recorta a 0,05 s. Técnicamente el ataque sigue avisando, sólo que en menos tiempo del que nadie puede leer. Así simula el laboratorio un ataque sin aviso: la máquina de estados funciona exactamente igual y lo único que desaparece es el tiempo para reaccionar.
-
-El embestidor lo usa así:
 
 <CodeBlock filename="addons/combat_kit/enemies/charger.gd">
 ```gdscript
@@ -135,128 +93,26 @@ func _think(delta: float) -> void:
 				face_target()
 				telegraph(&"embestida", windup_time)
 		&"windup":
-			# Retrocede un poco mientras carga: la anticipación va en sentido contrario.
-			velocity.x = move_toward(velocity.x, -facing * 26.0, 600.0 * delta)
 			if windup_done():
 				contact.attack = &"embestida"
 				release(&"charge")
-		&"charge":
-			velocity.x = facing * charge_speed
-			if wall_ahead(facing):
-				# ...
-				_end_charge(&"dazed")
-			elif ledge_ahead(facing) or state_time >= charge_time:
-				_end_charge(&"recover")
 ```
 </CodeBlock>
 
-`face_target()` se ejecuta una sola vez, antes de `telegraph()`, y nada en la rama de `windup` vuelve a girar al embestidor. La dirección se decide cuando empieza el aviso. Lo que te enseñó el aviso es exactamente lo que pasa, y la embestida no puede torcerse hacia ti cuando ya has saltado. La otra mitad de la justicia viene después del ataque: 0,9 s de recuperación, o 1,3 s aturdido si se estrelló. Anticipación, activo y recuperación son las mismas tres fases que tiene [el ataque del propio jugador](/blog/es/attack-startup-active-recovery/), con las proporciones al revés: la anticipación del jugador dura 35 ms y la del embestidor, 550.
+`face_target()` se ejecuta una sola vez, antes de `telegraph()`, así que la embestida va justo hacia donde apuntaba el aviso.
 
-<h2 id="three-channels">Pose, anillo y sonido: los tres canales de un mismo aviso</h2>
-
-Los mismos 0,55 s se dibujan y se oyen tres veces. Cada canal cubre un caso que los otros no.
-
-<Tabs labels={["La pose", "El anillo", "El sonido"]}>
-<TabPanel>
-
-El cuerpo se inclina hacia atrás y tiembla más a medida que se llena el aviso. Es el canal que funciona aunque nunca hayas visto a ese enemigo: un cuerpo que se encoge hacia atrás se lee como "va a saltar" sin que nadie te lo explique.
-
-<CodeBlock filename="addons/combat_kit/enemies/charger.gd">
-```gdscript
-	match state:
-		&"windup":
-			lean = -0.2 * f * windup_ratio()
-			offset = Vector2(randf_range(-1.0, 1.0), 0.0) * windup_ratio() * 1.6
-```
-</CodeBlock>
-
-</TabPanel>
-<TabPanel>
-
-Un anillo sobre la cabeza del enemigo que pasa de 20 a 7 px y cambia de color al cerrarse. La pose dice que algo viene; el anillo dice *cuándo*. Lo dibuja la clase base, así que todos los enemigos comparten el mismo reloj.
-
-<CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
-```gdscript
-## AVISO VISIBLE: un signo de admiración y un anillo que se cierra sobre el
-## enemigo. Cuando el anillo llega al centro, el ataque sale.
-func _draw_telegraph() -> void:
-	var k := windup_ratio()
-	var top := Vector2(0.0, -body_size.y - 22.0)
-	var pulse := 0.65 + 0.35 * sin(state_time * 34.0)
-	var color := BP.ACCENT.lerp(BP.HAZARD, k * k)
-	_gfx.draw_arc(top, lerpf(20.0, 7.0, k), 0.0, TAU, 28, Color(color, 0.5 + 0.5 * k), 1.6, true)
-	_gfx.draw_line(top + Vector2(0.0, -7.0), top + Vector2(0.0, 2.0), Color(color, pulse), 3.0, true)
-	_gfx.draw_circle(top + Vector2(0.0, 6.5), 1.8, Color(color, pulse))
-```
-</CodeBlock>
-
-</TabPanel>
-<TabPanel>
-
-Un pitido corto que sube en cuanto empieza cualquier aviso. No lo reproduce el enemigo: emite una señal en un bus compartido y es la capa de presentación la que decide sonar. El comentario explica para qué está.
-
-<CodeBlock filename="addons/combat_kit/fx/combat_feedback.gd">
-```gdscript
-func _on_enemy_telegraphed(_enemy: Enemy, _attack: StringName, _seconds: float) -> void:
-	# El aviso también SUENA: se puede reaccionar sin estar mirando al enemigo.
-	if Lab.on(&"telegraph"):
-		Sfx.play(&"telegraph", -5.0, 1.0, 0.03)
-```
-</CodeBlock>
-
-</TabPanel>
-</Tabs>
-
-Con T pulsada se van los tres a la vez: el anillo no se dibuja, el pitido no suena y la inclinación hacia atrás dura 0,05 s, demasiado poco para verla.
-
-<h2 id="telegraph-as-question">El aviso es una pregunta que hace el enemigo</h2>
-
-Mike Stout lo dijo sin rodeos en 2015, en un [artículo de Game Developer sobre ataques enemigos y telegrafía](https://www.gamedeveloper.com/design/enemy-attacks-and-telegraphing): "queremos comunicar exactamente lo que va a hacer el enemigo para que el jugador sepa exactamente qué hacer para evitarlo". Describe la pausa antes del ataque como el enemigo diciendo "vale, allá voy, voy a atacar... ¿puedes esquivar mi daño?".
-
-Es una buena forma de leer el código del embestidor. El estado `windup` es la pregunta. Las tres respuestas válidas están en las notas de la lámina: saltarlo, atravesarlo con el dash o no estar en su línea. Los estados `recover` y `dazed` son la pregunta que Stout pone al lado, "¿puedes golpearme?". Los demás enemigos del laboratorio hacen su propia versión de esas dos, que es el tema de [otro post de la serie](/blog/es/enemy-patterns-and-openings/).
-
-Las respuestas dependen de cosas que montaron posts anteriores. Atravesarlo con el dash sólo funciona porque [el dash da i-frames](/blog/es/dodge-dash-i-frames/). Que te roce la embestida cuesta una máscara y te aparta, en vez de vaciarte la vida, gracias a [los frames de invulnerabilidad tras el daño](/blog/es/health-damage-invincibility-frames/). El aviso es lo que te deja elegir entre esas respuestas a propósito.
-
-<h2 id="when-to-use">Cuándo basta con avisar y cuándo no</h2>
-
-| Situación | Qué hace el laboratorio |
-|---|---|
-| Cualquier ataque que el jugador deba esquivar | Avisarlo, siempre con la misma duración. |
-| Una versión más difícil del mismo enemigo | Acortar el aviso. El jefe multiplica todos sus avisos por 0,85 en la segunda fase. |
-| Un ataque con puntería | Fijar la puntería a medio aviso. El dron deja de seguirte a mitad de sus 0,65 s. |
-| Chocar con un enemigo que no está atacando | Sin aviso, pero con una caja menor: la caja de contacto de un enemigo pasivo es el 60 % de su cuerpo. |
-| Golpear al enemigo mientras avisa | Recibe el daño y sigue. Si no, aporrear el botón cancelaría todos los ataques. |
-| Encadenar varios ataques seguidos | Cada uno conserva su aviso. El jefe nunca lanza un ataque sin el suyo. |
-
-<Collapsible title="Por qué golpear al embestidor mientras avisa no lo detiene">
-La clase base aturde un instante al enemigo cada vez que lo golpeas, salvo que el enemigo diga que en ese momento tiene aguante. El embestidor dice que sí durante el aviso y durante la embestida:
-
-<CodeBlock filename="addons/combat_kit/enemies/charger.gd">
-```gdscript
-func _has_poise() -> bool:
-	return state == &"windup" or state == &"charge"
-```
-</CodeBlock>
-
-Sin esa línea, la mejor respuesta a cualquier aviso sería golpear al enemigo durante el aviso, y el aviso pasaría de pregunta a ventana gratis. El saltador elige lo contrario: sólo aguanta en el aire, así que si estás lo bastante cerca puedes sacarlo de su agachada a golpes.
 </Collapsible>
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
 <h3 id="how-long-telegraph">¿Cuánto debería durar el aviso de un ataque?</h3>
 
-En mi laboratorio los enemigos normales avisan entre 0,45 s (el saltador) y 0,65 s (el dron). El aviso real más corto es el martillo del jefe en la segunda fase, 0,425 s. Con 0,05 s ya no es un aviso.
+Aquí los enemigos normales avisan entre 0,45 s (el saltador) y 0,65 s (el dron). El aviso real más corto es el martillo del jefe en la segunda fase, 0,425 s. Con 0,05 s ya no es un aviso.
 
 <h3 id="telegraph-too-easy">¿Telegrafiar hace el juego demasiado fácil?</h3>
 
-No. La embestida me dio 14 veces en mis propias partidas, todas con el aviso encendido. El aviso le da al jugador la información; responder a tiempo sigue siendo cosa suya.
+No. El aviso te da la información, y responder a tiempo sigue siendo cosa tuya. Para endurecer una pelea, acorta el aviso o encadena ataques: el jefe acorta todos sus avisos un 15 % en la segunda fase.
 
 <h3 id="telegraph-sound">¿El aviso debería sonar?</h3>
 
-Sí. La pose y el anillo sólo funcionan si estás mirando al enemigo. En el laboratorio el pitido suena en cuanto empieza cualquier aviso, así que un ataque desde el borde de la pantalla también se puede leer.
-
-<h3 id="telegraph-direction">¿Puede un ataque avisado cambiar de dirección a mitad del aviso?</h3>
-
-En el laboratorio, no. El embestidor elige su dirección al empezar el aviso y no la corrige. Un ataque que se tuerce después del aviso castiga al jugador por haberlo leído.
-
-Ve a la lámina de telegrafiar y pulsa T. El embestidor es exactamente igual de rápido que antes, tiene los mismos 4 puntos de vida y el mismo muro contra el que estrellarse. Te va a quitar una máscara igual, y esta vez vas a sentir que el juego hizo trampa. No se volvió más difícil. Sólo dejó de decirte lo que iba a hacer.
+Sí. La pose y el anillo sólo funcionan si estás mirando al enemigo. Un pitido en cuanto empieza el aviso hace que también se pueda leer un ataque desde el borde de la pantalla.

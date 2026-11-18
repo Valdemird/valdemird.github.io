@@ -1,78 +1,31 @@
 ---
-title: "Aceleración y fricción en plataformas: 0,11 s para arrancar y 0,07 s para frenar (con código en Godot)"
-description: "Aceleración y fricción en un plataformas con Godot: velocidad máxima en 0,11 s, frenada en 0,07 s, giro en 0,06 s y menos freno en el aire. El código real con move_toward, la tasa única de Celeste y una lámina jugable."
+title: "Aceleración y fricción en plataformas: ajústalas en segundos"
+description: "La aceleración y la fricción deciden lo rápido que el personaje arranca, frena y gira: 0,11, 0,07 y 0,06 s. Por qué se ajustan en tiempo, y juégalo."
 pubDate: 2026-11-18
 tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 6
+seriesTitle: "Aceleración y fricción"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
-import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Aceleración y fricción: la velocidad horizontal nunca pasa de golpe de cero al máximo. En cada tick de física se acerca a un objetivo a un ritmo fijo, y ese ritmo depende de lo que esté haciendo el jugador. En mi laboratorio: 0,11 s para llegar a la velocidad máxima, 0,07 s para frenar y 0,06 s para perder la velocidad al dar la vuelta.",
-  "Se ajusta en segundos, no en px/s². El ritmo es la velocidad máxima dividida entre el tiempo que elijas, y una sola llamada a move_toward() hace el resto. En el aire el laboratorio conserva el 80 % de la aceleración pero solo el 40 % del frenado.",
-  "En 130 de mis partidas grabadas, el 19 % de los saltos desde el suelo despegó a una velocidad intermedia, ni parado ni a toda carrera. Una rampa así de corta sigue decidiendo hasta dónde llegan esos saltos.",
-]} />
+La **aceleración** es lo rápido que el personaje llega a su velocidad máxima de carrera; la **fricción**, lo rápido que se para cuando sueltas. Aquí son 0,11 s para arrancar, 0,07 s para frenar y 0,06 s para perder la velocidad al girar: rampa suficiente para que el personaje pese y lo bastante corta para seguir siendo preciso.
 
-La primera lámina de mi laboratorio después de la portada lleva un subtítulo dibujado en el plano: *el personaje no es un cursor*. El nivel es casi nada. Una franja de suelo y después tres fosos de tres casillas, con dos plataformas de dos casillas entre ellos. La nota del principio dice qué hacer y en qué fijarse: corre, suelta y cambia de sentido. Arranca en 0,11 s, frena en 0,07 s, gira en 0,06 s.
-
-Son números tan diminutos que es lógico preguntarse si la rampa llega a notarse jugando de verdad. Las mismas partidas grabadas del [post del coyote time](/blog/es/coyote-time-jump-buffer/) lo responden, porque el laboratorio apunta la velocidad horizontal en el instante de cada salto. De 3.497 saltos pulsados con los pies en el suelo, el 44 % salió exactamente a velocidad máxima y el 36 %, desde parado. El otro 19 % despegó a medio camino, y en el suelo eso significa casi siempre que el personaje estaba arrancando, frenando o girando.
-
-<StatGrid columns={2} stats={[
-  { value: "0,11 s", label: "Hasta la velocidad máxima", context: "de 0 a 340 px/s con una dirección pulsada" },
-  { value: "0,07 s", label: "Hasta parar", context: "desde la velocidad máxima, al soltar" },
-  { value: "0,06 s", label: "Para perder la velocidad al girar", context: "y luego 0,11 s más hacia el otro lado" },
-  { value: "19 %", label: "Saltos a media rampa", context: "de 3.497 desde el suelo, 130 partidas" },
-]} />
-
-<Callout type="important" title="La tesis">
-Una velocidad que pasa de cero al máximo de golpe es exacta y rígida. Una rampa de unas pocas centésimas de segundo le da peso al personaje, siempre que frenar sea más rápido que arrancar y girar, más rápido todavía. Las tres se ajustan como tiempos, porque un tiempo es lo que notan las manos del jugador.
-</Callout>
-
-<h2 id="what-is-acceleration-friction">¿Qué son la aceleración y la fricción en un plataformas?</h2>
-
-La aceleración es lo rápido que el personaje alcanza su velocidad máxima de carrera. La fricción, o deceleración, es lo rápido que se para cuando sueltas. En el código son la misma operación: en cada tick de física, mover la velocidad horizontal una cantidad fija hacia un objetivo. El objetivo es la dirección pulsada por la velocidad máxima. La cantidad fija es el ritmo, y en ese ritmo está todo el diseño.
-
-Mi laboratorio usa tres ritmos y elige uno según lo que hace el jugador:
-
-| El jugador... | Ritmo | Tiempo en mi laboratorio |
+| El jugador... | Ritmo | Tiempo |
 |---|---|---|
 | mantiene una dirección | acelerar | 0,11 s de 0 a 340 px/s |
 | suelta | frenar | 0,07 s de 340 px/s a 0 |
-| empuja hacia el otro lado | girar | 0,06 s para perder la velocidad y luego los 0,11 s normales hacia el otro lado |
+| empuja hacia el otro lado | girar | 0,06 s para perder la velocidad y luego 0,11 s hacia el otro lado |
+| está en el aire | los mismos, rebajados | 80 % para dirigir y girar, 40 % para frenar |
 
-La propia explicación de la lámina no se anda con rodeos: unos pocos frames de rampa dan sensación de peso, pero tienen que ser muy pocos. Frenar más rápido que acelerar, y girar más rápido aún, es lo que mantiene la precisión.
+<h2 id="what-is-acceleration-friction">Aceleración y fricción: el personaje no es un cursor</h2>
 
-El control en el aire es la misma idea con dos multiplicadores. En el aire el laboratorio conserva el 80 % de los ritmos de acelerar y girar (`air_control = 0.8`), así que un salto se sigue pudiendo dirigir. Del frenado solo conserva el 40 % (`air_friction = 0.4`), y soltar a mitad de salto no se come el impulso con el que saltaste.
-
-Así se ve como traza de velocidad, con los números del laboratorio: mantener a la derecha, cambiar a la izquierda y soltar.
-
-<InteractiveChart
-  type="line"
-  title="Velocidad horizontal en el tiempo: derecha, luego izquierda, luego soltar"
-  story="Con la rampa, la velocidad se curva en cada cambio. Después de T salta en seco entre el máximo, cero y el máximo hacia el otro lado."
-  xLabel="milisegundos"
-  yLabel="velocidad horizontal (px/s)"
-  xUnit=" ms"
-  unit=" px/s"
-  series={[
-    { name: "con aceleración y fricción", data: [{ label: "0", value: 0 }, { label: "25", value: 77 }, { label: "50", value: 155 }, { label: "75", value: 232 }, { label: "100", value: 309 }, { label: "125", value: 340 }, { label: "150", value: 340 }, { label: "175", value: 340 }, { label: "200", value: 340 }, { label: "225", value: 340 }, { label: "250", value: 340 }, { label: "275", value: 198 }, { label: "300", value: 57 }, { label: "325", value: -64 }, { label: "350", value: -141 }, { label: "375", value: -218 }, { label: "400", value: -295 }, { label: "425", value: -340 }, { label: "450", value: -340 }, { label: "475", value: -340 }, { label: "500", value: -340 }, { label: "525", value: -340 }, { label: "550", value: -340 }, { label: "575", value: -219 }, { label: "600", value: -97 }, { label: "625", value: 0 }, { label: "650", value: 0 }, { label: "675", value: 0 }, { label: "700", value: 0 }] },
-    { name: "después de T (velocidad instantánea)", data: [{ label: "0", value: 0 }, { label: "25", value: 340 }, { label: "50", value: 340 }, { label: "75", value: 340 }, { label: "100", value: 340 }, { label: "125", value: 340 }, { label: "150", value: 340 }, { label: "175", value: 340 }, { label: "200", value: 340 }, { label: "225", value: 340 }, { label: "250", value: 340 }, { label: "275", value: -340 }, { label: "300", value: -340 }, { label: "325", value: -340 }, { label: "350", value: -340 }, { label: "375", value: -340 }, { label: "400", value: -340 }, { label: "425", value: -340 }, { label: "450", value: -340 }, { label: "475", value: -340 }, { label: "500", value: -340 }, { label: "525", value: -340 }, { label: "550", value: -340 }, { label: "575", value: 0 }, { label: "600", value: 0 }, { label: "625", value: 0 }, { label: "650", value: 0 }, { label: "675", value: 0 }, { label: "700", value: 0 }] },
-  ]}
-  source="Simulado a 120 Hz con los parámetros del laboratorio: → pulsado hasta los 250 ms, ← hasta los 550 ms y después nada."
-/>
-
-La lámina 01 te pide justo eso, sobre plataformas de dos casillas donde pasarse de largo es caerse. El inspector del laboratorio dibuja la misma traza en directo mientras juegas.
+Una velocidad que pasa de cero al máximo de golpe es exacta y rígida. Una rampa de unas pocas centésimas le da peso al personaje, siempre que frenar sea más rápido que arrancar y girar, más rápido todavía. En el aire el frenado baja al 40 %, y soltar a mitad de salto no se come el impulso con el que saltaste.
 
 <PlayableLab
   sheets="accel"
@@ -86,41 +39,20 @@ La lámina 01 te pide justo eso, sobre plataformas de dos casillas donde pasarse
   ]}
 />
 
-<h2 id="acceleration-godot">Cómo programar la aceleración y la fricción en Godot 4</h2>
+<h2 id="how-to-implement">Cómo implementar la aceleración y la fricción</h2>
 
-Todo empieza en el archivo de parámetros, donde no hay ni una aceleración, solo tiempos.
+1. **Ajusta tiempos, no aceleraciones.** El ritmo es la velocidad máxima dividida entre el tiempo: 340 px/s en 0,11 s son 3.091 px/s².
+2. **Elige el ritmo según lo que hace el jugador.** Al soltar, el de frenar; al empujar contra la velocidad que llevas, el de girar; en cualquier otro caso, el de acelerar. En el aire, rebájalos.
+3. **Que el giro se acabe en el cero.** El ritmo de giro solo actúa mientras la velocidad aún apunta al otro lado, así que una media vuelta completa cuesta 0,06 + 0,11 = 0,17 s.
+4. **Acércate al objetivo una cantidad fija por tick.** Un `lerp` cierra una fracción fija: nunca termina de llegar, y su factor cambia de significado si cambia la frecuencia de ticks.
 
-<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
-```gdscript
-@export_group("Carrera")
-## Velocidad máxima horizontal.
-@export_range(100.0, 800.0, 5.0, "suffix:px/s") var max_speed := 340.0
-## Tiempo de 0 a velocidad máxima. Corto = responde al instante.
-@export_range(0.01, 0.5, 0.005, "suffix:s") var accel_time := 0.11
-## Tiempo de velocidad máxima a 0 al soltar. Más corto que acelerar = parada precisa.
-@export_range(0.01, 0.5, 0.005, "suffix:s") var decel_time := 0.07
-## Tiempo en perder la velocidad al invertir la dirección (giro rápido).
-@export_range(0.01, 0.5, 0.005, "suffix:s") var turn_time := 0.06
-# ...
-## Fracción de aceleración disponible en el aire.
-@export_range(0.0, 1.0, 0.01) var air_control := 0.8
-## Fracción de frenado en el aire sin entrada (conserva la inercia del salto).
-@export_range(0.0, 1.0, 0.01) var air_friction := 0.4
-```
-</CodeBlock>
-
-El controlador convierte esos tiempos en ritmos sobre la marcha: ritmo = velocidad máxima / tiempo. Con 340 px/s salen 3.091 px/s² para acelerar, 4.857 para frenar y 5.667 para girar. Nadie ajusta un 4.857. Ajustas 0,07 s y dejas que la división haga lo suyo. La cabecera del mismo archivo lo dice a propósito de la gravedad: nadie piensa "gravedad 1994 px/s²", se piensa "salta 3,6 casillas y tarda 0,38 s en llegar arriba".
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="addons/platformer_kit/player/player.gd">
 ```gdscript
 var p := params
 var target := input_x * p.max_speed * _walk_scale(on_floor)
-
-# Versión ingenua: velocidad = dirección × máxima. Preciso pero robótico.
-if not Lab.on(&"accel_curves"):
-	velocity.x = target
-	return
-
+# ...
 # ACELERACIÓN Y FRICCIÓN: tres tasas distintas según la intención del jugador.
 var rate: float
 if input_x == 0:
@@ -137,82 +69,24 @@ else:
 	if not on_floor:
 		rate *= p.air_control
 	# ...
-if _at_apex(on_floor):
-	rate *= p.apex_accel_mult                         # más control en el ápice
 velocity.x = move_toward(velocity.x, target, rate * delta)
 ```
 </CodeBlock>
 
-Con T, la función se queda en el primer `return`. `velocity.x = target` es la versión ingenua entera, una línea (`_walk_scale` vale 1,0 mientras se corre). Todo lo que viene debajo es la técnica, y hay detalles que merecen una segunda lectura:
+El archivo de parámetros no tiene ni una aceleración, solo tiempos: `accel_time`, `decel_time` y `turn_time`.
 
-- La rama de giro solo actúa mientras la velocidad todavía apunta hacia el otro lado (`signf(velocity.x) != float(input_x)`). En cuanto cruza el cero entra la aceleración normal, así que una media vuelta completa cuesta 0,06 + 0,11 = 0,17 s.
-- Los multiplicadores del aire van dentro de cada rama, y por eso el frenado se queda en 0,4 mientras el control se queda en 0,8.
-- Cerca de lo alto de un salto el ritmo recibe un empujón más, `apex_accel_mult` (×1,5). Es la pausa en el ápice del [post sobre la gravedad del salto](/blog/es/jump-gravity-apex-hang/).
-- Los dos `# ...` son casos especiales. Después de un [salto de pared](/blog/es/wall-jump/), soltar casi no frena, y el salto te lleva solo hasta la pared de enfrente. Y la velocidad por encima del máximo, la de un [dash](/blog/es/platformer-dash/) o una plataforma móvil, se pierde despacio en lugar de cortarse.
-
-<h2 id="celeste">Tres ritmos o uno: mi laboratorio frente a Celeste</h2>
-
-Celeste lo hace con un solo ritmo.<Sidenote>Del [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), el código del jugador que el equipo de Celeste subió a GitHub. Las constantes están al principio del archivo. C#, recortado.</Sidenote> `RunAccel = 1000f` sirve para arrancar, para frenar y para girar, y en el aire todo se multiplica por `AirMult = .65f`. Hay un segundo ritmo, `RunReduce = 400f`, que solo entra cuando ya vas por encima de la velocidad máxima de `MaxRun = 90f` y sigues empujando hacia el mismo lado.
-
-<CodeBlock filename="Celeste/Source/Player/Player.cs">
-```csharp
-float mult = onGround ? 1 : AirMult;
-if (onGround && level.CoreMode == Session.CoreModes.Cold)
-    mult *= .3f;
-
-float max = Holding == null ? MaxRun : HoldingMaxRun;
-// ...
-if (Math.Abs(Speed.X) > max && Math.Sign(Speed.X) == moveX)
-    Speed.X = Calc.Approach(Speed.X, max * moveX, RunReduce * mult * Engine.DeltaTime);  //Reduce back from beyond the max speed
-else
-    Speed.X = Calc.Approach(Speed.X, max * moveX, RunAccel * mult * Engine.DeltaTime);   //Approach the max speed
-```
-</CodeBlock>
-
-`Calc.Approach` es el `move_toward` de Celeste: el patrón es idéntico. Para comparar el ajuste hay que pasarlo a segundos, la única unidad que sobrevive al viaje de un juego a otro. El personaje de Celeste corre a 90 px/s y el mío a 340, así que 1.000 frente a 3.091 px/s² no dice nada.
-
-| | Mi laboratorio | Celeste |
-|---|---|---|
-| Arrancar, de 0 al máximo | 0,11 s | 0,09 s |
-| Parar después de soltar | 0,07 s | 0,09 s |
-| Media vuelta completa, de máximo a máximo | 0,17 s | 0,18 s |
-| Arrancar en el aire | 0,14 s | 0,14 s |
-| Parar en el aire | 0,175 s | 0,14 s |
-
-Los tiempos de Celeste son `MaxRun / RunAccel`, el doble para la media vuelta y divididos entre `AirMult` en el aire. Los números salen parecidos. La forma no: Celeste frena exactamente igual de fuerte que acelera, en todas partes. Mi laboratorio frena más fuerte de lo que acelera en el suelo y mucho más suave en el aire. En los dos, una media vuelta completa tarda menos de una quinta parte de segundo.
-
-<h2 id="when-to-use">Cuándo ayudan la aceleración y la fricción, y cuándo estorban</h2>
-
-| Situación | Qué hacer |
-|---|---|
-| Plataformas estrechas, aterrizajes precisos | Rampas cortas, y frenar más rápido que acelerar. Con 0,07 s el personaje del laboratorio patina unos 10 px después de soltar, un cuarto de casilla. |
-| Dar la vuelta en plena carrera | Que sea el más rápido de los tres ritmos: 0,06 s en mi laboratorio. |
-| Saltos | Frenar menos en el aire que en el suelo, para que soltar no se coma el impulso del salto. |
-| Hielo y suelos resbaladizos, a propósito | Ahí la rampa larga es la gracia. Celeste multiplica la aceleración en el suelo por 0,3 en su modo de núcleo frío (`CoreModes.Cold`). |
-| Una frenada lenta en un juego de precisión | No. Con 0,3 s para parar, un personaje a 340 px/s se desliza 51 px después de soltar, más de una casilla entera. |
-
-<Collapsible title="Por qué move_toward y no lerp">
-Una alternativa habitual es escribir `velocity.x = lerp(velocity.x, target, k)` en cada tick. Eso cierra una fracción fija de la distancia que falta en lugar de una cantidad fija, así que arranca rápido, se frena cerca del objetivo y nunca termina de llegar. No hay un "tiempo hasta la velocidad máxima" que ajustar, solo una `k` que cambia de significado si cambia la frecuencia de ticks. Es un esquema genérico, no código de mi proyecto.
-
-`move_toward` cierra una cantidad fija por tick, llega exactamente al objetivo, y lo que tarda es el número que escribiste en el archivo de parámetros. A los 120 Hz del laboratorio, 0,11 s son 13,2 ticks, así que en la práctica el personaje llega a 340 px/s en el tick 14.
 </Collapsible>
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
 <h3 id="how-fast-accelerate">¿Cuánto debe tardar en acelerar el personaje de un plataformas?</h3>
 
-Poco. Mi laboratorio tarda 0,11 s en llegar a la velocidad máxima y Celeste 0,09 s. A 60 fotogramas por segundo, en los dos casos son menos de siete fotogramas.
+Poco: 0,11 s hasta la velocidad máxima aquí y 0,09 s en [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs). A 60 fotogramas por segundo, en los dos casos son menos de siete fotogramas.
 
 <h3 id="stop-faster">¿Frenar debe ser más rápido que acelerar?</h3>
 
-En el suelo, si tus plataformas son estrechas, sí: mi laboratorio frena en 0,07 s frente a 0,11 s para arrancar. Celeste usa el mismo ritmo para las dos cosas y se juega muy bien, así que tómalo como una decisión que tomas a propósito.
+En el suelo, si tus plataformas son estrechas, sí: 0,07 s para frenar frente a 0,11 s para arrancar. Celeste usa el mismo ritmo para las dos cosas y se juega muy bien, así que tómalo como una decisión a propósito.
 
 <h3 id="air-control">¿Qué es el control en el aire en un plataformas?</h3>
 
-La fracción de la aceleración del suelo que conservas en el aire: 0,8 en mi laboratorio y 0,65 en Celeste. Mi laboratorio le da además un número propio al frenado en el aire (0,4), así que dirigir un salto y dejarse llevar en él se ajustan por separado.
-
-<h3 id="time-to-acceleration">¿Cómo convierto un tiempo en una aceleración?</h3>
-
-Divide la velocidad máxima entre el tiempo. 340 px/s en 0,11 s son 3.091 px/s². Después, en cada tick: `velocity.x = move_toward(velocity.x, target, rate * delta)`.
-
-Abre la lámina 01, pulsa T y párate en las plataformas de dos casillas. Te vas a parar justo donde sueltes, y la nota de la lámina lo reconoce: la velocidad instantánea es exacta. Luego da la vuelta en mitad del pasillo y mira el inspector: una onda cuadrada sin nada en medio. Ese es el cursor del subtítulo, y seis centésimas de segundo bastan para devolverle el cuerpo.
+La fracción de la aceleración del suelo que conservas en el aire: 0,8 aquí y 0,65 en Celeste. Si el frenado en el aire tiene su propio número (0,4 aquí), dirigir un salto y dejarse llevar en él se ajustan por separado.

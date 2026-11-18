@@ -1,86 +1,56 @@
 ---
-title: "Fases de un ataque: anticipación, activo y recuperación (con código en Godot)"
-description: "Todo ataque tiene tres fases: anticipación hasta que puede dar, activo mientras la hitbox está encendida y recuperación hasta que vuelves a actuar. Mis números en Godot (35, 100 y 200 ms) y el buffer de ataque de 150 ms."
+title: "Fases de un ataque: anticipación, activo y recuperación"
+description: "Todo ataque tiene anticipación, activo y recuperación: antes de poder dar, mientras da y hasta que vuelves a actuar. Mira sus 35, 100 y 200 ms y juégalos."
 pubDate: 2026-11-18
 tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 12
+seriesTitle: "Fases de un ataque"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
-import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
-import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Un ataque tiene tres fases. La anticipación va desde que pulsas hasta que el golpe puede dar, el activo es la ventana en que la hitbox está encendida, y la recuperación es lo que pagas antes de poder atacar otra vez.",
-  "En el tajo de mi laboratorio duran 35, 100 y 200 ms: unos 2, 6 y 12 frames a 60 fps. Solo los 100 ms del medio pueden hacer daño.",
-  "Un buffer de ataque recuerda durante 150 ms una pulsación hecha cuando todavía no puedes atacar. En mis partidas grabadas salió de él el 23 % de todos los golpes, y el 52 % de los segundos y terceros golpes de un combo.",
-]} />
+Todo ataque tiene tres fases: la **anticipación** (startup) hasta que puede dar, el **activo** mientras la hitbox está encendida y la **recuperación** hasta que vuelves a actuar. Aquí el tajo dura **35, 100 y 200 ms**, y solo los 100 ms del medio pueden hacer daño.
 
-La lámina 02 del plano de combate de mi laboratorio pone una regla sobre la cabeza del personaje cada vez que ataca. Tres tramos a escala y un cursor que los recorre: 35 ms, 100 ms, 200 ms. Esa regla es el ataque entero, y solo el tramo del medio puede hacerle daño a algo.
+<TimingDiagram
+  title="Un tajo del combo"
+  duration={335}
+  start={260}
+  tick={50}
+  probe="vuelves a pulsar ataque"
+  onLabel="Con el buffer de ataque"
+  offLabel="Sin él"
+  phases={[
+    { from: 0, to: 35, label: "anticipación", tone: "neutral", on: { ok: false, text: "Perdida: demasiado pronto incluso para el buffer." } },
+    { from: 35, to: 135, label: "activo", tone: "danger", on: { ok: false, text: "Perdida: demasiado pronto incluso para el buffer." } },
+    { from: 135, to: 335, label: "recuperación", tone: "neutral", on: { ok: null, text: "Recuperación: no hay hitbox y el siguiente golpe tiene que esperar." } },
+  ]}
+  events={[
+    { at: 35, label: "hitbox encendida" },
+    { at: 135, label: "hitbox apagada" },
+  ]}
+  windows={[
+    { from: 75, to: 225, label: "buffer de ataque", detail: "150 ms", measure: "until",
+      on: { ok: true, text: "Guardada: el siguiente golpe empieza a los 225 ms, dentro de {ms} ms." },
+      off: { ok: false, text: "Perdida: sin el buffer, una pulsación solo cuenta en su propio tic." } },
+    { from: 225, to: 335, label: "cancel", detail: "desde los 90 ms de recuperación", measure: "until",
+      on: { ok: true, text: "Cancel: el siguiente golpe corta la recuperación y empieza ya." },
+      off: { ok: false, text: "Perdida: llegas {ms} ms pronto." } },
+  ]}
+/>
 
-La regla explica el tajo. Las partidas grabadas explican el botón. De 4.672 golpes, 1.083 salieron de una pulsación hecha más de 20 ms antes de que el personaje pudiera atacar. Pulsar antes de tiempo no es un error que el jugador comete de vez en cuando. Es su manera de atacar.
+<h2 id="what-are-startup-active-recovery">Anticipación, activo y recuperación: qué decide cada fase</h2>
 
-<StatGrid columns={2} stats={[
-  { value: "35 ms", label: "Anticipación", context: "de la pulsación al primer golpe posible, unos 2 frames" },
-  { value: "100 ms", label: "Activo", context: "la única ventana con la hitbox encendida" },
-  { value: "200 ms", label: "Recuperación", context: "el precio del golpe, acierte o no" },
-  { value: "23 %", label: "Golpes salidos del buffer", context: "1.083 de 4.672 grabados, 15–18 nov" },
-]} />
+La anticipación decide lo rápido que se siente el botón, el activo lo indulgente que es el momento de pulsar y la recuperación lo que cuesta fallar. El [glosario de juegos de pelea de Infil](https://glossary.infil.net/?t=Startup) las llama las tres etapas de un ataque, y solo los frames activos tienen hitbox. A 60 fps, este tajo son unos 2, 6 y 12 frames.
 
-<Callout type="important" title="La tesis">
-Un ataque son tres duraciones, y cada una responde a una pregunta distinta. La anticipación decide lo rápido que se siente el botón, el activo decide lo indulgente que es el momento de pulsar, y la recuperación decide lo que cuesta fallar. El buffer responde a una cuarta: si una pulsación que llegó un poco pronto sigue contando. Debería.
-</Callout>
+<h2 id="attack-buffer">Buffer de ataque: pulsar antes de tiempo también es pulsar</h2>
 
-<h2 id="what-are-startup-active-recovery">¿Qué son la anticipación, el activo y la recuperación?</h2>
-
-La **anticipación** (startup) es el tiempo desde que pulsas el botón hasta que el ataque puede tocar algo. El **activo** (active) es la ventana en la que puede. La **recuperación** (recovery) es el tiempo que pasa después hasta que vuelves a poder actuar. El [glosario de juegos de pelea de Infil](https://glossary.infil.net/?t=Startup) las llama las tres etapas de un ataque, medidas en frames, y su [entrada de hitbox](https://glossary.infil.net/?t=Hitbox) las ata entre sí: un movimiento solo tiene hitbox durante su fase activa. La anticipación y la recuperación no tienen ninguna.
-
-Mi laboratorio guarda los tres números en `CombatParams`. El recurso almacena segundos, pero los comentarios piensan en frames a 60 fps, que es como se habla del tiempo en los juegos de acción.
-
-<CodeBlock filename="addons/combat_kit/player/combat_params.gd">
-```gdscript
-@export_group("Ataque")
-## ANTICIPACIÓN: desde que se pulsa hasta que el golpe hace daño. Muy corta en el
-## jugador (responde al instante); larga en los enemigos (se puede leer).
-@export_range(0.0, 0.3, 0.005, "suffix:s") var attack_startup := 0.035
-## ACTIVO: ventana en la que el hitbox hace daño.
-@export_range(0.02, 0.4, 0.005, "suffix:s") var attack_active := 0.1
-## RECUPERACIÓN: tiempo hasta poder atacar otra vez. Es el "compromiso" del golpe.
-@export_range(0.0, 1.0, 0.005, "suffix:s") var attack_recovery := 0.2
-## BUFFER: una pulsación hecha durante el golpe anterior se recuerda este tiempo.
-@export_range(0.0, 0.4, 0.005, "suffix:s") var attack_buffer_time := 0.15
-```
-</CodeBlock>
-
-| Fase | Laboratorio | Frames a 60 fps | Qué decide |
-|---|---|---|---|
-| Anticipación | 35 ms | unos 2 | lo rápido que se siente el botón |
-| Activo | 100 ms | 6 | lo indulgente que es el momento de pulsar |
-| Recuperación | 200 ms | 12 | lo que cuesta fallar |
-| Buffer | 150 ms | 9 | cuánto antes puede llegar una pulsación y seguir contando |
-
-La [entrada de active](https://glossary.infil.net/?t=Active) de Infil dice que en los juegos de pelea los movimientos suelen tener entre 1 y 4 frames activos, aunque el movimiento entero dure 30. Mi tajo está activo 6 de sus 20. Es una ventana amplia, y encaja con un juego en el que atacar no te para: puedes correr, saltar y girarte en mitad del golpe, y lo mismo puede hacer aquello a lo que apuntas.
-
-El ataque completo es una máquina de cuatro estados:
-
-<MermaidDiagram title="Un tajo, cuatro estados" chart={`graph LR
-  I["Libre"] -->|"pulsar"| S["Anticipación · 35 ms"]
-  S -->|"hitbox encendida"| A["Activo · 100 ms"]
-  A -->|"hitbox apagada"| R["Recuperación · 200 ms"]
-  R -->|"acaba"| I
-  R -.->|"pulsación guardada del combo, desde 90 ms"| S
-`} />
-
-En la lámina 02 la regla dibuja esas fases sobre tu cabeza en cada golpe. Hay dos maniquíes juntos y, más adelante, un tercero que está ahí para aporrear el botón.
+Un buffer de ataque recuerda **150 ms** una pulsación hecha mientras el personaje está ocupado, y el ataque sale en cuanto puede: es el [jump buffer](/blog/es/coyote-time-jump-buffer/) en otro botón. En un combo, la pulsación guardada además corta la recuperación desde los 90 ms, y el siguiente golpe empieza a los 225 ms en vez de a los 335. En los juegos de pelea eso es un [cancel](https://glossary.infil.net/?t=Cancel). Esperar la recuperación entera es un [link](https://glossary.infil.net/?t=Link), y es lo único que te deja la T.
 
 <PlayableLab
   plane="combate"
@@ -95,12 +65,20 @@ En la lámina 02 la regla dibuja esas fases sobre tu cabeza en cada golpe. Hay d
   ]}
 />
 
-<h2 id="attack-phases-godot">Cómo programar las fases de un ataque en Godot 4</h2>
+<h2 id="how-to-implement">Cómo implementar las fases de un ataque y el buffer de ataque</h2>
 
-Un único temporizador, `_phase_time`, va sumando. Cada fase lo compara con su propia duración, y la hitbox se enciende y se apaga en las dos transiciones del medio. Nada más en el código puede hacer que el tajo dañe.
+1. **Un temporizador por golpe.** Cada fase lo compara con su propia duración. La hitbox se enciende al acabar la anticipación y se apaga al acabar el activo.
+2. **El botón solo carga un buffer.** El golpe empieza cuando el personaje está libre y al buffer todavía le queda tiempo.
+3. **En un combo, deja que la pulsación guardada corte la recuperación,** aquí a partir del 45 %.
+4. **Nunca pongas la recuperación a cero, ni hagas el buffer mucho más largo que ella.** Sin recuperación nadie piensa antes de pulsar. Con un buffer enorme sale una pulsación de la que el jugador ya se arrepintió.
+
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="addons/combat_kit/player/player_combat.gd">
 ```gdscript
+		if Lab.on(&"attack_buffer"):
+			_attack_buffer = params.attack_buffer_time
+	# ...
 	match phase:
 		Phase.STARTUP:
 			if _phase_time >= startup_time():
@@ -116,10 +94,6 @@ Un único temporizador, `_phase_time`, va sumando. Cada fase lo compara con su p
 				_end_attack()
 			elif _attack_buffer > 0.0 and not is_healing and Lab.on(&"attack_buffer") \
 					and _phase_time >= recovery_time() * params.combo_cancel and _chains(_decide(true)):
-				# ENCADENAR: la pulsación guardada corta lo que queda de recuperación
-				# (el golpe siguiente sale justo debajo, en este mismo tic). Sin el
-				# buffer no hay pulsación guardada: se encadena pulsando al acabar,
-				# dentro de la ventana.
 				_end_attack()
 	# ...
 	if phase == Phase.IDLE and _attack_buffer > 0.0 and not is_healing and not dashing and not spent:
@@ -127,86 +101,16 @@ Un único temporizador, `_phase_time`, va sumando. Cada fase lo compara con su p
 ```
 </CodeBlock>
 
-Dos detalles. `slash.begin()` también vacía la lista de hurtboxes ya golpeadas (el bucle está en el [post de hitbox y hurtbox](/blog/es/hitbox-vs-hurtbox/)), y por eso los dos maniquíes juntos reciben un golpe cada uno y nunca dos. Y pulsar el botón no arranca nada directamente: solo carga `_attack_buffer`. El golpe empieza al final, cuando el estado está libre y al buffer todavía le queda tiempo.
+`slash.begin()` también vacía la lista de hurtboxes ya golpeadas, así que cada objetivo recibe un golpe por activación.
 
-Las fases tampoco bloquean el movimiento. El jugador sigue corriendo y saltando durante la anticipación, el activo y la recuperación; solo algunos golpes más pesados te dejan plantado.<Sidenote>El remate, la estocada y el barrido. Cada uno tiene sus propias duraciones: el remate va a 70, 120 y 340 ms.</Sidenote>
-
-<h2 id="attack-buffer">El buffer de ataque: pulsar antes de tiempo también es pulsar</h2>
-
-Si leíste el [post del coyote time y el jump buffer](/blog/es/coyote-time-jump-buffer/), esto es la misma idea en otro botón. Una pulsación hecha cuando el personaje todavía no puede atacar se recuerda durante 150 ms, y el ataque sale en cuanto puede. Sin el buffer, la pulsación solo cuenta en el tic en que ocurrió. Esto es lo que se ejecuta en el tic en que se pulsa el botón de ataque:
-
-<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
-```gdscript
-		# ...
-		if Lab.on(&"attack_buffer"):
-			# BUFFER DE ATAQUE: la pulsación se recuerda. Si ahora no se puede
-			# atacar pero sí dentro de 150 ms, el golpe saldrá.
-			_attack_buffer = params.attack_buffer_time
-		else:
-			_attack_buffer = delta * 0.5   # sólo vale para este tick exacto
-			if phase != Phase.IDLE:
-				var wait := _time_to_idle()
-				if wait <= params.attack_buffer_time:
-					attack_dropped.emit(int(wait * 1000.0))
-```
-</CodeBlock>
-
-La rama del `else` es la parte del experimento que pone el laboratorio. Con el buffer apagado, una pulsación que se habría guardado dispara `attack_dropped` con los milisegundos que se adelantó, y la lámina te lo escribe en rojo a los pies. En mis partidas el buffer estuvo encendido todo el tiempo, así que esas 1.083 pulsaciones salieron como ataques. Esto es cuánto se adelantaron:
-
-<InteractiveChart
-  type="horizontal"
-  title="Cuánto se adelantaron las pulsaciones guardadas"
-  story="Dos de cada tres pulsaciones guardadas llegaron con menos de 100 ms de adelanto. Sin el buffer, todas se tiran a la basura."
-  unit=" golpes"
-  data={[
-    { label: "25–49 ms", value: 329 },
-    { label: "50–74 ms", value: 140 },
-    { label: "75–99 ms", value: 250 },
-    { label: "100–124 ms", value: 186 },
-    { label: "125–149 ms", value: 129 },
-    { label: "150 ms o más", value: 49 },
-  ]}
-  annotations={[{ targetIndex: 0, text: "el grupo más grande: apenas adelantadas", emphasize: true }]}
-  source="1.083 golpes salidos del buffer de 4.672 grabados en mis partidas, 15–18 nov. Las pulsaciones adelantadas menos de 20 ms no se apuntan como guardadas. Unas pocas pasan de 150 ms porque el buffer se detiene durante un dash."
-/>
-
-El buffer hace un segundo trabajo. Una pulsación guardada durante la recuperación de un golpe del combo corta lo que queda de ella, a partir del 45 % de la recuperación (90 ms). En el idioma de los juegos de pelea eso es un [cancel](https://glossary.infil.net/?t=Cancel): quitarle la recuperación a un ataque para pasar directamente al siguiente. Con la T no hay pulsación guardada, así que nada puede cortar la recuperación. El siguiente golpe tiene que esperar los 200 ms enteros y pulsarse después, que es lo que Infil llama un [link](https://glossary.infil.net/?t=Link). Una tecla convierte mi combo de cancels en links.
-
-En números: con el buffer, cada tajo encadenado puede empezar 225 ms después del anterior (35 + 100 + 90). Sin él, 335 ms como pronto, más lo que tarde en llegar tu pulsación. Mis partidas enseñan cuánto se apoya el combo en esto: de los 855 segundos y terceros golpes que grabé, 446 salieron del buffer. Es el 46 % de los segundos golpes y el 60 % de los remates.<Sidenote>Solo las partidas más recientes apuntan qué golpe del combo era cada uno, así que esos 855 salen de una parte de los 4.672.</Sidenote>
-
-<h2 id="when-to-use">Cuánto debería durar cada fase</h2>
-
-| Situación | Qué hacer |
-|---|---|
-| El ataque básico del jugador | Anticipación corta. La mía es de 35 ms: el botón tiene que responder ya. |
-| El ataque de un enemigo | Anticipación larga, para que se pueda leer. El comentario de la anticipación en `CombatParams` lo dice tal cual. |
-| Un golpe pesado o un remate | Más de todo. Mi remate va a 70 / 120 / 340 ms y quita 2 en vez de 1. |
-| Recuperación a cero | No. La recuperación es el precio del golpe; sin ella nadie piensa antes de pulsar. |
-| Encadenar golpes en un combo | Guarda la pulsación y deja que corte la recuperación. Encadenar debería ser más rápido que dar golpes sueltos: ese es el premio. |
-| Un buffer mucho más largo que la recuperación | Cuidado: sale una pulsación de la que el jugador ya se había arrepentido. |
-
-<Collapsible title="Cómo se cuentan de verdad los frames">
-La física del laboratorio va a 120 Hz, así que los 35 ms de anticipación se comprueban cada 8,3 ms. El tajo puede conectar por primera vez en el quinto tic después de la pulsación, hacia los 42 ms. Los comentarios siguen hablando en frames a 60 fps porque es el idioma del género, no porque el motor vaya a 60.
-
-Los juegos de pelea tienen su propia rareza. Infil explica que muchas comunidades cuentan el primer frame activo dentro de la anticipación, así que un movimiento con 8 frames de startup golpea en el frame 8, no en el 9. Antes de comparar datos de frames entre juegos, comprueba cómo cuenta cada uno.
 </Collapsible>
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
 <h3 id="attack-startup-length">¿Cuánto debería durar la anticipación de un ataque?</h3>
 
-En el jugador, tan poco como permita la animación. La mía es de 35 ms, unos dos frames a 60 fps. En los enemigos es al revés: su anticipación es el aviso que deja reaccionar al jugador.
+En el jugador, tan poco como permita la animación: aquí 35 ms, unos dos frames a 60 fps. En los enemigos es al revés, porque su anticipación es el aviso que te deja reaccionar.
 
 <h3 id="how-many-active-frames">¿Cuántos frames activos debería tener un ataque?</h3>
 
-Los juegos de pelea suelen usar entre 1 y 4, según el glosario de Infil. Mi tajo usa 6 (100 ms), una ventana generosa para un juego en el que tanto el jugador como sus objetivos siguen moviéndose.
-
-<h3 id="what-is-attack-buffer">¿Qué es un buffer de ataque?</h3>
-
-Una memoria corta para el botón de ataque. Si pulsas mientras el personaje sigue ocupado, la pulsación se guarda un rato (150 ms en mi laboratorio) y el ataque sale en cuanto se puede. La entrada de [buffer window](https://glossary.infil.net/?t=Buffer+Window) de Infil dice que los juegos de pelea tienen buffers por todas partes ("all over the place"), también para las entradas durante los combos, para que el jugador confíe en que sus movimientos van a salir.
-
-<h3 id="cancel-vs-link">¿Qué diferencia hay entre un cancel y un link?</h3>
-
-Un cancel corta la recuperación de un ataque para empezar el siguiente. Un link espera a que el primero termine del todo. En mi laboratorio, el buffer de ataque es lo que convierte el combo en una cadena de cancels; apagarlo con la T los convierte en links.
-
-Ve a la lámina 02, pulsa T y aporrea el botón. Las etiquetas rojas se te amontonan a los pies, y cada una es una pulsación que hiciste a propósito. El juego, simplemente, no la esperó.
+Los juegos de pelea suelen usar entre 1 y 4, según la [entrada de active](https://glossary.infil.net/?t=Active) de Infil. Este tajo usa 6 (100 ms), una ventana amplia para un juego en el que nadie deja de moverse en mitad del golpe.

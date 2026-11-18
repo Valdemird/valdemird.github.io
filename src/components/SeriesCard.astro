@@ -34,7 +34,7 @@ const metrics = [
 
 <a href={seriesHref(id, lang)} class="series-card animate-fade-in delay-1">
 	<div class="series-card__inner">
-		<p class="eyebrow">{es ? 'Serie jugable · Godot 4' : 'Playable series · Godot 4'}</p>
+		<p class="eyebrow">{es ? `Serie jugable · ${stats.posts} mecánicas` : `Playable series · ${stats.posts} mechanics`}</p>
 		<Heading class="series-card__title">{info.name}</Heading>
 		<p class="desc">{info.description}</p>
 		{thumbs.length > 0 && (

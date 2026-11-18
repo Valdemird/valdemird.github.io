@@ -41,7 +41,9 @@ const inPublic = (path: string) => existsSync(join(process.cwd(), 'public', path
 export interface SeriesCard {
 	id: string;
 	href: string;
+	/** seriesTitle, or the full title when the post has none. */
 	title: string;
+	fullTitle: string;
 	description: string;
 	order: number;
 	minutes: number;
@@ -68,7 +70,8 @@ export async function getSeriesCards(id: SeriesId, lang: Lang): Promise<SeriesCa
 		return {
 			id: post.id,
 			href: `/blog/${post.id}/`,
-			title: post.data.title,
+			title: post.data.seriesTitle ?? post.data.title,
+			fullTitle: post.data.title,
 			description: post.data.description,
 			order: i + 1,
 			minutes: readingMinutes(post.body),

@@ -23,6 +23,8 @@ const blog = defineCollection({
 		series: z.string().optional(),
 		/** 1-based position inside the series. */
 		seriesOrder: z.number().int().optional(),
+		/** Short name of the part (1–4 words) for the series nav and the hub's cards. */
+		seriesTitle: z.string().optional(),
 	}),
 });
 

@@ -50,116 +50,96 @@ const metrics = [
 
 const COPY = es
 	? {
-			eyebrow: `Serie · ${stats.posts} posts · Godot 4`,
-			h1: 'Game feel de plataformas en Godot 4, una mecánica cada vez',
-			lead: 'El 15 de noviembre empecé un plataformas en Godot. Antes de dibujar un solo nivel construí un laboratorio: un plano largo en el que cada lámina aísla una técnica y la tecla T la apaga mientras juegas. Esta serie es ese laboratorio contado una mecánica por post: qué hace, cuándo la necesita un juego, el código real y la lámina misma, corriendo en tu navegador.',
+			eyebrow: `Serie · ${stats.posts} mecánicas`,
+			h1: 'Game feel en plataformas, una mecánica cada vez',
+			lead: 'Las técnicas que deciden cómo se siente un plataformas, desde un salto que perdona una pulsación tardía hasta un jefe que lo exige todo. Cada post explica una en pocas líneas y te deja jugarla, con la técnica encendida y apagada.',
 			updated: 'Actualizada',
 			breadcrumb: 'Serie',
 			startTitle: 'Empieza aquí: todo el juice sobre un salto',
 			start: [
-				'Si vas a probar una sola lámina, que sea ésta. Es la 13 del laboratorio y apila sobre un mismo salto el juice de mi [post de game feel]: squash and stretch, hitstop, screen shake, partículas, sonido y estelas. T se lo quita todo a la vez. El salto de debajo no cambia, y de ese salto de debajo van los posts de esta serie.',
+				'Squash and stretch, hitstop, screen shake, partículas y sonido sobre un mismo salto. Pulsa T y desaparecen: el salto es el mismo, pero ya no se siente. De eso va la serie.',
 			],
 			labTitle: 'Game feel, todo a la vez',
 			labNote: 'Saltando bugs y rebotando en los muelles con todo el juice encendido. Luego T se lo quita: los mismos saltos, las mismas reglas, nada que sentir.',
-			labCaption: 'Lámina 13 del laboratorio. T le quita el juice, y las reglas de debajo no cambian.',
+			labCaption: 'T le quita el juice, y las reglas de debajo no cambian.',
 			labSteps: [
 				'Corre hacia la derecha con <kbd>→</kbd>, salta sobre los bugs con <kbd>Espacio</kbd> y cae sobre los muelles.',
 				'Sube a la torre y déjate caer las 10 casillas del otro lado. Fíjate en el aterrizaje.',
 				'Pulsa <kbd>T</kbd> y repítelo. Los mismos saltos, las mismas reglas, sin juice.',
 			],
 			partIntro: {
-				movement: 'Diez posts sobre la parte de un plataformas que sólo notas cuando falta. Temporizadores que aceptan un salto pulsado unos fotogramas tarde, una gravedad que decide la forma del arco, empujoncitos que te sacan de una esquina que rozaste por unos píxeles y una cámara que te enseña adónde vas antes de que llegues.',
-				combat: 'Diez posts sobre el contacto. Las cajas que deciden si un golpe entró, los fotogramas que un ataque pasa cargando y recuperándose, la congelación que vende un impacto, la invencibilidad después de recibirlo y todo lo que un enemigo tiene que enseñarte antes de atacar. El último es un jefe que necesita todo eso a la vez.',
+				movement: 'Lo que decide si un salto sale: tiempos que perdonan, gravedad, esquinas, pendientes y la cámara.',
+				combat: 'Golpear y recibir: las cajas del golpe, las fases de un ataque, la invencibilidad y lo que un enemigo avisa antes de atacar.',
 			} as Record<string, string>,
 			partTitle: {
-				movement: 'Movimiento: si el salto sale o no',
-				combat: 'Combate: golpear, recibir y leer al enemigo',
+				movement: 'Movimiento',
+				combat: 'Combate',
 			} as Record<string, string>,
 			min: 'min',
-			howTitle: 'Qué trae cada post',
-			how: [
-				'Cada post abre con un párrafo que responde qué es la técnica, para quien llega desde un buscador con esa pregunta exacta. Luego viene la lámina: un video corto con la técnica encendida, después T pulsada y las mismas pulsaciones sin ella, y una pestaña para jugarla tú con los pasos numerados.',
-				'Después vienen el GDScript real del laboratorio, números de mis propias partidas (siempre agregados, nunca una partida suelta) y ejemplos de juegos publicados, cada uno contrastado con una fuente que pude abrir. El código es de Godot 4, pero nada depende del motor: un temporizador, un multiplicador de gravedad o una hitbox se leen igual en Unity, en Phaser o en un juego hecho en canvas.',
-			],
 			faqTitle: 'Respuestas rápidas',
 			faq: [
 				{
 					q: '¿Qué es el game feel?',
-					a: 'Es cómo responde un juego a lo que haces: qué tan rápido, con cuánta fuerza y cuánto te perdona. Steve Swink le puso nombre en 2008. La mitad es juice, lo que el juego te enseña después de actuar, y de eso va [game feel en la web]. Esta serie es la otra mitad: las reglas que deciden si tu acción sale.',
+					a: 'Es cómo responde un juego a lo que haces: qué tan rápido, con cuánta fuerza y cuánto te perdona. El juice, lo que el juego te enseña después de actuar, es la mitad visible; está en [game feel en la web]. Esta serie es la otra mitad: las reglas que deciden si tu acción sale.',
 				},
 				{
-					q: '¿Necesito Godot para seguirla?',
-					a: 'No. Todas las láminas corren en el navegador y las ideas sirven en cualquier motor. Si usas Godot 4, los bloques de código están copiados del GDScript del laboratorio.',
-				},
-				{
-					q: '¿Funciona en el móvil?',
-					a: 'Sí. En una pantalla táctil la lámina enseña botones para moverte, saltar y apagar la técnica. Para lo que depende de unos pocos fotogramas, que es casi toda la serie, un teclado va mejor.',
+					q: '¿Necesito saber programar?',
+					a: 'No. Cada post explica la idea primero y la puedes jugar en el navegador. Al final hay una sección de cómo implementarla, con el código en Godot 4, que sirve igual en cualquier motor.',
 				},
 				{
 					q: '¿Por dónde empiezo?',
-					a: 'Por [el coyote time y el jump buffer] si estás haciendo un plataformas, o por [hitbox vs hurtbox] si sólo te interesa el combate. Los posts siguen el orden del laboratorio, y los de más adelante enlazan las láminas anteriores cuando se apoyan en ellas.',
+					a: 'Por [el coyote time y el jump buffer] si te interesa el movimiento, o por [hitbox vs hurtbox] si te interesa el combate.',
 				},
 			],
 			links: {
-				'post de game feel': postHref('game-feel-on-the-web'),
 				'game feel en la web': postHref('game-feel-on-the-web'),
 				'el coyote time y el jump buffer': postHref('coyote-time-jump-buffer'),
 				'hitbox vs hurtbox': postHref('hitbox-vs-hurtbox'),
 			} as Record<string, string>,
 		}
 	: {
-			eyebrow: `Series · ${stats.posts} posts · Godot 4`,
-			h1: 'Platformer game feel in Godot 4, one mechanic at a time',
-			lead: 'On November 15 I started a platformer in Godot. Before drawing a single level I built a lab: one long blueprint where each sheet isolates a technique and the T key switches it off while you play. This series is that lab, written up one mechanic per post: what it does, when a game needs it, the real code, and the sheet itself, running in your browser.',
+			eyebrow: `Series · ${stats.posts} mechanics`,
+			h1: 'Platformer game feel, one mechanic at a time',
+			lead: 'The techniques that decide how a platformer feels, from a jump that forgives a late press to a boss that asks for everything. Each post explains one in a few lines and lets you play it, with the technique on and off.',
 			updated: 'Updated',
 			breadcrumb: 'Series',
 			startTitle: 'Start here: all the juice on one jump',
 			start: [
-				"If you only try one sheet, try this one. It's sheet 13 of the lab, and it stacks the juice from my [game feel post] on a single jump: squash and stretch, hitstop, screen shake, particles, sound and afterimages. T strips all of it at once. The jump underneath doesn't change, and that jump underneath is what the posts in this series are about.",
+				"Squash and stretch, hitstop, screen shake, particles and sound on a single jump. Press T and they're gone: the jump is the same, but it no longer feels like anything. That's what the series is about.",
 			],
 			labTitle: 'Game feel, all at once',
 			labNote: 'Hopping bugs and bouncing off springs with all the juice on. Then T strips it: same jumps, same rules, nothing to feel.',
-			labCaption: "Sheet 13 of the lab. T strips the juice, and the rules underneath don't change.",
+			labCaption: "T strips the juice, and the rules underneath don't change.",
 			labSteps: [
 				'Run right with <kbd>→</kbd>, jump on the bugs with <kbd>Space</kbd> and land on the springs.',
 				'Get up the tower and drop the 10 tiles on the other side. Watch the landing.',
 				'Press <kbd>T</kbd> and do it again. Same jumps, same rules, no juice.',
 			],
 			partIntro: {
-				movement: "Ten posts on the part of a platformer you only notice when it's missing. Timers that accept a jump pressed a few frames late, gravity that decides the shape of the arc, nudges that slide you past a corner you clipped by a few pixels, and a camera that shows where you're going before you get there.",
-				combat: 'Ten posts on contact. The boxes that decide whether a swing landed, the frames an attack spends winding up and recovering, the freeze that sells a hit, the invincibility after you take one, and everything an enemy has to show you before it swings. The last one is a boss that needs all of it at once.',
+				movement: 'What decides whether a jump works: forgiving timers, gravity, corners, slopes and the camera.',
+				combat: 'Hitting and getting hit: hit boxes, attack phases, invincibility and what an enemy shows you before it swings.',
 			} as Record<string, string>,
 			partTitle: {
-				movement: 'Movement: whether the jump works at all',
-				combat: 'Combat: hitting, getting hit and reading the enemy',
+				movement: 'Movement',
+				combat: 'Combat',
 			} as Record<string, string>,
 			min: 'min',
-			howTitle: 'What every post has',
-			how: [
-				'Every post opens with a paragraph that answers what the technique is, for whoever arrived from a search with that exact question. Then comes the sheet: a short clip with the technique on, then T pressed and the same inputs without it, and a tab to play it yourself with numbered steps.',
-				"After that come the real GDScript from the lab, numbers from my own playtests (always aggregated, never one run), and examples from shipped games, each checked against a source I could open. The code is Godot 4, but nothing in it depends on the engine: a timer, a gravity multiplier or a hitbox reads the same in Unity, Phaser or a canvas game.",
-			],
 			faqTitle: 'Quick answers',
 			faq: [
 				{
 					q: 'What is game feel?',
-					a: 'How a game answers your input: how fast, how hard, how forgiving. Steve Swink named it in 2008. Half of it is juice, what the game shows you after you act, which is what [game feel on the web] is about. This series is the other half: the rules that decide whether your action works.',
+					a: "How a game answers your input: how fast, how hard, how forgiving. Juice, what the game shows you after you act, is the visible half; that's [game feel on the web]. This series is the other half: the rules that decide whether your action works.",
 				},
 				{
-					q: 'Do I need Godot to follow it?',
-					a: "No. Every sheet runs in the browser, and the ideas carry to any engine. If you do use Godot 4, the code blocks are copied from the lab's GDScript.",
-				},
-				{
-					q: 'Does it work on a phone?',
-					a: 'Yes. On a touch screen the sheet shows buttons for moving, jumping and switching the technique off. A keyboard is better for anything that depends on a few frames of timing, which is most of the series.',
+					q: 'Do I need to know how to code?',
+					a: 'No. Each post explains the idea first, and you can play it in the browser. At the end there is a section on how to implement it, with the code in Godot 4, and it carries to any engine.',
 				},
 				{
 					q: 'Where should I start?',
-					a: "With [coyote time and the jump buffer] if you're building a platformer, or [hitbox vs hurtbox] if you only care about combat. The posts follow the lab's order, and later ones link back to earlier sheets when they lean on them.",
+					a: 'With [coyote time and the jump buffer] for movement, or [hitbox vs hurtbox] for combat.',
 				},
 			],
 			links: {
-				'game feel post': postHref('game-feel-on-the-web'),
 				'game feel on the web': postHref('game-feel-on-the-web'),
 				'coyote time and the jump buffer': postHref('coyote-time-jump-buffer'),
 				'hitbox vs hurtbox': postHref('hitbox-vs-hurtbox'),
@@ -219,7 +199,7 @@ const jsonLd = {
 			hasPart: cards.map((c) => ({
 				'@type': 'BlogPosting',
 				'@id': `${SITE_URL}${c.href}#article`,
-				headline: c.title,
+				headline: c.fullTitle,
 				url: `${SITE_URL}${c.href}`,
 				position: c.order,
 			})),
@@ -230,7 +210,7 @@ const jsonLd = {
 			name: info.name,
 			numberOfItems: cards.length,
 			itemListOrder: 'https://schema.org/ItemListOrderAscending',
-			itemListElement: cards.map((c) => ({ '@type': 'ListItem', position: c.order, url: `${SITE_URL}${c.href}`, name: c.title })),
+			itemListElement: cards.map((c) => ({ '@type': 'ListItem', position: c.order, url: `${SITE_URL}${c.href}`, name: c.fullTitle })),
 		},
 		{
 			'@type': 'BreadcrumbList',
@@ -328,11 +308,6 @@ const jsonLd = {
 						</ol>
 					</section>
 				))}
-
-				<section class="prose" aria-labelledby="how-it-works">
-					<h2 id="how-it-works">{COPY.howTitle}</h2>
-					{COPY.how.map((p) => <p>{p}</p>)}
-				</section>
 
 				<section class="prose faq" aria-labelledby="quick-answers">
 					<h2 id="quick-answers">{COPY.faqTitle}</h2>

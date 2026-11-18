@@ -1,64 +1,36 @@
 ---
-title: "Hitbox y hurtbox: las tres cajas que necesita un personaje (con código en Godot)"
-description: "La hitbox es donde un ataque hace daño, la hurtbox es donde un personaje lo recibe y el cuerpo solo choca con las paredes. Por qué mi laboratorio en Godot hace el tajo más grande que su dibujo y la hurtbox más pequeña."
+title: "Hitbox y hurtbox: las tres cajas que necesita un personaje"
+description: "La hitbox es donde un ataque hace daño y la hurtbox, donde un personaje lo recibe. Mira las tres cajas, por qué ninguna debe calcar el sprite, y juégalo."
 pubDate: 2026-11-18
 tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 11
+seriesTitle: "Hitbox y hurtbox"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
-import Tabs from '../../../components/blog/Tabs.astro';
-import TabPanel from '../../../components/blog/TabPanel.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "La hitbox es donde un ataque hace daño. La hurtbox es donde un personaje lo puede recibir. Un golpe es una tocando a la otra, y nada más cuenta.",
-  "El cuerpo es una tercera caja: choca con suelos y paredes, y nunca hace ni recibe daño.",
-  "Ninguna de las tres debería coincidir con el dibujo. En mi laboratorio la caja del tajo mide 88×56 px (la exacta mediría 48×28) y la hurtbox del jugador, 16×28 px dentro de un cuerpo de 24×36.",
-  "En Godot 4 son dos nodos Area2D en sus propias capas de física. La hitbox solo detecta, la hurtbox solo se deja detectar, y en el código no hay ni una comprobación de equipo.",
-]} />
+La **hitbox** es donde un ataque hace daño. La **hurtbox** es donde un personaje lo puede recibir. Un golpe es una tocando a la otra, y una tercera caja, el cuerpo, solo choca con suelos y paredes.
 
-La lámina 01 del plano de combate de mi laboratorio se llama TRES CAJAS, y las dibuja sobre cada personaje: verde donde te pueden dar, rojo donde estás haciendo daño, blanco donde chocas con el mundo. Con las cajas a la vista, ninguna encaja con el dibujo. El propio texto de la lámina lo reconoce: "Ninguna coincide con el dibujo."
+| Caja | Tamaño | Frente al dibujo |
+|---|---|---|
+| Cuerpo del jugador | 24×36 px | es la forma de colisión |
+| Hurtbox del jugador | 16×28 px | menor: un roce no cuenta |
+| Hitbox del tajo del jugador | 88×56 px | mayor: la exacta mide 48×28 |
+| Hurtbox del enemigo | cuerpo + 6 px | mayor: acertarle es fácil |
+| Hitbox de contacto del enemigo | 60 % del cuerpo | menor: rozarlo sale gratis |
 
-Después conté lo que me había hecho daño. En mis partidas grabadas recibí 293 golpes, y 147, casi exactamente la mitad, fueron por tocar a un enemigo que no estaba atacando. Todos esos los decidió una caja que mide el 60 % del cuerpo del enemigo.
+<h2 id="what-is-a-hitbox-and-a-hurtbox">Hitbox, hurtbox y cuerpo: tres cajas, tres trabajos</h2>
 
-<StatGrid columns={2} stats={[
-  { value: "24×36", label: "Cuerpo del jugador (px)", context: "choca con el mundo; no hace ni recibe nada" },
-  { value: "16×28", label: "Hurtbox del jugador (px)", context: "menor que el cuerpo: un roce no cuenta" },
-  { value: "88×56", label: "Hitbox del tajo (px)", context: "la caja exacta mediría 48×28" },
-  { value: "147 de 293", label: "Golpes por simple contacto", context: "grabados del 15 al 18 nov; la caja de contacto es el 60 % del cuerpo" },
-]} />
+El [glosario de juegos de pelea de Infil](https://glossary.infil.net/?t=Hitbox) define el golpe igual, y recoge la convención de colores de casi todos los modos de entrenamiento: hitboxes en rojo, hurtboxes en verde. En los juegos de pelea la tercera caja se llama pushbox. Aquí el cuerpo es lo que choca con el mundo, y nunca hace ni recibe daño.
 
-<Callout type="important" title="La tesis">
-Las cajas son reglas, no un calco del dibujo. Haz que cada desacuerdo entre caja y dibujo favorezca al jugador: su ataque llega más lejos de lo que parece el trazo, su hurtbox es menor que su cuerpo, y un enemigo que solo está paseando únicamente hace daño desde su núcleo.
-</Callout>
+<h2 id="generous-hitbox">Hitboxes generosas: grandes a favor del jugador, pequeñas en su contra</h2>
 
-<h2 id="what-is-a-hitbox-and-a-hurtbox">¿Qué es una hitbox y qué es una hurtbox?</h2>
-
-La **hitbox** es la zona donde un ataque puede hacer daño. La **hurtbox** es la zona donde un personaje lo puede recibir. Hay golpe cuando la hitbox de un ataque se solapa con la hurtbox del rival. Así lo define el [glosario de juegos de pelea de Infil](https://glossary.infil.net/?t=Hitbox), que además recoge la convención de colores de casi todos los modos de entrenamiento: hitboxes en rojo, hurtboxes en verde. Mi laboratorio las pinta igual.
-
-La tercera caja es el **cuerpo**. En los juegos de pelea se llama [pushbox](https://glossary.infil.net/?t=Pushbox) o caja de colisión: el espacio que impide que dos personajes se solapen. En mi laboratorio el cuerpo es un `CharacterBody2D` que choca con suelos y paredes. Nunca hace daño y nunca lo recibe.
-
-Estas son todas las cajas del laboratorio, al lado de lo que cubren en pantalla:
-
-| Caja | De quién | Tamaño | Frente al dibujo |
-|---|---|---|---|
-| Cuerpo | jugador | 24×36 px | es la forma de colisión |
-| Hurtbox | jugador | 16×28 px (16×14 agachado) | menor: un roce no cuenta |
-| Hitbox (tajo) | jugador | 88×56 px, empieza 8 px por detrás del centro | mayor que el trazo; la exacta mide 48×28 |
-| Hurtbox | enemigo | cuerpo + 6 px | mayor: acertarle es fácil |
-| Hitbox (contacto) | enemigo | 60 % del cuerpo; casi entero durante un ataque con el cuerpo | menor: rozarlo sale gratis |
-| Hurtbox | maniquí | 34×56 px, sin cuerpo | se le puede golpear desde dentro |
-
-En la lámina 01 las cajas se ven todo el rato, y los maniquíes son la prueba. Uno está en el suelo, así que puedes retroceder hasta que el tajo apenas llegue. Otro está sobre un pedestal de una casilla, un poco demasiado alto para un tajo honesto.
+Ninguna de las tres debería coincidir con el dibujo. Haz que cada desacuerdo favorezca al jugador: el tajo llega a 80 px del centro en vez de 60, mide 56 px de grosor en vez de 28 y empieza 8 px por detrás del centro, para que un tajo a quemarropa también entre. A los enemigos es fácil acertarles, y mientras solo pasean nada más hace daño su núcleo. Cuando atacan con el propio cuerpo, esa caja crece hasta el cuerpo menos 8 px.
 
 <PlayableLab
   plane="combate"
@@ -73,12 +45,15 @@ En la lámina 01 las cajas se ven todo el rato, y los maniquíes son la prueba. 
   ]}
 />
 
-<h2 id="hitbox-hurtbox-godot">Cómo programar hitbox y hurtbox en Godot 4</h2>
+Los juegos de pelea ajustan la hurtbox [al modelo del personaje](https://glossary.infil.net/?t=Hurtbox), porque cada píxel que le das a un jugador se lo quitas al otro.
 
-Tres nodos por personaje: un `CharacterBody2D` para el cuerpo y dos `Area2D`, uno para la hurtbox y otro para la hitbox. Lo que mantiene el código corto es cómo usan las capas de física. La hurtbox es detectable pero no vigila nada: solo se la puede encontrar. La hitbox vigila, no es detectable y no tiene capa propia, solo una máscara que apunta a la capa de las hurtboxes del otro equipo.
+<h2 id="how-to-implement">Cómo implementar hitboxes y hurtboxes</h2>
 
-<Tabs labels={["Hitbox", "Hurtbox", "Capas"]}>
-<TabPanel>
+1. **Un cuerpo y dos áreas.** El cuerpo choca con el mundo. La hurtbox se deja encontrar pero no busca nada, y la hitbox busca pero nadie la encuentra.
+2. **Una capa por equipo.** Pon las hurtboxes de cada equipo en su propia capa y haz que cada hitbox mire solo la del otro. Una hitbox ni siquiera ve a un aliado, así que no hay que comprobar equipos en ninguna parte.
+3. **Un golpe por activación.** Guarda una lista de lo que el ataque ya golpeó y vacíala cuando empiece. Sin ella, un tajo activo durante 100 ms golpea al mismo objetivo doce veces a 120 ticks por segundo.
+
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="addons/combat_kit/core/hitbox.gd">
 ```gdscript
@@ -86,81 +61,15 @@ func _init() -> void:
 	monitoring = true
 	monitorable = false
 	collision_layer = 0
-	_shape.shape = RectangleShape2D.new()
-	add_child(_shape)
-
-
+# ...
 func _ready() -> void:
 	collision_mask = CombatLayers.hurtbox_bit(CombatLayers.opponent(team))
-	if source == null:
-		source = get_parent()
-	add_to_group(&"hitboxes")
-```
-</CodeBlock>
-
-</TabPanel>
-<TabPanel>
-
-<CodeBlock filename="addons/combat_kit/core/hurtbox.gd">
-```gdscript
-func _init() -> void:
-	monitoring = false
-	monitorable = true
-	collision_mask = 0
-	_shape.shape = RectangleShape2D.new()
-	add_child(_shape)
-
-
-func _ready() -> void:
-	collision_layer = CombatLayers.hurtbox_bit(team)
-	add_to_group(&"hurtboxes")
-```
-</CodeBlock>
-
-</TabPanel>
-<TabPanel>
-
-<CodeBlock filename="addons/combat_kit/core/combat_layers.gd">
-```gdscript
-## Máscara de bits de una capa (las capas se numeran desde 1).
-static func bit(layer: int) -> int:
-	return 1 << (layer - 1)
-
-
-## Capa en la que vive la hurtbox de un equipo.
-static func hurtbox_bit(team: Team) -> int:
-	return bit(PLAYER_HURTBOX if team == Team.PLAYER else ENEMY_HURTBOX)
-
-
-static func opponent(team: Team) -> Team:
-	return Team.ENEMY if team == Team.PLAYER else Team.PLAYER
-```
-</CodeBlock>
-
-</TabPanel>
-</Tabs>
-
-La capa 5 es la de la hurtbox del jugador y la 6, la de los enemigos. El tajo del jugador mira la capa 6, el ataque de un enemigo mira la 5, y así una hitbox ni siquiera ve a los de su equipo. No hay ningún "¿es un aliado?" en todo el código, porque el servidor de física nunca llega a informar de un aliado.
-
-<h3 id="one-hit-per-activation">Un golpe por activación</h3>
-
-La otra regla está en el bucle de física de la hitbox. Mientras el tajo está activo le pide a Godot todas las áreas que se solapan con él, y cada hurtbox entra en una lista en cuanto recibe el golpe. Sin esa lista, un tajo activo durante 100 ms dañaría al mismo objetivo en cada tic de física: doce veces, a los 120 Hz del laboratorio.
-
-<CodeBlock filename="addons/combat_kit/core/hitbox.gd">
-```gdscript
+# ...
 ## Empiezan los frames activos: la lista de golpeados se vacía.
 func begin() -> void:
 	active = true
 	_already_hit.clear()
-
-
-func end() -> void:
-	active = false
-
-
-func _physics_process(_delta: float) -> void:
-	if not active or (Combat.hold and team != CombatLayers.Team.PLAYER):
-		return
+# ...
 	for area in get_overlapping_areas():
 		var hurtbox := area as Hurtbox
 		if hurtbox == null or not hurtbox.enabled:
@@ -169,108 +78,21 @@ func _physics_process(_delta: float) -> void:
 			continue
 		var hit := _make_hit(hurtbox)
 		var result := hurtbox.receive(hit)
-		if result == Hurtbox.Result.IGNORED:
-			continue  # invulnerable: si la ventana sigue abierta, se reintenta
 		if not continuous:
 			_already_hit.append(hurtbox)
-		landed.emit(hurtbox, hit, result)
-		if not active:
-			return  # el dueño cerró la caja al reaccionar
 ```
 </CodeBlock>
 
-`continuous` es la excepción. El daño por contacto de un enemigo está siempre activo y lo reintenta en cada tic, y lo que lo limita es la invulnerabilidad del jugador después de recibir un golpe. La hitbox tampoco decide qué pasa después: emite `landed` y su dueño reacciona con el retroceso, el pogo, la energía o el sonido.
+La hurtbox es la imagen inversa: `monitoring = false`, `monitorable = true`, y su capa es la de su propio equipo.
 
-<h2 id="generous-hitbox">Generoso con el jugador, tacaño en su contra</h2>
-
-El tajo generoso sale de tres números de `CombatParams`: 80 px de alcance desde el centro del jugador en vez de 60, 56 px de grosor en vez de 28, y una caja que empieza 8 px por detrás del centro para que un tajo a quemarropa también entre. La caja exacta, la que activa la T, empieza en el borde delantero del cuerpo, 12 px por delante del centro.
-
-<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
-```gdscript
-## HITBOX GENEROSA: la caja del golpe es más larga y más gruesa que el trazo que
-## se dibuja, y empieza un poco por detrás del jugador. Nadie protesta porque un
-## golpe "casi" acierte; todos protestan cuando falla el que parecía dar.
-func _configure_slash(dir: Vector2) -> void:
-	var generous := Lab.on(&"generous_hitbox")
-	var reach := params.slash_reach if generous else params.slash_exact_reach
-	var thick := params.slash_thickness if generous else params.slash_exact_thickness
-	var back := params.slash_backreach if generous else -PlatformerPlayer.HALF_SIZE.x
-	# ...
-	var length := reach + back
-	var along := (reach - back) * 0.5
-	if dir.x != 0.0:
-		slash.set_rect(Vector2(length, thick), Vector2(dir.x * along, drop))
-	else:
-		slash.set_rect(Vector2(thick, length), Vector2(0.0, dir.y * along))
-```
-</CodeBlock>
-
-El pedestal de la lámina 01 es esa cuenta hecha objeto. De pie en el suelo, el centro del jugador queda a 18 px de altura. La caja generosa, de 56 px de alto, llega hasta 46 px por encima del suelo. El maniquí del pedestal empieza a 40, así que seis de sus píxeles quedan dentro del tajo. La caja exacta mide 28 px, se queda en 32 y falla por ocho.<Sidenote>Las dos cajas llegan al pedestal en horizontal. La diferencia es solo vertical, y por eso la lámina pide atacar desde el suelo.</Sidenote>
-
-Los enemigos tienen la imagen inversa. Su hurtbox es 6 px mayor que su cuerpo, así que acertarles es fácil, y su caja de contacto es el 60 % del cuerpo mientras solo pasean. Cuando atacan con el propio cuerpo, una embestida o un salto, la caja crece hasta el cuerpo menos 8 px. Un ataque hay que esquivarlo de verdad. Rozar a uno que va a lo suyo no te cuesta nada.
-
-<CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
-```gdscript
-	# HURTBOX: algo mayor que el cuerpo — acertarle es fácil.
-	hurtbox = Hurtbox.new()
-	hurtbox.name = "Hurtbox"
-	hurtbox.team = CombatLayers.Team.ENEMY
-	hurtbox.health = health
-	hurtbox.set_rect(body_size + Vector2(6.0, 6.0), _body_shape.position)
-	add_child(hurtbox)
-# ...
-## DOS TAMAÑOS PARA LA CAJA DE CONTACTO. Tocar a un enemigo que anda a lo suyo
-## es un descuido pequeño: la caja es el núcleo del cuerpo (`contact_scale`) y
-## un roce —al pasarle por encima, al golpearlo de cerca— no cuenta. Un ataque
-## hecho con el cuerpo es otra cosa: mientras `contact.attack` lleva el nombre
-## de un ataque, la caja es casi el cuerpo entero.
-func _fit_contact(force: bool = false) -> void:
-	var attacking := contact.attack != &"contacto"
-	if attacking == _contact_attacking and not force:
-		return
-	_contact_attacking = attacking
-	var box := body_size - Vector2(8.0, 8.0) if attacking else body_size * contact_scale
-	contact.set_rect(box, _body_shape.position)
-```
-</CodeBlock>
-
-Esa caja del 60 % es la que más trabaja en mis datos: 147 de los 293 golpes que recibí fueron por simple contacto, y todos pasaron por una caja más pequeña que el dibujo del enemigo. Los otros 146 fueron ataques de verdad y peligros del entorno.
-
-Los juegos de pelea apuntan en la dirección contraria. La [entrada de hurtbox](https://glossary.infil.net/?t=Hurtbox) del glosario de Infil dice que las hurtboxes suelen intentar ajustarse bastante al modelo del personaje para que nada se sienta raro ("so things don't feel funky"). Tiene sentido cuando los dos lados son personas: cada píxel que le das a un jugador se lo quitas al otro. Contra enemigos que maneja el juego no hay nadie con quien ser justo, así que mi laboratorio elige bando.
-
-<h2 id="when-to-use">Cuándo ayuda una caja generosa y cuándo no</h2>
-
-| Situación | ¿Mayor o menor que el dibujo? |
-|---|---|
-| El ataque del jugador | Mayor. Como dice el comentario del código, nadie protesta porque un golpe "casi" acierte; todos protestan cuando falla el que parecía dar. |
-| La hurtbox del jugador | Menor. Un roce que no duele se siente como haberse librado por poco; un roce que duele parece un fallo del juego. |
-| La hurtbox de un enemigo | Un poco mayor, para que apuntar sea fácil. |
-| El daño por contacto de un enemigo que solo pasea | Mucho menor. Tocarlo es un descuido pequeño, y la caja debería tratarlo así. |
-| Un ataque deliberado de un enemigo | Casi el cuerpo entero. Si el ataque se avisó, esquivarlo es cosa del jugador. |
-| Dos jugadores humanos | Cerca del modelo en los dos lados. Ser generoso con uno es ser injusto con el otro. |
-
-<Collapsible title="Por qué los cuerpos no se empujan entre sí">
-En un juego de pelea, la pushbox es lo que impide que dos personajes se atraviesen. En mi laboratorio los cuerpos no chocan entre sí: el del jugador solo mira el mundo y las plataformas de un sentido, y el de los enemigos solo el mundo. Un jugador y un enemigo se pueden solapar sin problema.
-
-Es a propósito, y traslada el trabajo a otra parte. El daño por contacto decide qué pasa cuando te metes en un enemigo, y el retroceso tras un tajo que conecta te saca hacia atrás para que no acabes dentro de él. Sin ese empujón, un tajo dado a la carrera te llevaría hasta la caja de contacto del enemigo y castigaría un golpe bien dado.
 </Collapsible>
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
 <h3 id="hurtbox-same-as-hitbox">¿La hurtbox es lo mismo que la hitbox?</h3>
 
-No. La hitbox es del ataque y la hurtbox, de quien recibe el golpe. El glosario de Infil advierte que mucha gente dice "hitbox" para las dos, y así salen las quejas sobre la "hitbox" de alguien que en realidad son sobre su hurtbox.
+No. La hitbox es del ataque y la hurtbox, de quien recibe el golpe. Mucha gente dice "hitbox" para las dos, y así salen quejas sobre la "hitbox" de alguien que en realidad son sobre su hurtbox.
 
 <h3 id="hitbox-match-sprite">¿La hitbox debería coincidir con el sprite?</h3>
 
-En un juego de acción para un jugador, no. La caja de mi tajo tiene unas 3,7 veces el área del trazo dibujado (88×56 frente a 48×28 px), y la hurtbox de mi jugador es menor que su cuerpo. Ajústala al dibujo solo cuando lo que importa es la justicia entre dos personas.
-
-<h3 id="hit-multiple-times">¿Cómo evito que un ataque golpee al mismo objetivo en cada frame?</h3>
-
-Guarda una lista de las hurtboxes que el ataque ya golpeó y vacíala cuando el ataque empiece. En mi laboratorio esa lista vive en la hitbox: `begin()` la vacía y cada golpe la amplía.
-
-<h3 id="hitbox-colors">¿De qué color son las hitboxes y las hurtboxes?</h3>
-
-Por convención, hitboxes en rojo y hurtboxes en verde, que es lo que enseñan casi todos los modos de entrenamiento de los juegos de pelea según el glosario de Infil. Mi laboratorio añade el blanco para el cuerpo.
-
-Vuelve a la lámina 01, pulsa T y golpea desde el suelo al maniquí del pedestal. La caja roja le pasa ocho píxeles por debajo de los pies. Es la caja exacta siendo fiel al dibujo, y desde el mando se siente como un golpe que el juego se negó a contar.
+En un juego de acción para un jugador, no. La caja del tajo tiene unas 3,7 veces el área del trazo dibujado, y la hurtbox del jugador es menor que su cuerpo. Ajústala al dibujo solo cuando lo que importa es la justicia entre dos personas.

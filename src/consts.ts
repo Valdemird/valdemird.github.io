@@ -63,15 +63,15 @@ export const SERIES = {
 		],
 		en: {
 			name: 'Game feel in a platformer, playable',
-			description: 'Every technique from my Godot platformer lab, one per post: what it does, when you need it, the real code, and the sheet to play.',
-			title: 'Platformer game feel in Godot 4: 20 playable mechanics',
-			metaDescription: 'One platformer mechanic per post, from coyote time and wall jumps to hitboxes, i-frames and bosses, with real Godot 4 code and a sheet you can play.',
+			description: 'The techniques that make a platformer feel good, one per post: what each one does, why it matters, and a sheet to play it.',
+			title: 'Platformer game feel: 20 mechanics explained and playable',
+			metaDescription: 'Coyote time, wall jumps, dash, hitboxes, i-frames, bosses: 20 platformer mechanics, each explained in a few lines and playable in your browser.',
 		},
 		es: {
 			name: 'Game feel en un plataformas, jugable',
-			description: 'Cada técnica del laboratorio de mi plataformas en Godot, una por post: qué hace, cuándo la necesitas, el código real y la lámina para jugarla.',
-			title: 'Game feel de plataformas en Godot 4: 20 mecánicas jugables',
-			metaDescription: 'Una mecánica de plataformas por post: del coyote time y el wall jump a las hitboxes, los i-frames y los jefes, con código real de Godot 4 y una lámina jugable.',
+			description: 'Las técnicas que hacen que un plataformas se sienta bien, una por post: qué hace cada una, por qué importa y una lámina para jugarla.',
+			title: 'Game feel en plataformas: 20 mecánicas explicadas y jugables',
+			metaDescription: 'Coyote time, wall jump, dash, hitboxes, i-frames, jefes: 20 mecánicas de plataformas, cada una explicada en pocas líneas y jugable en el navegador.',
 		},
 	},
 } as const;

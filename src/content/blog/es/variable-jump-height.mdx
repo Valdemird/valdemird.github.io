@@ -1,71 +1,46 @@
 ---
-title: "Salto variable: cómo un solo botón da muchos saltos (con código en Godot)"
-description: "El salto variable convierte cuánto mantienes el botón en cuánto subes: un toque da 1,1 casillas y mantener, 3,6. Tres formas de programarlo, en Godot y en Celeste, y por qué el 58 % de mis saltos no fueron completos."
+title: "Salto variable: saltitos y saltos completos con un botón"
+description: "El salto variable convierte cuánto mantienes el botón en cuánto subes: un toque da 1,1 casillas y mantener, 3,6. Mira cuándo cuenta y juégalo."
 pubDate: 2026-11-18
 tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 2
+seriesTitle: "Salto variable"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
-import Tabs from '../../../components/blog/Tabs.astro';
-import TabPanel from '../../../components/blog/TabPanel.astro';
-import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Salto variable: cuanto más tiempo mantienes el botón de salto, más alto llegas. En mi laboratorio un toque es un saltito de 1,1 casillas y mantener da el salto completo de 3,6.",
-  "La forma habitual de programarlo es triplicar la gravedad en cuanto sueltas el botón mientras subes. Celeste lo hace al revés: te mantiene subiendo a toda velocidad hasta 0,2 s mientras lo mantienes.",
-  "En mis propias partidas grabadas, el 58 % de los saltos desde el suelo no fueron completos. El botón llevaba todo el rato controlando la altura.",
-]} />
+Con el **salto variable**, cuanto más mantienes el botón, más alto llegas: un toque da un saltito de 1,1 casillas y mantenerlo, el salto completo de 3,6. Así un solo botón sirve para pasar bajo un techo bajo y para subir un muro alto.
 
-Después del [post del coyote time](/blog/es/coyote-time-jump-buffer/) volví a las mismas partidas grabadas a por un número más. Cada vez que se suelta el botón de salto, mi laboratorio apunta cuánto tiempo estuvo pulsado. De 3.906 saltos desde el suelo, solo el 41,6 % se mantuvo lo suficiente para llegar arriba del todo. El resto se cortó antes, y el grupo más grande quedó entre 200 y 300 ms.
-
-Si me hubieras preguntado, te habría dicho que "solo saltaba". Las cifras dicen que elegía una altura cada vez, con un solo botón y sin pensarlo.
-
-<StatGrid columns={2} stats={[
-  { value: "3.906", label: "Saltos desde el suelo", context: "grabados en mi laboratorio, 15–18 nov" },
-  { value: "41,6 %", label: "Saltos completos", context: "botón pulsado 380 ms o más" },
-  { value: "58,4 %", label: "Cortados a propósito", context: "el 1,7 %, toques de menos de 100 ms" },
-  { value: "333 ms", label: "Mediana pulsado", context: "justo por debajo de los 380 ms de subida" },
-]} />
-
-<Callout type="important" title="La tesis">
-La altura del salto es el control más expresivo de un plataformas, y vive en un solo botón. El salto variable convierte cuánto lo mantienes en cuánto subes. Sin él, cada obstáculo del juego tiene que diseñarse para un único arco.
-</Callout>
-
-<h2 id="what-is-variable-jump-height">¿Qué es el salto variable?</h2>
-
-El salto variable significa que el salto que obtienes depende de cuánto mantienes el botón: si lo sueltas pronto, el personaje deja de subir antes. En mi laboratorio un toque da un saltito de 1,1 casillas y mantener da las 3,6 completas, con todo lo intermedio disponible. Super Mario Bros. ya funcionaba así en 1985: cuanto más mantienes A, más alto salta Mario.
-
-Lo importante no son los dos extremos, es el continuo. La gráfica de abajo es el mismo código de salto con cuatro tiempos de pulsación, simulado con los números reales del laboratorio.
-
-<InteractiveChart
-  type="line"
-  title="Altura en el tiempo, según cuánto se mantiene el salto"
-  story="El mismo botón y el mismo código: solo el tiempo pulsado decide el arco."
-  xLabel="segundos desde el despegue"
-  yLabel="altura (casillas)"
-  xUnit=" s"
-  unit=" casillas"
-  palette="sequential"
-  series={[
-    { name: "toque (0 ms)", data: [{ label: "0.00", value: 0.0 }, { label: "0.04", value: 0.63 }, { label: "0.08", value: 1.01 }, { label: "0.12", value: 1.12 }, { label: "0.16", value: 1.06 }, { label: "0.20", value: 0.85 }, { label: "0.24", value: 0.5 }, { label: "0.28", value: 0.01 }, { label: "0.32", value: 0.0 }, { label: "0.36", value: 0.0 }, { label: "0.40", value: 0.0 }, { label: "0.44", value: 0.0 }, { label: "0.48", value: 0.0 }, { label: "0.52", value: 0.0 }, { label: "0.56", value: 0.0 }, { label: "0.60", value: 0.0 }, { label: "0.64", value: 0.0 }, { label: "0.68", value: 0.0 }, { label: "0.72", value: 0.0 }, { label: "0.76", value: 0.0 }, { label: "0.80", value: 0.0 }] },
-    { name: "100 ms pulsado", data: [{ label: "0.00", value: 0.0 }, { label: "0.04", value: 0.74 }, { label: "0.08", value: 1.39 }, { label: "0.12", value: 1.83 }, { label: "0.16", value: 2.15 }, { label: "0.20", value: 2.21 }, { label: "0.24", value: 2.09 }, { label: "0.28", value: 1.82 }, { label: "0.32", value: 1.51 }, { label: "0.36", value: 1.0 }, { label: "0.40", value: 0.34 }, { label: "0.44", value: 0.0 }, { label: "0.48", value: 0.0 }, { label: "0.52", value: 0.0 }, { label: "0.56", value: 0.0 }, { label: "0.60", value: 0.0 }, { label: "0.64", value: 0.0 }, { label: "0.68", value: 0.0 }, { label: "0.72", value: 0.0 }, { label: "0.76", value: 0.0 }, { label: "0.80", value: 0.0 }] },
-    { name: "200 ms pulsado", data: [{ label: "0.00", value: 0.0 }, { label: "0.04", value: 0.74 }, { label: "0.08", value: 1.39 }, { label: "0.12", value: 1.85 }, { label: "0.16", value: 2.34 }, { label: "0.20", value: 2.75 }, { label: "0.24", value: 2.97 }, { label: "0.28", value: 2.94 }, { label: "0.32", value: 2.81 }, { label: "0.36", value: 2.52 }, { label: "0.40", value: 2.09 }, { label: "0.44", value: 1.52 }, { label: "0.48", value: 0.81 }, { label: "0.52", value: 0.14 }, { label: "0.56", value: 0.0 }, { label: "0.60", value: 0.0 }, { label: "0.64", value: 0.0 }, { label: "0.68", value: 0.0 }, { label: "0.72", value: 0.0 }, { label: "0.76", value: 0.0 }, { label: "0.80", value: 0.0 }] },
-    { name: "hasta arriba", data: [{ label: "0.00", value: 0.0 }, { label: "0.04", value: 0.74 }, { label: "0.08", value: 1.39 }, { label: "0.12", value: 1.85 }, { label: "0.16", value: 2.34 }, { label: "0.20", value: 2.75 }, { label: "0.24", value: 3.07 }, { label: "0.28", value: 3.31 }, { label: "0.32", value: 3.43 }, { label: "0.36", value: 3.52 }, { label: "0.40", value: 3.56 }, { label: "0.44", value: 3.55 }, { label: "0.48", value: 3.47 }, { label: "0.52", value: 3.33 }, { label: "0.56", value: 3.03 }, { label: "0.60", value: 2.59 }, { label: "0.64", value: 2.02 }, { label: "0.68", value: 1.3 }, { label: "0.72", value: 0.63 }, { label: "0.76", value: 0.0 }, { label: "0.80", value: 0.0 }] },
+<TimingDiagram
+  title="Salto variable"
+  duration={600}
+  start={150}
+  probe="sueltas"
+  hint="Arrastra el marcador o usa las flechas: es el momento en que sueltas el salto."
+  phases={[
+    { from: 0, to: 380, label: "subida", tone: "air", on: { ok: true, text: "Sueltas mientras subes: la gravedad se triplica y el salto sale más bajo." }, off: { ok: false, text: "Soltar no cambia nada: el salto sale entero." } },
+    { from: 380, to: 600, label: "caída", tone: "air", on: { ok: null, text: "Ya pasaste lo más alto: soltar no cambia nada." } },
   ]}
-  source="Simulado a 120 Hz con los parámetros del laboratorio: salto de 3,6 casillas, 0,38 s de subida, 0,30 s de caída, gravedad ×3 al soltar."
+  events={[
+    { at: 0, label: "despegue" },
+    { at: 380, label: "lo más alto" },
+  ]}
+  windows={[
+    { from: 0, to: 380, label: "ventana para mantener", detail: "380 ms", measure: "since",
+      on: { ok: true, text: "Sueltas a los {ms} ms: la gravedad se triplica y el salto se queda corto." },
+      off: { ok: false, text: "Soltar no hace nada: todos los saltos son de 3,6 casillas." } },
+  ]}
 />
 
-La lámina 02 del laboratorio lo pone a prueba. El techo está lleno de pinchos, así que un salto completo te mata y solo pasan los saltitos. Después, un muro de tres casillas pide justo lo contrario.
+<h2 id="what-is-variable-jump-height">Salto variable: un toque es un saltito, mantener es un salto</h2>
+
+Cada obstáculo pide una altura distinta. Un techo de pinchos pide un saltito; un muro, el salto entero. Con el salto variable el jugador elige cualquier altura entre 1,1 y 3,6 casillas con el mismo botón, y el botón responde como el jugador ya espera que responda. Sin él, cada obstáculo del juego tiene que diseñarse para un único arco.
 
 <PlayableLab
   sheets="variable"
@@ -78,9 +53,14 @@ La lámina 02 del laboratorio lo pone a prueba. El techo está lleno de pinchos,
   ]}
 />
 
-<h2 id="variable-jump-godot">Cómo programar el salto variable en Godot 4</h2>
+<h2 id="how-to-implement">Cómo implementar el salto variable</h2>
 
-Mi laboratorio lo hace con la gravedad. Mientras el personaje sube con el botón pulsado, la gravedad es la normal. En cuanto lo sueltas y todavía vas hacia arriba, la gravedad se multiplica por 3 hasta llegar al punto más alto.
+1. **Vigila cuándo se suelta el botón durante la subida.** Si se suelta mientras el personaje todavía va hacia arriba, marca el salto como recortado.
+2. **Sube la gravedad hasta lo más alto.** Un salto recortado sube con la gravedad ×3, así que el arco se dobla en lugar de romperse. Partir por la mitad la velocidad de subida al soltar también funciona, pero el arco hace un quiebre visible justo en ese instante.
+3. **Recorta una sola vez por salto.** Volver a pulsar en el aire no debe deshacerlo.
+4. **Protege el salto de pared.** Impide el recorte durante los primeros 220 ms de un [salto de pared](/blog/es/wall-jump/); si no, quien aporrea el botón contra una pared pierde altura en cada impulso.
+
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="addons/platformer_kit/player/player.gd">
 ```gdscript
@@ -99,77 +79,20 @@ if velocity.y < 0.0:
 ```
 </CodeBlock>
 
-Hay dos detalles ahí que importan más que el multiplicador. El recorte ocurre una sola vez por salto (`_jump_cut`), así que volver a pulsar en el aire no lo deshace. Y `_wall_jump_hold` impide recortar durante los primeros 220 ms de un salto de pared: quien aporrea el botón contra una pared perdería altura en cada impulso.
+`jump_cut_gravity_mult` vale 3, y es el único número que hay que ajustar.
 
-<h2 id="three-ways">Tres maneras de hacerlo, y cómo se siente cada una</h2>
-
-Hay tres recetas habituales. Las tres hacen que un toque salte menos que mantener, y se sienten distintas justo en el momento de soltar.
-
-<Tabs labels={["Recorte de gravedad (mi laboratorio)", "Velocidad sostenida (Celeste)", "Recorte de velocidad (ingenuo)"]}>
-<TabPanel>
-
-Sueltas mientras subes y la gravedad se triplica hasta el punto más alto. El arco se dobla en lugar de romperse: el personaje sigue frenando con suavidad, solo que más deprisa. Es lo que enseña la gráfica de arriba.
-
-</TabPanel>
-<TabPanel>
-
-Celeste le da la vuelta. El salto arranca a toda velocidad y, durante un máximo de 0,2 s (`VarJumpTime = .2f`), mantener el botón impide que la velocidad de subida baje. Si sueltas, o se acaba el tiempo, entra la gravedad normal.<Sidenote>Del [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), el código del jugador que el equipo de Celeste subió a GitHub. C#, recortado.</Sidenote>
-
-<CodeBlock filename="Celeste/Source/Player/Player.cs">
-```csharp
-//Variable Jumping
-if (varJumpTimer > 0)
-{
-    if (AutoJump || Input.Jump.Check)
-        Speed.Y = Math.Min(Speed.Y, varJumpSpeed);
-    else
-        varJumpTimer = 0;
-}
-```
-</CodeBlock>
-
-</TabPanel>
-<TabPanel>
-
-La versión con la que empiezan casi todos los tutoriales: cuando se suelta el botón, multiplicar la velocidad de subida por algo como 0,5. Funciona, y se nota que funciona: el arco tiene un quiebre visible justo al soltar. Es un esquema genérico, no código de mi proyecto.
-
-<CodeBlock>
-```gdscript
-if Input.is_action_just_released("jump") and velocity.y < 0.0:
-	velocity.y *= 0.5
-```
-</CodeBlock>
-
-</TabPanel>
-</Tabs>
-
-Elegí el recorte de gravedad porque mantiene el arco continuo y tiene un único número que ajustar. Lo de Celeste tiene su propia ventaja: durante los primeros 0,2 s un salto mantenido sube a velocidad constante, así que se lee con facilidad.
-
-<h2 id="when-to-use">Cuándo ayuda el salto variable y cuándo no</h2>
-
-| Situación | ¿Salto variable? |
-|---|---|
-| Plataformas de acción con un solo botón de salto | Sí. Super Mario Bros. ya lo hacía en 1985. |
-| Techos bajos, pinchos encima, túneles estrechos | Sí. El saltito es la herramienta que los resuelve. |
-| Un juego construido alrededor de saltos comprometidos | No. Castlevania (1986) le da a Simon un único arco de salto fijo, y sus niveles están construidos alrededor de él. |
-| Saltos guardados por el buffer | Cuidado. Si el botón ya estaba suelto cuando el salto guardado sale, se recorta en el primer frame y sale un saltito. |
-
-<Collapsible title="Por qué un toque de 0 ms sigue dando 1,1 casillas">
-El salto arranca a toda la velocidad de despegue (758 px/s aquí) y la suelta solo se comprueba cuando el personaje ya está subiendo, así que hasta el toque más corto tiene un instante a esa velocidad antes de que la gravedad se triplique. Ese instante más la gravedad triple son el mínimo de 1,1 casillas. Si quieres un mínimo más bajo, el mando es `jump_cut_gravity_mult`, no el momento de soltar.
 </Collapsible>
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
 <h3 id="short-hop-height">¿Cuánto debe medir un saltito?</h3>
 
-En mi laboratorio el saltito más corto es más o menos el 30 % del salto completo: 1,1 casillas frente a 3,6. Lo bastante bajo para no tocar el techo de pinchos de tres casillas, y lo bastante largo (2,5 casillas a la carrera) para cruzar un hueco de dos.
+Más o menos el 30 % del salto completo: 1,1 casillas frente a 3,6. Lo bastante bajo para no tocar un techo de pinchos a tres casillas, y lo bastante largo (2,5 casillas a la carrera) para cruzar un hueco de dos.
 
 <h3 id="cut-velocity-or-gravity">¿Recorto la velocidad o subo la gravedad?</h3>
 
-Sube la gravedad si quieres que el arco siga siendo suave; recorta la velocidad si quieres que la suelta se note. Las dos funcionan. La versión de gravedad tiene un único parámetro, el multiplicador (3 en mi laboratorio).
+Sube la gravedad si quieres que el arco siga siendo suave; recorta la velocidad si quieres que la suelta se note. Las dos funcionan.
 
 <h3 id="hold-window">¿Cuánto debe durar la ventana para mantener?</h3>
 
-Celeste la limita a 0,2 s. Mi laboratorio deja que cuente hasta el punto más alto, 0,38 s, porque el recorte puede ocurrir en cualquier momento de la subida.
-
-Vuelve a la lámina 02, apaga la técnica e intenta pasar bajo el techo. Vas a empezar a tocar el botón con más fuerza, como si apretar más fuerte pudiera hacer el salto más corto. Ese reflejo es todo el argumento: el jugador ya cree que el botón funciona así.
+Aquí mantener cuenta hasta lo más alto, 0,38 s. [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) la limita a 0,2 s: mientras mantienes, la velocidad de subida no baja.

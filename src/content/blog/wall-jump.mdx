@@ -1,95 +1,32 @@
 ---
-title: "Wall jump: the five assists that make it feel fair (with Godot code)"
-description: "A fair wall jump needs five assists: 5 px wall detection, 100 ms of wall coyote time, a 140 ms control lock, carried momentum and a 220 ms minimum height. The Godot code, Celeste's version and how often each one acted."
+title: "Wall jump: the five assists that make it feel fair"
+description: "A wall jump throws you up and away from a wall. Five small assists keep it fair: 5 px of reach, 100 ms of wall coyote time and more. See them and play it."
 pubDate: 2026-11-18
 tags: ["game-feel", "game-design", "godot", "platformers"]
 featured: false
 lang: en
 series: platformer-lab
 seriesOrder: 4
+seriesTitle: "Wall jump"
 ---
 
-import TLDR from '../../components/blog/TLDR.astro';
 import PlayableLab from '../../components/blog/PlayableLab.astro';
-import StatGrid from '../../components/blog/StatGrid.astro';
-import Callout from '../../components/blog/Callout.astro';
-import CodeBlock from '../../components/blog/CodeBlock.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
-import Sidenote from '../../components/blog/Sidenote.astro';
-import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "A wall jump has two halves. The wall slide: push against a wall in the air and the fall slows to 130 px/s. The jump: press jump and you're thrown up and away from it at 400 px/s.",
-  "The raw version breaks in five places. My lab patches them with five assists (5 px detection, 100 ms of wall coyote time, a 140 ms control lock, carried momentum and a 220 ms minimum height), and T switches all five off.",
-  "In my recorded sessions, 77% of 437 wall jumps hit at least one case an assist exists for. One in three had the stick pushed back toward the wall right after the jump.",
-]} />
+A **wall jump** is a jump from a wall instead of the floor: in the air, against a wall, you press jump and get thrown up and away at 400 px/s. It comes with a **wall slide**, which caps the fall at 130 px/s while you push toward the wall, and that's the catch: the input that keeps you on the wall is the same one that ruins the jump off it.
 
-Sheet 11 of my lab is a shaft four tiles wide. You walk in under a wall that stops two tiles above the floor, and the way forward is straight up, kicking from one side to the other. Next to it there's an optional pit: slide down into it and you have to wall-jump your way back out.
+<h2 id="five-ways-it-fails">Wall jump assists: five fixes the player never sees</h2>
 
-The recorded sessions show how I actually wall jump. Of 437 wall jumps, 144 had the stick pushed back toward the wall I'd just left during the first third of a second of the jump. That's one in three. A raw wall jump turns that exact input into a fall.
+Raw physics breaks the wall jump in five small places. Each assist fixes one, and T switches all five off. [Mega Man X](https://en.wikipedia.org/wiki/Mega_Man_X_%28video_game%29) (1993) already let you slide down or jump off nearly any wall.
 
-<StatGrid columns={2} stats={[
-  { value: "437", label: "Wall jumps", context: "recorded in my lab, Nov 15–18" },
-  { value: "77%", label: "Leaned on an assist", context: "at least one of the five" },
-  { value: "18%", label: "Pressed after leaving the wall", context: "median 33 ms late, caught by wall coyote time" },
-  { value: "33%", label: "Stick back toward the wall", context: "in the 0.35 s after the jump" },
-]} />
-
-<Callout type="important" title="The thesis">
-A wall jump makes a simple promise: push against the wall and you slide, press jump and you land on the other side. Raw physics breaks that promise in five small places. Each assist fixes one of them, and when they work the player never sees any of it.
-</Callout>
-
-<h2 id="what-is-a-wall-jump">What is a wall jump?</h2>
-
-A wall jump is a jump taken from a wall instead of the floor: in the air, against a wall, you press jump and get kicked up and away from it. It almost always comes with a wall slide, where pushing toward the wall slows the fall so you have time to aim. Mega Man X (1993) already let you slide down or jump off nearly any wall.<Sidenote>[Wikipedia's Mega Man X article](https://en.wikipedia.org/wiki/Mega_Man_X_%28video_game%29) lists it as one of the game's prominent features.</Sidenote>
-
-In my lab the slide caps the fall at 130 px/s, against 900 px/s for a normal fall. The jump sets 400 px/s sideways and 85% of a normal jump's height upward, about three tiles.
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-# WALL SLIDE: pegado a una pared y empujando hacia ella, la caída se frena.
-var sliding := not on_floor and wall_dir != 0 and input_x == wall_dir and velocity.y > 0.0
-if sliding:
-	is_fast_falling = false
-	velocity.y = minf(velocity.y, p.wall_slide_speed)
-```
-</CodeBlock>
-
-Look at `input_x == wall_dir`. You only slide while you push toward the wall. That's the root of the whole problem: the input that keeps you on the wall is the same input that ruins the jump off it.
-
-<h2 id="five-ways-it-fails">Five ways a raw wall jump fails</h2>
-
-Each assist in the lab answers one specific way the plain version lets the player down.
-
-| What goes wrong without help | The assist | In my lab |
+| Without help | The assist | In the lab |
 |---|---|---|
-| You have to touch the wall to the pixel | Wall detection with a margin | 5 px (1.5 px after T) |
-| You drifted off the wall a moment before pressing | Wall coyote time | 100 ms |
-| You're still holding toward the wall, so the push gets cancelled | Control lock | stick ignored for 140 ms |
-| You let go of the stick and stall halfway | Carried momentum | air drag ×0.1 until you touch the stick |
-| A short tap gets cut and leaves you lower than where you started | Minimum height | 220 ms before the jump can be cut |
-
-All 437 recorded wall jumps happened with the assists on, so the data can't say which ones would have failed without them. What it can say is how often each assist had a case to handle.
-
-<InteractiveChart
-  type="horizontal"
-  title="% of 437 recorded wall jumps"
-  story="Every assist had work to do. The control lock had the most: a third of my wall jumps kept pushing toward the wall they had just left."
-  unit="%"
-  data={[
-    { label: "Stick held toward the wall (control lock)", value: 33 },
-    { label: "Pressed after leaving the wall (wall coyote)", value: 18 },
-    { label: "Pressed 2–5 px from the wall (detection)", value: 17 },
-    { label: "Jump released before 220 ms (minimum height)", value: 15 },
-    { label: "Stick let go (carried momentum)", value: 9 },
-  ]}
-  annotations={[{ targetIndex: 0, text: "144 jumps", emphasize: true }]}
-  source="My recorded sessions, Nov 15–18 2026, all with the assists on. One jump can count in several rows; 335 of 437 count in at least one."
-/>
-
-The other 102 (23%) needed none of them. The textbook wall jump, stick pushed away and button held, is the minority case.
-
-In the playable sheet, climb the shaft twice. The first time, the way the assists were built for. The second time, after T, the way a third of my jumps went.
+| You must touch the wall to the pixel | Detection margin | 5 px (1.5 px after T) |
+| You left the wall just before pressing | Wall coyote time | 100 ms |
+| Holding toward the wall cancels the push | Control lock | stick ignored for 140 ms |
+| Letting go of the stick stalls you halfway | Carried momentum | air drag ×0.1 until you touch the stick |
+| A short tap leaves you lower than you started | Minimum height | 220 ms before the jump can be cut |
 
 <PlayableLab
   sheets="wall"
@@ -102,216 +39,53 @@ In the playable sheet, climb the shaft twice. The first time, the way the assist
   ]}
 />
 
-<h2 id="wall-jump-godot">How to code a wall jump in Godot 4</h2>
+<h2 id="how-to-implement">How to implement a wall jump</h2>
 
-The wall check runs after `move_and_slide()`. It's a shape query: the player's own collision shape, shifted a few pixels to each side. With the assists the shift is 5 px; after T it's 1.5. Every tick that finds a wall reloads a 100 ms wall coyote timer, the same idea as [coyote time on ledges](/blog/coyote-time-jump-buffer/), turned sideways.
+1. **Detect the wall with a margin.** Shift the player's collision shape a few pixels to each side and check for overlap. Every tick that finds a wall reloads the wall coyote timer.
+2. **Set the jump velocity outright**, away from the wall at 85% of a normal jump's height, then start the lock, the carry and the minimum height.
+3. **Expect the stick to stay on the wall.** Without the lock, air control beats the push and sends you back to the same wall.
+
+<Collapsible title="The code in Godot 4">
 
 <CodeBlock filename="addons/platformer_kit/player/player.gd">
 ```gdscript
-# Pared: sólo interesa en el aire.
-wall_spent = false
-wall_dir = 0 if on_floor or not wall_grip or not has_ability(Abilities.WALL) else _detect_wall()
 if wall_dir != 0:
-	_last_wall_dir = wall_dir
-	_last_wall_x = global_position.x
-	_wall_hold = 0            # llegó a otra pared: la mano vuelve a mandar
 	_wall_coyote = params.wall_coyote_time if Lab.on(&"wall_assist") else 0.0
 # ...
+# WALL SLIDE: pegado a una pared y empujando hacia ella, la caída se frena.
+var sliding := not on_floor and wall_dir != 0 and input_x == wall_dir and velocity.y > 0.0
+if sliding:
+	velocity.y = minf(velocity.y, p.wall_slide_speed)
+# ...
 
-func _detect_wall() -> int:
-	var distance := params.wall_check_assist if Lab.on(&"wall_assist") else 1.5
-	var space := get_world_2d().direct_space_state
-	var first := input_x if input_x != 0 else facing
-	for side: int in [first, -first]:
-		_wall_query.transform = Transform2D(0.0, global_position + Vector2(side * distance, 0.0))
-		if space.intersect_shape(_wall_query, 1).is_empty():
-			continue
-		if _wall_is_spent(side):
-			wall_spent = true      # la toca, pero ya no le agarra
-			continue
-		return side
-	return 0
-```
-</CodeBlock>
-
-Both numbers show up in the sessions. 76 wall jumps (17%) were pressed with the character 2 to 5 px from the wall, out of reach of the 1.5 px check. Another 79 (18%) came after the character had already left the wall: a median of 33 ms late, and the latest at 99 ms, one millisecond inside the window.
-
-The jump itself sets the velocity outright and then arms the other three assists:
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
 func _do_wall_jump(margin: bool = false) -> void:
 	var from_dir := wall_dir if wall_dir != 0 else _last_wall_dir
-	if wall_dir == 0 and not margin:
-		assist_note.emit(&"wall_coyote_hit", int((params.wall_coyote_time - _wall_coyote) * 1000.0))
 	velocity.x = -from_dir * params.wall_jump_speed_x
 	velocity.y = -params.jump_velocity * sqrt(params.wall_jump_height_ratio)
-	facing = -from_dir
 	# ...
 	# BLOQUEO DE CONTROL: durante unos ms se ignora el stick. Sin esto, quien
 	# mantiene pulsado "hacia la pared" anula el impulso y vuelve a ella al instante.
 	_wall_jump_lock = params.wall_jump_lock_time if Lab.on(&"wall_assist") else 0.0
-	# ALTURA MÍNIMA: durante un momento el wall jump no se puede recortar. Quien
-	# aporrea el botón (toques cortos) obtiene casi el salto entero; sin esto,
-	# cada toque contra la pared la devuelve más abajo de donde salió.
 	_wall_jump_hold = params.wall_jump_min_time if Lab.on(&"wall_assist") else 0.0
 	# INERCIA: hasta que se toque el stick, el aire apenas frena este salto.
 	_wall_carry = Lab.on(&"wall_assist")
-	_wall_coyote = 0.0
-	_begin_rise(true)
-	jumped.emit(&"wall")
 ```
 </CodeBlock>
 
-`_wall_jump_hold` is the same variable that keeps a release from cutting the jump in the [variable jump height](/blog/variable-jump-height/) code. In the sessions, 65 wall jumps (15%) had the button released before 220 ms. Simulated with the lab's numbers, a tap with no minimum height gets cut almost at once and rises 0.9 tiles. With the 220 ms it rises 2.7 of the 3.
+While `_wall_jump_lock` runs, the horizontal movement returns before it reads the stick.
 
-The lock and the carry live in the horizontal movement:
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-	if _wall_jump_lock > 0.0:
-		return
-	var input_x := _steer()   # (la dirección que de verdad manda: ver `_steer`)
-	if _root_time > 0.0 and on_floor:
-		input_x = 0           # plantado: ni anda ni se gira (ver `root`)
-	if input_x != 0:
-		facing = input_x
-		_wall_carry = false   # el jugador toma el mando: se acabó la inercia del wall jump
-	# ...
-	var rate: float
-	if input_x == 0:
-		rate = p.max_speed / p.decel_time                 # soltar: frenar rápido
-		if not on_floor:
-			rate *= p.air_friction                         # ...pero conservar inercia en el aire
-			if _wall_carry:
-				# Tras un wall jump y sin tocar el stick, casi no se frena: el salto
-				# llega solo a la otra pared ("saltar y salir despedido al otro lado").
-				rate *= p.wall_jump_air_friction
-```
-</CodeBlock>
-
-The lock is blunt: for 140 ms the function returns before it reads the stick at all. The carry is a different kind of help. It does nothing while you hold a direction, and while you don't, it cuts the air drag to a tenth, so the push from the wall reaches the other side by itself. The first touch of the stick ends it, and from then on you're steering. 38 wall jumps (9%) let go of the stick right after the jump. Without the carry, that push dies after about one tile, a third of the way across the shaft.
-
-<h2 id="a-wall-is-not-a-ladder">A wall is not a ladder</h2>
-
-Give a wall unlimited jumps and holding toward it turns into climbing: you kick off, the stick drags you back, you jump again a little higher. Until the morning of November 17 the lab worked like that. In the recorded sessions from those days, 46 of 129 wall jumps (36%) ended back on the same wall, every one of them with the stick held toward it.
-
-Now each wall gives one jump. After that it stops gripping, no slide and no jump, until you touch the floor, bounce off something or jump from a different wall. It's the same rule as the rest of the lab's movement economy:
-
-| Resource | Spent | Recharged |
-|---|---|---|
-| Air jump | `air_jumps` per flight | floor, bounce |
-| Dash | one per flight; on the floor, one per `dash_cooldown` | floor, bounce |
-| Wall jump | `wall_jumps_per_wall` per wall (1; 0 means no limit) | floor, bounce, jumping from another wall |
-
-That rule set a new trap. Holding toward a wall that no longer grips means falling along it. So the jump code checks for a chimney:
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-	# UNA PARED DA LOS SALTOS QUE DIGA SU NÚMERO (de fábrica, uno): se apunta de
-	# cuál se ha saltado. Volver a ESA pared sin haber pisado suelo, rebotado o
-	# saltado desde otra ya no agarra (ver `_wall_is_spent`).
-	if from_dir == _wall_used_side and absf(_last_wall_x - _wall_used_x) <= SAME_WALL:
-		_wall_used += 1
-	else:
-		_wall_used = 1
-	_wall_used_side = from_dir
-	_wall_used_x = _last_wall_x
-	# LA MANO QUE SIGUE APRETANDO HACIA LA PARED. Para deslizar hay que empujar
-	# hacia ella, y mucha gente no suelta al saltar. Antes eso devolvía a la misma
-	# pared, más arriba; ahora esa pared ya no agarra, y volver a ella sería caer.
-	# Si hay OTRA pared enfrente (una chimenea), esa dirección no cuenta hasta que
-	# se suelte: el salto cruza solo, igual que con el stick suelto. Con un muro
-	# aislado no se retiene nada: tras el bloqueo de siempre se puede volver para
-	# subirse a su borde.
-	_wall_hold = 0
-	if Lab.on(&"wall_assist") and input_x == from_dir and _wall_is_spent(from_dir) and _wall_across(-from_dir):
-		_wall_hold = from_dir
-		_wall_hold_time = params.wall_cross_time
-```
-</CodeBlock>
-
-If there's another wall within 260 px, the direction you were holding doesn't count until you release it, or for at most 0.6 s, and the jump crosses as if the stick were neutral. It belongs to the same `wall_assist` flag, so T turns it off along with the other five. The one-jump-per-wall rule stays on either way, which is why the wrong way fails so hard after T.
-
-<h2 id="celeste-wall-jump">Celeste's wall jump, side by side</h2>
-
-Celeste's published player code makes a useful comparison, because it solves the same problems with different tools.<Sidenote>From [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub. Its player hitbox is `new Hitbox(8, 11, -4, -11)`, 8 px wide. Mine is 24 px wide.</Sidenote>
-
-| | My lab | Celeste |
-|---|---|---|
-| Wall detection | 5 px on a 24 px body | 3 px on an 8 px body (`WallJumpCheckDist`) |
-| Wall coyote time | 100 ms | no wall timer; the only grace timer is the ground's `JumpGraceTime` |
-| Right after the jump | stick ignored for 140 ms | if any direction is held, it's replaced by "away from the wall" for 0.16 s (`WallJumpForceTime`) |
-| Push off the wall | 400 px/s, 16.7 body widths per second | 130 px/s (`MaxRun + JumpHBoost`), 16.25 body widths per second |
-| Wall slide | fall capped at 130 px/s | cap starts at 20 px/s and rises to 160 over 1.2 s |
-| Same wall again | one jump, then it stops gripping | no limit on wall jumps; a climb jump costs a quarter of the stamina (`ClimbJumpCost = 110 / 4f`) |
-
-<CodeBlock filename="Celeste/Source/Player/Player.cs">
-```csharp
-private const int WallJumpCheckDist = 3;
-private const float WallJumpForceTime = .16f;
-private const float WallJumpHSpeed = MaxRun + JumpHBoost;
-// ...
-private bool WallJumpCheck(int dir)
-{
-    return ClimbBoundsCheck(dir) && CollideCheck<Solid>(Position + Vector2.UnitX * dir * WallJumpCheckDist);
-}
-
-private void WallJump(int dir)
-{
-    // ...
-    if (moveX != 0)
-    {
-        forceMoveX = dir;
-        forceMoveXTimer = WallJumpForceTime;
-    }
-    // ...
-    Speed.X = WallJumpHSpeed * dir;
-    Speed.Y = JumpSpeed;
-```
-</CodeBlock>
-
-Measured against the body, Celeste's reach is almost twice as generous as mine: 37% of its width, against 21%. The push is nearly identical. And its answer to the stick held toward the wall is smarter than my lock: it doesn't ignore the input, it rewrites it into the input you should have given.
-
-<h2 id="when-to-use">When the assists help, and when they don't</h2>
-
-| Situation | Assists? |
-|---|---|
-| Shafts climbed by alternating walls | Yes, all five. It's what they're tuned for. |
-| A lone wall you want to get on top of | Yes, without the chimney help: after the 140 ms lock the stick is yours again, so you can turn back and grab the edge. |
-| Climbing a single wall as a power | Set `wall_jumps_per_wall` to 0. The code calls it a design decision for each game, not a detail. |
-| Missing the wall is meant to be the challenge | Shrink the detection and the coyote window. The other three only fix inputs that were already right. |
-| Presses that land just short of a wall | The lab has an extra flag, off by default: within 12 px of a wall, a press that would do nothing becomes a wall jump. Its code comment says it came out of the session log, from presses lost 10 to 24 px from a wall. |
-
-<Collapsible title="What the assists change, in pixels">
-Simulated at 120 Hz with the lab's parameters. In the sheet's shaft there are 136 px between the body and the far wall.
-
-| After the jump | Assists on | After T |
-|---|---|---|
-| Stick released | reaches the other wall in 0.36 s | the push dies after 40 px, about one tile |
-| Stick held toward the wall, in the shaft | crosses anyway: the held direction doesn't count | 16 px out, then back against the same wall |
-| Stick held toward a lone wall | 73 px out, then the stick takes over | 16 px out, then back |
-| Jump tapped instead of held | rises 2.7 tiles | rises 0.9 tiles |
-
-The 16 px is the air control at work. Turning around in the air uses the lab's fastest rate, about 4,500 px/s², which eats a 400 px/s push in under a tenth of a second.
 </Collapsible>
 
 <h2 id="quick-answers">Quick answers</h2>
 
 <h3 id="wall-coyote-time">How long should wall coyote time be?</h3>
 
-100 ms in my lab, the same as coyote time on ledges. In the recorded sessions the late wall jumps had a median of 33 ms and the latest was 99 ms. Celeste's player code has no wall-specific timer; what it has instead is a wider reach, 3 px on an 8 px body.
-
-<h3 id="back-to-the-same-wall">Why does my wall jump send me back to the same wall?</h3>
-
-Because the stick still points at the wall and your air control is stronger than the push. Ignore the stick for a moment after the jump (140 ms in my lab), or do what Celeste does: for 0.16 s, if any direction is held, treat it as "away from the wall".
+100 ms, the same as [coyote time on ledges](/blog/coyote-time-jump-buffer/). [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) has no wall timer and gives a wider reach instead: 3 px on an 8 px body.
 
 <h3 id="wall-slide-speed">How fast should a wall slide be?</h3>
 
-Slow enough to aim. My lab caps it at 130 px/s, about a seventh of the 900 px/s free fall. Celeste starts its cap at 20 px/s and lets it rise to 160 over 1.2 s, so a long slide speeds up.
+Slow enough to aim: 130 px/s here, about a seventh of the 900 px/s free fall.
 
 <h3 id="single-wall-climbing">Should players be able to climb a single wall?</h3>
 
-Decide it on purpose. With unlimited jumps per wall, 36% of my recorded wall jumps ended back on the same wall, which in practice is climbing. My lab gives each wall one jump. Celeste puts no limit on wall jumps and makes climbing cost stamina instead.
-
-Go back to sheet 11, press T, and climb the way your hand wants to, pushing toward the wall on every jump. The character drops back against the wall it just left. The controls didn't change. The game stopped forgiving a habit that a third of my own wall jumps had.
+Decide it on purpose. Here each wall gives one jump, then stops gripping until you touch the floor, bounce or jump from another wall. Celeste allows unlimited wall jumps and makes climbing cost stamina.

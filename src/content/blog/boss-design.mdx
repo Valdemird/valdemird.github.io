@@ -1,60 +1,30 @@
 ---
-title: "Boss fight design in a platformer: three readable attacks, two phases and a stagger bar (Godot code)"
-description: "Boss fight design for a platformer: three attacks, each with its own warning and an earlier enemy's question, randomness with rules, a stagger bar and a faster phase two. Godot code and a playable boss."
+title: "Boss fight design: three attacks, two phases, a stagger bar"
+description: "Good boss design tests what the player already learned: a few readable attacks, randomness with rules, a stagger bar and a faster phase two. Play it."
 pubDate: 2026-11-18
 tags: ["game-feel", "game-design", "godot", "combat"]
 featured: false
 lang: en
 series: platformer-lab
 seriesOrder: 20
+seriesTitle: "Boss design"
 ---
 
-import TLDR from '../../components/blog/TLDR.astro';
 import PlayableLab from '../../components/blog/PlayableLab.astro';
-import StatGrid from '../../components/blog/StatGrid.astro';
-import Callout from '../../components/blog/Callout.astro';
-import CodeBlock from '../../components/blog/CodeBlock.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
-import Sidenote from '../../components/blog/Sidenote.astro';
-import Timeline from '../../components/blog/Timeline.astro';
-import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "A boss is an exam: it teaches nothing new and combines what the player already learned. My lab's test boss has three attacks, each with its own warning, and each one repeats the question of an earlier enemy: the charger, the hopper, the drone.",
-  "The attack choice is random with rules: weighted by distance, and never the same attack three times in a row. Unpredictable, so it can't be memorized. Readable, because every attack still announces itself.",
-  "Seven hits fill its stagger bar and it collapses for 2.2 s. At half health it enters a second phase: the same attacks, 15% shorter warnings, 28% shorter recoveries. In my recorded sessions I started the fight 36 times and won twice.",
-]} />
+A **boss fight** is an exam: it teaches nothing new and combines what the player already learned. This one has three attacks with their own warnings, collapses for **2.2 s** after seven hits, and speeds up at half health.
 
-The boss sheet is the last real stop in the combat half of my lab. It's a closed room with a boss asleep in the middle and a checkpoint at the door. Walk in, get clear of the entrance, and the gates shut on both sides. The sheet's note is short: three attacks, each with its own warning; seven hits knock it down, and that's your opening.
+| Boss attack | Warning | Asked before by |
+|---|---|---|
+| Charge | 0.6 s | [The charger](/blog/telegraphing-attacks/) |
+| Hammer | 0.5 s | [The hopper](/blog/enemy-patterns-and-openings/) |
+| Burst | 0.6 s | The drone |
 
-Going back through my recorded sessions for this post, I started that fight 36 times. I won twice. A typical loss took about 19 seconds from the gates closing.
+<h2 id="what-makes-a-good-boss">Boss attacks: questions the player already answered</h2>
 
-<StatGrid columns={2} stats={[
-  { value: "36", label: "Fights started", context: "35 of them at full health" },
-  { value: "2", label: "Wins", context: "with 2 and 1 masks left" },
-  { value: "19 s", label: "Median losing attempt", context: "from the gates closing to my death" },
-  { value: "30%", label: "Of the boss's hits on me", context: "were me touching its body" },
-]} />
-
-That last number is the one worth staying on. Out of 158 hits the boss landed on me, the largest group wasn't any of its three attacks.
-
-<Callout type="important" title="The thesis">
-A boss teaches nothing new. It's an exam of everything that came before. Keep the moveset small enough to learn, make every attack repeat a question the player has already answered, and put rules on the randomness so the fight can't be memorized but can always be read.
-</Callout>
-
-<h2 id="what-makes-a-good-boss">What makes a good boss fight?</h2>
-
-A good boss fight tests the skills the game already taught, at a higher intensity, with openings the player can create or wait for. Mike Stout's 2010 [breakdown of boss battle structure](https://www.gamedeveloper.com/design/boss-battle-design-and-structure) splits a fight into eight beats, from the build-up to the victory sequence, and frames the boss as the player's chance "to feel like he has mastered the skills you've taught him so far." Two of his beats map straight onto code: "Business as Usual", where the boss shows its basic attacks, and "Escalation", where it raises the difficulty.
-
-My lab's boss is that idea stripped to the minimum. Each of its three attacks is a question an earlier sheet already asked:
-
-| Boss attack | Warning | What it does | Asked before by | The answer |
-|---|---|---|---|---|
-| Charge | 0.6 s | Crosses the room at 680 px/s, up to 380 px | [The charger](/blog/telegraphing-attacks/) | Jump over or dash through |
-| Hammer | 0.5 s | Leaps at you, slams for 2 masks, sends a shockwave each way | [The hopper](/blog/enemy-patterns-and-openings/) | Move after takeoff, then jump the waves |
-| Burst | 0.6 s | Three shots in a fan, the middle one aimed at you | The drone | Keep moving or dash through the fan |
-
-After each attack it recovers for 0.8 s. That's "Can you hit me?", the same turn every regular enemy gives you.
+Each attack repeats an earlier enemy's question and takes the same answer. After every attack the boss recovers for 0.8 s: your turn to hit it.
 
 <PlayableLab
   plane="combate"
@@ -68,13 +38,29 @@ After each attack it recovers for 0.8 s. That's "Can you hit me?", the same turn
   ]}
 />
 
-<h2 id="boss-godot">How to code a boss fight in Godot 4</h2>
+<h2 id="random-with-rules">Random boss attacks, with rules</h2>
 
-The boss is the same `Enemy` state machine as everything else in the lab, with two additions: an attack selector and two counters, health and poise. The selector is the part that decides whether the fight feels fair. The comments are in Spanish because the whole project is.
+A fixed order gets memorized instead of read. So the pick is weighted by distance and never the same attack three times in a row: within 260 px the hammer comes half the time, further away a quarter. You can't predict the next attack, but you can predict the mood.
+
+<h2 id="stagger-bar">Stagger bar: aggression turned into an opening</h2>
+
+The boss never flinches from a single hit, so the stagger bar is where your aggression shows: the seventh hit drops it for 2.2 s with its contact damage off. Sekiro builds its whole combat on the same idea, [posture](https://sekiroshadowsdietwice.wiki.fextralife.com/Posture).
+
+<h2 id="boss-phases">Boss phases: the same attacks, faster</h2>
+
+At half health the boss roars for 0.9 s, so you notice the rules just changed. Then warnings are multiplied by 0.85 and recoveries by 0.72, with no new attacks to learn mid-fight.
+
+<h2 id="how-to-implement">How to implement a boss fight</h2>
+
+1. Build the boss on the regular enemy loop, and add only an attack selector and a hit counter.
+2. Weight each pick by distance, and drop the last attack from the pool once it has come twice in a row.
+3. Ignore hits during the stagger so collapses can't chain, and if the bar fills mid-jump or mid-charge, collapse when the attack ends, not in mid-air.
+4. Put the checkpoint at the door, and close the gates only once the player is inside and clear of both.
+
+<Collapsible title="The code in Godot 4">
 
 <CodeBlock filename="addons/combat_kit/enemies/boss.gd">
 ```gdscript
-## ELECCIÓN CON REGLAS: pesos según la distancia y sin repetir tres veces.
 func _choose_attack() -> void:
 	var far := absf(to_target().x) > 260.0
 	var weights := {
@@ -84,42 +70,10 @@ func _choose_attack() -> void:
 	}
 	if _repeats >= 1:
 		weights.erase(_last_attack)   # como mucho dos veces seguidas
-	var total := 0.0
-	for attack: StringName in weights:
-		total += weights[attack]
-	var pick := _rng.randf() * total
-	var chosen := &"embestida"
-	for attack: StringName in weights:
-		pick -= weights[attack]
-		if pick <= 0.0:
-			chosen = attack
-			break
-	_repeats = _repeats + 1 if chosen == _last_attack else 0
-	_last_attack = chosen
-	var times := {&"embestida": 0.6, &"martillo": 0.5, &"rafaga": 0.6}
-	var windup: float = times[chosen]
-	telegraph(chosen, windup * (0.85 if phase == 2 else 1.0))
-```
-</CodeBlock>
 
-`embestida` is the charge, `martillo` the hammer, `rafaga` the burst. Work the weights out and the boss has a temperament. Within 260 px it picks the hammer half the time, the charge a third and the burst a sixth. From further away the hammer drops to a quarter and the charge and the burst split the rest. You can't predict the next attack, but you can predict the mood: stand close and expect to be jumped on. The `erase` line is the second rule. After the same attack twice, it's off the table for one pick.
 
-The last line is the whole of phase two's extra difficulty on the warning side: every telegraph is multiplied by 0.85. It never goes to zero, which is [the telegraph post's](/blog/telegraphing-attacks/) argument applied to a boss.
-
-The two counters live in the damage handler:
-
-<CodeBlock filename="addons/combat_kit/enemies/boss.gd">
-```gdscript
 func _on_damaged(hit: Hit) -> void:
 	super(hit)
-	if asleep:
-		wake()   # un golpe lo despierta: nunca es un saco de golpes gratis
-	# FASE 2: a mitad de vida ruge y acelera.
-	if phase == 1 and health.current * 2 <= max_health:
-		phase = 2
-		Combat.notify(&"boss_phase", center(), {"phase": 2})
-		if state in [&"idle", &"recover", &"windup"]:
-			set_state(&"roar")
 	if state == &"staggered":
 		return   # ya está desplomado: los golpes no alargan la apertura
 	# AGUANTE: cada golpe suma; al llenarse, se desploma.
@@ -132,110 +86,18 @@ func _on_damaged(hit: Hit) -> void:
 ```
 </CodeBlock>
 
-The boss never flinches from a single hit (`hit_stun = 0.0`, `knockback_resistance = 1.0`), so the stagger bar is the only way your aggression shows. Every hit counts; the seventh drops it for 2.2 s with its contact damage switched off. Two details keep it honest. Hits during a stagger don't count towards the next one, so you can't chain collapses. And if the bar fills mid-jump or mid-charge, the collapse waits until the attack ends, so a boss never drops out of the air onto your head.
+`embestida` is the charge, `martillo` the hammer and `rafaga` the burst; the weighted draw comes right after, in the same function.
 
-<h2 id="one-attempt">One attempt, as the code runs it</h2>
-
-<Timeline items={[
-  { date: "The door", title: "Checkpoint, full health", body: "The checkpoint is at the entrance and checkpoints heal. 35 of my 36 attempts started with all 5 masks." },
-  { date: "Inside", title: "The gates close", body: "Only once you're past the first tile and clear of both doors. The boss wakes up here, or earlier if you hit it." },
-  { date: "Phase 1", title: "Business as usual", body: "A new attack after 0.55 s of walking towards you. Warnings of 0.5 to 0.6 s, then 0.8 s of recovery." },
-  { date: "7 hits", title: "Stagger", body: "It collapses for 2.2 s and stops hurting on contact. The biggest opening of the fight.", emphasize: true },
-  { date: "13 HP", title: "Phase 2", body: "At half of its 26 HP it roars for 0.9 s. Warnings ×0.85, recoveries ×0.72, 0.3 s between attacks, a faster charge and a five-shot burst." },
-  { date: "The end", title: "Win or lose", body: "Either way the gates open. Lose and you're back at the door, healed, with the boss asleep again." },
-]} />
-
-The roar is a small thing worth copying. If the boss is idle, recovering or still warning when it crosses half health, it drops what it was doing and roars for 0.9 s. The player gets a beat to notice that the rules just changed, which is Stout's "Midpoint" in nine-tenths of a second.
-
-<h2 id="what-36-attempts-say">What 36 attempts against my own boss say</h2>
-
-Every hit the player takes is recorded with who landed it and with which attack. Here are the boss's 158.
-
-<InteractiveChart
-  type="horizontal"
-  title="Hits the boss landed on me, by source"
-  story="The most common way the boss hurt me was plain contact with its body. Its shockwaves landed more often than the slam that sends them."
-  unit=" hits"
-  data={[
-    { label: "Touching its body", value: 48 },
-    { label: "Shockwaves", value: 33 },
-    { label: "Hammer (jump and slam)", value: 32 },
-    { label: "Burst", value: 23 },
-    { label: "Charge", value: 22 },
-  ]}
-  annotations={[
-    { targetIndex: 0, text: "Not one of its attacks", emphasize: true },
-  ]}
-  source="My recorded sessions in the lab, Nov 15–16: 36 fights. The hammer count includes 6 slams for 2 masks each."
-/>
-
-Three readings.
-
-Contact damage was the biggest source, 48 of 158. Those are hits from the boss's body while it wasn't attacking with it: walking, warning, firing, recovering. One detail matters for the number. These sessions were recorded with an earlier version of the enemy base class, where an enemy's contact box was nearly its whole body at all times. In the current code a passive enemy's box is 60% of its body, and only goes back to full size while it attacks with it. The 30% is a measurement of that older box.
-
-The shockwaves out-hit the hammer: 33 against 32, and only 6 of those 32 were the slam itself. The hammer stacks two questions. First get out from under it, which is the hopper's question. Then deal with the waves running along the floor, the kind the pile driver on the [dodge sheet](/blog/dodge-dash-i-frames/) sends at you. The second question hit me more often than the first. The code comment says why the waves exist: the landing also threatens whoever stepped aside.
-
-I broke its poise 23 times across the 36 fights and reached phase two in 11 of them. Of those 11, I won 2.
-
-<h2 id="sekiro-stout">Stagger bars and fight structure elsewhere</h2>
-
-The poise bar has a famous relative. Sekiro builds its whole combat around one: the community wiki explains that once an enemy reaches its posture threshold, the player can perform a Deathblow, and that an enemy left alone too long recovers some posture.<Sidenote>From the community wiki's page on [Posture](https://sekiroshadowsdietwice.wiki.fextralife.com/Posture).</Sidenote> My lab's version is cruder, a count of hits instead of a meter that drains, but it does the same job: it converts sustained aggression into one large, readable opening instead of a slow trickle of damage.
-
-Stout's beat structure is the other lens. The lab's boss has a short version of it: the door and the sleeping boss are the build-up, the gates closing are the reveal, phase one is business as usual, the roar is the midpoint, phase two is the escalation. What it skips is everything after: no kill sequence, no victory beat beyond the gates opening. That's fine for a lab. A game would want them.
-
-<h2 id="when-to-use">When a boss design works, and when it doesn't</h2>
-
-| Choice | What the lab does |
-|---|---|
-| An attack that tests something never taught | Avoids it. Every attack repeats an earlier enemy's question. |
-| Purely random attack choice | Avoids it. Weighted by distance, never three times in a row. |
-| A fixed attack order | Avoids it. It can be learned, but it gets memorized instead of read. |
-| Lots of health and nothing else | Adds a stagger bar: 7 hits turn into a 2.2 s opening. |
-| A harder second half | Same attacks, faster: warnings ×0.85, recoveries ×0.72. No new attacks to learn mid-fight. |
-| A checkpoint far from the room | Puts it at the door. Retrying the boss shouldn't mean replaying the path. |
-| Gates that can trap the player | Closes them only once the player is inside and clear of both doors. |
-
-<Collapsible title="Why the boss starts asleep, and when the room closes">
-The boss's script starts it in an `asleep` state where it doesn't move or attack. The scene wakes it when the fight begins, and the rule for "begins" is in the lab's combat scene:
-
-<CodeBlock filename="game/combat/combat_main.gd">
-```gdscript
-	# Se cierra cuando el jugador ya está dentro y lejos de ambas puertas:
-	# una compuerta nunca debe atraparlo.
-	var left := minf(_arena.gates[0].global_position.x, _arena.gates[1].global_position.x)
-	var right := maxf(_arena.gates[0].global_position.x, _arena.gates[1].global_position.x)
-	var x := player.global_position.x
-	if x > left + BP.TILE + 34.0 and x < right - 34.0:
-		boss_fight = true
-		for gate in _arena.gates:
-			gate.set_closed(true)
-		boss.wake()
-```
-</CodeBlock>
-
-The margin keeps a gate from closing on top of the player. And because a hit also wakes it, you can't stand outside and chip at a sleeping boss: the comment calls that never being a free punching bag.
 </Collapsible>
 
 <h2 id="quick-answers">Quick answers</h2>
 
-<h3 id="good-boss-platformer">What makes a good boss fight in a platformer?</h3>
-
-A small set of attacks, each with a clear warning and a clear answer that the game has already taught, plus a recovery after every attack. In my lab that's three attacks, each one an earlier enemy's question, with 0.8 s of recovery after each.
-
 <h3 id="how-many-attacks">How many attacks should a boss have?</h3>
 
-Few enough to learn in a handful of attempts. The lab's boss has three. Its script says it outright: better three that read well than ten that confuse.
+Few enough to learn in a handful of attempts. This one has three, and its script says why: better three that read well than ten that confuse.
 
 <h3 id="random-but-fair">How do you make boss attack patterns random but fair?</h3>
 
-Put rules on the randomness. The lab's boss weights its choice by distance and never repeats an attack three times in a row, and every attack keeps its warning. You can't memorize the order, but you can always read the next move.
+Put rules on the randomness: weight the choice by distance, never repeat an attack three times in a row, and keep every warning. The order can't be memorized, but the next move can always be read.
 
-<h3 id="stagger-bar">What is a stagger or poise bar in a boss fight?</h3>
-
-A counter that fills as you land hits, and knocks the boss down for a moment when full. Mine breaks at 7 hits and gives 2.2 s. Sekiro's posture system is the best-known version.
-
-<h3 id="phase-two">When should a boss change phase?</h3>
-
-At a point the player can see coming, with a beat to notice. My lab's boss switches at half health, roars for 0.9 s, and then runs the same three attacks faster.
-
-This is the last post in [the series](/blog/series/platformer-game-feel/). It started with [the timers that forgive your jumps](/blog/coyote-time-jump-buffer/), went through [the dash](/blog/platformer-dash/), [three kinds of box](/blog/hitbox-vs-hurtbox/), [the three phases of a swing](/blog/attack-startup-active-recovery/), [the pogo](/blog/pogo-attack/) and [dodging with i-frames](/blog/dodge-dash-i-frames/), and it ends in a room where all of them have to work at the same time. The lab's closing sheet has the line I'd keep from all of it: combat leans on movement, it doesn't replace it. That boss killed me 30 times. Both wins came with one or two masks left, and the recording says exactly which hit ended each of the 30.
+This is the last post in [the series](/blog/series/platformer-game-feel/): one room where every earlier technique has to work at once.

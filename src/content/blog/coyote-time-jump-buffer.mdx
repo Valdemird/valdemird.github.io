@@ -1,50 +1,49 @@
 ---
-title: "Coyote time and jump buffer: what they are and how to code them in Godot"
-description: "Coyote time lets you jump 100 ms after leaving a ledge. A jump buffer remembers a press for 120 ms before you land. Both playable here, with the real Godot code and the numbers from 4,595 of my own jumps."
+title: "Coyote time and jump buffer: what they are and how they work"
+description: "Coyote time lets you jump just after leaving a ledge. A jump buffer keeps a jump you pressed just before landing. See both on a timeline and play them."
 pubDate: 2026-11-18
-tags: ["game-feel", "game-design", "godot", "platformers"]
+tags: ["game-feel", "game-design", "platformers", "godot"]
 featured: false
 lang: en
 series: platformer-lab
 seriesOrder: 1
+seriesTitle: "Coyote time and jump buffer"
 ---
 
-import TLDR from '../../components/blog/TLDR.astro';
 import PlayableLab from '../../components/blog/PlayableLab.astro';
-import StatGrid from '../../components/blog/StatGrid.astro';
-import Callout from '../../components/blog/Callout.astro';
-import CodeBlock from '../../components/blog/CodeBlock.astro';
+import TimingDiagram from '../../components/blog/TimingDiagram.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
-import Sidenote from '../../components/blog/Sidenote.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Coyote time: for 100 ms after you walk off a ledge, the game still lets you jump. A jump buffer: if you press jump up to 120 ms before landing, the jump fires the moment you touch down.",
-  "In four days of my own play, 1 jump in 13 only happened because of one of them. I didn't notice a single one, which is the point.",
-  "Both are below, in the real game: watch the clip, or open the second tab, play the sheet yourself and press T to switch the technique off.",
-]} />
+**Coyote time** lets you jump a moment after you leave a ledge. A **jump buffer** keeps a jump you pressed just before landing. Both make the game answer what you meant to do, not what the collision box says.
 
-On November 15 I started a platformer in Godot. Before I drew a single level I built a lab: one long blueprint where every sheet isolates a single technique, and the T key switches it off while you play. It's the idea behind [my game feel post](/blog/game-feel-on-the-web/), pointed one layer down. That post was about juice, what the game shows you after you act. This series is about what decides whether your action works at all.
-
-The lab records every session: every jump, every press that didn't turn into a jump, every time one of these assists stepped in. While putting this post together I had Claude total up four days of my own sessions. 130 of them, 4,595 jumps. 363 of those jumps happened only because of two timers I had stopped thinking about the day I wrote them.
-
-<StatGrid columns={2} stats={[
-  { value: "4,595", label: "Jumps", context: "130 sessions, Nov 15–18" },
-  { value: "152", label: "Coyote time saves", context: "jumped after the ledge was gone" },
-  { value: "211", label: "Buffer saves", context: "pressed before touching down" },
-  { value: "1 in 13", label: "Needed one of them", context: "I noticed none" },
-]} />
-
-<Callout type="important" title="The thesis">
-A good assist is one the player never notices. Coyote time and the jump buffer are two timers, 100 and 120 milliseconds, and their whole job is to side with what the player meant over what the hitbox says happened.
-</Callout>
+<TimingDiagram
+  title="Coyote time and jump buffer"
+  duration={600}
+  start={250}
+  probe="you press jump"
+  phases={[
+    { from: 0, to: 200, label: "floor", tone: "solid", on: { ok: true, text: "You're on the floor: you jump." } },
+    { from: 200, to: 480, label: "air", tone: "air", on: { ok: null, text: "You're in the air: the press does nothing." } },
+    { from: 480, to: 600, label: "floor", tone: "solid", on: { ok: true, text: "You're on the floor: you jump." } },
+  ]}
+  events={[
+    { at: 200, label: "the ledge ends" },
+    { at: 480, label: "you land" },
+  ]}
+  windows={[
+    { from: 200, to: 300, label: "coyote time", detail: "100 ms", measure: "since",
+      on: { ok: true, text: "You jump, {ms} ms after leaving the ledge." },
+      off: { ok: false, text: "You fall: {ms} ms too late." } },
+    { from: 360, to: 480, label: "jump buffer", detail: "120 ms", measure: "until",
+      on: { ok: true, text: "Kept: you jump the moment you land, {ms} ms later." },
+      off: { ok: false, text: "Lost: {ms} ms too early, and you land without jumping." } },
+  ]}
+/>
 
 <h2 id="coyote-time">Coyote time: jumping after the ground is gone</h2>
 
-Coyote time is a short window after you walk off a ledge during which the game still lets you jump, as if you were standing on it. In my lab the window is 100 ms. The name comes from Wile E. Coyote, who runs off the cliff and hangs in the air until he looks down. Celeste ships the same number: it's in the published player code as `JumpGraceTime = 0.1f`<Sidenote>Line 48 of [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub.</Sidenote>.
-
-It exists because players judge the edge with their eyes, and they jump as late as they can on purpose: the later you leave, the farther you get. For a frame or two after the collision box has left the ledge, the character still looks like it's standing on it. Without coyote time, that press arrives one frame late, the character drops, and the player blames the game. They're right to.
-
-This is sheet 05 of the lab. In the clip the hero runs and jumps a beat *after* leaving each ledge: watch for the green `COYOTE +ms` tag, then for the moment T switches it off. Or open the second tab and try it yourself.
+You jump as late as you can, because later means farther. By eye, the character is still on the ledge for a few frames after leaving it. Coyote time gives you those frames: **100 ms**, the same as Celeste. The name comes from Wile E. Coyote, who only falls once he looks down.
 
 <PlayableLab
   sheets="coyote"
@@ -53,53 +52,18 @@ This is sheet 05 of the lab. In the clip the hero runs and jumps a beat *after* 
   steps={[
     "Run right with <kbd>→</kbd> and jump with <kbd>Space</kbd> as late as you can before each gap.",
     "If you were already in the air when you pressed, a green «COYOTE +ms» tag appears: the window gave you that jump.",
-    "Press <kbd>T</kbd> to switch coyote time off and repeat the run. The same late jumps now show «× TARDE» (too late) and you fall.",
+    "Press <kbd>T</kbd> and repeat the run. The same late jumps now show «× TARDE» (too late) and you fall.",
   ]}
 />
 
-<h3 id="coyote-time-godot">Coyote time in Godot 4: the code</h3>
+<h2 id="jump-buffer">Jump buffer: pressing early counts too</h2>
 
-The code is three lines from three places in the player. The comments are in Spanish because the whole project is.
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-# Tras moverse, cada tick. Mientras se pisa suelo, el coyote está "cargado".
-if on_floor:
-	_coyote = params.coyote_time if Lab.on(&"coyote_time") else 0.0
-
-# En _tick_timers(), cada tick:
-_coyote = maxf(_coyote - delta, 0.0)
-
-# En _try_jump(). COYOTE TIME: se puede saltar si se está en el suelo... o si se
-# dejó hace menos de `coyote_time` segundos. El jugador ve la cornisa bajo sus pies
-# unos frames después de haberla abandonado; el juego le da la razón.
-if on_floor or _coyote > 0.0:
-	_do_jump(&"ground" if on_floor else &"coyote")
-```
-</CodeBlock>
-
-The line that matters isn't in that block. When a jump starts, `_begin_rise()` sets `_coyote` back to zero. Forget it and the timer is still running while you rise, so a second press in the first 100 ms of a jump becomes a free double jump. Coyote time refills only while you're standing on something, and it's spent the moment you leave by jumping.
-
-| Situation | Coyote time? |
-|---|---|
-| Running jumps off ledges, the bread and butter of the genre | Yes. It's the case it was invented for. |
-| Walking off a ledge on purpose to drop down | Harmless. It only matters if you press jump. |
-| A second press right after a real jump | Never. Zero the timer when the jump starts. |
-| Precision games that ask for exact edges | Keep it short. 100 ms is what Celeste ships. |
-
-<h2 id="jump-buffer">Jump buffer: pressing too early counts too</h2>
-
-A jump buffer remembers a jump press made shortly before landing and fires the jump the instant you touch down. In my lab it holds the press for 120 ms. It's coyote time's mirror: coyote time forgives a press that comes late, and the buffer forgives one that comes early.
-
-Without it, the press you sent is simply gone. You pressed, nothing happened, and from your side of the screen the button didn't work. It shows most when you chain jumps: across a row of pillars you start pressing on the way down, because that's the rhythm the level asks for.
-
-Sheet 06 is pillars over spikes. In the clip every press comes 70 ms before a landing. With the buffer the hero bounces all the way across. After T, the same presses come back as `× PRONTO` (too early): it lands on the pillar without jumping, keeps running, and drops into the spikes.
+Press a little before touching the ground and, without a buffer, the press is lost: you pressed and nothing happened. With a buffer it's kept for **120 ms** and the jump fires on landing. You feel it most when chaining jumps.
 
 <PlayableLab
   sheets="buffer"
   title="Jump buffer"
   videoNote="Every press comes 70 ms before landing. With the buffer the hero chains the bounces; after T the same presses are lost and it lands in the spikes."
-  caption="The presses don't change between runs. What changes is whether the game remembers them."
   steps={[
     "Run right with <kbd>→</kbd> and jump onto the first pillar.",
     "On the way down, press <kbd>Space</kbd> a moment before you land. You bounce on to the next pillar and see «BUFFER −ms».",
@@ -107,76 +71,46 @@ Sheet 06 is pillars over spikes. In the clip every press comes 70 ms before a la
   ]}
 />
 
-<h3 id="jump-buffer-godot">Jump buffer in Godot 4: the code</h3>
+<h2 id="how-to-implement">How to implement coyote time and a jump buffer</h2>
+
+1. **Coyote time:** a timer that refills while you stand on the floor and runs down in the air. You can jump if you're on the floor or the timer has time left.
+2. **Zero it when a jump starts.** Otherwise a second press early in the jump is a free double jump.
+3. **Jump buffer:** another timer, filled when you press and run down every frame. If you touch the floor while it has time left, you jump.
+
+<Collapsible title="The code in Godot 4">
 
 <CodeBlock filename="addons/platformer_kit/player/player.gd">
 ```gdscript
+# Tras moverse, cada tick. Mientras se pisa suelo, el coyote está "cargado".
+if on_floor:
+	_coyote = params.coyote_time if Lab.on(&"coyote_time") else 0.0
+
 # JUMP BUFFER: no se actúa sobre la pulsación; se RECUERDA durante unos ms.
 if Input.is_action_just_pressed(&"jump"):
 	_jump_buffer = params.jump_buffer_time if Lab.on(&"jump_buffer") else delta * 0.5
 
 # En _tick_timers(), cada tick:
+_coyote = maxf(_coyote - delta, 0.0)
 _jump_buffer = maxf(_jump_buffer - delta, 0.0)
 
-# En _try_jump(): sin una pulsación reciente no hay nada que decidir.
+# En _try_jump():
 if _jump_buffer <= 0.0:
 	return
+if on_floor or _coyote > 0.0:
+	_do_jump(&"ground" if on_floor else &"coyote")
 ```
 </CodeBlock>
 
-My favorite part is the `else`. With the buffer off, the press is still stored, just for half a tick (`delta * 0.5`), which means "only this exact frame counts". That's what a naive `if Input.is_action_just_pressed(&"jump"): jump()` does anyway. So the T key compares the technique against the code you'd write by default, not against a version someone broke on purpose to make the technique look good.
+`_begin_rise()` sets `_coyote` back to zero when each jump starts.
 
-Where the buffer earns its place:
-
-- Chained jumps: pillars, stomping enemies, anything with a rhythm.
-- Any action the player can request while the game can't do it yet: a dash during a recovery, an attack while another one is still swinging. The combat half of my lab buffers attacks the same way, down to the `delta * 0.5`.
-- Keep it short. A buffer that's too long jumps after the player has already decided not to, and then the game is the one that feels late.
-
-<h2 id="the-pattern">The pattern underneath: don't react, remember</h2>
-
-Both techniques have the same shape. You don't act on the input when it arrives. You remember when it arrived, and every tick you ask one question: is there a recent press, and can I jump right now? Coyote time stretches the "can I jump" half. The buffer stretches the "recent press" half.
-
-```text
-              the ledge ends                       the ground arrives
-                    │                                      │
- ── floor ──────────┼────────────── air ───────────────────┼── floor ──
-                    ├── coyote: 100 ms ──┤     ├── buffer: 120 ms ──┤
-                    press here: still a jump   press here: jumps on landing
-```
-
-There's a funny line in my own numbers. The lab exists to switch these things off and feel the difference, and across 130 sessions I died with a technique switched off exactly twice. I built a machine for feeling the gap and then did what every player does: left the help on and forgot it was there.
-
-<Collapsible title="How the lab knows you would have fallen">
-With the technique off, the player still measures how long ago it left the floor. If you press jump inside the window the technique would have given you, it doesn't jump, but it reports the miss so the lab can draw `× TARDE 49 ms` over your head:
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-elif _since_jump_press == 0.0 and _walked_off and not Lab.on(&"coyote_time") \
-		and _since_left_floor <= params.coyote_time:
-	# Didáctico: con la técnica apagada, avisamos de que el coyote lo habría salvado.
-	assist_note.emit(&"coyote_miss", int(_since_left_floor * 1000.0))
-```
-</CodeBlock>
-
-The same signal, with technique on, becomes `coyote_hit`. That's what the session recorder counts, and where the 152 at the top of this post comes from: jumps that only happened because the window was open.
 </Collapsible>
 
 <h2 id="quick-answers">Quick answers</h2>
 
 <h3 id="how-long-coyote-time">How long should coyote time be?</h3>
 
-100 ms works: it's what my lab uses and what Celeste ships. That's six frames at 60 fps, enough to cover a late reaction and short enough that nobody sees the character jump off thin air.
+About 100 ms, six frames at 60 fps. Longer and you can tell you're jumping off thin air.
 
 <h3 id="how-long-jump-buffer">How long should a jump buffer be?</h3>
 
-My lab uses 120 ms. Keep it in that range: a longer buffer starts jumping after the player has already changed their mind.
-
-<h3 id="coyote-double-jump">Can coyote time give a free double jump?</h3>
-
-Only if you forget to reset it. Zero the coyote timer when a jump starts and refill it only while the character stands on the floor.
-
-<h3 id="coyote-and-buffer-together">Do coyote time and the jump buffer work together?</h3>
-
-Yes, and they don't interfere. They stretch opposite ends of the same check: the buffer keeps the press alive, and coyote time keeps the "can jump" alive.
-
-Go back to the coyote sheet, switch the technique off and try to clear the 6u gap. You'll start leaving the ledge earlier without deciding to, and the run feels worse even when you make it. That's what the 100 ms buys. The jumps it saves are the smaller part. The bigger part is that you get to keep jumping as late as your eyes tell you to.
+About 120 ms. Much longer and it jumps after you've changed your mind.

@@ -1,60 +1,30 @@
 ---
-title: "Diseño de jefes en un plataformas: tres ataques legibles, dos fases y una barra de aguante (código en Godot)"
-description: "Diseño de jefes para un plataformas: pocos ataques, cada uno con su aviso y con la pregunta de un enemigo anterior, azar con reglas, una barra de aguante y una segunda fase más rápida. Código en Godot y un jefe jugable."
+title: "Diseño de jefes: tres ataques, dos fases y barra de aguante"
+description: "Un buen jefe examina lo que el jugador ya aprendió: pocos ataques legibles, azar con reglas, una barra de aguante y una segunda fase más rápida. Juégalo."
 pubDate: 2026-11-18
 tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 20
+seriesTitle: "Diseño de jefes"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
-import Timeline from '../../../components/blog/Timeline.astro';
-import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Un jefe es un examen: no enseña nada nuevo, combina lo que el jugador ya aprendió. El jefe de pruebas de mi laboratorio tiene tres ataques, cada uno con su aviso, y cada uno repite la pregunta de un enemigo anterior: el embestidor, el saltador y el dron.",
-  "La elección de ataque es aleatoria con reglas: ponderada por la distancia y nunca el mismo ataque tres veces seguidas. Impredecible, así que no se puede memorizar. Legible, porque todos los ataques siguen avisando.",
-  "Siete golpes llenan su barra de aguante y se desploma 2,2 s. A mitad de vida entra en una segunda fase: los mismos ataques, avisos un 15 % más cortos y recuperaciones un 28 % más cortas. En mis partidas grabadas empecé la pelea 36 veces y gané dos.",
-]} />
+Una **pelea contra un jefe** es un examen: no enseña nada nuevo, combina lo que el jugador ya aprendió. Éste tiene tres ataques, cada uno con su aviso, se desploma **2,2 s** tras siete golpes y se acelera a mitad de vida.
 
-La lámina del jefe es la última parada de verdad en la mitad de combate de mi laboratorio. Es una sala cerrada con un jefe dormido en el centro y un checkpoint en la puerta. Entras, te alejas de la entrada y las compuertas se cierran a los dos lados. La nota de la lámina es corta: tres ataques, cada uno con su aviso; siete golpes lo desploman, y ésa es tu apertura.
+| Ataque del jefe | Aviso | Ya lo preguntó |
+|---|---|---|
+| Embestida | 0,6 s | [El embestidor](/blog/es/telegraphing-attacks/) |
+| Martillo | 0,5 s | [El saltador](/blog/es/enemy-patterns-and-openings/) |
+| Ráfaga | 0,6 s | El dron |
 
-El laboratorio graba cada pelea. Repasando mis partidas para este post, a este jefe me enfrenté 36 veces. Gané dos. Una derrota típica duró unos 19 segundos desde que se cerraron las compuertas.
+<h2 id="what-makes-a-good-boss">Ataques del jefe: preguntas que el jugador ya respondió</h2>
 
-<StatGrid columns={2} stats={[
-  { value: "36", label: "Peleas empezadas", context: "35 de ellas con la vida llena" },
-  { value: "2", label: "Victorias", context: "con 2 y 1 máscaras de sobra" },
-  { value: "19 s", label: "Mediana de una derrota", context: "de que se cierran las compuertas a mi muerte" },
-  { value: "30 %", label: "De los golpes del jefe", context: "fueron yo tocando su cuerpo" },
-]} />
-
-Ese último número es el que merece la pena mirar despacio. De los 158 golpes que me dio el jefe, el grupo más grande no era ninguno de sus tres ataques.
-
-<Callout type="important" title="La tesis">
-Un jefe no enseña nada nuevo. Es un examen de todo lo anterior. Haz el repertorio lo bastante pequeño para aprenderlo, que cada ataque repita una pregunta que el jugador ya ha respondido, y pon reglas al azar para que la pelea no se pueda memorizar pero siempre se pueda leer.
-</Callout>
-
-<h2 id="what-makes-a-good-boss">¿Qué hace buena una pelea contra un jefe?</h2>
-
-Una buena pelea de jefe pone a prueba las habilidades que el juego ya enseñó, con más intensidad, y con aperturas que el jugador puede provocar o esperar. El [análisis de Mike Stout sobre la estructura de los jefes](https://www.gamedeveloper.com/design/boss-battle-design-and-structure), de 2010, divide la pelea en ocho tiempos, de la preparación a la secuencia de victoria, y plantea el jefe como la ocasión del jugador de sentir que domina lo que se le ha enseñado hasta entonces. Dos de esos tiempos caen directos en el código: "Business as Usual", donde el jefe enseña sus ataques básicos, y "Escalation", donde sube la dificultad.
-
-El jefe de mi laboratorio es esa idea reducida al mínimo. Cada uno de sus tres ataques es una pregunta que ya hizo una lámina anterior:
-
-| Ataque del jefe | Aviso | Qué hace | Ya lo preguntó | La respuesta |
-|---|---|---|---|---|
-| Embestida | 0,6 s | Cruza la sala a 680 px/s, hasta 380 px | [El embestidor](/blog/es/telegraphing-attacks/) | Saltarlo o atravesarlo con el dash |
-| Martillo | 0,5 s | Salta hacia ti, cae quitando 2 máscaras y lanza una onda a cada lado | [El saltador](/blog/es/enemy-patterns-and-openings/) | Moverse tras el despegue y saltar las ondas |
-| Ráfaga | 0,6 s | Tres disparos en abanico, el del medio apuntado a ti | El dron | No pararse o atravesar el abanico con el dash |
-
-Después de cada ataque se recupera 0,8 s. Es el "¿puedes golpearme?", el mismo turno que te da cualquier enemigo normal.
+Cada ataque repite la pregunta de un enemigo anterior y se responde igual. Después de cada ataque el jefe se recupera 0,8 s: es tu turno para golpearlo.
 
 <PlayableLab
   plane="combate"
@@ -68,13 +38,29 @@ Después de cada ataque se recupera 0,8 s. Es el "¿puedes golpearme?", el mismo
   ]}
 />
 
-<h2 id="boss-godot">Cómo programar la pelea contra un jefe en Godot 4</h2>
+<h2 id="random-with-rules">Ataques aleatorios del jefe, con reglas</h2>
 
-El jefe usa la misma máquina de estados `Enemy` que todo lo demás en el laboratorio, con dos añadidos: un selector de ataques y dos contadores, la vida y el aguante. El selector es la parte que decide si la pelea se siente justa.
+Un orden fijo se memoriza en vez de leerse, así que la elección se pondera por la distancia y nunca repite un ataque tres veces seguidas: a menos de 260 px sale el martillo la mitad de las veces; más lejos, una de cada cuatro. No puedes predecir el siguiente ataque, pero sí el humor.
+
+<h2 id="stagger-bar">Barra de aguante: la agresividad convertida en apertura</h2>
+
+El jefe no se inmuta por un golpe suelto, así que tu agresividad se nota en la barra de aguante: el séptimo golpe lo tumba 2,2 s sin daño por contacto. Sekiro construye todo su combate sobre la misma idea, la [postura](https://sekiroshadowsdietwice.wiki.fextralife.com/Posture) (enlace en inglés).
+
+<h2 id="boss-phases">Fases del jefe: los mismos ataques, más rápidos</h2>
+
+A mitad de vida el jefe ruge 0,9 s para que notes que las reglas han cambiado. Luego los avisos se multiplican por 0,85 y las recuperaciones por 0,72, sin ataques nuevos que aprender.
+
+<h2 id="how-to-implement">Cómo implementar la pelea contra un jefe</h2>
+
+1. Monta el jefe sobre el bucle de cualquier enemigo y añade sólo un selector de ataques y un contador de golpes.
+2. Pondera cada elección por la distancia y saca el último ataque del sorteo cuando ya haya salido dos veces seguidas.
+3. Ignora los golpes durante el desplome para que no se encadenen, y si la barra se llena en pleno salto o embestida, que se desplome al acabar el ataque, no en el aire.
+4. Pon el checkpoint en la puerta y cierra las compuertas sólo cuando el jugador esté dentro y lejos de las dos.
+
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="addons/combat_kit/enemies/boss.gd">
 ```gdscript
-## ELECCIÓN CON REGLAS: pesos según la distancia y sin repetir tres veces.
 func _choose_attack() -> void:
 	var far := absf(to_target().x) > 260.0
 	var weights := {
@@ -84,42 +70,10 @@ func _choose_attack() -> void:
 	}
 	if _repeats >= 1:
 		weights.erase(_last_attack)   # como mucho dos veces seguidas
-	var total := 0.0
-	for attack: StringName in weights:
-		total += weights[attack]
-	var pick := _rng.randf() * total
-	var chosen := &"embestida"
-	for attack: StringName in weights:
-		pick -= weights[attack]
-		if pick <= 0.0:
-			chosen = attack
-			break
-	_repeats = _repeats + 1 if chosen == _last_attack else 0
-	_last_attack = chosen
-	var times := {&"embestida": 0.6, &"martillo": 0.5, &"rafaga": 0.6}
-	var windup: float = times[chosen]
-	telegraph(chosen, windup * (0.85 if phase == 2 else 1.0))
-```
-</CodeBlock>
 
-Si haces las cuentas con los pesos, el jefe tiene carácter. A menos de 260 px elige el martillo la mitad de las veces, la embestida un tercio y la ráfaga un sexto. Desde más lejos, el martillo baja a un cuarto y la embestida y la ráfaga se reparten el resto. No puedes predecir el siguiente ataque, pero sí el humor: si te quedas cerca, espera que se te eche encima. La línea del `erase` es la segunda regla. Tras el mismo ataque dos veces, queda fuera durante una elección.
 
-La última línea es todo lo que endurece los avisos en la segunda fase: cada aviso se multiplica por 0,85. Nunca llega a cero, que es el argumento [del post de telegrafiar](/blog/es/telegraphing-attacks/) aplicado a un jefe.
-
-Los dos contadores viven en la función que recibe el daño:
-
-<CodeBlock filename="addons/combat_kit/enemies/boss.gd">
-```gdscript
 func _on_damaged(hit: Hit) -> void:
 	super(hit)
-	if asleep:
-		wake()   # un golpe lo despierta: nunca es un saco de golpes gratis
-	# FASE 2: a mitad de vida ruge y acelera.
-	if phase == 1 and health.current * 2 <= max_health:
-		phase = 2
-		Combat.notify(&"boss_phase", center(), {"phase": 2})
-		if state in [&"idle", &"recover", &"windup"]:
-			set_state(&"roar")
 	if state == &"staggered":
 		return   # ya está desplomado: los golpes no alargan la apertura
 	# AGUANTE: cada golpe suma; al llenarse, se desploma.
@@ -132,110 +86,18 @@ func _on_damaged(hit: Hit) -> void:
 ```
 </CodeBlock>
 
-El jefe no se inmuta por un golpe suelto (`hit_stun = 0.0`, `knockback_resistance = 1.0`), así que la barra de aguante es el único sitio donde se nota tu agresividad. Cada golpe cuenta; el séptimo lo tumba 2,2 s con el daño por contacto apagado. Dos detalles lo mantienen honesto. Los golpes durante el desplome no cuentan para el siguiente, así que no se pueden encadenar desplomes. Y si la barra se llena en pleno salto o en plena embestida, el desplome espera a que acabe el ataque, así que un jefe nunca se te cae encima desde el aire.
+`embestida`, `martillo` y `rafaga` son los tres ataques, y el sorteo ponderado viene justo después, en la misma función.
 
-<h2 id="one-attempt">Un intento, tal como lo ejecuta el código</h2>
-
-<Timeline items={[
-  { date: "La puerta", title: "Checkpoint, vida llena", body: "El checkpoint está en la entrada y los checkpoints curan. 35 de mis 36 intentos empezaron con las 5 máscaras." },
-  { date: "Dentro", title: "Se cierran las compuertas", body: "Sólo cuando has pasado la primera casilla y estás lejos de las dos puertas. Aquí se despierta el jefe, o antes si lo golpeas." },
-  { date: "Fase 1", title: "Lo de siempre", body: "Un ataque nuevo tras 0,55 s acercándose a ti. Avisos de 0,5 a 0,6 s y luego 0,8 s de recuperación." },
-  { date: "7 golpes", title: "Desplome", body: "Cae 2,2 s y deja de hacer daño por contacto. La apertura más grande de la pelea.", emphasize: true },
-  { date: "13 de vida", title: "Fase 2", body: "A la mitad de sus 26 puntos de vida ruge durante 0,9 s. Avisos ×0,85, recuperaciones ×0,72, 0,3 s entre ataques, una embestida más rápida y una ráfaga de cinco disparos." },
-  { date: "El final", title: "Ganar o perder", body: "En los dos casos se abren las compuertas. Si pierdes vuelves a la puerta, curado, con el jefe dormido otra vez." },
-]} />
-
-El rugido es un detalle que merece la pena copiar. Si el jefe está quieto, recuperándose o todavía avisando cuando cruza la mitad de su vida, deja lo que estaba haciendo y ruge durante 0,9 s. El jugador tiene un respiro para darse cuenta de que las reglas acaban de cambiar, que es el "Midpoint" de Stout en nueve décimas de segundo.
-
-<h2 id="what-36-attempts-say">Lo que dicen 36 intentos contra mi propio jefe</h2>
-
-Cada golpe que recibe el jugador queda grabado con quién lo dio y con qué ataque. Éstos son los 158 del jefe.
-
-<InteractiveChart
-  type="horizontal"
-  title="Golpes que me dio el jefe, por origen"
-  story="La forma más habitual en que el jefe me hizo daño fue el simple contacto con su cuerpo. Sus ondas acertaron más que el martillazo que las lanza."
-  unit=" golpes"
-  data={[
-    { label: "Tocar su cuerpo", value: 48 },
-    { label: "Ondas de choque", value: 33 },
-    { label: "Martillo (salto y caída)", value: 32 },
-    { label: "Ráfaga", value: 23 },
-    { label: "Embestida", value: 22 },
-  ]}
-  annotations={[
-    { targetIndex: 0, text: "Ninguno de sus ataques", emphasize: true },
-  ]}
-  source="Mis partidas grabadas en el laboratorio, 15–16 nov: 36 peleas. El martillo incluye 6 caídas de 2 máscaras cada una."
-/>
-
-Tres lecturas.
-
-El daño por contacto fue la fuente más grande, 48 de 158. Son golpes de su cuerpo mientras no atacaba con él: andando, avisando, disparando, recuperándose. Hay un detalle que importa para ese número. Estas partidas se grabaron con una versión anterior de la clase base de los enemigos, en la que la caja de contacto era casi todo el cuerpo en todo momento. En el código actual, la caja de un enemigo que no ataca es el 60 % de su cuerpo, y sólo vuelve al tamaño completo mientras ataca con él. El 30 % mide aquella caja antigua.
-
-Las ondas superaron al martillo: 33 contra 32, y de esos 32 sólo 6 fueron la caída en sí. El martillo apila dos preguntas. Primero, salir de debajo, que es la pregunta del saltador. Después, las ondas que corren por el suelo, del mismo tipo que las que manda el martinete de la [lámina del dash](/blog/es/dodge-dash-i-frames/). La segunda pregunta me alcanzó más que la primera. El comentario del código dice para qué están: el aterrizaje también amenaza a quien se apartó.
-
-Le rompí el aguante 23 veces en las 36 peleas y llegué a la segunda fase en 11. De esas 11, gané 2.
-
-<h2 id="sekiro-stout">Barras de aguante y estructura de jefe en otros juegos</h2>
-
-La barra de aguante tiene un pariente famoso. Sekiro construye todo su combate alrededor de una: la wiki de la comunidad explica que cuando un enemigo llega a su umbral de postura el jugador puede ejecutar un Deathblow, el golpe de gracia, y que si se le deja demasiado tiempo recupera parte de la postura.<Sidenote>Según la página de la wiki de la comunidad sobre [Posture](https://sekiroshadowsdietwice.wiki.fextralife.com/Posture), en inglés.</Sidenote> La versión de mi laboratorio es más tosca, una cuenta de golpes en vez de un medidor que se vacía, pero hace el mismo trabajo: convierte la agresividad sostenida en una apertura grande y legible en vez de un goteo lento de daño.
-
-La estructura de Stout es la otra lente. El jefe del laboratorio tiene una versión corta: la puerta y el jefe dormido son la preparación, el cierre de las compuertas es la presentación, la fase uno es lo de siempre, el rugido es el punto medio y la fase dos es la escalada. Lo que se salta es todo lo de después: no hay secuencia de derrota ni momento de victoria más allá de que se abran las compuertas. Para un laboratorio vale. Un juego los querría.
-
-<h2 id="when-to-use">Cuándo funciona el diseño de un jefe y cuándo no</h2>
-
-| Decisión | Qué hace el laboratorio |
-|---|---|
-| Un ataque que pone a prueba algo que nunca se enseñó | Lo evita. Cada ataque repite la pregunta de un enemigo anterior. |
-| Elegir el ataque totalmente al azar | Lo evita. Ponderado por la distancia, nunca tres veces seguidas. |
-| Un orden de ataques fijo | Lo evita. Se aprende, pero se memoriza en vez de leerse. |
-| Mucha vida y nada más | Añade una barra de aguante: 7 golpes se convierten en 2,2 s de apertura. |
-| Una segunda mitad más difícil | Los mismos ataques, más rápidos: avisos ×0,85, recuperaciones ×0,72. Nada nuevo que aprender a mitad de pelea. |
-| Un checkpoint lejos de la sala | Lo pone en la puerta. Repetir el jefe no debería obligar a repetir el camino. |
-| Compuertas que pueden atrapar al jugador | Las cierra sólo cuando el jugador está dentro y lejos de ambas puertas. |
-
-<Collapsible title="Por qué el jefe empieza dormido y cuándo se cierra la sala">
-El script del jefe lo arranca en un estado `asleep` en el que ni se mueve ni ataca. La escena lo despierta cuando empieza la pelea, y la regla de qué es "empezar" está en la escena de combate del laboratorio:
-
-<CodeBlock filename="game/combat/combat_main.gd">
-```gdscript
-	# Se cierra cuando el jugador ya está dentro y lejos de ambas puertas:
-	# una compuerta nunca debe atraparlo.
-	var left := minf(_arena.gates[0].global_position.x, _arena.gates[1].global_position.x)
-	var right := maxf(_arena.gates[0].global_position.x, _arena.gates[1].global_position.x)
-	var x := player.global_position.x
-	if x > left + BP.TILE + 34.0 and x < right - 34.0:
-		boss_fight = true
-		for gate in _arena.gates:
-			gate.set_closed(true)
-		boss.wake()
-```
-</CodeBlock>
-
-El margen evita que una compuerta se cierre encima del jugador. Y como un golpe también lo despierta, no puedes quedarte fuera picando a un jefe dormido: el comentario lo resume en que nunca es un saco de golpes gratis.
 </Collapsible>
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
-<h3 id="good-boss-platformer">¿Qué hace buena una pelea de jefe en un plataformas?</h3>
-
-Pocos ataques, cada uno con un aviso claro y una respuesta clara que el juego ya enseñó, y una recuperación después de cada ataque. En mi laboratorio son tres ataques, cada uno la pregunta de un enemigo anterior, con 0,8 s de recuperación tras cada uno.
-
 <h3 id="how-many-attacks">¿Cuántos ataques debería tener un jefe?</h3>
 
-Los suficientemente pocos como para aprenderlos en un puñado de intentos. El jefe del laboratorio tiene tres. Su script lo dice tal cual: mejor tres bien leídos que diez confusos.
+Los suficientemente pocos como para aprenderlos en un puñado de intentos. Éste tiene tres, y su script dice por qué: mejor tres bien leídos que diez confusos.
 
 <h3 id="random-but-fair">¿Cómo se hace que los patrones de un jefe sean aleatorios pero justos?</h3>
 
-Poniéndole reglas al azar. El jefe del laboratorio pondera su elección por la distancia y nunca repite un ataque tres veces seguidas, y todos los ataques conservan su aviso. No puedes memorizar el orden, pero siempre puedes leer el siguiente movimiento.
+Poniéndole reglas al azar: ponderar la elección por la distancia, no repetir nunca un ataque tres veces seguidas y conservar todos los avisos. No puedes memorizar el orden, pero siempre puedes leer el siguiente movimiento.
 
-<h3 id="stagger-bar">¿Qué es una barra de aguante en una pelea de jefe?</h3>
-
-Un contador que se llena al acertar golpes y que, lleno, tumba al jefe un momento. El mío se rompe a los 7 golpes y da 2,2 s. El sistema de postura de Sekiro es la versión más conocida.
-
-<h3 id="phase-two">¿Cuándo debería cambiar de fase un jefe?</h3>
-
-En un punto que el jugador vea venir, y con un respiro para notarlo. El jefe de mi laboratorio cambia a mitad de vida, ruge 0,9 s y luego hace los mismos tres ataques más rápido.
-
-Éste es el último post de [la serie](/es/blog/series/platformer-game-feel/). Empezó con [los temporizadores que perdonan tus saltos](/blog/es/coyote-time-jump-buffer/), pasó por [el dash](/blog/es/platformer-dash/), [las tres cajas](/blog/es/hitbox-vs-hurtbox/), [las tres fases de un golpe](/blog/es/attack-startup-active-recovery/), [el pogo](/blog/es/pogo-attack/) y [esquivar con i-frames](/blog/es/dodge-dash-i-frames/), y termina en una sala donde todo eso tiene que funcionar a la vez. La lámina de cierre del laboratorio tiene la frase que me quedaría de todo: el combate se apoya en el movimiento, no lo sustituye. Ese jefe me mató 30 veces. Las dos victorias llegaron con una o dos máscaras de sobra, y la grabación dice exactamente qué golpe terminó cada una de esas 30.
+Éste es el último post de [la serie](/es/blog/series/platformer-game-feel/): una sala donde todo lo anterior tiene que funcionar a la vez.

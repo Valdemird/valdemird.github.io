@@ -1,64 +1,47 @@
 ---
-title: "Curación con riesgo y recompensa: golpear para cargarla, quedarse quieto para usarla (código en Godot)"
-description: "Curación con riesgo: cada golpe que aciertas carga 11 de energía, 33 compran una máscara y curarte es mantener un botón 0,9 s sin moverte; cualquier golpe la corta. Código en Godot y los números de Hollow Knight."
+title: "Curación con riesgo y recompensa: golpea y quédate quieto"
+description: "Curación con riesgo: cada golpe que aciertas carga energía, y curarte son 0,9 s quieto que cualquier golpe corta. Míralo en una línea de tiempo y juégalo."
 pubDate: 2026-11-18
 tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 18
+seriesTitle: "Curación con riesgo"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
-import Tabs from '../../../components/blog/Tabs.astro';
-import TabPanel from '../../../components/blog/TabPanel.astro';
-import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Curación con riesgo: el recurso que te cura sale de atacar, y gastarlo te deja expuesto. En mi laboratorio cada golpe que acierta da 11 de energía, y con 33 recuperas una máscara de vida.",
-  "Curarse es mantener V durante 0,9 s, en el suelo y sin poder moverte. Un golpe la interrumpe. La energía sólo se gasta al terminar, así que una curación cortada te cuesta tiempo, no recursos.",
-  "Los números son casi los del Focus de Hollow Knight: 11 por golpe, 33 por curación, un medidor de 99. En mis partidas grabadas, 7 de mis 11 curaciones fueron en la sala del jefe. En la propia lámina de curarse, ninguna.",
-]} />
+Una **curación con riesgo** se paga dos veces: la energía te la ganas acertando golpes, y para usarla pasas **0,9 s** quieto, expuesto a que cualquier golpe la corte. Así curarse deja de ser un botón del pánico y pasa a ser una pregunta que te haces en plena pelea: ¿tengo un segundo libre ahora mismo?
 
-La lámina de curarse de mi laboratorio tiene tres cosas en fila. Un maniquí de pruebas para cargar energía. Una placa de daño, para perder una máscara a propósito cuando tienes la vida llena. Y un saltador encerrado en su corral, que se agacha, avisa y salta hacia donde estés. La última nota de la lámina lo dice sin rodeos: ahora hazlo con el saltador encima, ésa es la decisión.
+<TimingDiagram
+  title="Una curación, 0,9 s quieto"
+  duration={1000}
+  start={400}
+  probe="te golpean"
+  onLabel="La máscara"
+  offLabel="La energía"
+  phases={[
+    { from: 0, to: 900, label: "mantienes V, quieto", tone: "danger", on: { ok: false, text: "Perdida: el golpe corta la curación." }, off: { ok: true, text: "Intacta: sólo se gasta al terminar la curación." } },
+    { from: 900, to: 1000, label: "+1 máscara", tone: "neutral", on: { ok: true, text: "Ya es tuya: la curación terminó antes del golpe." }, off: { ok: null, text: "Gastada: 33 de energía por la máscara." } },
+  ]}
+  events={[
+    { at: 0, label: "mantienes V" },
+    { at: 900, label: "curado" },
+  ]}
+  windows={[
+    { from: 0, to: 900, label: "se puede cortar", detail: "900 ms", measure: "since",
+      on: { ok: false, text: "Perdida: el golpe corta la curación a los {ms} ms." },
+      off: { ok: true, text: "Intacta: sólo se gasta al terminar la curación." } },
+  ]}
+/>
 
-El laboratorio graba cada partida. Repasando las mías para este post, me curé 11 veces en total. Ninguna en la lámina de curarse, donde pasé 44 segundos entre todas las partidas. Siete fueron en la sala del jefe. En mi primera partida larga me enfrenté al jefe 24 veces y no me curé ni una. Las dos victorias llegaron después, en las dos partidas en las que sí me curé. No voy a decir que las curaciones marcaron la diferencia: para entonces ese jefe ya me había matado 21 veces.
+<h2 id="what-is-risk-reward-healing">Curación con riesgo: pagas con golpes y luego con tiempo</h2>
 
-<StatGrid columns={2} stats={[
-  { value: "+11", label: "Energía por golpe", context: "sólo los golpes que aciertan" },
-  { value: "33", label: "Energía por máscara", context: "tres golpes y 0,9 s quieto" },
-  { value: "11", label: "Curaciones en mis partidas", context: "7 de ellas en la sala del jefe" },
-  { value: "6", label: "Curaciones empezadas y sin terminar", context: "solté antes o me golpearon" },
-]} />
-
-<Callout type="important" title="La tesis">
-Una curación instantánea y gratis es un botón del pánico, y un botón del pánico no exige pensar. Haz que cueste algo que sólo se consigue atacando, más un segundo de estar quieto, y se convierte en una pregunta que te haces en plena pelea: ¿tengo un segundo libre ahora mismo? Esa pregunta es toda la mecánica.
-</Callout>
-
-<h2 id="what-is-risk-reward-healing">¿Qué es una curación con riesgo y recompensa?</h2>
-
-Una curación con riesgo ata recuperar vida a dos costes: el recurso hay que ganárselo peleando, y usarlo te deja vulnerable un momento. La agresividad llena el medidor, y después tienes que leer a los enemigos lo bastante bien como para encontrar un hueco. El texto de la lámina tiene una frase que me gusta sobre el efecto secundario: el bucle regula la dificultad solo, porque quien juega bien tiene más curas.
-
-Así es el bucle tal como lo ejecuta el código:
-
-<MermaidDiagram title="Una curación, del golpe a la máscara" chart={`
-graph LR
-  A["Golpe que acierta<br/>+11 de energía"] --> B{"¿33 o más<br/>y falta una máscara?"}
-  B -->|no| A
-  B -->|sí| C["Mantener V<br/>en el suelo, quieto"]
-  C -->|"0,9 s"| D["+1 máscara<br/>−33 de energía"]
-  C -->|"golpe o soltar"| E["Cancelada<br/>la energía se queda"]
-  D -->|"sigue pulsado, quedan 33"| C
-  E --> A
-`} />
-
-La lámina de abajo tiene el maniquí, la placa y el saltador en ese orden. Aquí no hay T: la lámina no tiene técnica que apagar, sólo un trato que aprender.
+Cada golpe que acierta da 11 de energía; un golpe al aire o uno parado por un escudo no da nada. Una máscara cuesta 33, así que con tres golpes tienes para curarte: mantienes V durante 0,9 s, en el suelo y sin poder moverte. El bucle regula la dificultad solo, porque quien juega bien tiene más curas.
 
 <PlayableLab
   plane="combate"
@@ -72,32 +55,27 @@ La lámina de abajo tiene el maniquí, la placa y el saltador en ese orden. Aqu�
   ]}
 />
 
-<h2 id="heal-godot">Cómo programar una curación con riesgo en Godot 4</h2>
+El Focus de Hollow Knight usa casi los mismos números: un medidor de 99, 11 de SOUL por golpe y 33 por máscara (lo cuenta la wiki de la comunidad, en inglés, en sus páginas de [SOUL](https://hollowknight.wiki.fextralife.com/Soul) y [Focus](https://hollowknight.wiki.fextralife.com/Focus)).
 
-Todos los números viven en un `Resource`, en el mismo archivo que el resto del ajuste de combate del jugador.
+<h2 id="how-to-implement">Cómo implementar una curación con riesgo</h2>
+
+1. Suma la energía donde se resuelve el golpe, y sólo si acierta: en el mismo instante en que se [confirma el golpe](/blog/es/hit-confirm-hitstop/).
+2. Haz de la curación un temporizador que sólo avance con el botón mantenido y el jugador en el suelo, y quita el control mientras dura.
+3. Cobra la energía cuando el temporizador termina, no cuando empieza. Así sólo pagas por una curación que de verdad recibiste.
+4. Tras un golpe, exige soltar y volver a pulsar. Si no, el botón mantenido reanuda la curación en cuanto acaba el empujón, con el enemigo todavía encima.
+
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="addons/combat_kit/player/combat_params.gd">
 ```gdscript
-@export_group("Energía y curación")
-@export_range(1, 300) var energy_max := 99
-## Cada golpe que conecta carga energía: atacar es la forma de poder curarse.
 @export_range(0, 99) var energy_per_hit := 11
 @export_range(1, 99) var heal_cost := 33
-## Tiempo quieto y mantenido para curar una máscara: el RIESGO de la curación.
 @export_range(0.1, 3.0, 0.05, "suffix:s") var heal_time := 0.9
-@export_range(1, 5) var heal_amount := 1
 ```
 </CodeBlock>
 
-La energía entra donde se resuelve el golpe: cuando un tajo acierta en algo que no es un escudo, `add_energy(params.energy_per_hit)`. Un golpe al aire no da nada, y uno parado por un escudo tampoco. Es el mismo instante en que el juego [confirma el golpe con hitstop y chispas](/blog/es/hit-confirm-hitstop/), así que la barra de energía se llena justo cuando el golpe se siente acertado.
-
-La curación en sí es un temporizador que sólo avanza con el botón mantenido y el jugador en el suelo:
-
 <CodeBlock filename="addons/combat_kit/player/player_combat.gd">
 ```gdscript
-## CURACIÓN CON RIESGO: mantener el botón, en el suelo y sin moverse. Curarse
-## es una decisión táctica ("¿tengo un segundo libre?"), no un botón del pánico:
-## un golpe recibido la interrumpe y la energía sólo se gasta al completarla.
 func _tick_heal(delta: float) -> void:
 	# ...
 			player.control_enabled = false   # quieto: ése es el riesgo
@@ -113,87 +91,29 @@ func _tick_heal(delta: float) -> void:
 		add_energy(-params.heal_cost)
 		var amount := health.heal(params.heal_amount)
 		healed.emit(amount)
-		_heal_time = 0.0
-		if not can_heal():
-			_stop_heal(false)
-		else:
-			heal_started.emit()   # encadena otra máscara sin soltar
-```
-</CodeBlock>
 
-Tres líneas sostienen el diseño. `player.control_enabled = false` es el riesgo: durante 0,9 s no puedes salir andando de nada. `add_energy(-params.heal_cost)` está *después* de que se complete el temporizador, así que sólo pagas por una curación que de verdad recibiste. Y la rama `else` hace que, manteniendo el botón con 66 de energía, recuperes dos máscaras seguidas sin soltar.
 
-La cancelación por daño está en la función por la que pasa cualquier golpe recibido:
-
-<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
-```gdscript
 func _on_damaged(hit: Hit) -> void:
 	# ...
-	_cancel_attack()
 	_stop_heal(true)
-	# Tras un golpe hay que soltar y volver a pulsar para curarse: que no se
-	# reanude sola con el enemigo encima.
 	_heal_blocked = true
 ```
 </CodeBlock>
 
-<h2 id="hollow-knight-bloodborne">Hollow Knight, Bloodborne y el laboratorio: tres formas de curarse atacando</h2>
+`add_energy(-params.heal_cost)` sólo se ejecuta cuando el temporizador termina, así que una curación cortada te cuesta tiempo, no energía.
 
-<Tabs labels={["Mi laboratorio", "Hollow Knight", "Bloodborne"]}>
-<TabPanel>
-
-Un medidor de 99. Cada golpe que acierta da 11. Una curación cuesta 33 y tarda 0,9 s, quieto y en el suelo. Un golpe la corta y la energía se queda, porque sólo se gasta cuando la curación termina.
-
-</TabPanel>
-<TabPanel>
-
-El Focus, la curación del Caballero, funciona con SOUL. El medidor principal guarda 99, cada golpe a un enemigo da 11 y el Focus cuesta 33 por máscara.<Sidenote>Los números están en las páginas de la wiki de la comunidad sobre [SOUL](https://hollowknight.wiki.fextralife.com/Soul) y [Focus](https://hollowknight.wiki.fextralife.com/Focus), en inglés.</Sidenote> La primera máscara tarda unos 1,14 s y cada una de las siguientes unos 0,89 s. Un golpe lo interrumpe, y la wiki es muy clara con lo que cuesta: el SOUL consumido se desperdicia, así que conviene esperar a tener una apertura antes de intentar curarse.
-
-</TabPanel>
-<TabPanel>
-
-El Rally de Bloodborne es la misma idea sin botón. Cuando recibes daño, el trozo de vida perdido se vuelve naranja, y para recuperarlo tienes que acertar uno o varios ataques a un enemigo en los 5 segundos siguientes al golpe.<Sidenote>Según la página de la wiki de la comunidad sobre [Regain](https://bloodborne.wiki.fextralife.com/Regain), en inglés.</Sidenote> El riesgo es el de quedarse quieto para curarse, pero del revés: para recuperar la vida tienes que ir hacia lo que acaba de hacerte daño.
-
-</TabPanel>
-</Tabs>
-
-Si pones las dos primeras pestañas una junto a otra, los números del laboratorio son los de Hollow Knight casi uno por uno: 99, 11, 33 y unos 0,9 s por máscara. La regla que cambia es lo que cuesta una curación interrumpida. Hollow Knight quema SOUL mientras te concentras y, si te golpean, lo pierdes. El laboratorio cobra al final, así que un golpe a mitad de curación te cuesta la máscara que ibas a recibir y los 0,9 s que llevabas, nada más. Es la más blanda de las dos, y eso cambia cuántas veces te atreves a intentarlo.
-
-<h2 id="when-to-use">Cuándo ayuda curarse con riesgo y cuándo no</h2>
-
-| Situación | ¿Curación con riesgo? |
-|---|---|
-| Jefes y encuentros largos | Sí. 7 de mis 11 curaciones fueron en la sala del jefe, donde una máscara pesa más. |
-| Combate cuerpo a cuerpo basado en la agresividad | Sí. La energía sólo sale de los golpes que aciertan, así que curarse empuja a atacar. |
-| Jugadores que lo están pasando mal | Su punto débil. Menos golpes es menos curas, así que quien más las necesita es quien menos tiene. |
-| Salas con presión constante a distancia | Cuidado. Si nunca hay 0,9 s libres, la curación deja de ser una decisión y pasa a ser inútil. |
-| Curarse en el aire o en movimiento | Aquí no. El laboratorio exige suelo y estar quieto; quita cualquiera de los dos y el riesgo desaparece. |
-| Con la vida llena | Bloqueado. Pulsar V con la vida llena no hace nada y te dice por qué. |
-
-<Collapsible title="Tres reglas pequeñas para que curarse no se sienta torpe">
-Mantener V un instante antes de tiempo también vale. Si lo pulsas todavía en el aire o a mitad de un golpe, la curación empieza en cuanto es posible. El comentario del código dice que exigir la pulsación en el tick exacto sería "otro buffer que falta", el mismo razonamiento que [el jump buffer](/blog/es/coyote-time-jump-buffer/).
-
-Tras un golpe hay que soltar y volver a pulsar. Si no, un botón mantenido volvería a empezar la curación solo en cuanto acabara el empujón, con el enemigo todavía encima.
-
-Si sigues pulsando cuando termina una curación y queda energía, encadena la siguiente. Dos máscaras en 1,8 s, si te atreves a estar quieto tanto rato.
 </Collapsible>
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
 <h3 id="make-healing-risky">¿Cómo se hace que curarse tenga riesgo en un juego?</h3>
 
-Que tarde, que quite el movimiento mientras dura y que cualquier golpe la cancele. En mi laboratorio son 0,9 s en el suelo sin control, y el golpe se gestiona en el mismo sitio que cualquier otro daño.
+Que tarde, que quite el movimiento mientras dura y que cualquier golpe la cancele. Aquí son 0,9 s en el suelo y sin control.
 
 <h3 id="heal-duration">¿Cuánto debería tardar una curación?</h3>
 
-Mi laboratorio usa 0,9 s por máscara. El Focus de Hollow Knight tarda unos 1,14 s en la primera y unos 0,89 s en cada una de las siguientes. Mucho más corta y no hay riesgo; mucho más larga y nadie lo intenta fuera de una sala vacía.
+Alrededor de un segundo. Ésta tarda 0,9 s por máscara; el Focus de Hollow Knight, unos 1,14 s la primera y 0,89 s cada una de las siguientes. Mucho más corta y no hay riesgo; mucho más larga y nadie lo intenta fuera de una sala vacía.
 
 <h3 id="cancelled-heal-cost">¿Una curación interrumpida debería costar recursos?</h3>
 
-Elige una de las dos a propósito. Hollow Knight desperdicia el SOUL consumido; mi laboratorio sólo gasta la energía al completar la curación. Cobrar al final hace que se intente más, y el precio de fallar es el tiempo y la máscara que no llegó.
-
-<h3 id="why-heal-from-attacks">¿Por qué atar la curación a los ataques?</h3>
-
-Para que jugar a lo seguro y curarse tiren en direcciones opuestas. Para curarte necesitas energía, para la energía necesitas golpes, y los golpes exigen acercarse.
-
-Vuelve a la lámina de curarse con una máscara de menos y energía de tres golpes, y acércate al corral del saltador. Mantén V. Hacia el medio segundo te van a entrar ganas de soltar, porque el saltador se está agachando, y vas a tener que decidir si te bastan 0,4 s. Eso es todo el post, pasando en tu pulgar.
+Elige una opción a propósito. Hollow Knight desperdicia el SOUL consumido, y aquí la energía sólo se gasta al completar la curación. Cobrar al final hace que se intente más.

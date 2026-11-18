@@ -1,55 +1,31 @@
 ---
-title: "One-way and moving platforms in Godot: drop through on purpose, jump off with momentum"
-description: "One-way platforms in Godot 4: one_way_collision plus a 0.22 s collision-mask switch on down + jump. Moving platform momentum: platform_on_leave keeps the speed, but without a slow air bleed the jump still falls short."
+title: "One-way and moving platforms: drop through, keep momentum"
+description: "A one-way platform is solid from above and lets you drop through on purpose. A moving platform hands you its speed when you jump. See both and play them."
 pubDate: 2026-11-18
 tags: ["game-feel", "game-design", "godot", "platformers"]
 featured: false
 lang: en
 series: platformer-lab
 seriesOrder: 9
+seriesTitle: "One-way and moving platforms"
 ---
 
-import TLDR from '../../components/blog/TLDR.astro';
 import PlayableLab from '../../components/blog/PlayableLab.astro';
-import StatGrid from '../../components/blog/StatGrid.astro';
-import Callout from '../../components/blog/Callout.astro';
-import CodeBlock from '../../components/blog/CodeBlock.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
-import Sidenote from '../../components/blog/Sidenote.astro';
-import Tabs from '../../components/blog/Tabs.astro';
-import TabPanel from '../../components/blog/TabPanel.astro';
-import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "One-way platform: you jump up through it and stand on top. In Godot 4 that's one_way_collision on the collision shape. To drop through, my lab switches the platform layer off in the player's collision mask for 0.22 s when you press down + jump.",
-  "Moving platform momentum: jump off a moving platform and you keep its speed. In Godot 4 that's platform_on_leave = PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY, which keeps the sideways speed and ignores downward motion, so a jump never comes out shorter.",
-  "The flag isn't enough on its own. If air control pulls you back to run speed at the usual rate, the inherited speed is gone in about 0.1 s. Simulated with the lab's numbers, that jump reaches 6.7 tiles. Bleeding the extra speed at 140 px/s² instead gets it to 10.3, over an 8-tile gap.",
-]} />
+A **one-way platform** is solid from above and empty from below: you jump up through it, and drop down through it on purpose. A **moving platform** carries you, and when you jump off it you keep its speed.
 
-Sheet 10 of my lab ends in a gap of 8 tiles, and a full running jump in the lab covers 6.4. The way across is a platform that slides toward the gap at 267 px/s. Run with it, jump before it stops, keep its speed, and you land on the other side. Press T and the same jump drops short.
+| | Value |
+|---|---|
+| Drop-through window | 0.22 s |
+| Fast platform | 267 px/s |
+| Running jump off it | 340 + 267 = 607 px/s |
+| Gap that speed clears | 8 tiles (a full running jump covers 6.4) |
 
-Godot has a property for exactly this, `platform_on_leave`, and it's one line. Run the lab's numbers with only that line, though, and the jump comes out at 6.7 tiles. The line that actually gets you across lives somewhere else, in the code that decides how fast you're allowed to run.
+<h2 id="what-is-a-one-way-platform">One-way platforms: up through, down on purpose</h2>
 
-Sheet 09, right before it, is the other kind of platform that isn't plain floor: the one you jump up through and only fall through when you ask.
-
-<StatGrid columns={2} stats={[
-  { value: "8 tiles", label: "Gap on sheet 10", context: "from the platform's farthest point to the next block" },
-  { value: "6.4 tiles", label: "Full running jump", context: "the lab's own measurement, from solid ground" },
-  { value: "267 px/s", label: "Fast platform", context: "8 tiles in 1.2 s, at constant speed" },
-  { value: "0.22 s", label: "Drop-through window", context: "the player ignores one-way platforms after down + jump" },
-]} />
-
-<Callout type="important" title="The thesis">
-A platform that isn't plain floor makes a promise to the eye. A one-way platform should be solid only when you land on it from above, and stop being solid only when you ask. A moving platform should hand you its speed when you jump. Break either promise and the player stops reading the level and starts fighting the physics.
-</Callout>
-
-<h2 id="what-is-a-one-way-platform">What is a one-way platform?</h2>
-
-A one-way platform is solid from above and empty from below: you jump up through it from underneath and land on top. Most platformers also let you drop down through it on purpose, usually with down + jump. Celeste's code calls them jump-thrus (`JumpThru`).<Sidenote>In [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub.</Sidenote>
-
-Sheet 09 is a short tower built out of them. Three platforms stacked three tiles apart, inside the 3.6 tiles of a full jump, then a shaft with two one-way floors that you can only get past by going down. The sheet's subtitle is the whole brief: *subir atravesando, bajar a propósito*. Go up through, come down on purpose.
-
-This sheet has nothing for T to switch off. A one-way platform is either there or it isn't.
+One-way platforms let the player climb a tower without walking around every floor. Dropping through takes down + jump, never down alone: down alone is crouch, and crouching on a one-way platform shouldn't drop you. [Celeste's code](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) calls them jump-thrus.
 
 <PlayableLab
   sheets="oneway"
@@ -62,111 +38,9 @@ This sheet has nothing for T to switch off. A one-way platform is either there o
   ]}
 />
 
-<h2 id="one-way-platforms-godot">How to make one-way platforms in Godot 4</h2>
+<h2 id="what-is-moving-platform-momentum">Moving platform momentum: jump off with its speed</h2>
 
-The platform half is two properties on its collision shape and a collision layer of its own. The comments are in Spanish because the whole project is.
-
-<CodeBlock filename="game/entities/one_way_platform.gd">
-```gdscript
-class_name OneWayPlatform
-extends StaticBody2D
-## OneWayPlatform — plataforma atravesable desde abajo.
-##
-## Vive en la capa de colisión 2 ("one_way"). Para bajarse (abajo + salto) el
-## jugador desactiva esa capa en su máscara durante unos milisegundos:
-## así no hay que tocar la plataforma ni afectar a otros cuerpos.
-
-const THICKNESS := 8.0
-# ...
-func _ready() -> void:
-	collision_layer = 2
-	collision_mask = 0
-
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(_width, THICKNESS)
-	var shape := CollisionShape2D.new()
-	shape.shape = rect
-	shape.position = Vector2(_width * 0.5, THICKNESS * 0.5)
-	shape.one_way_collision = true
-	shape.one_way_collision_margin = 6.0
-	add_child(shape)
-```
-</CodeBlock>
-
-`one_way_collision` makes the shape collide on one side only. `one_way_collision_margin` is how thick that side behaves, and Godot's docs say higher values work better for bodies that enter the shape at high speed.<Sidenote>Both are documented on [CollisionShape2D](https://docs.godotengine.org/en/stable/classes/class_collisionshape2d.html).</Sidenote> That isn't a theoretical worry here. A normal fall in the lab tops out at 900 px/s, which at 120 physics ticks per second is 7.5 px per tick, a fast fall goes faster still, and the platform is 8 px thick.
-
-The player half decides when to let go:
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-func _try_jump(on_floor: bool) -> void:
-# ...
-	# Abajo + salto sobre una plataforma one-way: atravesarla hacia abajo.
-	if on_floor and input_y > 0 and _floor_is_one_way:
-		_drop_through()
-		return
-# ...
-func _drop_through() -> void:
-	_jump_buffer = 0.0
-	_coyote = 0.0
-	_press_pending = false
-	_drop_timer = 0.22
-	set_collision_mask_value(LAYER_ONE_WAY, false)
-	global_position.y += 2.0
-	velocity.y = maxf(velocity.y, 80.0)
-	dropped_through.emit()
-# ...
-if _drop_timer > 0.0:
-	_drop_timer -= delta
-	if _drop_timer <= 0.0:
-		set_collision_mask_value(LAYER_ONE_WAY, true)
-# ...
-func _update_floor_kind() -> void:
-	for i in get_slide_collision_count():
-		var hit := get_slide_collision(i)
-		if hit.get_normal().y < -0.5:
-			var collider := hit.get_collider() as CollisionObject2D
-			_floor_is_one_way = collider != null and collider.get_collision_layer_value(LAYER_ONE_WAY)
-			return
-```
-</CodeBlock>
-
-Each line of `_drop_through` closes a specific hole:
-
-- `_jump_buffer = 0.0` and `_coyote = 0.0`. The Space press that started the drop is still sitting in the [jump buffer](/blog/coyote-time-jump-buffer/), and you just left the floor, so coyote time is still charged. Without these two lines the next tick turns that same press into a coyote jump, straight back up through the platform.
-- `set_collision_mask_value(LAYER_ONE_WAY, false)`. The player stops scanning layer 2. The platform itself isn't touched, so anything else standing on it stays where it is.
-- `global_position.y += 2.0` and `velocity.y = maxf(velocity.y, 80.0)`. A 2-px nudge into the platform and a downward speed from the first tick, so the drop starts right away.
-- `_drop_timer = 0.22`. After 0.22 s the layer comes back.
-
-Run the lab's numbers on that 0.22 s. With the fall gravity of 3,200 px/s² from [the gravity post](/blog/jump-gravity-apex-hang/), the 24×36 px hitbox is entirely below the 8-px platform after about 0.14 s, and by the time the layer comes back it has fallen about 97 px, roughly 2.4 tiles. The shaft's floors are three tiles apart, so you land on the next one. Put two one-way platforms closer than that and one press takes you through both.
-
-<h2 id="ways-to-drop-through">Three ways to let the player through</h2>
-
-There's more than one way to make a single body ignore a single platform for a moment, and they fail differently.
-
-| Approach | What changes | The catch |
-|---|---|---|
-| Switch the layer off in the player's `collision_mask` (my lab) | Only the player | During the window the player ignores every one-way platform, not just the one underfoot |
-| Disable the platform's collision shape | The platform | Everything standing on it falls, enemies included |
-| `add_collision_exception_with(platform)` | That player and that platform | You have to remember to remove the exception, per platform |
-
-The comment at the top of `one_way_platform.gd` gives the reason for the first one: *así no hay que tocar la plataforma ni afectar a otros cuerpos*, so the platform doesn't change and no other body is affected.<Sidenote>`collision_mask` lives on [CollisionObject2D](https://docs.godotengine.org/en/stable/classes/class_collisionobject2d.html), and `add_collision_exception_with` on [PhysicsBody2D](https://docs.godotengine.org/en/stable/classes/class_physicsbody2d.html).</Sidenote>
-
-Celeste's player code spends its jump-thru logic on the way up instead. While you're moving up and overlapping a jump-thru, a *Jump Thru Assist* nudges you upward at 40 px/s (`JumpThruAssistSpeed = -40f`). The only place Player.cs sets `IgnoreJumpThrus = true` is when one specific falling state, `ReflectionFall`, begins.
-
-<CodeBlock filename="Celeste/Source/Player/Player.cs">
-```csharp
-//Jump Thru Assist
-if (!onGround && Speed.Y <= 0 && (StateMachine.State != StClimb || lastClimbMove == -1) && CollideCheck<JumpThru>() && !JumpThruBoostBlockedCheck())
-    MoveV(JumpThruAssistSpeed * Engine.DeltaTime);
-```
-</CodeBlock>
-
-<h2 id="what-is-moving-platform-momentum">What is moving platform momentum?</h2>
-
-Moving platform momentum means that when you jump off a moving platform, you keep its speed on top of your own. Ride a platform going right, jump, and you fly right at your speed plus the platform's. It's what anyone expects from jumping off something that moves, and it turns a platform into a launcher the designer can measure. Sheet 10's subtitle: *la inercia se hereda*, momentum is inherited.
-
-There are two separate things going on. While you stand on the platform, the engine carries you with it, so you don't slide off. When you leave it, something has to decide what happens to the platform's speed. In Godot 4 those are two different mechanisms, and T only switches the second.
+While you stand on a moving platform, it carries you and you don't slide. Jump, and you keep its speed on top of your own: run along a platform doing 267 px/s and you leave at 607 px/s, enough for an 8-tile gap that a 6.4-tile running jump can't clear. Keep its sideways and upward motion but drop the downward part, so jumping off a platform on its way down never shortens the jump.
 
 <PlayableLab
   sheets="movers"
@@ -180,217 +54,57 @@ There are two separate things going on. While you stand on the platform, the eng
   ]}
 />
 
-<h2 id="moving-platforms-godot">How to make moving platforms in Godot 4</h2>
+<h2 id="how-to-implement">How to implement one-way and moving platforms</h2>
 
-The platform is an `AnimatableBody2D` that moves itself back and forth in the physics step. The header comment is the checklist:
+1. **One-way:** collide only from above, with some margin (6 px on an 8 px platform) so fast falls don't slip through, and put these platforms on their own collision layer.
+2. **Drop-through:** on down + jump over a one-way floor, stop colliding with that layer for 0.22 s and nudge the player 2 px down. Clear the jump buffer and coyote time too, or the same press jumps you straight back up.
+3. **Moving platforms:** move them in the physics step, the same step as the player, and carry whoever stands on them.
+4. **Bleed extra speed slowly in the air.** If air control pulls you back to run speed at the usual rate, the inherited speed is gone in about 0.1 s and the jump falls short.
 
-<CodeBlock filename="game/entities/mover.gd">
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="game/entities/one_way_platform.gd">
 ```gdscript
-class_name Mover
-extends AnimatableBody2D
-## Mover — plataforma móvil (va y vuelve entre dos puntos).
-##
-## BUENAS PRÁCTICAS DE PLATAFORMAS MÓVILES
-##  · AnimatableBody2D + sync_to_physics: el motor conoce su velocidad y
-##    CharacterBody2D la aplica al pasajero (no resbala ni tiembla encima).
-##  · Se mueve en _physics_process, en el mismo paso que el jugador.
-##  · Es one-way: se puede subir saltando desde abajo y nunca aplasta contra
-##    una pared (aplastar exige diseñar esa muerte; por defecto, evítala).
-##  · Inercia al saltar: la gestiona el jugador (`platform_on_leave`).
-# ...
 func _ready() -> void:
 	collision_layer = 2
-	collision_mask = 0
-	sync_to_physics = true
 # ...
-func _physics_process(delta: float) -> void:
-	_time += delta
-	var cycle := (travel_time + PAUSE) * 2.0
-	var t := fmod(_time, cycle)
-	var k: float
-	if t < travel_time:
-		k = t / travel_time
-	elif t < travel_time + PAUSE:
-		k = 1.0
-	elif t < travel_time * 2.0 + PAUSE:
-		k = 1.0 - (t - travel_time - PAUSE) / travel_time
-	else:
-		k = 0.0
-	if eased:
-		k = smoothstep(0.0, 1.0, k)
-	position = from.lerp(to, k)
+	shape.one_way_collision = true
+	shape.one_way_collision_margin = 6.0
 ```
 </CodeBlock>
 
-Riding comes for free once the platform is the right kind of body. Godot's docs say that when an `AnimatableBody2D` is moved, its velocity is estimated and used to affect other physics bodies in its path, and that `move_and_slide()` adds a moving platform's velocity to the body standing on it.<Sidenote>[AnimatableBody2D](https://docs.godotengine.org/en/stable/classes/class_animatablebody2d.html) and [CharacterBody2D](https://docs.godotengine.org/en/stable/classes/class_characterbody2d.html).</Sidenote> The platform is also one-way, on the same layer 2 as sheet 09's, so down + jump drops you through it too. The header explains why: a solid platform can squeeze you into a wall, and a crush is a death someone has to design on purpose.
-
-Leaving is the part T switches, and it lives in the player:
-
 <CodeBlock filename="addons/platformer_kit/player/player.gd">
 ```gdscript
-## Ajustes de CharacterBody2D que dependen de banderas del laboratorio.
+func _drop_through() -> void:
+	_jump_buffer = 0.0
+	_coyote = 0.0
+	_drop_timer = 0.22
+	set_collision_mask_value(LAYER_ONE_WAY, false)
+	global_position.y += 2.0
+	velocity.y = maxf(velocity.y, 80.0)
+# ...
 func _apply_lab() -> void:
-	# FLOOR SNAP: pega al jugador al suelo al bajar pendientes o escalones.
-	var snap := Lab.on(&"floor_snap")
-	floor_snap_length = params.floor_snap_px if snap else 0.0
-	floor_constant_speed = snap
 	# INERCIA DE PLATAFORMA: al saltar desde una plataforma móvil se hereda su
 	# velocidad (sólo la componente ascendente en vertical: nunca acorta el salto).
 	platform_on_leave = (PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY if Lab.on(&"platform_momentum")
 			else PLATFORM_ON_LEAVE_DO_NOTHING)
-```
-</CodeBlock>
-
-`platform_on_leave` has three settings:
-
-| `platform_on_leave` | When you leave a moving platform |
-|---|---|
-| `PLATFORM_ON_LEAVE_ADD_VELOCITY` (the default) | The platform's last velocity is added to yours |
-| `PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY` (my lab, T on) | The same, but any downward motion is ignored |
-| `PLATFORM_ON_LEAVE_DO_NOTHING` (my lab, after T) | Nothing: you leave with your own speed |
-
-With the default, jumping off a platform on its way down adds that downward speed to your jump, and the jump comes out shorter. Godot's docs say it directly: the upward-only version is useful to keep full jump height even when the platform is moving down.
-
-<h2 id="why-the-flag-falls-short">Why the flag alone falls short</h2>
-
-Run along the fast platform at the lab's 340 px/s, leave it while it's doing 267 px/s, and you're flying at 607 px/s. That's well over the run speed, and the movement code's whole job is to pull you toward the run speed. At the normal air acceleration (340 px/s over 0.11 s, times 0.8 air control: about 2,473 px/s²) the extra 267 px/s is gone in 0.11 s, barely a seventh of the way through a jump of about 0.75 s.
-
-So the lab treats overspeed as a case of its own:
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-else:
-	rate = p.max_speed / p.accel_time                 # acelerar
-	if not on_floor:
-		rate *= p.air_control
+# ...
 	if absf(velocity.x) > p.max_speed:
 		# Sobrevelocidad (plataforma, dash-jump): perderla despacio, sobre todo en el aire.
 		rate = p.overspeed_decel if on_floor else p.air_overspeed_decel
-# ...
-velocity.x = move_toward(velocity.x, target, rate * delta)
 ```
 </CodeBlock>
 
-<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
-```gdscript
-## Frenado suave en el suelo cuando se supera max_speed: no se corta en seco.
-@export_range(0.0, 4000.0, 10.0, "suffix:px/s²") var overspeed_decel := 700.0
-## Lo mismo en el aire, mucho menor: la inercia heredada (plataformas) dura todo el salto.
-@export_range(0.0, 4000.0, 10.0, "suffix:px/s²") var air_overspeed_decel := 140.0
-```
-</CodeBlock>
+The platform is an `AnimatableBody2D`, so `move_and_slide()` carries the rider, and `air_overspeed_decel` is 140 px/s², slow enough for the inherited speed to last the whole jump.
 
-The comment on the second number says it plainly: *la inercia heredada (plataformas) dura todo el salto*, inherited momentum lasts the whole jump. At 140 px/s² it would take about 1.9 s to bleed off those 267 px/s, far longer than any jump. And it only applies while you hold the direction you're moving. Let go of <kbd>→</kbd> in the air and the normal air braking takes over, so the player can still kill the momentum on purpose. (The rest of the run curve gets its own post: [acceleration and friction](/blog/acceleration-and-friction/).)
-
-<InteractiveChart
-  type="horizontal"
-  title="Jump distance off the fast platform, in tiles"
-  story="The flag hands you the speed. The slow bleed is what keeps it until you land."
-  unit=" tiles"
-  data={[
-    { label: "No momentum (after T)", value: 6.4 },
-    { label: "Momentum, bled at normal air accel", value: 6.7 },
-    { label: "Momentum, bled at 140 px/s² (my lab)", value: 10.3 },
-  ]}
-  annotations={[
-    { targetIndex: 1, text: "Still 1.3 tiles short of the gap" },
-    { targetIndex: 2, text: "Clears the 8-tile gap", emphasize: true },
-  ]}
-  source="Simulated at 120 Hz with the lab's parameters: running at 340 px/s on a platform moving at 267 px/s, with → and jump held to the top. The 6.4 matches the lab's own measured full jump."
-/>
-
-The same simulation hides one more catch: momentum only pays if you run with the platform. Stand still on it and jump, and you leave at 267 px/s. That's under your own run speed, so the normal acceleration takes you to 340 and you get an ordinary 6.4-tile jump. The gap on sheet 10 asks you to add your run to the platform's.
-
-<h2 id="celeste-lift-boost">How Celeste does it</h2>
-
-Celeste gets to the same place with two pieces of code that mirror the lab's two.
-
-<Tabs labels={["Lift boost", "Overspeed"]}>
-<TabPanel>
-
-Celeste's jumps (`Jump`, `SuperJump`, `WallJump`, `SuperWallJump`) all add `LiftBoost` to the player's speed. `LiftBoost` is `LiftSpeed`, the speed of what you're riding (on a wall jump with no lift of its own, Player.cs takes it from the wall), with the sideways part capped at 250 px/s and anything pointing down thrown away. Upward it's capped at 130 px/s. That's `ADD_UPWARD_VELOCITY` with a cap. For scale, Celeste's run speed is `MaxRun = 90f`.
-
-<CodeBlock filename="Celeste/Source/Player/Player.cs">
-```csharp
-private const float LiftYCap = -130f;
-private const float LiftXCap = 250f;
-// ...
-Speed.X += JumpHBoost * moveX;
-Speed.Y = JumpSpeed;
-Speed += LiftBoost;
-// ...
-private Vector2 LiftBoost
-{
-    get
-    {
-        Vector2 val = LiftSpeed;
-
-        if (Math.Abs(val.X) > LiftXCap)
-            val.X = LiftXCap * Math.Sign(val.X);
-
-        if (val.Y > 0)
-            val.Y = 0;
-        else if (val.Y < LiftYCap)
-            val.Y = LiftYCap;
-
-        return val;
-    }
-}
-```
-</CodeBlock>
-
-Celeste also handles walking off a rising platform without jumping, in a separate check (`//Use Lift Boost if walked off platform`). In Godot, `platform_on_leave` applies whenever you leave a moving platform, so walking off is already covered.
-
-</TabPanel>
-<TabPanel>
-
-Above `MaxRun` and holding the same direction, Celeste slows you with `RunReduce = 400f` instead of `RunAccel = 1000f`, times `AirMult = .65f` in the air. The lab's ratio is more extreme (140 against about 2,473 in the air), but the rule is the same: speed you couldn't reach by running is speed you lose slowly.
-
-<CodeBlock filename="Celeste/Source/Player/Player.cs">
-```csharp
-if (Math.Abs(Speed.X) > max && Math.Sign(Speed.X) == moveX)
-    Speed.X = Calc.Approach(Speed.X, max * moveX, RunReduce * mult * Engine.DeltaTime);  //Reduce back from beyond the max speed
-else
-    Speed.X = Calc.Approach(Speed.X, max * moveX, RunAccel * mult * Engine.DeltaTime);   //Approach the max speed
-```
-</CodeBlock>
-
-</TabPanel>
-</Tabs>
-
-<h2 id="when-to-use">When these platforms help, and when they bite</h2>
-
-| Situation | What to do |
-|---|---|
-| Vertical rooms and towers | One-way platforms: the player climbs without walking around each one |
-| Dropping down | Down + jump, never down alone. Down alone is crouch, and crouching on a one-way platform shouldn't drop you |
-| One-way platforms stacked close together | Careful: the lab's 0.22 s window falls about 2.4 tiles, so closer floors go by in one press |
-| Platforms that move down | `ADD_UPWARD_VELOCITY`, so jumping off one never shortens the jump |
-| A fast platform toward a gap | Momentum plus a slow overspeed bleed in the air, or the speed is gone in 0.1 s |
-| Platforms that could squeeze you into a wall | Make them one-way. A crush is a death you design on purpose or not at all |
-
-<Collapsible title="Why the fast platform is the only linear one">
-Sheet 10 has four moving platforms and only the fast one is set to `"linear": true`. The others ease in and out with `smoothstep`, so their speed changes along the trip: zero at both ends, 1.5 times the average in the middle. The fast one moves at 267 px/s from start to finish, so the speed you take with you doesn't depend on the moment you jump.
-
-It does stop dead at the end, and it waits there for `PAUSE = 0.4` seconds. Jump during the pause and there's nothing to inherit, which is why the sheet's note says *salta MIENTRAS se mueve*: jump WHILE it moves.
 </Collapsible>
 
 <h2 id="quick-answers">Quick answers</h2>
 
-<h3 id="one-way-platform-godot">How do I make a one-way platform in Godot 4?</h3>
+<h3 id="jump-falls-short">Why does my jump off a moving platform fall short?</h3>
 
-Set `one_way_collision = true` on the platform's `CollisionShape2D`, and give it a margin (6 px in my lab) so fast falls don't slip through. Put one-way platforms on their own collision layer. You'll need it to drop through them.
+Check your air control first: speed above the run speed should bleed off slowly in the air (140 px/s² here, against about 2,473 for normal air acceleration). Then run with the platform. Jump standing still and you leave at 267 px/s, under your own run speed, so it's an ordinary jump.
 
-<h3 id="drop-through-godot">How do I drop through a one-way platform in Godot?</h3>
+<h3 id="which-platform-on-leave">Which platform_on_leave should I use in Godot?</h3>
 
-On down + jump, if the floor under the player is on the one-way layer, switch that layer off in the player's collision mask for a short window (0.22 s in my lab), nudge the player 2 px down, and clear the jump buffer and coyote time so the same press doesn't jump you back up.
-
-<h3 id="moving-platform-carry-player">How do I make a moving platform carry the player in Godot?</h3>
-
-In Godot 4, make the platform an `AnimatableBody2D` and move it in `_physics_process`, in the same step as the player. Godot then estimates its velocity, and `move_and_slide()` adds it to whoever is standing on it.
-
-<h3 id="which-platform-on-leave">Which platform_on_leave should I use?</h3>
-
-`PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY`. It keeps the sideways momentum and never makes a jump shorter. Then check your air control: if it clamps to run speed quickly, the momentum it gives you won't last past the first tenth of a second.
-
-Go to sheet 10, switch momentum off and try the jump a few times. You'll start jumping earlier, from further back on the platform, as if your timing were the problem. It isn't. You were moving at 607 px/s a tick ago, and the game forgot.
+`PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY`. It keeps the sideways momentum and ignores downward motion, so a jump never comes out shorter. The default, `PLATFORM_ON_LEAVE_ADD_VELOCITY`, adds the downward part too.

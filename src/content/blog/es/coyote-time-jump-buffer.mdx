@@ -1,50 +1,49 @@
 ---
-title: "Coyote time y jump buffer: qué son y cómo programarlos en Godot"
-description: "El coyote time te deja saltar 100 ms después de salir de una cornisa. El jump buffer recuerda tu pulsación 120 ms antes de aterrizar. Los dos jugables aquí, con el código real de Godot y las cifras de 4.595 saltos míos."
+title: "Coyote time y jump buffer: qué son y cómo funcionan"
+description: "El coyote time te deja saltar justo después de salir de una cornisa. El jump buffer guarda un salto pulsado justo antes de aterrizar. Míralos y juégalos."
 pubDate: 2026-11-18
-tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+tags: ["game-feel", "diseño-de-juegos", "plataformas", "godot"]
 featured: false
 lang: es
 series: platformer-lab
 seriesOrder: 1
+seriesTitle: "Coyote time y jump buffer"
 ---
 
-import TLDR from '../../../components/blog/TLDR.astro';
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
-import StatGrid from '../../../components/blog/StatGrid.astro';
-import Callout from '../../../components/blog/Callout.astro';
-import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
-import Sidenote from '../../../components/blog/Sidenote.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
-<TLDR bullets={[
-  "Coyote time: durante 100 ms después de salir andando de una cornisa, el juego te sigue dejando saltar. Jump buffer: si pulsas saltar hasta 120 ms antes de aterrizar, el salto sale en cuanto tocas el suelo.",
-  "En cuatro días de partidas mías, 1 de cada 13 saltos solo existió gracias a uno de los dos. No noté ninguno, y de eso se trata.",
-  "Los dos están abajo, en el juego de verdad: mira el video, o abre la segunda pestaña, juega tú la lámina y pulsa T para apagar la técnica.",
-]} />
+El **coyote time** te deja saltar un instante después de salir de una cornisa. El **jump buffer** guarda un salto que pulsaste justo antes de aterrizar. Los dos hacen que el juego responda a lo que quisiste hacer, no a lo que dice la caja de colisión.
 
-El 15 de noviembre empecé un plataformas en Godot. Antes de dibujar un solo nivel construí un laboratorio: un plano largo en el que cada lámina aísla una técnica, y la tecla T la apaga mientras juegas. Es la idea de [mi post de game feel](/blog/es/game-feel-on-the-web/), apuntada una capa más abajo. Aquel post iba del juice, de lo que el juego te enseña después de que actúas. Esta serie va de lo que decide si tu acción funciona o no.
+<TimingDiagram
+  title="Coyote time y jump buffer"
+  duration={600}
+  start={250}
+  probe="pulsas saltar"
+  phases={[
+    { from: 0, to: 200, label: "suelo", tone: "solid", on: { ok: true, text: "Estás en el suelo: saltas." } },
+    { from: 200, to: 480, label: "aire", tone: "air", on: { ok: null, text: "Estás en el aire: la pulsación no hace nada." } },
+    { from: 480, to: 600, label: "suelo", tone: "solid", on: { ok: true, text: "Estás en el suelo: saltas." } },
+  ]}
+  events={[
+    { at: 200, label: "se acaba la cornisa" },
+    { at: 480, label: "aterrizas" },
+  ]}
+  windows={[
+    { from: 200, to: 300, label: "coyote time", detail: "100 ms", measure: "since",
+      on: { ok: true, text: "Saltas, {ms} ms después de dejar la cornisa." },
+      off: { ok: false, text: "Caes: llegas {ms} ms tarde." } },
+    { from: 360, to: 480, label: "jump buffer", detail: "120 ms", measure: "until",
+      on: { ok: true, text: "Guardada: saltas al aterrizar, {ms} ms después." },
+      off: { ok: false, text: "Perdida: llegas {ms} ms pronto y aterrizas sin saltar." } },
+  ]}
+/>
 
-El laboratorio graba cada partida: cada salto, cada pulsación que no acabó en salto, cada vez que una de estas ayudas intervino. Mientras preparaba este post le pedí a Claude que sumara cuatro días de mis propias partidas. Fueron 130 partidas y 4.595 saltos. De esos, 363 solo ocurrieron por dos temporizadores en los que dejé de pensar el mismo día que los escribí.
+<h2 id="coyote-time">Coyote time: saltar cuando ya no hay suelo</h2>
 
-<StatGrid columns={2} stats={[
-  { value: "4.595", label: "Saltos", context: "130 partidas, 15–18 nov" },
-  { value: "152", label: "Salvados por el coyote", context: "saltó con la cornisa ya atrás" },
-  { value: "211", label: "Salvados por el buffer", context: "pulsó antes de aterrizar" },
-  { value: "1 de 13", label: "Necesitó alguno", context: "no noté ninguno" },
-]} />
-
-<Callout type="important" title="La tesis">
-Una buena ayuda es la que el jugador nunca nota. El coyote time y el jump buffer son dos temporizadores, de 100 y 120 milisegundos, y su único trabajo es darle la razón a lo que el jugador quiso hacer por encima de lo que dice la hitbox.
-</Callout>
-
-<h2 id="coyote-time">Coyote time: saltar cuando el suelo ya se acabó</h2>
-
-El coyote time es un instante, justo después de salir andando de una cornisa, en el que el juego te sigue dejando saltar como si siguieras encima. En mi laboratorio dura 100 ms. El nombre viene del Coyote de los dibujos, el que corre más allá del precipicio y se queda flotando hasta que mira hacia abajo. Celeste usa el mismo número: está en el código del jugador que publicaron, como `JumpGraceTime = 0.1f`<Sidenote>Línea 48 de [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), el código del jugador que el equipo de Celeste subió a GitHub.</Sidenote>.
-
-Existe porque el jugador juzga el borde con los ojos, y salta lo más tarde que puede a propósito: cuanto más tarde sales, más lejos llegas. Durante un par de frames después de que la caja de colisión haya dejado la cornisa, el personaje todavía parece estar encima. Sin coyote time, esa pulsación llega un frame tarde, el personaje cae y el jugador le echa la culpa al juego. Y tiene razón.
-
-Esta es la lámina 05 del laboratorio. En el video el héroe corre y salta un instante *después* de dejar cada cornisa: fíjate en la etiqueta verde `COYOTE +ms` y luego en el momento en que T la apaga. O abre la segunda pestaña y pruébalo tú.
+Saltas lo más tarde que puedes, porque más tarde es más lejos. A ojo, el personaje sigue sobre la cornisa unos fotogramas después de dejarla. El coyote time te da esos fotogramas: **100 ms**, lo mismo que usa Celeste. El nombre viene del Coyote de los dibujos, que sólo cae cuando mira abajo.
 
 <PlayableLab
   sheets="coyote"
@@ -53,53 +52,18 @@ Esta es la lámina 05 del laboratorio. En el video el héroe corre y salta un in
   steps={[
     "Corre hacia la derecha con <kbd>→</kbd> y salta con <kbd>Espacio</kbd> lo más tarde que puedas antes de cada hueco.",
     "Si ya estabas en el aire cuando pulsaste, aparece la etiqueta verde «COYOTE +ms»: ese salto te lo dio la ventana.",
-    "Pulsa <kbd>T</kbd> para apagar el coyote time y repite la carrera. Los mismos saltos tardíos ahora dicen «× TARDE» y te caes.",
+    "Pulsa <kbd>T</kbd> y repite la carrera. Los mismos saltos tardíos ahora dicen «× TARDE» y te caes.",
   ]}
 />
 
-<h3 id="coyote-time-godot">Coyote time en Godot 4: el código</h3>
+<h2 id="jump-buffer">Jump buffer: pulsar pronto también cuenta</h2>
 
-El código son tres líneas en tres sitios distintos del jugador:
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-# Tras moverse, cada tick. Mientras se pisa suelo, el coyote está "cargado".
-if on_floor:
-	_coyote = params.coyote_time if Lab.on(&"coyote_time") else 0.0
-
-# En _tick_timers(), cada tick:
-_coyote = maxf(_coyote - delta, 0.0)
-
-# En _try_jump(). COYOTE TIME: se puede saltar si se está en el suelo... o si se
-# dejó hace menos de `coyote_time` segundos. El jugador ve la cornisa bajo sus pies
-# unos frames después de haberla abandonado; el juego le da la razón.
-if on_floor or _coyote > 0.0:
-	_do_jump(&"ground" if on_floor else &"coyote")
-```
-</CodeBlock>
-
-La línea importante no está en ese bloque. Cuando empieza un salto, `_begin_rise()` pone `_coyote` a cero. Si te la olvidas, el temporizador sigue corriendo mientras subes, y una segunda pulsación en los primeros 100 ms del salto se convierte en un doble salto gratis. El coyote solo se recarga mientras pisas algo, y se gasta en cuanto te vas saltando.
-
-| Situación | ¿Coyote time? |
-|---|---|
-| Saltos a la carrera desde cornisas, el pan de cada día del género | Sí. Es el caso para el que se inventó. |
-| Bajarse de una cornisa a propósito para caer | No molesta: solo cuenta si pulsas saltar. |
-| Una segunda pulsación justo después de un salto de verdad | Nunca. Pon el temporizador a cero al empezar el salto. |
-| Juegos de precisión que piden bordes exactos | Que sea corto. 100 ms es lo que usa Celeste. |
-
-<h2 id="jump-buffer">Jump buffer: pulsar antes de tiempo también vale</h2>
-
-El jump buffer recuerda una pulsación de salto hecha poco antes de aterrizar y salta en el instante en que tocas el suelo. En mi laboratorio guarda la pulsación 120 ms. Es el espejo del coyote time: el coyote perdona la pulsación que llega tarde, y el buffer perdona la que llega pronto.
-
-Sin buffer, la pulsación que mandaste se pierde sin más. Pulsaste, no pasó nada, y desde tu lado de la pantalla el botón no funcionó. Donde más se nota es al encadenar saltos: sobre una fila de pilares empiezas a pulsar mientras bajas, porque es el ritmo que te pide el nivel.
-
-La lámina 06 son pilares sobre pinchos. En el video cada pulsación llega 70 ms antes del aterrizaje. Con el buffer el héroe cruza rebotando de un pilar a otro. Después de T, las mismas pulsaciones vuelven como `× PRONTO`: aterriza en el pilar sin saltar, sigue corriendo y cae en los pinchos.
+Si pulsas un poco antes de tocar el suelo, sin buffer la pulsación se pierde: pulsaste y no pasó nada. Con buffer se guarda **120 ms** y el salto sale al aterrizar. Se nota sobre todo al encadenar saltos.
 
 <PlayableLab
   sheets="buffer"
   title="Jump buffer"
   videoNote="Cada pulsación llega 70 ms antes de aterrizar. Con el buffer el héroe encadena los botes; tras T, las mismas pulsaciones se pierden y cae en los pinchos."
-  caption="Las pulsaciones no cambian de una pasada a otra. Lo que cambia es si el juego las recuerda."
   steps={[
     "Corre hacia la derecha con <kbd>→</kbd> y salta al primer pilar.",
     "Mientras bajas, pulsa <kbd>Espacio</kbd> un poco antes de aterrizar. Rebotas al siguiente pilar y ves «BUFFER −ms».",
@@ -107,76 +71,46 @@ La lámina 06 son pilares sobre pinchos. En el video cada pulsación llega 70 ms
   ]}
 />
 
-<h3 id="jump-buffer-godot">Jump buffer en Godot 4: el código</h3>
+<h2 id="how-to-implement">Cómo implementar coyote time y jump buffer</h2>
+
+1. **Coyote time:** un temporizador que se recarga mientras pisas suelo y baja en el aire. Puedes saltar si estás en el suelo o si le queda tiempo.
+2. **Ponlo a cero al saltar.** Si no, una segunda pulsación al empezar el salto es un doble salto gratis.
+3. **Jump buffer:** otro temporizador que se carga al pulsar y baja cada fotograma. Si tocas suelo y le queda tiempo, saltas.
+
+<Collapsible title="El código en Godot 4">
 
 <CodeBlock filename="addons/platformer_kit/player/player.gd">
 ```gdscript
+# Tras moverse, cada tick. Mientras se pisa suelo, el coyote está "cargado".
+if on_floor:
+	_coyote = params.coyote_time if Lab.on(&"coyote_time") else 0.0
+
 # JUMP BUFFER: no se actúa sobre la pulsación; se RECUERDA durante unos ms.
 if Input.is_action_just_pressed(&"jump"):
 	_jump_buffer = params.jump_buffer_time if Lab.on(&"jump_buffer") else delta * 0.5
 
 # En _tick_timers(), cada tick:
+_coyote = maxf(_coyote - delta, 0.0)
 _jump_buffer = maxf(_jump_buffer - delta, 0.0)
 
-# En _try_jump(): sin una pulsación reciente no hay nada que decidir.
+# En _try_jump():
 if _jump_buffer <= 0.0:
 	return
+if on_floor or _coyote > 0.0:
+	_do_jump(&"ground" if on_floor else &"coyote")
 ```
 </CodeBlock>
 
-Lo que más me gusta es el `else`. Con el buffer apagado, la pulsación se guarda igual, pero medio tick (`delta * 0.5`), o sea, "solo vale este frame exacto". Es lo mismo que hace un `if Input.is_action_just_pressed(&"jump"): jump()` ingenuo. Así la tecla T compara la técnica con el código que escribirías por defecto, no con una versión rota a propósito para que la técnica quede bien.
+`_begin_rise()` pone `_coyote` a cero al empezar cada salto.
 
-Dónde se gana su sitio el buffer:
-
-- Saltos encadenados: pilares, enemigos que pisas, todo lo que tenga ritmo.
-- Cualquier acción que el jugador pide cuando el juego todavía no puede hacerla: un dash durante una recuperación, un ataque mientras el anterior sigue en marcha. La mitad de combate de mi laboratorio guarda los ataques igual, `delta * 0.5` incluido.
-- Que sea corto. Un buffer demasiado largo salta cuando el jugador ya decidió no saltar, y entonces el que va tarde es el juego.
-
-<h2 id="the-pattern">El patrón de debajo: no reaccionar, recordar</h2>
-
-Las dos técnicas tienen la misma forma. No se actúa sobre la pulsación cuando llega. Se recuerda cuándo llegó y, en cada tick, se hace una sola pregunta: ¿hay una pulsación reciente y puedo saltar ahora? El coyote time estira la mitad del "puedo saltar". El buffer estira la de la "pulsación reciente".
-
-```text
-           se acaba la cornisa                      llega el suelo
-                    │                                      │
- ── suelo ──────────┼────────────── aire ──────────────────┼── suelo ──
-                    ├── coyote: 100 ms ──┤     ├── buffer: 120 ms ──┤
-                    pulsar aquí: aún salta    pulsar aquí: salta al aterrizar
-```
-
-En mis propias cifras hay un dato que me hace gracia. El laboratorio existe para apagar estas cosas y sentir la diferencia, y en 130 partidas me caí con una técnica apagada exactamente dos veces. Construí una máquina para notar el hueco y luego hice lo que hace cualquier jugador: dejé la ayuda puesta y me olvidé de que estaba ahí.
-
-<Collapsible title="Cómo sabe el laboratorio que te habrías caído">
-Con la técnica apagada, el jugador sigue midiendo cuánto hace que dejó el suelo. Si pulsas saltar dentro de la ventana que la técnica te habría dado, no salta, pero avisa del fallo para que el laboratorio dibuje `× TARDE 49 ms` sobre tu cabeza:
-
-<CodeBlock filename="addons/platformer_kit/player/player.gd">
-```gdscript
-elif _since_jump_press == 0.0 and _walked_off and not Lab.on(&"coyote_time") \
-		and _since_left_floor <= params.coyote_time:
-	# Didáctico: con la técnica apagada, avisamos de que el coyote lo habría salvado.
-	assist_note.emit(&"coyote_miss", int(_since_left_floor * 1000.0))
-```
-</CodeBlock>
-
-La misma señal, con la técnica encendida, se convierte en `coyote_hit`. Eso es lo que cuenta el grabador de partidas, y de ahí sale el 152 del principio del post: saltos que solo ocurrieron porque la ventana estaba abierta.
 </Collapsible>
 
 <h2 id="quick-answers">Respuestas rápidas</h2>
 
 <h3 id="how-long-coyote-time">¿Cuánto debe durar el coyote time?</h3>
 
-100 ms funcionan: es lo que usa mi laboratorio y lo que usa Celeste. Son seis frames a 60 fps, suficiente para cubrir una reacción tardía y tan poco que nadie ve al personaje saltar desde el aire.
+Unos 100 ms, seis fotogramas a 60 fps. Más y se nota que saltas desde el aire.
 
 <h3 id="how-long-jump-buffer">¿Cuánto debe durar el jump buffer?</h3>
 
-Mi laboratorio usa 120 ms. Mantenlo por ahí: un buffer más largo empieza a saltar cuando el jugador ya cambió de idea.
-
-<h3 id="coyote-double-jump">¿El coyote time puede dar un doble salto gratis?</h3>
-
-Solo si te olvidas de reiniciarlo. Pon el temporizador del coyote a cero cuando empieza un salto y recárgalo únicamente mientras el personaje pisa suelo.
-
-<h3 id="coyote-and-buffer-together">¿El coyote time y el jump buffer funcionan juntos?</h3>
-
-Sí, y no se estorban. Estiran los dos extremos de la misma comprobación: el buffer mantiene viva la pulsación y el coyote mantiene vivo el "puedo saltar".
-
-Vuelve a la lámina del coyote, apaga la técnica e intenta cruzar el hueco de 6u. Vas a empezar a saltar antes sin decidirlo, y la carrera se siente peor aunque llegues. Eso es lo que compran los 100 ms. Los saltos que salva son lo de menos. Lo que de verdad te da es poder seguir saltando tan tarde como te dicen los ojos.
+Unos 120 ms. Mucho más y salta cuando ya cambiaste de idea.
