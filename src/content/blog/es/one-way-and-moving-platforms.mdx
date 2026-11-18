@@ -1,0 +1,396 @@
+---
+title: "Plataformas one-way y plataformas móviles en Godot: bajar a propósito y saltar con la inercia"
+description: "Plataformas one-way en Godot 4: one_way_collision y apagar una capa de la máscara 0,22 s con abajo + salto. Plataformas móviles: platform_on_leave hereda la inercia, pero sin perderla despacio en el aire el salto no llega."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 10
+---
+
+import TLDR from '../../../components/blog/TLDR.astro';
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import StatGrid from '../../../components/blog/StatGrid.astro';
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "Plataforma one-way: la atraviesas saltando desde abajo y te sostiene por arriba. En Godot 4 es one_way_collision en la forma de colisión. Para bajar, mi laboratorio apaga la capa de esas plataformas en la máscara del jugador durante 0,22 s cuando pulsas abajo + salto.",
+  "Inercia de plataforma: al saltar desde una plataforma en movimiento conservas su velocidad. En Godot 4 es platform_on_leave = PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY, que mantiene la velocidad lateral e ignora el movimiento hacia abajo, así que ningún salto sale más corto.",
+  "La bandera sola no basta. Si el control en el aire te devuelve a la velocidad de carrera al ritmo habitual, la velocidad heredada desaparece en unos 0,1 s. Simulado con los números del laboratorio, ese salto llega a 6,7 casillas. Si el exceso se pierde a 140 px/s², llega a 10,3, por encima de un hueco de 8.",
+]} />
+
+La lámina 10 de mi laboratorio acaba en un hueco de 8 casillas, y un salto completo corriendo cubre 6,4. Para cruzarlo hay una plataforma que se desliza hacia el hueco a 267 px/s. Corres con ella, saltas antes de que se pare, te llevas su velocidad y llegas al otro lado. Pulsa T y el mismo salto se queda corto.
+
+Godot tiene una propiedad justo para esto, `platform_on_leave`, y es una línea. Pero si simulas el salto con los números del laboratorio y solo esa línea, se queda en 6,7 casillas. La línea que de verdad te hace llegar está en otra parte, en el código que decide lo rápido que puedes correr.
+
+La lámina 09, justo antes, es la otra plataforma que no es suelo sin más: la que atraviesas saltando desde abajo y que solo te deja caer cuando se lo pides.
+
+<StatGrid columns={2} stats={[
+  { value: "8 casillas", label: "Hueco de la lámina 10", context: "desde el punto más lejano de la plataforma hasta el bloque siguiente" },
+  { value: "6,4 casillas", label: "Salto completo corriendo", context: "medido por el propio laboratorio, desde suelo firme" },
+  { value: "267 px/s", label: "Plataforma rápida", context: "8 casillas en 1,2 s, a velocidad constante" },
+  { value: "0,22 s", label: "Ventana para bajar", context: "el jugador ignora las one-way tras abajo + salto" },
+]} />
+
+<Callout type="important" title="La tesis">
+Una plataforma que no es suelo sin más le hace una promesa al ojo. Una one-way solo debe ser sólida cuando caes sobre ella desde arriba, y solo debe dejar de serlo cuando tú lo pides. Una móvil debe darte su velocidad cuando saltas. Si se rompe cualquiera de las dos promesas, el jugador deja de leer el nivel y empieza a pelearse con la física.
+</Callout>
+
+<h2 id="what-is-a-one-way-platform">¿Qué es una plataforma one-way?</h2>
+
+Una plataforma one-way (de un solo sentido, o atravesable) es sólida por arriba y vacía por abajo: la atraviesas saltando desde debajo y aterrizas encima. Casi todos los plataformas te dejan además bajar a través de ella a propósito, normalmente con abajo + salto. En el código de Celeste se llaman *jump-thrus* (`JumpThru`).<Sidenote>En [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), el código del jugador que el equipo de Celeste subió a GitHub.</Sidenote>
+
+La lámina 09 es una torre corta hecha con ellas. Tres plataformas apiladas a tres casillas una de otra, dentro de las 3,6 casillas de un salto completo, y después un pozo con dos suelos one-way que solo se pasan bajando. El subtítulo de la lámina lo resume todo: *subir atravesando, bajar a propósito*.
+
+Esta lámina no tiene nada que apagar con T. Una plataforma one-way está o no está.
+
+<PlayableLab
+  sheets="oneway"
+  title="Plataformas one-way"
+  steps={[
+    "Sube atravesando las tres plataformas de la izquierda con <kbd>Espacio</kbd>. Pasas por debajo y aterrizas encima.",
+    "Desde la de arriba, salta hacia la derecha al pilar con <kbd>→</kbd> y <kbd>Espacio</kbd>, y déjate caer por el otro lado a la primera plataforma del pozo.",
+    "Mantén <kbd>↓</kbd> y pulsa <kbd>Espacio</kbd> para atravesarla hacia abajo. Repítelo en la siguiente para llegar al suelo y a la salida, abajo a la derecha.",
+    "Ahora quédate quieto sobre una plataforma y pulsa solo <kbd>↓</kbd>. Solo te agachas: para bajar hacen falta las dos teclas.",
+  ]}
+/>
+
+<h2 id="one-way-platforms-godot">Cómo hacer plataformas one-way en Godot 4</h2>
+
+La parte de la plataforma son dos propiedades de su forma de colisión y una capa de colisión propia.
+
+<CodeBlock filename="game/entities/one_way_platform.gd">
+```gdscript
+class_name OneWayPlatform
+extends StaticBody2D
+## OneWayPlatform — plataforma atravesable desde abajo.
+##
+## Vive en la capa de colisión 2 ("one_way"). Para bajarse (abajo + salto) el
+## jugador desactiva esa capa en su máscara durante unos milisegundos:
+## así no hay que tocar la plataforma ni afectar a otros cuerpos.
+
+const THICKNESS := 8.0
+# ...
+func _ready() -> void:
+	collision_layer = 2
+	collision_mask = 0
+
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(_width, THICKNESS)
+	var shape := CollisionShape2D.new()
+	shape.shape = rect
+	shape.position = Vector2(_width * 0.5, THICKNESS * 0.5)
+	shape.one_way_collision = true
+	shape.one_way_collision_margin = 6.0
+	add_child(shape)
+```
+</CodeBlock>
+
+`one_way_collision` hace que la forma solo choque por un lado. `one_way_collision_margin` es lo gruesa que se comporta ese lado, y la documentación de Godot dice que los valores altos funcionan mejor con cuerpos que entran en la forma a mucha velocidad.<Sidenote>Las dos están documentadas en [CollisionShape2D](https://docs.godotengine.org/en/stable/classes/class_collisionshape2d.html).</Sidenote> Aquí no es una preocupación teórica. Una caída normal en el laboratorio llega a 900 px/s, que a 120 ticks de física por segundo son 7,5 px por tick, una caída rápida va todavía más deprisa, y la plataforma mide 8 px de grosor.
+
+La parte del jugador decide cuándo soltarla:
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _try_jump(on_floor: bool) -> void:
+# ...
+	# Abajo + salto sobre una plataforma one-way: atravesarla hacia abajo.
+	if on_floor and input_y > 0 and _floor_is_one_way:
+		_drop_through()
+		return
+# ...
+func _drop_through() -> void:
+	_jump_buffer = 0.0
+	_coyote = 0.0
+	_press_pending = false
+	_drop_timer = 0.22
+	set_collision_mask_value(LAYER_ONE_WAY, false)
+	global_position.y += 2.0
+	velocity.y = maxf(velocity.y, 80.0)
+	dropped_through.emit()
+# ...
+if _drop_timer > 0.0:
+	_drop_timer -= delta
+	if _drop_timer <= 0.0:
+		set_collision_mask_value(LAYER_ONE_WAY, true)
+# ...
+func _update_floor_kind() -> void:
+	for i in get_slide_collision_count():
+		var hit := get_slide_collision(i)
+		if hit.get_normal().y < -0.5:
+			var collider := hit.get_collider() as CollisionObject2D
+			_floor_is_one_way = collider != null and collider.get_collision_layer_value(LAYER_ONE_WAY)
+			return
+```
+</CodeBlock>
+
+Cada línea de `_drop_through` tapa un agujero concreto:
+
+- `_jump_buffer = 0.0` y `_coyote = 0.0`. La pulsación de Espacio que empezó la bajada sigue guardada en el [jump buffer](/blog/es/coyote-time-jump-buffer/), y acabas de dejar el suelo, así que el coyote time sigue cargado. Sin estas dos líneas, el tick siguiente convertiría esa misma pulsación en un salto de coyote, de vuelta hacia arriba a través de la plataforma.
+- `set_collision_mask_value(LAYER_ONE_WAY, false)`. El jugador deja de mirar la capa 2. La plataforma no se toca, así que cualquier otra cosa que esté encima se queda donde está.
+- `global_position.y += 2.0` y `velocity.y = maxf(velocity.y, 80.0)`. Un empujón de 2 px hacia dentro de la plataforma y velocidad hacia abajo desde el primer tick, para que la bajada empiece al momento.
+- `_drop_timer = 0.22`. A los 0,22 s la capa vuelve.
+
+Echa cuentas con esos 0,22 s. Con la gravedad de caída de 3.200 px/s² del [post de la gravedad](/blog/es/jump-gravity-apex-hang/), la caja de 24×36 px queda entera por debajo de la plataforma de 8 px a los 0,14 s más o menos, y cuando la capa vuelve ya ha caído unos 97 px, casi 2,4 casillas. Los suelos del pozo están a tres casillas, así que caes en el siguiente. Si pones dos one-way más juntas que eso, una sola pulsación te hace atravesar las dos.
+
+<h2 id="ways-to-drop-through">Tres maneras de dejar pasar al jugador</h2>
+
+Hay más de una forma de que un cuerpo ignore una plataforma durante un momento, y cada una falla de una manera distinta.
+
+| Cómo | Qué cambia | El problema |
+|---|---|---|
+| Apagar la capa en la `collision_mask` del jugador (mi laboratorio) | Solo el jugador | Durante la ventana el jugador ignora todas las one-way, no solo la que pisa |
+| Desactivar la forma de colisión de la plataforma | La plataforma | Se cae todo lo que esté encima, enemigos incluidos |
+| `add_collision_exception_with(plataforma)` | Ese jugador y esa plataforma | Hay que acordarse de quitar la excepción, plataforma por plataforma |
+
+El comentario al principio de `one_way_platform.gd` da la razón de la primera: *así no hay que tocar la plataforma ni afectar a otros cuerpos*.<Sidenote>`collision_mask` está en [CollisionObject2D](https://docs.godotengine.org/en/stable/classes/class_collisionobject2d.html), y `add_collision_exception_with` en [PhysicsBody2D](https://docs.godotengine.org/en/stable/classes/class_physicsbody2d.html).</Sidenote>
+
+El código del jugador de Celeste dedica su lógica de *jump-thrus* al camino de subida. Mientras subes y te solapas con una, un *Jump Thru Assist* te empuja hacia arriba a 40 px/s (`JumpThruAssistSpeed = -40f`). El único sitio donde Player.cs pone `IgnoreJumpThrus = true` es al empezar un estado de caída concreto, `ReflectionFall`.
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+//Jump Thru Assist
+if (!onGround && Speed.Y <= 0 && (StateMachine.State != StClimb || lastClimbMove == -1) && CollideCheck<JumpThru>() && !JumpThruBoostBlockedCheck())
+    MoveV(JumpThruAssistSpeed * Engine.DeltaTime);
+```
+</CodeBlock>
+
+<h2 id="what-is-moving-platform-momentum">¿Qué es la inercia de una plataforma móvil?</h2>
+
+La inercia de plataforma significa que, al saltar desde una plataforma en movimiento, conservas su velocidad sumada a la tuya. Vas en una plataforma que va a la derecha, saltas, y sales disparado a la derecha a tu velocidad más la suya. Es lo que cualquiera espera al saltar desde algo que se mueve, y convierte la plataforma en una catapulta que el diseñador puede medir. El subtítulo de la lámina 10: *la inercia se hereda*.
+
+Aquí pasan dos cosas distintas. Mientras estás encima, el motor te lleva con ella y no resbalas. Cuando te vas, algo tiene que decidir qué pasa con la velocidad de la plataforma. En Godot 4 son dos mecanismos separados, y T solo cambia el segundo.
+
+<PlayableLab
+  sheets="movers"
+  title="Plataformas móviles"
+  videoNote="Sube a la plataforma rápida y salta mientras avanza hacia el hueco de 8 casillas: con inercia, el salto se lleva la velocidad de la plataforma y llega. Tras pulsar T salta solo con su propia velocidad y se queda corto. Cada intento del video empieza en el borde del bloque."
+  steps={[
+    "Cruza el foso en la primera plataforma con <kbd>→</kbd> y sube en el ascensor. Quédate quieto encima: la plataforma te lleva y no resbalas.",
+    "Desde el borde del bloque, sube corriendo a la plataforma rápida con <kbd>→</kbd> pulsado y salta con <kbd>Espacio</kbd> desde su borde delantero mientras todavía se mueve. Te llevas su velocidad y cruzas el hueco de 8 casillas.",
+    "¿Te quedaste corto? El ascensor de abajo te vuelve a subir.",
+    "Pulsa <kbd>T</kbd> y repite el salto. Sales solo con tu propia velocidad y caes al suelo bajo el hueco.",
+  ]}
+/>
+
+<h2 id="moving-platforms-godot">Cómo hacer plataformas móviles en Godot 4</h2>
+
+La plataforma es un `AnimatableBody2D` que va y vuelve moviéndose a sí mismo en el paso de física. El comentario de cabecera es la lista de comprobación:
+
+<CodeBlock filename="game/entities/mover.gd">
+```gdscript
+class_name Mover
+extends AnimatableBody2D
+## Mover — plataforma móvil (va y vuelve entre dos puntos).
+##
+## BUENAS PRÁCTICAS DE PLATAFORMAS MÓVILES
+##  · AnimatableBody2D + sync_to_physics: el motor conoce su velocidad y
+##    CharacterBody2D la aplica al pasajero (no resbala ni tiembla encima).
+##  · Se mueve en _physics_process, en el mismo paso que el jugador.
+##  · Es one-way: se puede subir saltando desde abajo y nunca aplasta contra
+##    una pared (aplastar exige diseñar esa muerte; por defecto, evítala).
+##  · Inercia al saltar: la gestiona el jugador (`platform_on_leave`).
+# ...
+func _ready() -> void:
+	collision_layer = 2
+	collision_mask = 0
+	sync_to_physics = true
+# ...
+func _physics_process(delta: float) -> void:
+	_time += delta
+	var cycle := (travel_time + PAUSE) * 2.0
+	var t := fmod(_time, cycle)
+	var k: float
+	if t < travel_time:
+		k = t / travel_time
+	elif t < travel_time + PAUSE:
+		k = 1.0
+	elif t < travel_time * 2.0 + PAUSE:
+		k = 1.0 - (t - travel_time - PAUSE) / travel_time
+	else:
+		k = 0.0
+	if eased:
+		k = smoothstep(0.0, 1.0, k)
+	position = from.lerp(to, k)
+```
+</CodeBlock>
+
+Ir encima sale gratis en cuanto la plataforma es el tipo de cuerpo adecuado. La documentación de Godot dice que, cuando un `AnimatableBody2D` se mueve, su velocidad se estima y se usa para afectar a los demás cuerpos que encuentra, y que `move_and_slide()` suma la velocidad de una plataforma móvil al cuerpo que va encima.<Sidenote>[AnimatableBody2D](https://docs.godotengine.org/en/stable/classes/class_animatablebody2d.html) y [CharacterBody2D](https://docs.godotengine.org/en/stable/classes/class_characterbody2d.html).</Sidenote> La plataforma también es one-way, en la misma capa 2 que las de la lámina 09, así que abajo + salto también te deja caer a través de ella. La cabecera explica por qué: una plataforma sólida puede aplastarte contra una pared, y aplastar es una muerte que alguien tiene que diseñar a propósito.
+
+Lo que pasa al irte es lo que cambia T, y vive en el jugador:
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+## Ajustes de CharacterBody2D que dependen de banderas del laboratorio.
+func _apply_lab() -> void:
+	# FLOOR SNAP: pega al jugador al suelo al bajar pendientes o escalones.
+	var snap := Lab.on(&"floor_snap")
+	floor_snap_length = params.floor_snap_px if snap else 0.0
+	floor_constant_speed = snap
+	# INERCIA DE PLATAFORMA: al saltar desde una plataforma móvil se hereda su
+	# velocidad (sólo la componente ascendente en vertical: nunca acorta el salto).
+	platform_on_leave = (PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY if Lab.on(&"platform_momentum")
+			else PLATFORM_ON_LEAVE_DO_NOTHING)
+```
+</CodeBlock>
+
+`platform_on_leave` tiene tres opciones:
+
+| `platform_on_leave` | Al dejar una plataforma móvil |
+|---|---|
+| `PLATFORM_ON_LEAVE_ADD_VELOCITY` (la de serie) | Se suma a la tuya la última velocidad de la plataforma |
+| `PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY` (mi laboratorio, T encendida) | Lo mismo, pero se ignora cualquier movimiento hacia abajo |
+| `PLATFORM_ON_LEAVE_DO_NOTHING` (mi laboratorio, tras pulsar T) | Nada: te vas con tu propia velocidad |
+
+Con la opción de serie, saltar desde una plataforma que baja suma esa velocidad hacia abajo a tu salto, y el salto sale más corto. La documentación de Godot lo dice tal cual: la versión que solo suma hacia arriba sirve para conservar la altura completa del salto aunque la plataforma esté bajando.
+
+<h2 id="why-the-flag-falls-short">Por qué la bandera sola se queda corta</h2>
+
+Corre por la plataforma rápida a los 340 px/s del laboratorio, déjala mientras va a 267 px/s, y sales volando a 607 px/s. Eso está muy por encima de la velocidad de carrera, y todo el trabajo del código de movimiento es devolverte a ella. Con la aceleración normal en el aire (340 px/s en 0,11 s, por 0,8 de control en el aire: unos 2.473 px/s²) los 267 px/s de más desaparecen en 0,11 s, apenas una séptima parte de un salto de unos 0,75 s.
+
+Por eso el laboratorio trata el exceso de velocidad como un caso aparte:
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+else:
+	rate = p.max_speed / p.accel_time                 # acelerar
+	if not on_floor:
+		rate *= p.air_control
+	if absf(velocity.x) > p.max_speed:
+		# Sobrevelocidad (plataforma, dash-jump): perderla despacio, sobre todo en el aire.
+		rate = p.overspeed_decel if on_floor else p.air_overspeed_decel
+# ...
+velocity.x = move_toward(velocity.x, target, rate * delta)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
+```gdscript
+## Frenado suave en el suelo cuando se supera max_speed: no se corta en seco.
+@export_range(0.0, 4000.0, 10.0, "suffix:px/s²") var overspeed_decel := 700.0
+## Lo mismo en el aire, mucho menor: la inercia heredada (plataformas) dura todo el salto.
+@export_range(0.0, 4000.0, 10.0, "suffix:px/s²") var air_overspeed_decel := 140.0
+```
+</CodeBlock>
+
+El comentario del segundo número lo dice sin rodeos: *la inercia heredada (plataformas) dura todo el salto*. A 140 px/s² tardarías unos 1,9 s en perder esos 267 px/s, mucho más de lo que dura cualquier salto. Y solo se aplica mientras mantienes la dirección en la que vas. Suelta <kbd>→</kbd> en el aire y entra el frenado normal, así que el jugador puede matar la inercia cuando quiera. (El resto de la curva de carrera tiene su propio post: [aceleración y fricción](/blog/es/acceleration-and-friction/).)
+
+<InteractiveChart
+  type="horizontal"
+  title="Distancia del salto desde la plataforma rápida, en casillas"
+  story="La bandera te da la velocidad. Perderla despacio es lo que hace que te dure hasta aterrizar."
+  unit=" casillas"
+  data={[
+    { label: "Sin inercia (tras pulsar T)", value: 6.4 },
+    { label: "Con inercia, perdida a la aceleración normal", value: 6.7 },
+    { label: "Con inercia, perdida a 140 px/s² (mi laboratorio)", value: 10.3 },
+  ]}
+  annotations={[
+    { targetIndex: 1, text: "Aún 1,3 casillas por debajo del hueco" },
+    { targetIndex: 2, text: "Cruza el hueco de 8 casillas", emphasize: true },
+  ]}
+  source="Simulado a 120 Hz con los parámetros del laboratorio: corriendo a 340 px/s sobre una plataforma a 267 px/s, con → y el salto mantenidos hasta arriba. Las 6,4 coinciden con el salto completo que mide el propio laboratorio."
+/>
+
+La misma simulación esconde otra trampa: la inercia solo cuenta si corres con la plataforma. Si te quedas quieto encima y saltas, sales a 267 px/s. Eso está por debajo de tu propia velocidad de carrera, así que la aceleración normal te lleva a 340 y el salto es uno normal de 6,4 casillas. El hueco de la lámina 10 te pide sumar tu carrera a la de la plataforma.
+
+<h2 id="celeste-lift-boost">Cómo lo hace Celeste</h2>
+
+Celeste llega al mismo sitio con dos piezas de código que se corresponden con las dos del laboratorio.
+
+<Tabs labels={["Lift boost", "Exceso de velocidad"]}>
+<TabPanel>
+
+Los saltos de Celeste (`Jump`, `SuperJump`, `WallJump`, `SuperWallJump`) suman todos `LiftBoost` a la velocidad del jugador. `LiftBoost` es `LiftSpeed`, la velocidad de lo que te lleva (en un salto de pared sin velocidad propia, Player.cs la coge de la pared), con la parte lateral limitada a 250 px/s y tirando todo lo que apunte hacia abajo. Hacia arriba la limita a 130 px/s. Es `ADD_UPWARD_VELOCITY` con un tope. Para hacerse una idea, la velocidad de carrera de Celeste es `MaxRun = 90f`.
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+private const float LiftYCap = -130f;
+private const float LiftXCap = 250f;
+// ...
+Speed.X += JumpHBoost * moveX;
+Speed.Y = JumpSpeed;
+Speed += LiftBoost;
+// ...
+private Vector2 LiftBoost
+{
+    get
+    {
+        Vector2 val = LiftSpeed;
+
+        if (Math.Abs(val.X) > LiftXCap)
+            val.X = LiftXCap * Math.Sign(val.X);
+
+        if (val.Y > 0)
+            val.Y = 0;
+        else if (val.Y < LiftYCap)
+            val.Y = LiftYCap;
+
+        return val;
+    }
+}
+```
+</CodeBlock>
+
+Celeste también trata aparte el caso de salir andando de una plataforma que sube, sin saltar (`//Use Lift Boost if walked off platform`). En Godot, `platform_on_leave` se aplica siempre que dejas una plataforma móvil, así que salir andando ya está cubierto.
+
+</TabPanel>
+<TabPanel>
+
+Por encima de `MaxRun` y manteniendo la misma dirección, Celeste te frena con `RunReduce = 400f` en lugar de `RunAccel = 1000f`, multiplicado por `AirMult = .65f` en el aire. La proporción del laboratorio es más extrema (140 frente a unos 2.473 en el aire), pero la regla es la misma: la velocidad que no podrías alcanzar corriendo se pierde despacio.
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+if (Math.Abs(Speed.X) > max && Math.Sign(Speed.X) == moveX)
+    Speed.X = Calc.Approach(Speed.X, max * moveX, RunReduce * mult * Engine.DeltaTime);  //Reduce back from beyond the max speed
+else
+    Speed.X = Calc.Approach(Speed.X, max * moveX, RunAccel * mult * Engine.DeltaTime);   //Approach the max speed
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+<h2 id="when-to-use">Cuándo ayudan estas plataformas y cuándo muerden</h2>
+
+| Situación | Qué hacer |
+|---|---|
+| Salas verticales y torres | Plataformas one-way: el jugador sube sin rodear cada una |
+| Bajar | Abajo + salto, nunca abajo a secas. Abajo a secas es agacharse, y agacharse sobre una one-way no debería tirarte |
+| One-way apiladas muy juntas | Cuidado: en los 0,22 s del laboratorio se caen unas 2,4 casillas, y los suelos más cercanos se atraviesan con una sola pulsación |
+| Plataformas que bajan | `ADD_UPWARD_VELOCITY`, para que saltar desde una nunca acorte el salto |
+| Una plataforma rápida hacia un hueco | Inercia, y perder el exceso despacio en el aire, o la velocidad se va en 0,1 s |
+| Plataformas que podrían aplastarte contra una pared | Hazlas one-way. Aplastar es una muerte que se diseña a propósito o no se diseña |
+
+<Collapsible title="Por qué la plataforma rápida es la única lineal">
+La lámina 10 tiene cuatro plataformas móviles y solo la rápida lleva `"linear": true`. Las demás arrancan y frenan con `smoothstep`, así que su velocidad cambia a lo largo del recorrido: cero en los extremos y 1,5 veces la media en el centro. La rápida va a 267 px/s de principio a fin, así que la velocidad que te llevas no depende del momento en que saltas.
+
+Eso sí, se para en seco al final y espera ahí `PAUSE = 0.4` segundos. Si saltas durante la pausa no hay nada que heredar, y por eso la nota de la lámina dice *salta MIENTRAS se mueve*.
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="one-way-platform-godot">¿Cómo hago una plataforma one-way en Godot 4?</h3>
+
+Pon `one_way_collision = true` en el `CollisionShape2D` de la plataforma y dale un margen (6 px en mi laboratorio) para que las caídas rápidas no la atraviesen. Mete las one-way en su propia capa de colisión. Te hará falta para poder bajar a través de ellas.
+
+<h3 id="drop-through-godot">¿Cómo bajo a través de una plataforma one-way en Godot?</h3>
+
+Con abajo + salto, si el suelo que pisa el jugador está en la capa de las one-way, apaga esa capa en la máscara del jugador durante una ventana corta (0,22 s en mi laboratorio), bájalo 2 px y vacía el jump buffer y el coyote time para que la misma pulsación no te devuelva arriba de un salto.
+
+<h3 id="moving-platform-carry-player">¿Cómo hago que una plataforma móvil lleve al jugador en Godot?</h3>
+
+En Godot 4, haz la plataforma un `AnimatableBody2D` y muévela en `_physics_process`, en el mismo paso que el jugador. Godot estima entonces su velocidad, y `move_and_slide()` se la suma a quien vaya encima.
+
+<h3 id="which-platform-on-leave">¿Qué platform_on_leave debería usar?</h3>
+
+`PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY`. Conserva la inercia lateral y nunca acorta un salto. Después revisa tu control en el aire: si te devuelve deprisa a la velocidad de carrera, la inercia que te da no pasará de la primera décima de segundo.
+
+Ve a la lámina 10, apaga la inercia e intenta el salto unas cuantas veces. Vas a empezar a saltar antes, desde más atrás en la plataforma, como si el problema fuera tu sincronización. No lo es. Hace un tick ibas a 607 px/s, y el juego se olvidó.

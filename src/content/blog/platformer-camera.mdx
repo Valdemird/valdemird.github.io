@@ -1,0 +1,303 @@
+---
+title: "Platformer camera in Godot: look-ahead, a vertical anchor and frame-rate-independent smoothing"
+description: "A platformer camera should aim 110 px ahead, stay anchored to the last floor through jumps (60% of my hops landed where they took off) and smooth with 1 − e^(−k·Δt). Godot 4 code, Celeste's version, playable."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 11
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "Look-ahead: the camera aims 110 px (2.75 tiles) ahead of the direction you're moving, and only switches sides once you move faster than 60 px/s, so turning in place doesn't swing the view.",
+  "Vertical anchor (platform snapping): the camera stays at the height of the last floor you stood on and only follows if you go 170 px above it or 50 px below. A full jump rises 144 px, so a jump on its own never moves it.",
+  "Smoothing: lerp(a, b, 1 − exp(−k·Δt)) instead of lerp(a, b, 0.1). The first behaves the same at any frame rate. The second gets stiffer the more FPS you have. Celeste's camera uses the same idea, written as 1 − 0.01^Δt.",
+]} />
+
+Sheet 14 of my lab draws the camera's decisions on top of the level in yellow: a line at the height it's anchored to, two dashed lines for how far you can go before it moves, and a cross where it's aiming. Climb the steps and the lines climb with you, one step at a time. Hop on the plateau and they stay at the same height.
+
+That second part matters more than it looks. In my recorded sessions (Nov 15–18), 2,521 jumps from the ground ended in a landing with nothing else in between, and 60% of them came down within 4 px of the height they took off from. A camera glued to the player scrolls the whole level up to 3.6 tiles up and back down on every one of those, and you end up exactly where you started.
+
+<StatGrid columns={2} stats={[
+  { value: "60%", label: "Hops that land where they started", context: "1,506 of 2,521 recorded, within 4 px" },
+  { value: "144 px", label: "Full jump height", context: "inside the camera's 170 px window" },
+  { value: "110 px", label: "Look-ahead", context: "2.75 tiles in front of where you run" },
+  { value: "0.08 s", label: "Half the distance, sideways", context: "follow sharpness 9, at any frame rate" },
+]} />
+
+<Callout type="important" title="The thesis">
+A platformer camera's job is to move as little as it can and show what's in front of you. Glued to the player it does the opposite: it moves on every hop and shows as much behind you as ahead. The sheet's subtitle says it in four words: *anticipar, no perseguir*. Anticipate, don't chase.
+</Callout>
+
+<h2 id="what-makes-a-good-platformer-camera">What makes a good platformer camera?</h2>
+
+A platformer camera decides three things every tick: where to aim sideways, when to move vertically, and how fast to get there. The usual answers have names, most of them catalogued in Itay Keren's GDC 2015 talk [*Scroll Back: The Theory and Practice of Cameras in Side-Scrollers*](https://www.gamedeveloper.com/design/scroll-back-the-theory-and-practice-of-cameras-in-side-scrollers): forward focus (look-ahead) for the first, a camera window with platform snapping for the second, smoothing for the third. The camera script in my lab cites that talk in its header.
+
+One line from the article sums up the direction: keep scrolling to the necessary minimum. Sheet 14 is built to show the difference. Steps going up, where the camera has to move, then a flat plateau, where it shouldn't.
+
+<PlayableLab
+  sheets="camera"
+  title="Platformer camera"
+  videoNote="Climbs the steps, then jumps in place on the plateau. With the smart camera the view stays put while it hops; after T the camera follows every jump."
+  steps={[
+    "Climb the steps with <kbd>→</kbd> and <kbd>Space</kbd>. The solid yellow line is the anchor, the height of the last floor you stood on. It moves up one step each time you land.",
+    "On the plateau, hop with <kbd>Space</kbd>. The dashed line above you is the top of the window. A full jump tops out just under it, so the view stays put.",
+    "Turn around with <kbd>←</kbd>. The look-ahead cross drifts over to the other side, slower than the camera follows you.",
+    "Press <kbd>T</kbd> and hop again. The guides disappear except the camera's center, and every jump drags the whole level up and down.",
+  ]}
+/>
+
+<h2 id="platformer-camera-godot">How to code a platformer camera in Godot 4</h2>
+
+The whole decision fits in one `_physics_process`. The comments are in Spanish because the whole project is.
+
+<CodeBlock filename="addons/platformer_kit/camera/platformer_camera.gd">
+```gdscript
+@export var look_ahead := 110.0
+@export var look_sharpness := 2.6
+@export var follow_sharpness_x := 9.0
+@export var follow_sharpness_y := 7.0
+@export var vertical_offset := 70.0     ## el jugador queda algo por debajo del centro
+@export var window_up := 170.0          ## cuánto puede subir sin mover la cámara
+@export var window_down := 50.0         ## al caer se le sigue casi de inmediato
+# ...
+func _physics_process(delta: float) -> void:
+	if target == null:
+		return
+	var pos := target.global_position
+
+	if Lab.on(&"camera_smart"):
+		# Look-ahead: sólo cambia de lado cuando el jugador se mueve de verdad.
+		if absf(target.velocity.x) > 60.0:
+			_look_target = signf(target.velocity.x) * look_ahead
+		_look = BP.damp(_look, _look_target, look_sharpness, delta)
+
+		# Platform snapping: re-anclar al pisar suelo (o al deslizar por una pared).
+		if target.is_on_floor() or target.is_wall_sliding:
+			_anchor_y = pos.y
+		else:
+			_anchor_y = clampf(_anchor_y, pos.y - window_down, pos.y + window_up)
+
+		var desired := Vector2(pos.x + _look, _anchor_y - vertical_offset)
+		_focus.x = BP.damp(_focus.x, desired.x, follow_sharpness_x, delta)
+		_focus.y = BP.damp(_focus.y, desired.y, follow_sharpness_y, delta)
+	else:
+		# Cámara ingenua: clavada al jugador. Cada salto mueve todo el mundo.
+		_focus = pos
+		_anchor_y = pos.y
+		_look = 0.0
+# ...
+```
+</CodeBlock>
+
+The `else` branch is what T switches to, and its comment is the argument against it: *cada salto mueve todo el mundo*, every jump moves the whole world. Three numbers carry the smart branch: how far ahead it looks, how big the vertical window is, and how sharp the smoothing is. The rest of this post is one section per number.
+
+The same node also runs the screen shake from [sheet 13](/blog/game-feel-on-the-web/), trauma squared times smooth noise, after this code. T on this sheet doesn't touch it.
+
+<h2 id="look-ahead">Look-ahead: frame where the player is going</h2>
+
+Look-ahead shifts the camera ahead of the player in the direction they're moving, because in a side-scroller the space that matters is the space in front. Keren files it under forward focus, and his examples include Cave Story, which moves the focus point slowly from side to side based on walking speed, and Super Mario World, which has two anchors and only switches to the other one after Mario crosses a threshold.
+
+My lab aims 110 px ahead and changes sides only when the horizontal speed passes 60 px/s. The run speed is 340 px/s, so any real run flips it, and a small correction or a turn in place doesn't.
+
+The other number is the sharpness. The look-ahead moves with 2.6, the camera follows the player with 9. That's half the distance in 0.27 s for the look-ahead and 0.08 s for the follow. Turn around and the camera keeps up with your body right away, while the extra room in front drifts over to the new side. If the look-ahead used 9 too, every turn would swing the view 5.5 tiles across, half of it in 0.08 s.
+
+<h2 id="platform-snapping">Platform snapping: don't follow the jump</h2>
+
+Platform snapping means the camera doesn't follow the player vertically while they're in the air. It waits for them to land, then moves to the new floor. Keren credits Super Mario World with introducing it: the camera stays still inside a window, like any camera window, and as soon as Mario lands on a platform it snaps to him. That let the designers keep the camera smooth during jumps.
+
+My lab's version is an anchor plus a window. While the player is on the floor (or sliding down a wall, see the [wall jump post](/blog/wall-jump/)), the anchor is their height. In the air the anchor stays put unless the player gets more than 170 px above it or 50 px below it. A full jump rises 144 px ([3.6 tiles](/blog/jump-gravity-apex-hang/)), so a jump from the ground never moves it on its own. Down, the window is only 50 px: step off a ledge and the camera follows almost at once, because below you is where you're about to land.
+
+Here's what that looks like against my own play. These are the 2,521 jumps from the ground that ended in a landing with nothing else in between: no second jump, dash, bounce or hit.
+
+| Where the hop landed | Hops | Smart camera, vertically |
+|---|---|---|
+| Same height (within 4 px) | 1,506 (59.7%) | Doesn't move at all |
+| Higher | 479 (19.0%) | Moves once, after landing |
+| Lower, by up to 50 px | 473 (18.8%) | Moves once, after landing |
+| Lower, by more than 50 px | 63 (2.5%) | Follows during the fall |
+
+In 97.5% of those hops the player never left the window, so the camera's vertical target didn't change until the landing. With the glued camera, all 2,521 moved the view up and down the full arc.
+
+<h2 id="frame-rate-independent-smoothing">Smoothing that doesn't depend on the frame rate</h2>
+
+Every tick, the camera covers part of the distance to where it wants to be. The classic way to write it is `lerp(position, target, 0.1)`: 10% of what's left, each frame. Keren's article credits Donkey Kong Country as among the first to use lerp smoothing. The catch is "each frame". At 30 FPS that's 30 steps of 10% per second, at 144 FPS it's 144, and the camera gets stiffer the faster the machine.
+
+The fix is to make the fraction depend on the time that passed:
+
+<CodeBlock filename="addons/platformer_kit/core/bp.gd">
+```gdscript
+## Suavizado exponencial independiente del framerate.
+## `lerp(a, b, 0.1)` por frame cambia de velocidad con los FPS; esto no.
+static func damp(from: float, to: float, sharpness: float, delta: float) -> float:
+	return lerpf(from, to, 1.0 - exp(-sharpness * delta))
+```
+</CodeBlock>
+
+With `1.0 - exp(-sharpness * delta)`, after t seconds the distance left is e^(−sharpness·t), whatever the frame rate. With sharpness 9 the camera covers half the distance in 0.08 s, at 30 FPS or at 144.
+
+<InteractiveChart
+  type="line"
+  title="Distance left to the target after the player stops"
+  story="The same lerp(a, b, 0.1) is three different cameras at three frame rates. The exponential one is one curve at all of them."
+  xLabel="seconds"
+  yLabel="distance left (%)"
+  xUnit=" s"
+  unit="%"
+  series={[
+    { name: "lerp 0.1 per frame, 30 FPS", data: [{ label: "0.00", value: 100 }, { label: "0.05", value: 90.0 }, { label: "0.10", value: 72.9 }, { label: "0.15", value: 65.6 }, { label: "0.20", value: 53.1 }, { label: "0.25", value: 47.8 }, { label: "0.30", value: 38.7 }, { label: "0.35", value: 34.9 }, { label: "0.40", value: 28.2 }, { label: "0.45", value: 25.4 }, { label: "0.50", value: 20.6 }] },
+    { name: "lerp 0.1 per frame, 60 FPS", data: [{ label: "0.00", value: 100 }, { label: "0.05", value: 72.9 }, { label: "0.10", value: 53.1 }, { label: "0.15", value: 38.7 }, { label: "0.20", value: 28.2 }, { label: "0.25", value: 20.6 }, { label: "0.30", value: 15.0 }, { label: "0.35", value: 10.9 }, { label: "0.40", value: 8.0 }, { label: "0.45", value: 5.8 }, { label: "0.50", value: 4.2 }] },
+    { name: "lerp 0.1 per frame, 144 FPS", data: [{ label: "0.00", value: 100 }, { label: "0.05", value: 47.8 }, { label: "0.10", value: 22.9 }, { label: "0.15", value: 10.9 }, { label: "0.20", value: 5.2 }, { label: "0.25", value: 2.3 }, { label: "0.30", value: 1.1 }, { label: "0.35", value: 0.5 }, { label: "0.40", value: 0.2 }, { label: "0.45", value: 0.1 }, { label: "0.50", value: 0.1 }] },
+    { name: "damp, sharpness 9 (any FPS)", data: [{ label: "0.00", value: 100 }, { label: "0.05", value: 63.8 }, { label: "0.10", value: 40.7 }, { label: "0.15", value: 25.9 }, { label: "0.20", value: 16.5 }, { label: "0.25", value: 10.5 }, { label: "0.30", value: 6.7 }, { label: "0.35", value: 4.3 }, { label: "0.40", value: 2.7 }, { label: "0.45", value: 1.7 }, { label: "0.50", value: 1.1 }] },
+  ]}
+  source="Computed: (0.9)^frames for the lerp, e^(−9t) for the damp, sampled every 0.05 s."
+/>
+
+One honest caveat about my own lab: its camera runs in the physics step at a fixed 120 Hz, so its delta never changes and the naive version would behave the same every time there. The formula still earns its place. The sharpness becomes a number in seconds you tune once and keep, even if the tick rate changes or the code moves to `_process`.
+
+<Tabs labels={["My lab", "Celeste", "Naive lerp"]}>
+<TabPanel>
+
+`BP.damp(from, to, sharpness, delta)`, shown above: `lerpf(from, to, 1.0 - exp(-sharpness * delta))`. Sharpness 9 sideways, 7 vertically, 2.6 for the look-ahead.
+
+</TabPanel>
+<TabPanel>
+
+Celeste writes the same idea another way: each frame the camera covers `1 - 0.01^Δt` of the distance, so after one second 1% is left, at any frame rate. In the lab's terms that's a sharpness of about 4.6, half the distance in 0.15 s.<Sidenote>From [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub. The comment is theirs.</Sidenote>
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+// Camera (lerp by distance using delta-time)
+// ...
+var from = level.Camera.Position;
+var target = CameraTarget;
+var multiplier = StateMachine.State == StTempleFall ? 8 : 1f;
+
+level.Camera.Position = from + (target - from) * (1f - (float)Math.Pow(0.01f / multiplier, Engine.DeltaTime));
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+The version most tutorials start with. It works, at one frame rate. A generic sketch, not code from my project.
+
+<CodeBlock>
+```gdscript
+func _process(delta):
+	position = position.lerp(player.position, 0.1)
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+<Collapsible title="What Celeste's camera aims at">
+Celeste's `CameraTarget` is simpler than you might guess. In its normal state it's the player centered on screen, plus a `CameraOffset` the level sets, plus anchors the camera can lerp toward, all clamped to the level's bounds. The only look-ahead in Player.cs lives in two special movement states: `StRedDash` adds 48 px in the direction of motion and `StStarFly` adds 0.2 times the speed.
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+Vector2 target = new Vector2(X - Celeste.GameWidth / 2, Y - Celeste.GameHeight / 2);
+if (StateMachine.State != StReflectionFall)
+    target += new Vector2(level.CameraOffset.X, level.CameraOffset.Y);
+// ...
+else if (StateMachine.State == StRedDash)
+{
+    target.X += 48 * Math.Sign(Speed.X);
+    target.Y += 48 * Math.Sign(Speed.Y);
+}
+// ...
+at.X = MathHelper.Clamp(target.X, level.Bounds.Left, level.Bounds.Right - Celeste.GameWidth);
+at.Y = MathHelper.Clamp(target.Y, level.Bounds.Top, level.Bounds.Bottom - Celeste.GameHeight);
+```
+</CodeBlock>
+</Collapsible>
+
+<h2 id="godot-camera2d">What Godot's Camera2D does for you, and what it doesn't</h2>
+
+Godot's own `Camera2D` covers part of this. Its drag margins are a camera window (it only moves when the target reaches them), it has position smoothing, and it has limits to keep the view inside the level. What it doesn't have is look-ahead, or anything that re-anchors when you land.<Sidenote>The full property list is on [Camera2D](https://docs.godotengine.org/en/stable/classes/class_camera2d.html). `offset` is the closest thing to look-ahead, and you drive it yourself.</Sidenote> My lab keeps `Camera2D` for the rendering and sets its position from its own script every physics tick.
+
+That last part matters if physics interpolation is on, as it is in my lab. The header comment puts it this way: moved in `_physics_process`, *cámara y jugador se interpolan con la misma fracción y no hay "jitter" entre ambos*, camera and player get interpolated by the same fraction and there's no jitter between them. The camera is told from birth:
+
+<CodeBlock filename="addons/platformer_kit/camera/platformer_camera.gd">
+```gdscript
+func _init() -> void:
+	# Con interpolación de física el motor mueve la cámara en el paso de física;
+	# se le dice desde que nace, antes de entrar en el árbol, para que no avise.
+	process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
+```
+</CodeBlock>
+
+<h2 id="when-to-use">When each piece helps, and when it gets in the way</h2>
+
+| Situation | What the lab's camera does |
+|---|---|
+| Hopping on flat ground | Stays still vertically |
+| Climbing steps | Moves up once per landing |
+| Stepping off a ledge | Follows after 50 px, so you see where you'll land |
+| Sliding down a wall | Re-anchors every tick while you slide |
+| Turning in place | Keeps its look-ahead until you move faster than 60 px/s |
+| A spring that throws you 7 tiles up | Waits until you're 170 px above the last floor, then the window drags it along |
+| Respawning | Snaps straight to the player, no smoothing |
+
+The one place this camera is the wrong tool is a long climb with no floor or wall to touch. With a 170 px window and the player sitting 70 px below the center, the camera only starts moving once the player is about 100 px above the middle of the screen. If your level does a lot of that, the window needs to be smaller, or the anchor needs another rule.
+
+<Collapsible title="Reading the yellow guides on sheet 14">
+The guides only show on this sheet, and their labels are in Spanish.
+
+- Two dashed horizontal lines: the vertical window, labeled *ventana vertical*. The top one is 170 px above the anchor, the bottom one 50 px below.
+- A fainter solid line between them: the anchor, labeled *ancla (último suelo)*, the last floor.
+- A dashed line from the player to a small cross, labeled *look-ahead*: where the camera is aiming sideways.
+- A circle with a cross: the point the camera is centering on. It's the only guide left after T, since the naive camera has no window, anchor or look-ahead to show.
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-far-ahead">How far ahead should a platformer camera look?</h3>
+
+My lab uses 110 px, about 2.75 tiles, and moves it slowly (sharpness 2.6) so turns don't whip the view. Keren's article describes Defender aiming at a point about 25% of the screen width in front of the ship. Start with something in that range and tune it on your own levels.
+
+<h3 id="follow-jumps">Should a platformer camera follow jumps?</h3>
+
+Not vertically. Anchor the camera to the height of the last floor and only move it if the player leaves a window around that height. Make the window taller than a full jump (170 px against 144 in my lab) and a jump on its own never moves the screen.
+
+<h3 id="smoothing-godot">How do I make camera smoothing frame-rate independent in Godot?</h3>
+
+Use `lerpf(a, b, 1.0 - exp(-sharpness * delta))` instead of `lerpf(a, b, 0.1)`. The distance left after t seconds is then e^(−sharpness·t) at any frame rate.
+
+<h3 id="camera2d-look-ahead">Does Godot's Camera2D have look-ahead?</h3>
+
+No. It has drag margins, position smoothing and limits. For look-ahead, either drive `offset` from a script or do what my lab does and set the camera's position yourself every physics tick.
+
+<h3 id="respawn-camera">What should the camera do when the player respawns?</h3>
+
+Snap, don't smooth. Smoothing across half a level after a death is a slow pan nobody asked for. My lab calls this on respawn:
+
+<CodeBlock filename="addons/platformer_kit/camera/platformer_camera.gd">
+```gdscript
+func snap_to_target() -> void:
+	if target == null:
+		return
+	_peek = Vector2.ZERO
+	_anchor_y = target.global_position.y
+	_look = target.facing * look_ahead
+	_look_target = _look
+	_focus = Vector2(target.global_position.x + _look, _anchor_y - vertical_offset)
+	global_position = _clamp(_focus)
+	reset_physics_interpolation()
+```
+</CodeBlock>
+
+Nobody compliments a camera. Open sheet 14, press T and hop on the plateau a few times, then press it again and hop. The level is the same both times, and only one of them feels like the floor is moving under you.
