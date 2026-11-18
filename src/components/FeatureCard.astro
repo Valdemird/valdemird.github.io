@@ -1,0 +1,212 @@
+---
+/**
+ * FeatureCard — the compact card for the site's special entries (a series, the
+ * course-wiki, the component lab, the knowledge map) on the blog index, the home
+ * page and /learn/. One link: an optional picture (slot "art") beside the words,
+ * the words being an eyebrow, a title, two lines of description, the numbers in
+ * one line, and the call to action.
+ *
+ *   <FeatureCard href="/lab/" eyebrow="Live components · lab" title="…"
+ *     description="…" stats={[{ value: '31', label: 'components' }]} cta="Open the lab">
+ *     <Picture slot="art" />
+ *   </FeatureCard>
+ */
+interface Stat {
+	value: string;
+	label: string;
+}
+interface Props {
+	href: string;
+	eyebrow: string;
+	title: string;
+	description: string;
+	stats?: Stat[];
+	statsLabel?: string;
+	cta: string;
+	/** h3 when the card sits under its own section heading (home page). */
+	heading?: 'h2' | 'h3';
+	/** Which side the picture goes on, from tablet width up. */
+	artSide?: 'left' | 'right';
+}
+
+const { href, eyebrow, title, description, stats = [], statsLabel, cta, heading = 'h2', artSide = 'left' } = Astro.props;
+const Heading = heading;
+const hasArt = Astro.slots.has('art');
+---
+
+<a href={href} class:list={['fcard', `fcard--${artSide}`, { 'fcard--text': !hasArt }, 'animate-fade-in', 'delay-1']}>
+	{hasArt && (
+		<div class="fcard__art">
+			<slot name="art" />
+		</div>
+	)}
+	<div class="fcard__text">
+		<p class="fcard__eyebrow">{eyebrow}</p>
+		<Heading class="fcard__title">{title}</Heading>
+		<p class="fcard__desc">{description}</p>
+		{stats.length > 0 && (
+			<ul class="fcard__stats" aria-label={statsLabel}>
+				{stats.map((s) => (
+					<li><b>{s.value}</b> {s.label}</li>
+				))}
+			</ul>
+		)}
+		<span class="fcard__cta">
+			{cta}
+			<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<line x1="5" y1="12" x2="19" y2="12"></line>
+				<polyline points="12 5 19 12 12 19"></polyline>
+			</svg>
+		</span>
+	</div>
+</a>
+
+<style>
+	.fcard {
+		display: grid;
+		grid-template-columns: 15.5rem minmax(0, 1fr);
+		gap: 1.5rem;
+		align-items: center;
+		padding: 1.15rem 1.4rem;
+		margin-bottom: 1.1rem;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		/* Tinted wash marks a special entry: no left accent bar. */
+		background: oklch(from var(--color-accent) l c h / 0.045);
+		color: inherit;
+		text-decoration: none;
+		transition: box-shadow var(--duration-normal) var(--ease-smooth), transform var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+	:global([data-theme='dark']) .fcard {
+		background: oklch(from var(--color-accent) l c h / 0.085);
+	}
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .fcard {
+			background: oklch(from var(--color-accent) l c h / 0.085);
+		}
+	}
+	.fcard--right {
+		grid-template-columns: minmax(0, 1fr) 15.5rem;
+	}
+	.fcard--right .fcard__art {
+		order: 2;
+	}
+	.fcard--text {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.fcard:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-lg);
+		border-color: var(--color-accent);
+	}
+	.fcard:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 3px;
+	}
+
+	.fcard__art {
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+	/* The pictures bring their own frame; here they are a little wider than tall. */
+	.fcard .fcard__art > :global(*) {
+		aspect-ratio: 16 / 10;
+	}
+	.fcard:hover .fcard__art {
+		transform: scale(1.02);
+	}
+
+	.fcard__text {
+		display: grid;
+		gap: 0.4rem;
+		min-width: 0;
+	}
+	.fcard__eyebrow {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+	.fcard__title {
+		margin: 0;
+		font-size: clamp(1.15rem, 2.2vw, 1.42rem);
+		line-height: 1.22;
+		letter-spacing: -0.012em;
+	}
+	.fcard__desc {
+		margin: 0;
+		font-size: 0.93rem;
+		line-height: 1.55;
+		color: var(--color-text-secondary);
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		line-clamp: 2;
+		overflow: hidden;
+	}
+	/* Bold numbers separate the items; no dots, so a wrapped line never starts with one. */
+	.fcard__stats {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.15rem 0.95rem;
+		margin: 0.1rem 0 0;
+		padding: 0;
+		list-style: none;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.02em;
+		color: var(--color-text-muted);
+	}
+	.fcard__stats li {
+		margin: 0;
+	}
+	.fcard__stats b {
+		font-weight: 600;
+		color: var(--color-text);
+	}
+	.fcard__cta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.35rem;
+		margin-top: 0.15rem;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--color-accent);
+	}
+	.fcard__cta svg {
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+	.fcard:hover .fcard__cta svg {
+		transform: translateX(4px);
+	}
+
+	@media (max-width: 680px) {
+		.fcard,
+		.fcard--right {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 0.9rem;
+			padding: 1rem 1.05rem;
+		}
+		.fcard--right .fcard__art {
+			order: 0;
+		}
+		/* On a phone the picture is a short strip above the words. */
+		.fcard .fcard__art > :global(*) {
+			aspect-ratio: 2 / 1;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.fcard,
+		.fcard__art,
+		.fcard__cta svg {
+			transition: none;
+		}
+		.fcard:hover,
+		.fcard:hover .fcard__art {
+			transform: none;
+		}
+	}
+</style>

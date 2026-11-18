@@ -7,6 +7,7 @@ import { UI_STRINGS, PERSON, SERIES } from '../../consts';
 import { getSeriesStats, seriesHref, seriesNodeId } from '../../lib/series';
 import TrackArtAgent from '../learn/TrackArtAgent.astro';
 import TrackArtClip from '../learn/TrackArtClip.astro';
+import FeatureCard from '../FeatureCard.astro';
 
 interface Props {
 	lang: Lang;
@@ -109,36 +110,23 @@ const jsonLd = {
 				</header>
 
 				<section class="tracks" aria-label={es ? 'Rutas de aprendizaje' : 'Learning tracks'}>
-					{tracks.map((t) => (
-						<a class="track" href={t.href} data-enter>
-							<div class="t-art">
-								{t.art === 'agent' ? (
-									<TrackArtAgent lang={lang} />
-								) : (
-									<TrackArtClip sheets="juice" badge={es ? 'jugable' : 'playable'} />
-								)}
-							</div>
-							<div class="t-text">
-							<p class="t-eyebrow">{t.eyebrow}</p>
-							<h2>{t.title}</h2>
-							<p class="t-desc">{t.description}</p>
-							<dl class="t-metrics" aria-label={es ? 'Cuánta información contiene' : 'How much it contains'}>
-								{t.metrics.map((m) => (
-									<div class="tm">
-										<dt>{m.value}</dt>
-										<dd>{m.label}</dd>
-									</div>
-								))}
-							</dl>
-							<span class="t-cta">
-								{t.cta}
-								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<line x1="5" y1="12" x2="19" y2="12"></line>
-									<polyline points="12 5 19 12 12 19"></polyline>
-								</svg>
-							</span>
-							</div>
-						</a>
+					{tracks.map((t, i) => (
+						<FeatureCard
+							href={t.href}
+							eyebrow={t.eyebrow}
+							title={t.title}
+							description={t.description}
+							stats={t.metrics}
+							statsLabel={es ? 'Cuánta información contiene' : 'How much it contains'}
+							cta={t.cta}
+							artSide={i % 2 ? 'right' : 'left'}
+						>
+							{t.art === 'agent' ? (
+								<TrackArtAgent slot="art" lang={lang} />
+							) : (
+								<TrackArtClip slot="art" sheets="juice" badge={es ? 'jugable' : 'playable'} />
+							)}
+						</FeatureCard>
 					))}
 				</section>
 
@@ -190,108 +178,11 @@ const jsonLd = {
 		max-width: 60ch;
 	}
 
+	/* Cards space themselves (FeatureCard's own margin). */
 	.tracks {
-		display: grid;
-		gap: var(--space-lg);
 		max-width: var(--wide-width);
 		margin: 0 auto;
 	}
-
-	/* Picture and words side by side, alternating sides down the page. */
-	.track {
-		display: grid;
-		grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-		gap: 2rem;
-		align-items: center;
-		text-decoration: none;
-		color: inherit;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		/* Tinted wash marks the card — no left accent bar (design rule). */
-		background: oklch(from var(--color-accent) l c h / 0.045);
-		padding: 2rem 2.25rem;
-		transition: box-shadow var(--duration-normal) var(--ease-smooth),
-			transform var(--duration-normal) var(--ease-spring),
-			border-color var(--duration-normal) var(--ease-smooth);
-	}
-	.track:hover {
-		box-shadow: var(--shadow-lg);
-		transform: translateY(-3px);
-		border-color: var(--color-accent);
-	}
-	.track:nth-child(even) .t-art {
-		order: 2;
-	}
-	.t-art {
-		transition: transform var(--duration-normal) var(--ease-spring);
-	}
-	.track:hover .t-art {
-		transform: scale(1.015);
-	}
-	.track:focus-visible {
-		outline: 2px solid var(--color-accent);
-		outline-offset: 4px;
-	}
-
-	.t-eyebrow {
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.14em;
-		color: var(--color-accent);
-		margin: 0 0 0.8rem;
-	}
-	.track h2 {
-		font-size: clamp(1.4rem, 3vw, 1.85rem);
-		margin: 0 0 0.5em;
-		line-height: 1.2;
-		letter-spacing: -0.015em;
-	}
-	.t-desc {
-		font-size: 1.02rem;
-		color: var(--color-text-secondary);
-		line-height: 1.65;
-		margin: 0 0 1.5em;
-	}
-
-	.t-metrics {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1.3rem 2rem;
-		margin: 0 0 1.5em;
-		padding: 1rem 0;
-		border-top: 1px solid var(--color-border);
-		border-bottom: 1px solid var(--color-border);
-	}
-	.tm { display: flex; flex-direction: column; gap: 0.15rem; }
-	.tm dt {
-		font-family: var(--font-mono);
-		font-size: 1.3rem;
-		font-weight: 600;
-		line-height: 1;
-		color: var(--color-text);
-		letter-spacing: -0.01em;
-	}
-	.tm dd {
-		margin: 0;
-		font-family: var(--font-mono);
-		font-size: 0.66rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: var(--color-text-muted);
-	}
-
-	.t-cta {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.88rem;
-		font-weight: 500;
-		color: var(--color-accent);
-	}
-	.t-cta svg { transition: transform var(--duration-normal) var(--ease-spring); }
-	.track:hover .t-cta svg { transform: translateX(4px); }
 
 	.more {
 		text-align: center;
@@ -303,24 +194,4 @@ const jsonLd = {
 		margin: var(--space-2xl) 0 0;
 	}
 
-	@media (max-width: 820px) {
-		.track {
-			grid-template-columns: minmax(0, 1fr);
-			gap: 1.4rem;
-		}
-		.track:nth-child(even) .t-art {
-			order: 0;
-		}
-	}
-	@media (max-width: 640px) {
-		.track { padding: 1.5rem; }
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.t-art {
-			transition: none;
-		}
-		.track:hover .t-art {
-			transform: none;
-		}
-	}
 </style>

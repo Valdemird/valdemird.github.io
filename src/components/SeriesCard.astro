@@ -6,6 +6,7 @@
 import { SERIES, type SeriesId } from '../consts';
 import { getSeriesStats, seriesHref } from '../lib/series';
 import TrackArtClip from './learn/TrackArtClip.astro';
+import FeatureCard from './FeatureCard.astro';
 
 interface Props {
 	id: SeriesId;
@@ -15,7 +16,6 @@ interface Props {
 }
 
 const { id, lang, heading = 'h2' } = Astro.props;
-const Heading = heading;
 const es = lang === 'es';
 const info = SERIES[id][lang];
 const stats = await getSeriesStats(id, lang);
@@ -28,169 +28,16 @@ const metrics = [
 ];
 ---
 
-<a href={seriesHref(id, lang)} class="series-card animate-fade-in delay-1">
-	<div class="series-card__inner">
-		<div class="series-card__art"><TrackArtClip sheets="juice" badge={es ? 'jugable' : 'playable'} /></div>
-		<div class="series-card__text">
-		<p class="eyebrow">{es ? `Serie jugable · ${stats.posts} mecánicas` : `Playable series · ${stats.posts} mechanics`}</p>
-		<Heading class="series-card__title">{info.name}</Heading>
-		<p class="desc">{info.description}</p>
-		<dl class="metrics" aria-label={es ? 'Lo que trae la serie' : 'What the series contains'}>
-			{metrics.map((m) => (
-				<div class="metric">
-					<dt>{m.value}</dt>
-					<dd>{m.label}</dd>
-				</div>
-			))}
-		</dl>
-		<span class="read-arrow">
-			{es ? 'Ver la serie completa' : 'See the whole series'}
-			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-				<line x1="5" y1="12" x2="19" y2="12"></line>
-				<polyline points="12 5 19 12 12 19"></polyline>
-			</svg>
-		</span>
-		</div>
-	</div>
-</a>
-
-<style>
-	.series-card {
-		position: relative;
-		display: block;
-		text-decoration: none;
-		color: inherit;
-		border-radius: var(--radius-lg);
-		border: 1px solid var(--color-border);
-		overflow: hidden;
-		/* Tinted wash marks this as a special block, like LabCard. */
-		background: oklch(from var(--color-accent) l c h / 0.045);
-		margin-bottom: 3rem;
-		transition: box-shadow var(--duration-normal) var(--ease-smooth),
-			transform var(--duration-normal) var(--ease-spring),
-			border-color var(--duration-normal) var(--ease-smooth);
-	}
-	:global([data-theme='dark']) .series-card {
-		background: oklch(from var(--color-accent) l c h / 0.085);
-	}
-	@media (prefers-color-scheme: dark) {
-		:global(:root:not([data-theme='light'])) .series-card {
-			background: oklch(from var(--color-accent) l c h / 0.085);
-		}
-	}
-	.series-card:hover {
-		box-shadow: var(--shadow-lg);
-		transform: translateY(-3px);
-		border-color: var(--color-accent);
-	}
-	/* Words and picture side by side, like the track on /learn/ (picture on the right). */
-	.series-card__inner {
-		display: grid;
-		grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-		gap: 2rem;
-		align-items: center;
-		padding: 2rem 2.5rem;
-	}
-	.series-card__art {
-		order: 2;
-		transition: transform var(--duration-normal) var(--ease-spring);
-	}
-	.series-card:hover .series-card__art {
-		transform: scale(1.015);
-	}
-	@media (max-width: 820px) {
-		.series-card__inner {
-			grid-template-columns: minmax(0, 1fr);
-			gap: 1.4rem;
-		}
-		.series-card__art {
-			order: 0;
-		}
-	}
-	.eyebrow {
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.14em;
-		color: var(--color-accent);
-		margin: 0 0 0.9rem;
-	}
-	.series-card__title {
-		font-size: clamp(1.5rem, 3vw, 2rem);
-		margin: 0 0 0.55em;
-		line-height: 1.2;
-		letter-spacing: -0.015em;
-	}
-	.desc {
-		font-size: 1.05rem;
-		color: var(--color-text-secondary);
-		line-height: 1.65;
-		margin: 0 0 1.4em;
-		max-width: 62ch;
-	}
-	.metrics {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1.6rem 2.2rem;
-		margin: 0 0 1.6em;
-		padding: 1.1rem 0;
-		border-top: 1px solid var(--color-border);
-		border-bottom: 1px solid var(--color-border);
-	}
-	.metric {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-	}
-	.metric dt {
-		font-family: var(--font-mono);
-		font-size: 1.35rem;
-		font-weight: 600;
-		line-height: 1;
-		color: var(--color-text);
-		letter-spacing: -0.01em;
-	}
-	.metric dd {
-		margin: 0;
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: var(--color-text-muted);
-	}
-	.read-arrow {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.88rem;
-		font-weight: 500;
-		color: var(--color-accent);
-	}
-	.read-arrow svg {
-		transition: transform var(--duration-normal) var(--ease-spring);
-	}
-	.series-card:hover .read-arrow svg {
-		transform: translateX(4px);
-	}
-	@media (max-width: 640px) {
-		.series-card__inner {
-			padding: 1.5rem;
-		}
-		.metrics {
-			display: grid;
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-			gap: 1.1rem 1rem;
-		}
-		.metric dt {
-			font-size: 1.15rem;
-		}
-	}
-	@media (prefers-reduced-motion: reduce) {
-		.series-card,
-		.series-card__art,
-		.read-arrow svg {
-			transition: none;
-		}
-	}
-</style>
+<FeatureCard
+	href={seriesHref(id, lang)}
+	eyebrow={es ? `Serie jugable · ${stats.posts} mecánicas` : `Playable series · ${stats.posts} mechanics`}
+	title={info.name}
+	description={info.description}
+	stats={metrics}
+	statsLabel={es ? 'Lo que trae la serie' : 'What the series contains'}
+	cta={es ? 'Ver la serie completa' : 'See the whole series'}
+	heading={heading}
+	artSide="right"
+>
+	<TrackArtClip slot="art" sheets="juice" badge={es ? 'jugable' : 'playable'} />
+</FeatureCard>
