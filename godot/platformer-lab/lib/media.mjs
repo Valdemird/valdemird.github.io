@@ -42,6 +42,21 @@ export async function finalizeClip(input, output = input, crf = Number(process.e
 	await rename(tmp, output);
 }
 
+/** Writes <name>-360.mp4 (640×360) next to a clip: what phones get, through <source media>. */
+export async function smallClip(file, crf = Number(process.env.CRF_SMALL || 27)) {
+	const out = file.replace(/\.mp4$/, '-360.mp4');
+	const tmp = `${out}.tmp.mp4`;
+	const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', file, '-an', '-vf', 'scale=640:360:flags=lanczos',
+		'-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf), '-profile:v', 'high', '-level:v', '4.0',
+		'-pix_fmt', 'yuv420p', '-tune', 'animation', '-g', '120', '-movflags', '+faststart', tmp];
+	const run = spawnSync(ffmpeg(), args, { encoding: 'utf8' });
+	if (run.status !== 0) {
+		await rm(tmp, { force: true });
+		throw new Error(`ffmpeg failed on ${file}: ${run.stderr}`);
+	}
+	await rename(tmp, out);
+}
+
 /** Writes <name>-320/-640/-960.webp next to a 1280-wide <name>.webp poster. */
 export async function posterSizes(file) {
 	for (const width of POSTER_WIDTHS) {

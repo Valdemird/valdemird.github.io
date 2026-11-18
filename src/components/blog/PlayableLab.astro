@@ -15,10 +15,9 @@
  * The clip, if it exists, also ships as VideoObject structured data. Only one
  * game runs at a time: starting one closes the others on the page.
  */
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
 import { getLocale } from '../../consts';
 import clips from '../../data/platformer-lab-clips.json';
+import { labMedia } from '../../lib/lab-media';
 
 type Plane = 'plataformas' | 'combate';
 interface Props {
@@ -36,23 +35,19 @@ interface Props {
 	/** Clip. Defaults to the record.mjs output; the tab only appears if the file exists. */
 	video?: string;
 	caption?: string;
+	/** "hero": the clip that opens a video-first post. Wider, no title row (the post's H1
+	 *  follows), and the poster loads with the page because it is the LCP image. */
+	variant?: 'inline' | 'hero';
 }
 
-const { sheets, plane = 'plataformas', title, steps = [], caption } = Astro.props;
-const slug = `${plane}-${sheets.replaceAll(',', '+')}`;
-const poster = Astro.props.poster ?? `/images/play/platformer-lab/${slug}.webp`;
-const videoPath = Astro.props.video ?? `/videos/play/platformer-lab/${slug}.mp4`;
-const videoFile = join(process.cwd(), 'public', videoPath);
-const hasVideo = existsSync(videoFile);
+const { sheets, plane = 'plataformas', title, steps = [], caption, variant = 'inline' } = Astro.props;
+const hero = variant === 'hero';
+const media = labMedia(plane, sheets, { poster: Astro.props.poster, video: Astro.props.video });
+const { slug, poster, posterSrcset, videoPoster, videoSrc, smallSrc, hasVideo } = media;
+const videoPath = media.video;
 const clip = (clips as Record<string, { uploadDate: string; duration: string }>)[slug];
-// The poster is 1280 wide; posters.mjs also writes -640 and -960 copies.
-const variant = (w: number) => poster.replace(/\.webp$/, `-${w}.webp`);
-const posterSrcset = [640, 960].every((w) => existsSync(join(process.cwd(), 'public', variant(w))))
-	? `${variant(640)} 640w, ${variant(960)} 960w, ${poster} 1280w`
-	: undefined;
 // Same width as .pl below: min(900px, 100vw - 2rem).
 const posterSizes = '(min-width: 932px) 900px, calc(100vw - 2rem)';
-const videoPoster = posterSrcset ? variant(960) : poster;
 const lang = getLocale(Astro.url);
 const es = lang === 'es';
 
@@ -66,6 +61,7 @@ const COPY = es
 			play: 'Juégalo y pruébalo',
 			start: 'Jugar',
 			watchStart: 'Ver el video',
+			watchRetry: 'No cargó: reintentar',
 			startHint: 'Tú llevas el mando desde el primer momento. Los pasos están debajo.',
 			videoNote: Astro.props.videoNote ?? 'Primero con la técnica encendida; a mitad del video se pulsa T y las mismas pulsaciones fallan sin ella.',
 			legendOn: 'con la técnica',
@@ -88,6 +84,7 @@ const COPY = es
 			play: 'Play it and try it',
 			start: 'Play',
 			watchStart: 'Play the clip',
+			watchRetry: "Didn't load: retry",
 			startHint: "You're in control from the first frame. The steps are below.",
 			videoNote: Astro.props.videoNote ?? 'First with the technique on; halfway through, T is pressed and the same inputs fail without it.',
 			legendOn: 'technique on',
@@ -137,11 +134,13 @@ const videoLd = hasVideo
 	: '';
 ---
 
-<figure class="pl" data-playable-lab data-src={src}>
-	<header class="pl-head">
-		<span class="pl-eyebrow">{COPY.eyebrow}</span>
-		<span class="pl-title">{title}</span>
-	</header>
+<figure class:list={['pl', { 'pl--hero': hero }]} data-playable-lab data-src={src}>
+	{!hero && (
+		<header class="pl-head">
+			<span class="pl-eyebrow">{COPY.eyebrow}</span>
+			<span class="pl-title">{title}</span>
+		</header>
+	)}
 
 	{hasVideo && (
 		<div class="pl-tabs" role="tablist" aria-label={title}>
@@ -163,12 +162,17 @@ const videoLd = hasVideo
 				    poster can't load lazily, so the script sets it when the clip nears the screen;
 				    without JS there is no poster, only the native controls. (An <img> under the
 				    video would be lazy for free, but Chrome's controls paint over it.) */}
-				<video class="pl-video" src={videoPath} data-poster={videoPoster} muted loop playsinline controls preload="none" aria-label={COPY.videoTitle} data-pl-video></video>
+				{/* Phones get the 640×360 copy: a fifth of the bytes, the same clip. Browsers that
+				    ignore `media` take the first source, which is why the small one comes first. */}
+				<video class="pl-video" poster={hero ? videoPoster : undefined} data-poster={hero ? undefined : videoPoster} muted loop playsinline controls preload="none" aria-label={COPY.videoTitle} data-pl-video>
+					{smallSrc && <source src={smallSrc} type="video/mp4" media="(max-width: 640px)" />}
+					<source src={videoSrc} type="video/mp4" />
+				</video>
 				{/* Revealed by the script when the clip won't start on its own: reduced motion, or
 				    autoplay refused. Without JS the native controls are enough. */}
-				<button class="pl-play pl-watch-start" type="button" data-pl-watch-start hidden>
+				<button class="pl-play pl-watch-start" type="button" data-pl-watch-start data-retry={COPY.watchRetry} hidden>
 					<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
-					<span>{COPY.watchStart}</span>
+					<span data-label>{COPY.watchStart}</span>
 				</button>
 			</div>
 			<p class="pl-legend">
@@ -216,12 +220,16 @@ const videoLd = hasVideo
 			</div>
 		</div>
 		<p class="pl-touch">{COPY.touch}</p>
+		{/* Only the game downloads an engine, so the note lives on its tab. */}
+		<p class="pl-weight">{COPY.weight}</p>
 	</div>
 
-	<figcaption class="pl-caption">
-		{caption && <span class="pl-caption__text">{caption}</span>}
-		<span class="pl-caption__meta">{COPY.weight} {COPY.spanish}</span>
-	</figcaption>
+	{(caption || COPY.spanish) && (
+		<figcaption class="pl-caption">
+			{caption && <span class="pl-caption__text">{caption}</span>}
+			{COPY.spanish && <span class="pl-caption__meta">{COPY.spanish}</span>}
+		</figcaption>
+	)}
 
 	{videoLd && <script type="application/ld+json" set:html={videoLd} />}
 </figure>
@@ -243,10 +251,29 @@ const videoLd = hasVideo
 
 	/** Muted autoplay. If the browser refuses (power saving, a site setting), the big play button appears. */
 	function autoplay(video: HTMLVideoElement) {
-		video.play().catch(() => {
+		// Data saver on: no clip downloads until the reader asks for one.
+		const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+		if (saveData) {
 			const button = video.parentElement?.querySelector<HTMLButtonElement>('[data-pl-watch-start]');
 			if (button && video.paused) button.hidden = false;
+			return;
+		}
+		video.play().catch((error: DOMException) => {
+			const button = video.parentElement?.querySelector<HTMLButtonElement>('[data-pl-watch-start]');
+			if (button && video.paused) showButton(button, video, error);
 		});
+	}
+
+	/** The big button: "play" when autoplay was refused, "retry" when the clip itself failed. */
+	function showButton(button: HTMLButtonElement, video: HTMLVideoElement, error?: DOMException) {
+		const failed = !!video.error || error?.name === 'NotSupportedError';
+		if (failed) {
+			console.warn('[PlayableLab] clip failed', video.currentSrc, error?.name, error?.message, video.error?.code, video.error?.message);
+			const label = button.querySelector('[data-label]');
+			if (label && button.dataset.retry) label.textContent = button.dataset.retry;
+			button.dataset.failed = '1';
+		}
+		button.hidden = false;
 	}
 
 	// Posters load a screen and a half ahead of the clip, not with the page.
@@ -296,7 +323,13 @@ const videoLd = hasVideo
 			video.addEventListener('playing', () => (watchStart.hidden = true));
 			watchStart.addEventListener('click', () => {
 				watchStart.hidden = true;
-				video.play().catch(() => (watchStart.hidden = false));
+				// After a failure, start over: reload the source before playing.
+				if (watchStart.dataset.failed || video.error) video.load();
+				video.muted = true;
+				video.play().catch((error: DOMException) => showButton(watchStart, video, error));
+			});
+			video.addEventListener('error', () => {
+				if (!watchStart.hidden || video.paused) showButton(watchStart, video);
 			});
 		}
 
@@ -420,6 +453,18 @@ const videoLd = hasVideo
 		margin: 2.5rem 0 2.5rem calc(50% - var(--pl-w) / 2);
 		display: grid;
 		gap: 0.75rem;
+	}
+
+	/* The clip that opens a video-first post: as wide as the page allows, right under the nav. */
+	.pl--hero {
+		/* Wide, but short enough on a laptop that the title below peeks over the fold
+		   (and never smaller than 560px on short landscape screens). */
+		--pl-w: min(1100px, calc(100vw - 2rem), max(560px, calc((100svh - 16rem) * 16 / 9)));
+		margin-top: 0.5rem;
+		margin-bottom: 2rem;
+	}
+	.pl--hero .pl-frame {
+		box-shadow: var(--shadow-lg);
 	}
 
 	.pl-head {
@@ -779,6 +824,12 @@ const videoLd = hasVideo
 		gap: 0.3rem;
 		font-size: 0.85rem;
 		color: var(--color-text-secondary);
+	}
+	.pl-weight {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
 	}
 	.pl-caption__meta {
 		font-family: var(--font-mono);

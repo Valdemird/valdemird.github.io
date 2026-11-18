@@ -14,7 +14,7 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { withBrowser, PUBLIC, SITE, sleep } from './lib/browser.mjs';
-import { ffmpeg, finalizeClip } from './lib/media.mjs';
+import { ffmpeg, finalizeClip, smallClip } from './lib/media.mjs';
 
 const OUT = join(PUBLIC, 'videos/play/platformer-lab');
 // uploadDate and duration of each clip, for PlayableLab's VideoObject (a file's
@@ -74,6 +74,7 @@ await withBrowser(async (page) => {
 		const raw = `${file}.raw.mp4`;
 		await writeFile(raw, Buffer.from(data, 'base64'));
 		await finalizeClip(raw, file);
+		await smallClip(file);
 		if (!process.env.KEEP_RAW) await rm(raw);
 		const clips = JSON.parse(await readFile(MANIFEST, 'utf8').catch(() => '{}'));
 		clips[`${plane}-${sheets.replaceAll(',', '+')}`] = { uploadDate: new Date().toISOString().slice(0, 10), duration: `PT${Math.round(on + off)}S` };
