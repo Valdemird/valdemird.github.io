@@ -3,6 +3,7 @@ import BaseHead from '../BaseHead.astro';
 import Header from '../Header.astro';
 import Footer from '../Footer.astro';
 import PostPreview from '../PostPreview.astro';
+import SeriesCard from '../SeriesCard.astro';
 import { SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, SOCIAL_LINKS, PERSON, ORGANIZATION, ORGANIZATION_ID, UI_STRINGS } from '../../consts';
 import { getCollection } from 'astro:content';
 import { readingMinutes } from '../../lib/learn';
@@ -18,8 +19,9 @@ const strings = UI_STRINGS[lang];
 // Pin any `featured` post first (so the breakout post keeps its high-authority
 // homepage link as newer posts publish), then fill the remaining slots by
 // recency. Total stays at 3.
+// Series parts are left out: the series has its own section, linking its hub.
 const postsByRecency = (await getCollection('blog'))
-	.filter((p) => p.data.lang === lang && !p.data.draft)
+	.filter((p) => p.data.lang === lang && !p.data.draft && !p.data.series)
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 const recentPosts = [
 	...postsByRecency.filter((p) => p.data.featured),
@@ -168,11 +170,21 @@ const homeJsonLd = {
 				</div>
 			</div>
 
+			<!-- Series -->
+			<section class="section series-section" id="series">
+				<div class="section-header">
+					<span class="section-label">01</span>
+					<h2>{lang === 'es' ? 'Serie' : 'Series'}</h2>
+					<div class="section-line"></div>
+				</div>
+				<SeriesCard id="platformer-lab" lang={lang} heading="h3" />
+			</section>
+
 			<!-- Recent Posts -->
 			{recentPosts.length > 0 && (
 				<section class="section posts-section" id="posts">
 					<div class="section-header">
-						<span class="section-label">01</span>
+						<span class="section-label">02</span>
 						<h2>{strings.home.recentPostsTitle}</h2>
 						<div class="section-line"></div>
 					</div>
@@ -704,6 +716,11 @@ const homeJsonLd = {
 	/* ========================================
 	   SECTIONS
 	   ======================================== */
+	/* The card's own bottom margin is for list pages; here the section padding is enough. */
+	.series-section :global(.series-card) {
+		margin-bottom: 0;
+	}
+
 	.section {
 		max-width: var(--wide-width);
 		margin: 0 auto;

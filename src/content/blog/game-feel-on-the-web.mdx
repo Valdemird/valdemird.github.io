@@ -1,13 +1,11 @@
 ---
 title: "Game feel and juice: squash, hitstop and screen shake (playable)"
-description: "Game feel is how a game answers your input: the squash, the hitstop, the shake. Six juice techniques rebuilt for the web with no libraries, each one playable, plus the same juice inside a real Godot platformer."
+description: "Game feel is how a game answers your input: the squash, the hitstop, the shake. Six juice techniques rebuilt for the web with no libraries, each one playable."
 pubDate: 2026-06-03
-updatedDate: 2026-11-18
+updatedDate: 2026-10-27
 tags: ["game-feel", "animation", "web-audio", "frontend", "interaction-design"]
 featured: true
 lang: en
-series: platformer-lab
-seriesOrder: 1
 ---
 
 import GameFeelHero from '../../components/blog/GameFeelHero.astro';
@@ -20,7 +18,6 @@ import Timeline from '../../components/blog/Timeline.astro';
 import Collapsible from '../../components/blog/Collapsible.astro';
 import Sidenote from '../../components/blog/Sidenote.astro';
 import EasingExplorer from '../../components/blog/EasingExplorer.astro';
-import PlayableLab from '../../components/blog/PlayableLab.astro';
 
 <GameFeelHero
   eyebrow="Interactive"
@@ -281,24 +278,6 @@ Six more lines. Same correctness, plus weight, sound, and a reason to keep going
 
 </TabPanel>
 </Tabs>
-
-<h2 id="in-a-real-game">The same juice, inside a real game</h2>
-
-Six months after the party game I started a platformer in Godot. The first thing I built wasn't a level but a lab: a long blueprint where every sheet isolates one technique and the T key switches it off. Sheet 13 is this post rebuilt inside an engine. Five of the six channels above are there (squash and stretch, hitstop, screen shake, particles and synthesized sound), plus afterimages, all hanging off the same jump. Press T and every one of them goes at once.
-
-<PlayableLab
-  sheets="juice"
-  title="Game feel, all at once"
-  videoNote="Hopping bugs and bouncing off springs with all the juice on. Then T strips it: same jumps, same rules, nothing to feel."
-  caption="Sheet 13 of my platformer lab. T strips the juice, and the rules underneath don't change."
-  steps={[
-    "Run right with <kbd>→</kbd>, jump on the bugs with <kbd>Space</kbd> and land on the springs.",
-    "Get up the tower and drop the 10 tiles on the other side. Watch the landing.",
-    "Press <kbd>T</kbd> and do it again. Same jumps, same rules, no juice.",
-  ]}
-/>
-
-The rest of that lab is about what sits under the juice: the timers and nudges that decide whether a jump works at all. I'm writing those up one mechanic per post, starting with [coyote time and the jump buffer](/blog/coyote-time-jump-buffer/).
 
 <h2 id="respect">The part that isn't optional</h2>
 

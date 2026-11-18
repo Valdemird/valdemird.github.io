@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
 import { SITE_TITLE, SITE_DESCRIPTION, SERIES, type SeriesId } from '../consts';
+import { seriesUrl } from '../lib/series';
 
 export const GET: APIRoute = async () => {
 	const all = (await getCollection('blog'))
@@ -81,6 +82,8 @@ export const GET: APIRoute = async () => {
 				`## Series: ${info.name} (${lang})`,
 				'',
 				info.description,
+				'',
+				`Hub, with every part in order: ${seriesUrl(id, lang)}`,
 				'',
 				...parts.map((p, i) => `${i + 1}. [${p.data.title}](https://valdemird.com/blog/${p.id}/) (markdown: https://valdemird.com/blog/${p.id}.md)`),
 				'',

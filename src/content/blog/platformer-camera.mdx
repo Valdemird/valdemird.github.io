@@ -6,7 +6,7 @@ tags: ["game-feel", "game-design", "godot", "platformers"]
 featured: false
 lang: en
 series: platformer-lab
-seriesOrder: 11
+seriesOrder: 10
 ---
 
 import TLDR from '../../components/blog/TLDR.astro';
@@ -104,7 +104,7 @@ func _physics_process(delta: float) -> void:
 
 The `else` branch is what T switches to, and its comment is the argument against it: *cada salto mueve todo el mundo*, every jump moves the whole world. Three numbers carry the smart branch: how far ahead it looks, how big the vertical window is, and how sharp the smoothing is. The rest of this post is one section per number.
 
-The same node also runs the screen shake from [sheet 13](/blog/game-feel-on-the-web/), trauma squared times smooth noise, after this code. T on this sheet doesn't touch it.
+The same node also runs the screen shake from [sheet 13](/blog/series/platformer-game-feel/#start-here), trauma squared times smooth noise, after this code. T on this sheet doesn't touch it.
 
 <h2 id="look-ahead">Look-ahead: frame where the player is going</h2>
 

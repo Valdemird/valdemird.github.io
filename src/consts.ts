@@ -50,17 +50,28 @@ export const ORGANIZATION = {
 export const ORGANIZATION_REF = { '@id': ORGANIZATION_ID } as const;
 
 // Ordered blog series. A post joins one with `series: "<id>"` and `seriesOrder: n`
-// in its frontmatter; BlogPost.astro renders the series nav and the JSON-LD
-// CreativeWorkSeries from this table, and llms.txt lists the series in order.
+// in its frontmatter. Each series has a hub page at /blog/series/<slug>/ (ES:
+// /es/blog/series/<slug>/, see src/lib/series.ts); BlogPost.astro renders the
+// series nav and the CreativeWorkSeries JSON-LD from this table, and llms.txt
+// lists the series in order. `parts` group the posts by seriesOrder on the hub.
 export const SERIES = {
 	'platformer-lab': {
+		slug: 'platformer-game-feel',
+		parts: [
+			{ id: 'movement', from: 1, to: 10, en: 'Movement', es: 'Movimiento' },
+			{ id: 'combat', from: 11, to: 20, en: 'Combat', es: 'Combate' },
+		],
 		en: {
 			name: 'Game feel in a platformer, playable',
 			description: 'Every technique from my Godot platformer lab, one per post: what it does, when you need it, the real code, and the sheet to play.',
+			title: 'Platformer game feel in Godot 4: 20 playable mechanics',
+			metaDescription: 'One platformer mechanic per post, from coyote time and wall jumps to hitboxes, i-frames and bosses, with real Godot 4 code and a sheet you can play.',
 		},
 		es: {
 			name: 'Game feel en un plataformas, jugable',
 			description: 'Cada técnica del laboratorio de mi plataformas en Godot, una por post: qué hace, cuándo la necesitas, el código real y la lámina para jugarla.',
+			title: 'Game feel de plataformas en Godot 4: 20 mecánicas jugables',
+			metaDescription: 'Una mecánica de plataformas por post: del coyote time y el wall jump a las hitboxes, los i-frames y los jefes, con código real de Godot 4 y una lámina jugable.',
 		},
 	},
 } as const;

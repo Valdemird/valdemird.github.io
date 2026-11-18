@@ -1,0 +1,639 @@
+---
+/**
+ * SeriesPage — the hub of a blog series: what it is, one sheet to try right
+ * away, and every part in reading order, grouped by SERIES[id].parts.
+ *
+ * Routes: /blog/series/<slug>/ and /es/blog/series/<slug>/ (thin shells).
+ * Structured data: CollectionPage whose mainEntity is the CreativeWorkSeries
+ * (the same @id every part's JSON-LD points to), an ItemList of the parts in
+ * order, and the breadcrumb.
+ */
+import BaseHead from '../BaseHead.astro';
+import Header from '../Header.astro';
+import Footer from '../Footer.astro';
+import FormattedDate from '../FormattedDate.astro';
+import PlayableLab from '../blog/PlayableLab.astro';
+import { SERIES, type SeriesId, UI_STRINGS, PERSON, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES } from '../../consts';
+import { getSeriesCards, getSeriesStats, seriesHref, seriesUrl, seriesNodeId, SITE_URL } from '../../lib/series';
+
+interface Props {
+	id: SeriesId;
+	lang: 'en' | 'es';
+}
+
+const { id, lang } = Astro.props;
+const es = lang === 'es';
+const series = SERIES[id];
+const info = series[lang];
+const strings = UI_STRINGS[lang];
+const cards = await getSeriesCards(id, lang);
+const stats = await getSeriesStats(id, lang);
+const url = seriesUrl(id, lang);
+const blogIndexPath = es ? '/es/blog/' : '/blog/';
+const homePath = es ? '/es/' : '/';
+const postHref = (slug: string) => (es ? `/blog/es/${slug}/` : `/blog/${slug}/`);
+
+const parts = series.parts.map((part) => ({
+	...part,
+	label: part[lang],
+	cards: cards.filter((c) => c.order >= part.from && c.order <= part.to),
+}));
+
+const hours = stats.minutes / 60;
+const readLabel = hours >= 1 ? `~${Math.round(hours * 2) / 2}h` : `${stats.minutes} min`;
+const metrics = [
+	{ value: String(stats.posts), label: es ? 'posts' : 'posts' },
+	{ value: String(stats.sheets), label: es ? 'láminas jugables' : 'playable sheets' },
+	{ value: String(stats.clips), label: es ? 'videos' : 'clips' },
+	{ value: readLabel, label: es ? 'de lectura' : 'reading' },
+];
+
+const COPY = es
+	? {
+			eyebrow: `Serie · ${stats.posts} posts · Godot 4`,
+			h1: 'Game feel de plataformas en Godot 4, una mecánica cada vez',
+			lead: 'El 15 de noviembre empecé un plataformas en Godot. Antes de dibujar un solo nivel construí un laboratorio: un plano largo en el que cada lámina aísla una técnica y la tecla T la apaga mientras juegas. Esta serie es ese laboratorio contado una mecánica por post: qué hace, cuándo la necesita un juego, el código real y la lámina misma, corriendo en tu navegador.',
+			updated: 'Actualizada',
+			breadcrumb: 'Serie',
+			startTitle: 'Empieza aquí: todo el juice sobre un salto',
+			start: [
+				'Si vas a probar una sola lámina, que sea ésta. Es la 13 del laboratorio y apila sobre un mismo salto el juice de mi [post de game feel]: squash and stretch, hitstop, screen shake, partículas, sonido y estelas. T se lo quita todo a la vez. El salto de debajo no cambia, y de ese salto de debajo van los posts de esta serie.',
+			],
+			labTitle: 'Game feel, todo a la vez',
+			labNote: 'Saltando bugs y rebotando en los muelles con todo el juice encendido. Luego T se lo quita: los mismos saltos, las mismas reglas, nada que sentir.',
+			labCaption: 'Lámina 13 del laboratorio. T le quita el juice, y las reglas de debajo no cambian.',
+			labSteps: [
+				'Corre hacia la derecha con <kbd>→</kbd>, salta sobre los bugs con <kbd>Espacio</kbd> y cae sobre los muelles.',
+				'Sube a la torre y déjate caer las 10 casillas del otro lado. Fíjate en el aterrizaje.',
+				'Pulsa <kbd>T</kbd> y repítelo. Los mismos saltos, las mismas reglas, sin juice.',
+			],
+			partIntro: {
+				movement: 'Diez posts sobre la parte de un plataformas que sólo notas cuando falta. Temporizadores que aceptan un salto pulsado unos fotogramas tarde, una gravedad que decide la forma del arco, empujoncitos que te sacan de una esquina que rozaste por unos píxeles y una cámara que te enseña adónde vas antes de que llegues.',
+				combat: 'Diez posts sobre el contacto. Las cajas que deciden si un golpe entró, los fotogramas que un ataque pasa cargando y recuperándose, la congelación que vende un impacto, la invencibilidad después de recibirlo y todo lo que un enemigo tiene que enseñarte antes de atacar. El último es un jefe que necesita todo eso a la vez.',
+			} as Record<string, string>,
+			partTitle: {
+				movement: 'Movimiento: si el salto sale o no',
+				combat: 'Combate: golpear, recibir y leer al enemigo',
+			} as Record<string, string>,
+			min: 'min',
+			howTitle: 'Qué trae cada post',
+			how: [
+				'Cada post abre con un párrafo que responde qué es la técnica, para quien llega desde un buscador con esa pregunta exacta. Luego viene la lámina: un video corto con la técnica encendida, después T pulsada y las mismas pulsaciones sin ella, y una pestaña para jugarla tú con los pasos numerados.',
+				'Después vienen el GDScript real del laboratorio, números de mis propias partidas (siempre agregados, nunca una partida suelta) y ejemplos de juegos publicados, cada uno contrastado con una fuente que pude abrir. El código es de Godot 4, pero nada depende del motor: un temporizador, un multiplicador de gravedad o una hitbox se leen igual en Unity, en Phaser o en un juego hecho en canvas.',
+			],
+			faqTitle: 'Respuestas rápidas',
+			faq: [
+				{
+					q: '¿Qué es el game feel?',
+					a: 'Es cómo responde un juego a lo que haces: qué tan rápido, con cuánta fuerza y cuánto te perdona. Steve Swink le puso nombre en 2008. La mitad es juice, lo que el juego te enseña después de actuar, y de eso va [game feel en la web]. Esta serie es la otra mitad: las reglas que deciden si tu acción sale.',
+				},
+				{
+					q: '¿Necesito Godot para seguirla?',
+					a: 'No. Todas las láminas corren en el navegador y las ideas sirven en cualquier motor. Si usas Godot 4, los bloques de código están copiados del GDScript del laboratorio.',
+				},
+				{
+					q: '¿Funciona en el móvil?',
+					a: 'Sí. En una pantalla táctil la lámina enseña botones para moverte, saltar y apagar la técnica. Para lo que depende de unos pocos fotogramas, que es casi toda la serie, un teclado va mejor.',
+				},
+				{
+					q: '¿Por dónde empiezo?',
+					a: 'Por [el coyote time y el jump buffer] si estás haciendo un plataformas, o por [hitbox vs hurtbox] si sólo te interesa el combate. Los posts siguen el orden del laboratorio, y los de más adelante enlazan las láminas anteriores cuando se apoyan en ellas.',
+				},
+			],
+			links: {
+				'post de game feel': postHref('game-feel-on-the-web'),
+				'game feel en la web': postHref('game-feel-on-the-web'),
+				'el coyote time y el jump buffer': postHref('coyote-time-jump-buffer'),
+				'hitbox vs hurtbox': postHref('hitbox-vs-hurtbox'),
+			} as Record<string, string>,
+		}
+	: {
+			eyebrow: `Series · ${stats.posts} posts · Godot 4`,
+			h1: 'Platformer game feel in Godot 4, one mechanic at a time',
+			lead: 'On November 15 I started a platformer in Godot. Before drawing a single level I built a lab: one long blueprint where each sheet isolates a technique and the T key switches it off while you play. This series is that lab, written up one mechanic per post: what it does, when a game needs it, the real code, and the sheet itself, running in your browser.',
+			updated: 'Updated',
+			breadcrumb: 'Series',
+			startTitle: 'Start here: all the juice on one jump',
+			start: [
+				"If you only try one sheet, try this one. It's sheet 13 of the lab, and it stacks the juice from my [game feel post] on a single jump: squash and stretch, hitstop, screen shake, particles, sound and afterimages. T strips all of it at once. The jump underneath doesn't change, and that jump underneath is what the posts in this series are about.",
+			],
+			labTitle: 'Game feel, all at once',
+			labNote: 'Hopping bugs and bouncing off springs with all the juice on. Then T strips it: same jumps, same rules, nothing to feel.',
+			labCaption: "Sheet 13 of the lab. T strips the juice, and the rules underneath don't change.",
+			labSteps: [
+				'Run right with <kbd>→</kbd>, jump on the bugs with <kbd>Space</kbd> and land on the springs.',
+				'Get up the tower and drop the 10 tiles on the other side. Watch the landing.',
+				'Press <kbd>T</kbd> and do it again. Same jumps, same rules, no juice.',
+			],
+			partIntro: {
+				movement: "Ten posts on the part of a platformer you only notice when it's missing. Timers that accept a jump pressed a few frames late, gravity that decides the shape of the arc, nudges that slide you past a corner you clipped by a few pixels, and a camera that shows where you're going before you get there.",
+				combat: 'Ten posts on contact. The boxes that decide whether a swing landed, the frames an attack spends winding up and recovering, the freeze that sells a hit, the invincibility after you take one, and everything an enemy has to show you before it swings. The last one is a boss that needs all of it at once.',
+			} as Record<string, string>,
+			partTitle: {
+				movement: 'Movement: whether the jump works at all',
+				combat: 'Combat: hitting, getting hit and reading the enemy',
+			} as Record<string, string>,
+			min: 'min',
+			howTitle: 'What every post has',
+			how: [
+				'Every post opens with a paragraph that answers what the technique is, for whoever arrived from a search with that exact question. Then comes the sheet: a short clip with the technique on, then T pressed and the same inputs without it, and a tab to play it yourself with numbered steps.',
+				"After that come the real GDScript from the lab, numbers from my own playtests (always aggregated, never one run), and examples from shipped games, each checked against a source I could open. The code is Godot 4, but nothing in it depends on the engine: a timer, a gravity multiplier or a hitbox reads the same in Unity, Phaser or a canvas game.",
+			],
+			faqTitle: 'Quick answers',
+			faq: [
+				{
+					q: 'What is game feel?',
+					a: 'How a game answers your input: how fast, how hard, how forgiving. Steve Swink named it in 2008. Half of it is juice, what the game shows you after you act, which is what [game feel on the web] is about. This series is the other half: the rules that decide whether your action works.',
+				},
+				{
+					q: 'Do I need Godot to follow it?',
+					a: "No. Every sheet runs in the browser, and the ideas carry to any engine. If you do use Godot 4, the code blocks are copied from the lab's GDScript.",
+				},
+				{
+					q: 'Does it work on a phone?',
+					a: 'Yes. On a touch screen the sheet shows buttons for moving, jumping and switching the technique off. A keyboard is better for anything that depends on a few frames of timing, which is most of the series.',
+				},
+				{
+					q: 'Where should I start?',
+					a: "With [coyote time and the jump buffer] if you're building a platformer, or [hitbox vs hurtbox] if you only care about combat. The posts follow the lab's order, and later ones link back to earlier sheets when they lean on them.",
+				},
+			],
+			links: {
+				'game feel post': postHref('game-feel-on-the-web'),
+				'game feel on the web': postHref('game-feel-on-the-web'),
+				'coyote time and the jump buffer': postHref('coyote-time-jump-buffer'),
+				'hitbox vs hurtbox': postHref('hitbox-vs-hurtbox'),
+			} as Record<string, string>,
+		};
+
+/** "[text]" → a link from COPY.links; everything else escaped. */
+const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const linkify = (text: string) =>
+	escape(text).replace(/\[([^\]]+)\]/g, (_, label: string) => {
+		const href = COPY.links[label];
+		return href ? `<a href="${href}">${label}</a>` : label;
+	});
+
+const alternates = [
+	{ hreflang: 'en', href: seriesUrl(id, 'en') },
+	{ hreflang: 'es', href: seriesUrl(id, 'es') },
+];
+const ogImage = `/og/${es ? 'es/' : ''}series-${series.slug}.png`;
+
+const jsonLd = {
+	'@context': 'https://schema.org',
+	'@graph': [
+		{
+			'@type': 'WebSite',
+			'@id': `${SITE_URL}/#website`,
+			name: SITE_TITLE,
+			url: SITE_URL,
+			description: es ? SITE_DESCRIPTION_ES : SITE_DESCRIPTION,
+			inLanguage: ['en', 'es'],
+			publisher: { '@id': ORGANIZATION_ID },
+		},
+		PERSON,
+		ORGANIZATION,
+		{
+			'@type': 'CollectionPage',
+			'@id': `${url}#webpage`,
+			url,
+			name: info.title,
+			description: info.metaDescription,
+			inLanguage: lang,
+			isPartOf: { '@id': `${SITE_URL}/#website` },
+			breadcrumb: { '@id': `${url}#breadcrumb` },
+			mainEntity: { '@id': seriesNodeId(id, lang) },
+			primaryImageOfPage: { '@type': 'ImageObject', url: `${SITE_URL}${ogImage}`, width: 1200, height: 630 },
+			dateModified: stats.updated.toISOString(),
+		},
+		{
+			'@type': 'CreativeWorkSeries',
+			'@id': seriesNodeId(id, lang),
+			name: info.name,
+			description: info.description,
+			url,
+			inLanguage: lang,
+			author: { '@id': PERSON_ID },
+			publisher: { '@id': ORGANIZATION_ID },
+			hasPart: cards.map((c) => ({
+				'@type': 'BlogPosting',
+				'@id': `${SITE_URL}${c.href}#article`,
+				headline: c.title,
+				url: `${SITE_URL}${c.href}`,
+				position: c.order,
+			})),
+		},
+		{
+			'@type': 'ItemList',
+			'@id': `${url}#parts`,
+			name: info.name,
+			numberOfItems: cards.length,
+			itemListOrder: 'https://schema.org/ItemListOrderAscending',
+			itemListElement: cards.map((c) => ({ '@type': 'ListItem', position: c.order, url: `${SITE_URL}${c.href}`, name: c.title })),
+		},
+		{
+			'@type': 'BreadcrumbList',
+			'@id': `${url}#breadcrumb`,
+			itemListElement: [
+				{ '@type': 'ListItem', position: 1, name: strings.nav.home, item: `${SITE_URL}${homePath}` },
+				{ '@type': 'ListItem', position: 2, name: strings.nav.blog, item: `${SITE_URL}${blogIndexPath}` },
+				{ '@type': 'ListItem', position: 3, name: info.name, item: url },
+			],
+		},
+	],
+};
+---
+
+<!doctype html>
+<html lang={lang}>
+	<head>
+		<BaseHead
+			title={info.title}
+			description={info.metaDescription}
+			lang={lang}
+			image={ogImage}
+			imageAlt={info.name}
+			alternates={alternates}
+			jsonLd={jsonLd}
+		/>
+	</head>
+	<body>
+		<a class="skip-link" href="#main-content">{strings.nav.skipToContent}</a>
+		<Header />
+		<main id="main-content">
+			<header class="series-hero">
+				<div class="series-hero-bg" aria-hidden="true"><div class="hero-grid"></div></div>
+				<div class="series-hero-content">
+					<nav class="crumbs animate-fade-in" aria-label={es ? 'Ruta de navegación' : 'Breadcrumb'}>
+						<a href={blogIndexPath}>{strings.nav.blog}</a>
+						<span aria-hidden="true">/</span>
+						<span aria-current="page">{COPY.breadcrumb}</span>
+					</nav>
+					<p class="eyebrow animate-fade-in">{COPY.eyebrow}</p>
+					<h1 class="animate-fade-in delay-1">{COPY.h1}</h1>
+					<p class="lead animate-fade-in delay-1">{COPY.lead}</p>
+					<dl class="metrics animate-fade-in delay-2" aria-label={es ? 'Lo que trae la serie' : 'What the series contains'}>
+						{metrics.map((m) => (
+							<div class="metric">
+								<dt>{m.value}</dt>
+								<dd>{m.label}</dd>
+							</div>
+						))}
+					</dl>
+					<p class="updated animate-fade-in delay-2">
+						{COPY.updated} <FormattedDate date={stats.updated} locale={lang} />
+					</p>
+				</div>
+			</header>
+
+			<div class="series-body">
+				<section class="start" aria-labelledby="start-here">
+					<h2 id="start-here">{COPY.startTitle}</h2>
+					{COPY.start.map((p) => <p set:html={linkify(p)} />)}
+					<PlayableLab
+						sheets="juice"
+						title={COPY.labTitle}
+						videoNote={COPY.labNote}
+						caption={COPY.labCaption}
+						steps={COPY.labSteps}
+					/>
+				</section>
+
+				{parts.map((part) => (
+					<section class="part" aria-labelledby={part.id}>
+						<p class="part-eyebrow">
+							{es ? 'Parte' : 'Part'} {part.from}–{part.to}
+						</p>
+						<h2 id={part.id}>{COPY.partTitle[part.id]}</h2>
+						<p class="part-intro">{COPY.partIntro[part.id]}</p>
+						<ol class="cards" start={part.from}>
+							{part.cards.map((c) => (
+								<li>
+									<a class="card" href={c.href}>
+										<span class="card-thumb">
+											{c.thumb && <img src={c.thumb} srcset={c.thumbSrcset} sizes="(max-width: 520px) 6.5rem, 9.5rem" alt="" width="640" height="360" loading="lazy" decoding="async" />}
+										</span>
+										<span class="card-text">
+											<span class="card-meta">
+												<span class="card-n">{String(c.order).padStart(2, '0')}</span>
+												<span>{c.minutes} {COPY.min}</span>
+											</span>
+											<h3 class="card-title">{c.title}</h3>
+											<span class="card-desc">{c.description}</span>
+										</span>
+									</a>
+								</li>
+							))}
+						</ol>
+					</section>
+				))}
+
+				<section class="prose" aria-labelledby="how-it-works">
+					<h2 id="how-it-works">{COPY.howTitle}</h2>
+					{COPY.how.map((p) => <p>{p}</p>)}
+				</section>
+
+				<section class="prose faq" aria-labelledby="quick-answers">
+					<h2 id="quick-answers">{COPY.faqTitle}</h2>
+					{COPY.faq.map(({ q, a }) => (
+						<>
+							<h3>{q}</h3>
+							<p set:html={linkify(a)} />
+						</>
+					))}
+				</section>
+			</div>
+		</main>
+		<Footer />
+	</body>
+</html>
+
+<script>
+	import { initPageEntrance, cleanupAll } from '../../lib/animations';
+
+	function initSeries() {
+		if (!document.querySelector('.series-hero')) return;
+		// Skip the entrance during a View Transition: the crossfade handles it.
+		if (!document.documentElement.hasAttribute('data-vt-nav')) {
+			initPageEntrance('.series-hero-content .animate-fade-in');
+		}
+		document.addEventListener('astro:before-swap', cleanupAll, { once: true });
+	}
+	initSeries();
+	document.addEventListener('astro:after-swap', initSeries);
+</script>
+
+<style>
+	main {
+		max-width: var(--full-width);
+		margin: 0 auto;
+		padding: 0;
+	}
+
+	/* ----- hero ----- */
+	.series-hero {
+		position: relative;
+		padding: 4.5rem var(--space-lg) 3rem;
+		overflow: hidden;
+	}
+	.series-hero-bg {
+		position: absolute;
+		inset: 0;
+		z-index: 0;
+	}
+	.hero-grid {
+		position: absolute;
+		inset: 0;
+		background-image:
+			linear-gradient(var(--color-border) 1px, transparent 1px),
+			linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
+		background-size: 48px 48px;
+		opacity: 0.25;
+		mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%);
+		-webkit-mask-image: radial-gradient(ellipse 70% 80% at 50% 60%, black 10%, transparent 70%);
+	}
+	.series-hero-content {
+		position: relative;
+		z-index: 1;
+		max-width: var(--wide-width);
+		margin: 0 auto;
+	}
+	.crumbs {
+		display: flex;
+		gap: 0.5rem;
+		margin-bottom: 1.4rem;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--color-text-muted);
+	}
+	.crumbs a {
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		transition: color var(--duration-fast) var(--ease-smooth);
+	}
+	.crumbs a:hover {
+		color: var(--color-accent);
+	}
+	.eyebrow,
+	.part-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 0.9rem;
+	}
+	.series-hero h1 {
+		font-size: clamp(1.9rem, 4.4vw, 3rem);
+		line-height: 1.12;
+		letter-spacing: -0.025em;
+		max-width: 20ch;
+		margin: 0 0 0.6em;
+	}
+	.lead {
+		font-size: 1.1rem;
+		line-height: 1.7;
+		color: var(--color-text-secondary);
+		max-width: 64ch;
+		margin: 0 0 1.8rem;
+	}
+	.metrics {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.4rem 2.4rem;
+		margin: 0 0 1rem;
+		padding: 1.1rem 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+		max-width: 64ch;
+	}
+	.metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+	.metric dt {
+		font-family: var(--font-mono);
+		font-size: 1.35rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--color-text);
+	}
+	.metric dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
+	.updated {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		color: var(--color-text-muted);
+	}
+
+	/* ----- body ----- */
+	.series-body {
+		max-width: var(--wide-width);
+		margin: 0 auto;
+		padding: 0 var(--space-lg) 5rem;
+		display: grid;
+		gap: 4.5rem;
+	}
+	.series-body h2 {
+		font-size: clamp(1.45rem, 3vw, 1.9rem);
+		line-height: 1.2;
+		letter-spacing: -0.015em;
+		margin: 0 0 0.7em;
+		scroll-margin-top: 90px;
+	}
+	.start > p,
+	.part-intro,
+	.prose p {
+		font-size: 1.05rem;
+		line-height: 1.75;
+		color: var(--color-text-secondary);
+		max-width: 66ch;
+		margin: 0 0 1.1em;
+	}
+	.start :global(a),
+	.prose :global(a) {
+		color: var(--color-accent);
+		text-decoration: underline;
+		text-underline-offset: 0.18em;
+		text-decoration-thickness: 1px;
+	}
+
+	/* ----- part cards ----- */
+	.cards {
+		list-style: none;
+		margin: 1.8rem 0 0;
+		padding: 0;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 1.1rem;
+	}
+	.cards li {
+		margin: 0;
+	}
+	.card {
+		display: grid;
+		grid-template-columns: 9.5rem minmax(0, 1fr);
+		gap: 1rem;
+		height: 100%;
+		padding: 0.85rem;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		background: var(--color-surface);
+		color: inherit;
+		text-decoration: none;
+		transition: transform var(--duration-normal) var(--ease-spring),
+			box-shadow var(--duration-normal) var(--ease-smooth),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+	.card:hover {
+		transform: translateY(-3px);
+		box-shadow: var(--shadow-lg);
+		border-color: var(--color-accent);
+	}
+	.card:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 3px;
+	}
+	.card-thumb {
+		align-self: start;
+		aspect-ratio: 16 / 9;
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		/* The lab's paper colour while the thumbnail loads. */
+		background: oklch(0.36 0.13 262);
+	}
+	.card-thumb img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.card-text {
+		display: grid;
+		align-content: start;
+		gap: 0.35rem;
+		min-width: 0;
+	}
+	.card-meta {
+		display: flex;
+		gap: 0.75rem;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		letter-spacing: 0.06em;
+		color: var(--color-text-muted);
+	}
+	.card-n {
+		font-weight: 600;
+		color: var(--color-accent);
+	}
+	.card-title {
+		margin: 0;
+		font-size: 1.02rem;
+		line-height: 1.3;
+		letter-spacing: -0.005em;
+	}
+	.card-desc {
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-text-secondary);
+		display: -webkit-box;
+		-webkit-line-clamp: 3;
+		-webkit-box-orient: vertical;
+		line-clamp: 3;
+		overflow: hidden;
+	}
+
+	/* ----- prose sections ----- */
+	.faq h3 {
+		font-size: 1.1rem;
+		margin: 1.6em 0 0.4em;
+	}
+	.faq h3:first-of-type {
+		margin-top: 0.4em;
+	}
+
+	@media (max-width: 860px) {
+		.cards {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+	@media (max-width: 520px) {
+		.series-hero {
+			padding-top: 3rem;
+		}
+		.card {
+			grid-template-columns: 6.5rem minmax(0, 1fr);
+			gap: 0.75rem;
+			padding: 0.7rem;
+		}
+		.card-desc {
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
+		}
+		.metrics {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.card,
+		.crumbs a {
+			transition: none;
+		}
+		.card:hover {
+			transform: none;
+		}
+	}
+</style>

@@ -1,0 +1,12 @@
+---
+import SeriesPage from '../../../components/pages/SeriesPage.astro';
+import { SERIES, type SeriesId } from '../../../consts';
+
+export function getStaticPaths() {
+	return (Object.keys(SERIES) as SeriesId[]).map((id) => ({ params: { series: SERIES[id].slug }, props: { id } }));
+}
+
+const { id } = Astro.props;
+---
+
+<SeriesPage id={id} lang="en" />

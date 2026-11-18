@@ -3,7 +3,8 @@ import BaseHead from '../BaseHead.astro';
 import Header from '../Header.astro';
 import Footer from '../Footer.astro';
 import { getLearnStats, courseHomeHref, learnHomeHref, type Lang } from '../../lib/learn';
-import { UI_STRINGS, PERSON } from '../../consts';
+import { UI_STRINGS, PERSON, SERIES } from '../../consts';
+import { getSeriesStats, seriesHref, seriesNodeId } from '../../lib/series';
 
 interface Props {
 	lang: Lang;
@@ -20,8 +21,12 @@ const agenticReadLabel =
 		? `${Math.round(agenticStats.readingMinutes / 60)}h`
 		: `${agenticStats.readingMinutes} min`;
 
+const series = await getSeriesStats('platformer-lab', lang);
+const seriesHours = series.minutes / 60;
+
 const tracks = [
 	{
+		ldType: 'Course',
 		href: courseHomeHref(lang),
 		eyebrow: es ? 'Curso-wiki · bilingüe' : 'Course-wiki · bilingual',
 		title: es ? 'Ingeniería de sistemas agénticos' : 'Engineering agentic systems',
@@ -37,12 +42,30 @@ const tracks = [
 		],
 		cta: es ? 'Abrir el curso' : 'Open the course',
 	},
+	{
+		// A blog series, not a course: one technique per post, each with its sheet to play.
+		ldType: 'CreativeWorkSeries',
+		ldId: seriesNodeId('platformer-lab', lang),
+		href: seriesHref('platformer-lab', lang),
+		eyebrow: es ? 'Serie jugable · Godot 4' : 'Playable series · Godot 4',
+		title: SERIES['platformer-lab'][lang].name,
+		description: es
+			? 'Cada mecánica de un plataformas, de un salto que perdona a un jefe que lo exige todo: qué hace, cuándo la necesitas, el código real y la lámina para jugarla en el navegador.'
+			: 'Every mechanic of a platformer, from a jump that forgives to a boss that demands everything: what it does, when you need it, the real code, and the sheet to play in your browser.',
+		metrics: [
+			{ value: String(series.posts), label: 'posts' },
+			{ value: String(series.sheets), label: es ? 'láminas jugables' : 'playable sheets' },
+			{ value: String(series.clips), label: es ? 'videos' : 'clips' },
+			{ value: seriesHours >= 1 ? `~${Math.round(seriesHours * 2) / 2}h` : `${series.minutes} min`, label: es ? 'de lectura' : 'read' },
+		],
+		cta: es ? 'Abrir la serie' : 'Open the series',
+	},
 ];
 
 const title = es ? 'Aprende' : 'Learn';
 const description = es
-	? 'Cursos-wiki en profundidad sobre temas difíciles de ingeniería: cada afirmación citada, graduada por credibilidad y comprobada. Elige una ruta.'
-	: 'In-depth course-wikis on hard engineering topics: every claim sourced, graded for credibility, and fact-checked. Pick a track.';
+	? 'Rutas en profundidad sobre temas difíciles de ingeniería: cursos-wiki con cada afirmación citada y graduada por credibilidad, y series jugables que se aprenden probando. Elige una ruta.'
+	: 'In-depth tracks on hard engineering topics: course-wikis with every claim sourced and graded for credibility, and playable series you learn by trying. Pick a track.';
 
 const alternates = [
 	{ hreflang: 'en', href: `https://valdemird.com${learnHomeHref('en')}` },
@@ -58,7 +81,8 @@ const jsonLd = {
 	author: PERSON,
 	url: `https://valdemird.com${learnHomeHref(lang)}`,
 	hasPart: tracks.map((t) => ({
-		'@type': 'Course',
+		'@type': t.ldType,
+		...('ldId' in t && t.ldId ? { '@id': t.ldId } : {}),
 		name: t.title,
 		url: `https://valdemird.com${t.href}`,
 	})),

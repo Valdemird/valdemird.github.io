@@ -15,12 +15,14 @@ interface SeriesPost {
 interface Props {
 	name: string;
 	description: string;
+	/** The series hub page. */
+	href: string;
 	posts: SeriesPost[];
 	currentId: string;
 	lang: 'en' | 'es';
 }
 
-const { name, description, posts, currentId, lang } = Astro.props;
+const { name, description, href: hubHref, posts, currentId, lang } = Astro.props;
 const es = lang === 'es';
 const index = posts.findIndex((p) => p.id === currentId);
 const prev = index > 0 ? posts[index - 1] : undefined;
@@ -32,7 +34,7 @@ const href = (id: string) => `/blog/${id}/`;
 	<p class="series-eyebrow">
 		{es ? 'Serie' : 'Series'} · {index + 1} / {posts.length}
 	</p>
-	<p class="series-name" id="series-title">{name}</p>
+	<p class="series-name" id="series-title"><a href={hubHref}>{name}</a></p>
 	<p class="series-desc">{description}</p>
 	<ol class="series-list">
 		{posts.map((p) => (
@@ -94,6 +96,16 @@ const href = (id: string) => `/blog/${id}/`;
 		font-family: var(--font-serif);
 		font-size: 1.3rem;
 		color: var(--color-text);
+	}
+	.series-name a {
+		color: inherit;
+		text-decoration: none;
+		transition: color var(--duration-fast) var(--ease-smooth);
+	}
+	.series-name a:hover {
+		color: var(--color-accent);
+		text-decoration: underline;
+		text-underline-offset: 0.18em;
 	}
 	.series-desc {
 		margin: 0.35rem 0 0;

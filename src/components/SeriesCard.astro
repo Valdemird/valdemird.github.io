@@ -1,0 +1,204 @@
+---
+/**
+ * SeriesCard — a blog series as one block, linking to its hub. Used on the
+ * home page and the blog index, where the series stands in for its parts.
+ */
+import { SERIES, type SeriesId } from '../consts';
+import { getSeriesCards, getSeriesStats, seriesHref } from '../lib/series';
+
+interface Props {
+	id: SeriesId;
+	lang: 'en' | 'es';
+	/** h3 when the card sits under its own section heading (home page). */
+	heading?: 'h2' | 'h3';
+}
+
+const { id, lang, heading = 'h2' } = Astro.props;
+const Heading = heading;
+const es = lang === 'es';
+const info = SERIES[id][lang];
+const cards = await getSeriesCards(id, lang);
+const stats = await getSeriesStats(id, lang);
+// One thumbnail per part of the series (movement, combat), plus two more for rhythm.
+const thumbs = [0, 3, 10, 14]
+	.map((i) => cards[i])
+	.filter((c): c is NonNullable<typeof c> => !!c?.thumb);
+const hours = stats.minutes / 60;
+const metrics = [
+	{ value: String(stats.posts), label: 'posts' },
+	{ value: String(stats.sheets), label: es ? 'láminas jugables' : 'playable sheets' },
+	{ value: String(stats.clips), label: es ? 'videos' : 'clips' },
+	{ value: hours >= 1 ? `~${Math.round(hours * 2) / 2}h` : `${stats.minutes} min`, label: es ? 'de lectura' : 'reading' },
+];
+---
+
+<a href={seriesHref(id, lang)} class="series-card animate-fade-in delay-1">
+	<div class="series-card__inner">
+		<p class="eyebrow">{es ? 'Serie jugable · Godot 4' : 'Playable series · Godot 4'}</p>
+		<Heading class="series-card__title">{info.name}</Heading>
+		<p class="desc">{info.description}</p>
+		{thumbs.length > 0 && (
+			<div class="thumbs" aria-hidden="true">
+				{thumbs.map((c) => <img src={c.thumb} srcset={c.thumbSrcset} sizes="(max-width: 640px) 40vw, 200px" alt="" width="640" height="360" loading="lazy" decoding="async" />)}
+			</div>
+		)}
+		<dl class="metrics" aria-label={es ? 'Lo que trae la serie' : 'What the series contains'}>
+			{metrics.map((m) => (
+				<div class="metric">
+					<dt>{m.value}</dt>
+					<dd>{m.label}</dd>
+				</div>
+			))}
+		</dl>
+		<span class="read-arrow">
+			{es ? 'Ver la serie completa' : 'See the whole series'}
+			<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+				<line x1="5" y1="12" x2="19" y2="12"></line>
+				<polyline points="12 5 19 12 12 19"></polyline>
+			</svg>
+		</span>
+	</div>
+</a>
+
+<style>
+	.series-card {
+		position: relative;
+		display: block;
+		text-decoration: none;
+		color: inherit;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+		/* Tinted wash marks this as a special block, like LabCard. */
+		background: oklch(from var(--color-accent) l c h / 0.045);
+		margin-bottom: 3rem;
+		transition: box-shadow var(--duration-normal) var(--ease-smooth),
+			transform var(--duration-normal) var(--ease-spring),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+	:global([data-theme='dark']) .series-card {
+		background: oklch(from var(--color-accent) l c h / 0.085);
+	}
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .series-card {
+			background: oklch(from var(--color-accent) l c h / 0.085);
+		}
+	}
+	.series-card:hover {
+		box-shadow: var(--shadow-lg);
+		transform: translateY(-3px);
+		border-color: var(--color-accent);
+	}
+	.series-card__inner {
+		padding: 2rem 2.5rem;
+	}
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+		margin: 0 0 0.9rem;
+	}
+	.series-card__title {
+		font-size: clamp(1.5rem, 3vw, 2rem);
+		margin: 0 0 0.55em;
+		line-height: 1.2;
+		letter-spacing: -0.015em;
+	}
+	.desc {
+		font-size: 1.05rem;
+		color: var(--color-text-secondary);
+		line-height: 1.65;
+		margin: 0 0 1.4em;
+		max-width: 62ch;
+	}
+	.thumbs {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+		gap: 0.6rem;
+		margin: 0 0 1.4em;
+	}
+	.thumbs img {
+		display: block;
+		width: 100%;
+		height: auto;
+		aspect-ratio: 16 / 9;
+		object-fit: cover;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-border);
+		background: oklch(0.36 0.13 262);
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+	.series-card:hover .thumbs img {
+		transform: translateY(-2px);
+	}
+	.metrics {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.6rem 2.2rem;
+		margin: 0 0 1.6em;
+		padding: 1.1rem 0;
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+	.metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+	}
+	.metric dt {
+		font-family: var(--font-mono);
+		font-size: 1.35rem;
+		font-weight: 600;
+		line-height: 1;
+		color: var(--color-text);
+		letter-spacing: -0.01em;
+	}
+	.metric dd {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-text-muted);
+	}
+	.read-arrow {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-size: 0.88rem;
+		font-weight: 500;
+		color: var(--color-accent);
+	}
+	.read-arrow svg {
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+	.series-card:hover .read-arrow svg {
+		transform: translateX(4px);
+	}
+	@media (max-width: 640px) {
+		.series-card__inner {
+			padding: 1.5rem;
+		}
+		.thumbs {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.metrics {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 1.1rem 1rem;
+		}
+		.metric dt {
+			font-size: 1.15rem;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.series-card,
+		.thumbs img,
+		.read-arrow svg {
+			transition: none;
+		}
+	}
+</style>
