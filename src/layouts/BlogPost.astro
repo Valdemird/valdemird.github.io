@@ -322,7 +322,7 @@ const relatedPosts = allPosts
 						<slot />
 					</div>
 					{seriesInfo && seriesPosts.length > 1 && (
-						<SeriesNav name={seriesInfo.name} description={seriesInfo.description} href={seriesHref(series as SeriesId, lang)} posts={seriesPosts} currentId={slug} lang={lang} />
+						<SeriesNav series={series as SeriesId} currentId={slug} lang={lang} />
 					)}
 					<aside class="author-follow" aria-labelledby="author-follow-title">
 						<p class="author-follow-eyebrow" id="author-follow-title">{strings.blog.followEyebrow}</p>

@@ -1,78 +1,121 @@
 ---
 /**
- * SeriesNav — the ordered list of a blog series, at the foot of each of its posts.
+ * SeriesNav — the series at the foot of each of its posts, as a level map.
  *
- * Rendered by BlogPost.astro when the post's frontmatter has `series` (a key of
- * SERIES in consts.ts) and `seriesOrder`. Same-language posts only. It is the
- * series' internal-linking spine: every part links every other part, in order,
- * plus explicit previous / next links.
+ * Three things, in the order a reader needs them:
+ *   · where you are: one track per part of the series (SERIES[id].parts), a node
+ *     per post; earlier ones read as done, the current one is marked, each node
+ *     names its post on hover or focus.
+ *   · what's next: the next post as a card, with its sheet's thumbnail.
+ *   · the way back: the previous post and the hub, as small links.
+ *
+ * Rendered by BlogPost.astro when the post has `series` + `seriesOrder`.
+ * Same-language posts only. Every node is a real link, so the map is also the
+ * series' internal-linking spine.
  */
-interface SeriesPost {
-	id: string;
-	title: string;
-	order: number;
-}
+import { SERIES, type SeriesId } from '../../consts';
+import { getSeriesCards, seriesHref } from '../../lib/series';
+
 interface Props {
-	name: string;
-	description: string;
-	/** The series hub page. */
-	href: string;
-	posts: SeriesPost[];
+	series: SeriesId;
 	currentId: string;
 	lang: 'en' | 'es';
 }
 
-const { name, description, href: hubHref, posts, currentId, lang } = Astro.props;
+const { series, currentId, lang } = Astro.props;
 const es = lang === 'es';
-const index = posts.findIndex((p) => p.id === currentId);
-const prev = index > 0 ? posts[index - 1] : undefined;
-const next = index >= 0 && index < posts.length - 1 ? posts[index + 1] : undefined;
-const href = (id: string) => `/blog/${id}/`;
+const info = SERIES[series][lang];
+const cards = await getSeriesCards(series, lang);
+const index = cards.findIndex((c) => c.id === currentId);
+const current = cards[index];
+const prev = index > 0 ? cards[index - 1] : undefined;
+const next = index >= 0 && index < cards.length - 1 ? cards[index + 1] : undefined;
+const hub = seriesHref(series, lang);
+const tracks = SERIES[series].parts.map((part) => ({
+	label: part[lang],
+	from: part.from,
+	to: part.to,
+	nodes: cards.filter((c) => c.order >= part.from && c.order <= part.to),
+}));
+const pad = (n: number) => String(n).padStart(2, '0');
+const state = (order: number) => (order < (current?.order ?? 0) ? 'done' : order === current?.order ? 'current' : 'todo');
 ---
 
 <aside class="series" aria-labelledby="series-title">
-	<p class="series-eyebrow">
-		{es ? 'Serie' : 'Series'} · {index + 1} / {posts.length}
-	</p>
-	<p class="series-name" id="series-title"><a href={hubHref}>{name}</a></p>
-	<p class="series-desc">{description}</p>
-	<ol class="series-list">
-		{posts.map((p) => (
-			<li>
-				{p.id === currentId ? (
-					<span class="series-current" aria-current="page">{p.title}</span>
-				) : (
-					<a href={href(p.id)}>{p.title}</a>
-				)}
-			</li>
+	<header class="series-head">
+		<p class="series-eyebrow">
+			{es ? 'Serie' : 'Series'} · {index + 1} / {cards.length}
+		</p>
+		<p class="series-name" id="series-title"><a href={hub}>{info.name}</a></p>
+	</header>
+
+	<nav class="map" aria-label={es ? 'Mapa de la serie' : 'Series map'}>
+		{tracks.map((track) => (
+			<div class="track">
+				<p class="track-label">
+					{track.label} <span>{track.from}–{track.to}</span>
+				</p>
+				<ol class="nodes" start={track.from} style={`--n:${track.nodes.length}`}>
+					{track.nodes.map((c) => (
+						<li class="node" data-state={state(c.order)}>
+							<a
+								href={c.href}
+								aria-label={`${pad(c.order)} · ${c.title}`}
+								aria-current={c.id === currentId ? 'page' : undefined}
+							>
+								<span class="dot">{c.order}</span>
+								<span class="tip" aria-hidden="true">{pad(c.order)} · {c.title}</span>
+							</a>
+						</li>
+					))}
+				</ol>
+			</div>
 		))}
-	</ol>
-	{(prev || next) && (
-		<nav class="series-step" aria-label={es ? 'Navegación de la serie' : 'Series navigation'}>
-			{prev ? (
-				<a class="series-step__link" href={href(prev.id)} rel="prev">
-					<span class="series-step__dir">&larr; {es ? 'Anterior' : 'Previous'}</span>
-					<span class="series-step__title">{prev.title}</span>
-				</a>
-			) : <span />}
-			{next && (
-				<a class="series-step__link series-step__link--next" href={href(next.id)} rel="next">
-					<span class="series-step__dir">{es ? 'Siguiente' : 'Next'} &rarr;</span>
-					<span class="series-step__title">{next.title}</span>
-				</a>
-			)}
-		</nav>
+	</nav>
+
+	{next && (
+		<a class="next" href={next.href} rel="next">
+			<span class="next-thumb">
+				{next.thumb && (
+					<img src={next.thumb} srcset={next.thumbSrcset} sizes="(max-width: 560px) 7rem, 12rem" alt="" width="640" height="360" loading="lazy" decoding="async" />
+				)}
+			</span>
+			<span class="next-text">
+				<span class="next-eyebrow">{es ? 'Siguiente' : 'Up next'} · {pad(next.order)}</span>
+				<span class="next-title">{next.title}</span>
+				<span class="next-desc">{next.description}</span>
+				<span class="next-meta">
+					{next.minutes} min
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+						<line x1="5" y1="12" x2="19" y2="12"></line>
+						<polyline points="12 5 19 12 12 19"></polyline>
+					</svg>
+				</span>
+			</span>
+		</a>
 	)}
+
+	<p class="series-links">
+		{prev && (
+			<a href={prev.href} rel="prev">&larr; {pad(prev.order)} · {prev.title}</a>
+		)}
+		<a href={hub} class="series-all">{es ? `Ver las ${cards.length}` : `See all ${cards.length}`} &rarr;</a>
+	</p>
 </aside>
 
 <style>
 	.series {
+		--done: var(--color-accent);
 		margin: var(--space-2xl) 0 var(--space-xl);
 		padding: var(--space-lg);
 		border-top: 1px solid var(--color-border);
 		border-bottom: 1px solid var(--color-border);
 		background: oklch(from var(--color-accent) l c h / 0.045);
 		border-radius: var(--radius-md);
+		display: grid;
+		gap: 1.4rem;
+		/* Safety net: nothing inside may widen the page sideways. */
+		overflow-x: clip;
 	}
 	:global([data-theme='dark']) .series {
 		background: oklch(from var(--color-accent) l c h / 0.085);
@@ -81,6 +124,11 @@ const href = (id: string) => `/blog/${id}/`;
 		:global(:root:not([data-theme='light'])) .series {
 			background: oklch(from var(--color-accent) l c h / 0.085);
 		}
+	}
+
+	.series-head {
+		display: grid;
+		gap: 0.3rem;
 	}
 	.series-eyebrow {
 		margin: 0;
@@ -92,9 +140,9 @@ const href = (id: string) => `/blog/${id}/`;
 		color: var(--color-accent);
 	}
 	.series-name {
-		margin: 0.4rem 0 0;
+		margin: 0;
 		font-family: var(--font-serif);
-		font-size: 1.3rem;
+		font-size: 1.25rem;
 		color: var(--color-text);
 	}
 	.series-name a {
@@ -104,83 +152,303 @@ const href = (id: string) => `/blog/${id}/`;
 	}
 	.series-name a:hover {
 		color: var(--color-accent);
-		text-decoration: underline;
-		text-underline-offset: 0.18em;
 	}
-	.series-desc {
-		margin: 0.35rem 0 0;
-		font-size: 0.9rem;
+
+	/* ----- the level map ----- */
+	.map {
+		display: grid;
+		gap: 0.9rem;
+	}
+	.track-label {
+		margin: 0 0 0.35rem;
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
 		color: var(--color-text-secondary);
 	}
-	.series-list {
-		margin: var(--space-md) 0 0;
-		padding-left: 1.4rem;
-		display: grid;
-		gap: 0.35rem;
-		font-size: 0.95rem;
+	.track-label span {
+		font-weight: 400;
+		color: var(--color-text-muted);
 	}
-	.series-list li {
+	.nodes {
+		position: relative;
+		display: grid;
+		grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	/* The path the nodes sit on. */
+	.nodes::before {
+		content: '';
+		position: absolute;
+		left: calc(50% / var(--n));
+		right: calc(50% / var(--n));
+		top: 50%;
+		height: 2px;
+		translate: 0 -50%;
+		background: var(--color-border-strong);
+		border-radius: 1px;
+	}
+	.node {
+		position: relative;
+		display: grid;
+		place-items: center;
 		margin: 0;
 	}
-	.series-list a {
+	/* The stretch of path already walked, from this node to the next one. */
+	.node[data-state='done']::after {
+		content: '';
+		position: absolute;
+		left: 50%;
+		width: 100%;
+		top: 50%;
+		height: 2px;
+		translate: 0 -50%;
+		background: var(--done);
+	}
+	.node:last-child::after {
+		display: none;
+	}
+	.node a {
+		position: relative;
+		z-index: 1;
+		display: grid;
+		place-items: center;
+		text-decoration: none;
+		border-radius: 50%;
+		/* 32px hit area even where the dot is smaller. */
+		width: 2rem;
+		height: 2rem;
+	}
+	.dot {
+		display: grid;
+		place-items: center;
+		width: 1.55rem;
+		height: 1.55rem;
+		border-radius: 50%;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		font-weight: 600;
+		color: var(--color-text-secondary);
+		background: var(--color-surface);
+		border: 1.5px solid var(--color-border-strong);
+		transition: transform var(--duration-normal) var(--ease-spring), border-color var(--duration-fast) var(--ease-smooth),
+			box-shadow var(--duration-normal) var(--ease-smooth);
+	}
+	.node[data-state='done'] .dot {
+		color: var(--color-on-accent);
+		background: var(--done);
+		border-color: var(--done);
+	}
+	.node[data-state='current'] .dot {
+		width: 1.95rem;
+		height: 1.95rem;
+		font-size: 0.72rem;
+		color: var(--color-accent);
+		background: var(--color-surface);
+		border: 2px solid var(--color-accent);
+		box-shadow: 0 0 0 4px oklch(from var(--color-accent) l c h / 0.18);
+	}
+	.node a:hover .dot,
+	.node a:focus-visible .dot {
+		transform: scale(1.15);
+		border-color: var(--color-accent);
+		box-shadow: var(--shadow-md);
+	}
+	.node a:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+	/* The node's post, named on hover or keyboard focus. */
+	.tip {
+		position: absolute;
+		bottom: calc(100% + 0.35rem);
+		left: 50%;
+		translate: -50% 4px;
+		padding: 0.3rem 0.55rem;
+		border-radius: var(--radius-sm);
+		background: var(--color-text);
+		color: var(--color-bg);
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		white-space: nowrap;
+		pointer-events: none;
+		opacity: 0;
+		z-index: 2;
+		transition: opacity var(--duration-fast) var(--ease-smooth), translate var(--duration-fast) var(--ease-smooth);
+	}
+	/* Near the ends of a track the tip hangs inward, so it never pokes out. */
+	.node:nth-child(-n + 3) .tip {
+		left: 0;
+		translate: 0 4px;
+	}
+	.node:nth-last-child(-n + 3) .tip {
+		left: auto;
+		right: 0;
+		translate: 0 4px;
+	}
+	.node a:hover .tip,
+	.node a:focus-visible .tip {
+		opacity: 1;
+		translate: -50% 0;
+	}
+	.node:nth-child(-n + 3) a:hover .tip,
+	.node:nth-child(-n + 3) a:focus-visible .tip,
+	.node:nth-last-child(-n + 3) a:hover .tip,
+	.node:nth-last-child(-n + 3) a:focus-visible .tip {
+		translate: 0 0;
+	}
+	/* Touch screens have no hover: the tips would only widen the page. */
+	@media (hover: none) {
+		.tip {
+			display: none;
+		}
+	}
+
+	/* ----- up next ----- */
+	.next {
+		display: grid;
+		grid-template-columns: 12rem minmax(0, 1fr);
+		gap: 1rem;
+		align-items: center;
+		padding: 0.8rem;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		background: var(--color-surface);
+		color: inherit;
+		text-decoration: none;
+		transition: transform var(--duration-normal) var(--ease-spring), box-shadow var(--duration-normal) var(--ease-smooth),
+			border-color var(--duration-normal) var(--ease-smooth);
+	}
+	.next:hover {
+		transform: translateY(-3px);
+		box-shadow: var(--shadow-lg);
+		border-color: var(--color-accent);
+	}
+	.next:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 3px;
+	}
+	.next-thumb {
+		aspect-ratio: 16 / 9;
+		border-radius: var(--radius-md);
+		overflow: hidden;
+		/* The lab's paper colour while the thumbnail loads. */
+		background: oklch(0.36 0.13 262);
+	}
+	.next-thumb img {
+		display: block;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+	.next-text {
+		display: grid;
+		gap: 0.3rem;
+		min-width: 0;
+	}
+	.next-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.66rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-accent);
+	}
+	.next-title {
+		font-family: var(--font-serif);
+		font-size: 1.15rem;
+		line-height: 1.25;
+		color: var(--color-text);
+	}
+	.next-desc {
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: var(--color-text-secondary);
+		display: -webkit-box;
+		-webkit-line-clamp: 2;
+		-webkit-box-orient: vertical;
+		line-clamp: 2;
+		overflow: hidden;
+	}
+	.next-meta {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-accent);
+	}
+	.next-meta svg {
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+	.next:hover .next-meta svg {
+		transform: translateX(4px);
+	}
+
+	.series-links {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: space-between;
+		gap: 0.5rem 1rem;
+		margin: 0;
+		font-size: 0.85rem;
+	}
+	.series-links a {
 		color: var(--color-text-secondary);
 		text-decoration: none;
 		transition: color var(--duration-fast) var(--ease-smooth);
 	}
-	.series-list a:hover {
+	.series-links a:hover {
 		color: var(--color-accent);
 	}
-	.series-current {
-		color: var(--color-text);
-		font-weight: 600;
-	}
-	.series-step {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: var(--space-md);
-		margin-top: var(--space-lg);
-	}
-	.series-step__link {
-		display: grid;
-		gap: 0.2rem;
-		padding: 0.75rem 0.9rem;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-md);
-		background: var(--color-surface);
-		text-decoration: none;
-		transition: all var(--duration-normal) var(--ease-spring);
-	}
-	.series-step__link:hover {
-		transform: translateY(-2px);
-		box-shadow: var(--shadow-md);
-		border-color: var(--color-accent);
-	}
-	.series-step__link--next {
-		text-align: right;
-		grid-column: 2;
-	}
-	.series-step__dir {
+	.series-all {
+		margin-left: auto;
 		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: var(--color-accent);
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
 	}
-	.series-step__title {
-		font-size: 0.88rem;
-		color: var(--color-text);
-	}
-	@media (max-width: 640px) {
-		.series-step {
-			grid-template-columns: 1fr;
+
+	@media (max-width: 560px) {
+		.series {
+			padding: var(--space-md);
 		}
-		.series-step__link--next {
-			grid-column: 1;
+		.next {
+			grid-template-columns: 7rem minmax(0, 1fr);
+			gap: 0.75rem;
+			padding: 0.65rem;
+		}
+		.next-desc {
+			-webkit-line-clamp: 2;
+			line-clamp: 2;
+			font-size: 0.8rem;
+		}
+		.dot {
+			width: 1.35rem;
+			height: 1.35rem;
+			font-size: 0.56rem;
+		}
+		.node[data-state='current'] .dot {
+			width: 1.7rem;
+			height: 1.7rem;
+		}
+		.node a {
+			width: 1.7rem;
+			height: 1.7rem;
 		}
 	}
 	@media (prefers-reduced-motion: reduce) {
-		.series-step__link {
+		.dot,
+		.tip,
+		.next,
+		.next-meta svg {
 			transition: none;
+		}
+		.next:hover {
+			transform: none;
 		}
 	}
 </style>
