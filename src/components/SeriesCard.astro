@@ -4,7 +4,8 @@
  * home page and the blog index, where the series stands in for its parts.
  */
 import { SERIES, type SeriesId } from '../consts';
-import { getSeriesCards, getSeriesStats, seriesHref } from '../lib/series';
+import { getSeriesStats, seriesHref } from '../lib/series';
+import TrackArtClip from './learn/TrackArtClip.astro';
 
 interface Props {
 	id: SeriesId;
@@ -17,12 +18,7 @@ const { id, lang, heading = 'h2' } = Astro.props;
 const Heading = heading;
 const es = lang === 'es';
 const info = SERIES[id][lang];
-const cards = await getSeriesCards(id, lang);
 const stats = await getSeriesStats(id, lang);
-// One thumbnail per part of the series (movement, combat), plus two more for rhythm.
-const thumbs = [0, 3, 10, 14]
-	.map((i) => cards[i])
-	.filter((c): c is NonNullable<typeof c> => !!c?.thumb);
 const hours = stats.minutes / 60;
 const metrics = [
 	{ value: String(stats.posts), label: 'posts' },
@@ -34,14 +30,11 @@ const metrics = [
 
 <a href={seriesHref(id, lang)} class="series-card animate-fade-in delay-1">
 	<div class="series-card__inner">
+		<div class="series-card__art"><TrackArtClip sheets="juice" badge={es ? 'jugable' : 'playable'} /></div>
+		<div class="series-card__text">
 		<p class="eyebrow">{es ? `Serie jugable · ${stats.posts} mecánicas` : `Playable series · ${stats.posts} mechanics`}</p>
 		<Heading class="series-card__title">{info.name}</Heading>
 		<p class="desc">{info.description}</p>
-		{thumbs.length > 0 && (
-			<div class="thumbs" aria-hidden="true">
-				{thumbs.map((c) => <img src={c.thumb} srcset={c.thumbSrcset} sizes="(max-width: 640px) 40vw, 200px" alt="" width="640" height="360" loading="lazy" decoding="async" />)}
-			</div>
-		)}
 		<dl class="metrics" aria-label={es ? 'Lo que trae la serie' : 'What the series contains'}>
 			{metrics.map((m) => (
 				<div class="metric">
@@ -57,6 +50,7 @@ const metrics = [
 				<polyline points="12 5 19 12 12 19"></polyline>
 			</svg>
 		</span>
+		</div>
 	</div>
 </a>
 
@@ -89,8 +83,29 @@ const metrics = [
 		transform: translateY(-3px);
 		border-color: var(--color-accent);
 	}
+	/* Words and picture side by side, like the track on /learn/ (picture on the right). */
 	.series-card__inner {
+		display: grid;
+		grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+		gap: 2rem;
+		align-items: center;
 		padding: 2rem 2.5rem;
+	}
+	.series-card__art {
+		order: 2;
+		transition: transform var(--duration-normal) var(--ease-spring);
+	}
+	.series-card:hover .series-card__art {
+		transform: scale(1.015);
+	}
+	@media (max-width: 820px) {
+		.series-card__inner {
+			grid-template-columns: minmax(0, 1fr);
+			gap: 1.4rem;
+		}
+		.series-card__art {
+			order: 0;
+		}
 	}
 	.eyebrow {
 		font-family: var(--font-mono);
@@ -113,26 +128,6 @@ const metrics = [
 		line-height: 1.65;
 		margin: 0 0 1.4em;
 		max-width: 62ch;
-	}
-	.thumbs {
-		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
-		gap: 0.6rem;
-		margin: 0 0 1.4em;
-	}
-	.thumbs img {
-		display: block;
-		width: 100%;
-		height: auto;
-		aspect-ratio: 16 / 9;
-		object-fit: cover;
-		border-radius: var(--radius-md);
-		border: 1px solid var(--color-border);
-		background: oklch(0.36 0.13 262);
-		transition: transform var(--duration-normal) var(--ease-spring);
-	}
-	.series-card:hover .thumbs img {
-		transform: translateY(-2px);
 	}
 	.metrics {
 		display: flex;
@@ -182,9 +177,6 @@ const metrics = [
 		.series-card__inner {
 			padding: 1.5rem;
 		}
-		.thumbs {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
-		}
 		.metrics {
 			display: grid;
 			grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -196,7 +188,7 @@ const metrics = [
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.series-card,
-		.thumbs img,
+		.series-card__art,
 		.read-arrow svg {
 			transition: none;
 		}

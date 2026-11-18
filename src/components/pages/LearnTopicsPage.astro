@@ -152,29 +152,10 @@ const jsonLd = {
 <script>
 	import { initPageEntrance, cleanupAll } from '../../lib/animations';
 
-	const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
-	const saveData = () => !!(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-	let observer: IntersectionObserver | undefined;
-
 	function initLearn() {
 		if (!document.querySelector('.tracks')) return;
 		if (!document.documentElement.hasAttribute('data-vt-nav')) initPageEntrance('[data-enter]');
-		// Each picture animates (and its clip plays) only while it is on screen.
-		observer?.disconnect();
-		observer = new IntersectionObserver(
-			(entries) => {
-				for (const entry of entries) {
-					const art = entry.target as HTMLElement;
-					art.classList.toggle('is-live', entry.isIntersecting);
-					const clip = art.querySelector<HTMLVideoElement>('[data-track-clip]');
-					if (!clip) continue;
-					if (entry.isIntersecting && !reduceMotion() && !saveData()) clip.play().catch(() => {});
-					else clip.pause();
-				}
-			},
-			{ threshold: 0.35 },
-		);
-		document.querySelectorAll('[data-track-art]').forEach((el) => observer!.observe(el));
+		// The pictures run themselves (src/lib/track-art.ts).
 		document.addEventListener('astro:before-swap', cleanupAll, { once: true });
 	}
 	initLearn();

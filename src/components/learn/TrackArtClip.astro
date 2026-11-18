@@ -32,6 +32,11 @@ const poster = media.posterSrcset ? media.videoPoster : media.poster;
 	{badge && <span class="badge">{badge}</span>}
 </div>
 
+<script>
+	import { initTrackArtOnPage } from '../../lib/track-art';
+	initTrackArtOnPage();
+</script>
+
 <style>
 	.art {
 		position: relative;
