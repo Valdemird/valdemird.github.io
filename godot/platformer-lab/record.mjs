@@ -20,7 +20,8 @@ const OUT = join(PUBLIC, 'videos/play/platformer-lab');
 // uploadDate and duration of each clip, for PlayableLab's VideoObject (a file's
 // mtime is the checkout time in CI, so it can't be the date).
 const MANIFEST = join(SITE, 'src/data/platformer-lab-clips.json');
-const BITRATE = Number(process.env.BITRATE || 600_000);
+// High on purpose: this is the intermediate; lib/media.mjs sets the final size.
+const BITRATE = Number(process.env.BITRATE || 12_000_000);
 const targets = process.argv.slice(2).map((a) => {
 	const [plane, sheets, on, off, extra = ''] = a.split(':');
 	return { plane, sheets, on: Number(on || 7), off: Number(off || 5), extra };
@@ -50,7 +51,7 @@ const START = `(() => {
 	return true;
 })()`;
 
-const [W, H] = (process.env.SIZE || '960x540').split('x').map(Number);
+const [W, H] = (process.env.SIZE || '1280x720').split('x').map(Number);
 
 ffmpeg(); // fail before recording anything, not after
 await mkdir(OUT, { recursive: true });
@@ -73,7 +74,7 @@ await withBrowser(async (page) => {
 		const raw = `${file}.raw.mp4`;
 		await writeFile(raw, Buffer.from(data, 'base64'));
 		await finalizeClip(raw, file);
-		await rm(raw);
+		if (!process.env.KEEP_RAW) await rm(raw);
 		const clips = JSON.parse(await readFile(MANIFEST, 'utf8').catch(() => '{}'));
 		clips[`${plane}-${sheets.replaceAll(',', '+')}`] = { uploadDate: new Date().toISOString().slice(0, 10), duration: `PT${Math.round(on + off)}S` };
 		await writeFile(MANIFEST, JSON.stringify(clips, null, '\t') + '\n');

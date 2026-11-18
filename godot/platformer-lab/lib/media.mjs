@@ -4,7 +4,9 @@
 // Clips: MediaRecorder writes a fragmented MP4 with no duration in its header
 // and, often, repeated timestamps. Browsers differ on how much of that they
 // forgive, so every clip is re-encoded into a plain progressive MP4: constant
-// 30 fps, H.264 High, index at the front (+faststart), no audio.
+// 60 fps (the game's own rate: a 45 ms hitstop is three frames), H.264 High,
+// index at the front (+faststart), no audio. The recording itself is taken at a
+// high bitrate so this is the only lossy pass that shows.
 //
 // Posters: the 1280×720 screenshot plus 320, 640 and 960 wide copies for srcset
 // (320 and 640 are the series hub's thumbnails).
@@ -27,11 +29,11 @@ export function ffmpeg() {
 }
 
 /** Re-encodes `input` into a progressive MP4 at `output` (they may be the same file). */
-export async function finalizeClip(input, output = input, crf = Number(process.env.CRF || 25)) {
+export async function finalizeClip(input, output = input, crf = Number(process.env.CRF || 23), fps = Number(process.env.FPS || 60)) {
 	const tmp = `${output}.tmp.mp4`;
-	const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-an', '-fps_mode', 'cfr', '-r', '30',
+	const args = ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-an', '-fps_mode', 'cfr', '-r', String(fps),
 		'-c:v', 'libx264', '-preset', 'slow', '-crf', String(crf), '-profile:v', 'high', '-level:v', '4.0',
-		'-pix_fmt', 'yuv420p', '-g', '60', '-movflags', '+faststart', tmp];
+		'-pix_fmt', 'yuv420p', '-tune', 'animation', '-g', String(fps * 2), '-movflags', '+faststart', tmp];
 	const run = spawnSync(ffmpeg(), args, { encoding: 'utf8' });
 	if (run.status !== 0) {
 		await rm(tmp, { force: true });
