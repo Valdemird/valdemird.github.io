@@ -1,0 +1,103 @@
+---
+title: "Gravedad del salto: caer más rápido y la pausa en el ápice"
+description: "La gravedad asimétrica hace que el salto suba en 0,38 s y caiga en 0,30 s; la pausa en el ápice la reduce a la mitad arriba. Míralas y juégalas."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 3
+seriesTitle: "Gravedad del salto"
+videoHero: {"sheets": "gravity", "title": "Gravedad asimétrica", "videoNote": "Subiendo los escalones y saltando el foso con gravedad asimétrica; luego T la apaga: los mismos saltos, pero cada caída tarda más y el arco flota.", "steps": ["Sube las tres plataformas saltando con <kbd>Espacio</kbd> y mira el rastro: los puntos se separan al bajar.", "Desde la de arriba, déjate caer. La caída acelera hasta llegar al tope de 900 px/s.", "Pulsa <kbd>T</kbd> y vuelve a saltar. Sin la técnica la caída es tan lenta como la subida, y los mismos saltos se sienten flotantes."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Con **gravedad asimétrica**, un salto cae más rápido de lo que sube: 0,38 s de subida y 0,30 s de bajada. La **pausa en el ápice** reduce la gravedad a la mitad en lo alto mientras mantienes el botón. Una le da peso al salto; la otra, un instante para apuntar dónde caes.
+
+| Parámetro | Valor |
+|---|---|
+| Subida de un salto de 3,6 casillas | 0,38 s |
+| Caída | 0,30 s |
+| Gravedad al subir / al caer | 1.994 / 3.200 px/s² |
+| Velocidad terminal | 900 px/s |
+| Pausa en el ápice, bajo 90 px/s | gravedad ×0,5, aceleración en el aire ×1,5 |
+
+<h2 id="what-is-asymmetric-gravity">Gravedad asimétrica: caer más rápido de lo que se sube</h2>
+
+Con la gravedad real, la bajada tarda lo mismo que la subida, y en pantalla esa parábola simétrica se ve flotante. Una caída más rápida te devuelve antes el control y hace más predecible dónde aterrizas. Eso sí, necesita un tope: sin él, una caída de diez casillas cuesta de dirigir y de leer.
+
+<h2 id="what-is-apex-hang">Pausa en el ápice: un poco más de aire arriba</h2>
+
+Lo alto del salto es donde decides dónde vas a caer. La pausa en el ápice (*apex hang*) te regala ahí unas centésimas y un poco más de agarre: el mismo salto completo llega arriba en 0,42 s en vez de 0,38 s. [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) también la usa, con media gravedad por debajo de 40 px/s si mantienes el salto.
+
+<PlayableLab
+  sheets="apex"
+  title="Pausa en el ápice"
+  videoNote="De pilar en pilar con la pausa en el ápice: mira la cifra sobre cada salto, 0,42 s hasta arriba. Luego T la apaga y los mismos saltos llegan arriba en 0,38 s, con menos tiempo para corregir."
+  steps={[
+    "Salta de pilar en pilar con <kbd>Espacio</kbd> mantenido, corrigiendo con <kbd>←</kbd> <kbd>→</kbd> en lo alto de cada salto.",
+    "Mira la cifra encima del arco: unos 0,42 s hasta arriba.",
+    "Pulsa <kbd>T</kbd> y repítelo. Lo alto llega a los 0,38 s y corregir el aterrizaje se vuelve claramente más difícil.",
+  ]}
+/>
+
+<h2 id="how-to-implement">Cómo implementar la gravedad del salto y la pausa en el ápice</h2>
+
+1. **Elige tiempos, no gravedades.** Fija la altura y los tiempos de subida y de caída, y saca de ahí las gravedades.
+2. **Cambia la gravedad según el sentido** y limita la caída a la velocidad terminal.
+3. **Añade la pausa.** Con el salto pulsado y la velocidad vertical bajo el umbral, gravedad a la mitad y un 50 % más de aceleración en el aire.
+4. **Que la pausa sea pequeña.** A partir de cierto punto el personaje deja de saltar y empieza a flotar.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
+```gdscript
+## Gravedad de subida: g = 2h / t²
+var gravity_up: float:
+	get:
+		return 2.0 * jump_height * tile_size / (time_to_apex * time_to_apex)
+
+## Gravedad de caída (mayor que la de subida si time_to_fall < time_to_apex).
+var gravity_down: float:
+	get:
+		return 2.0 * jump_height * tile_size / (time_to_fall * time_to_fall)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+else:
+	# GRAVEDAD ASIMÉTRICA: caer más rápido de lo que se sube. Quita la
+	# sensación "flotante" de la parábola simétrica y da peso al aterrizaje.
+	gravity = p.gravity_down if Lab.on(&"asym_gravity") else p.gravity_up
+
+# ÁPICE: gravedad reducida un instante en lo alto del salto (si se mantiene el botón).
+if jump_held and _at_apex(on_floor):
+	gravity *= p.apex_gravity_mult
+
+# Velocidad terminal: siempre acotada (la de la caída rápida es otra, mayor).
+var terminal := maxf(p.max_fall_speed, p.fast_fall_speed) if is_fast_falling else p.max_fall_speed
+velocity.y = minf(velocity.y + gravity * delta, terminal)
+```
+</CodeBlock>
+
+El `else` es la rama de cuando el personaje no está subiendo.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="why-fall-faster">¿Por qué en los plataformas se cae más rápido de lo que se sube?</h3>
+
+Un arco simétrico se ve flotante en pantalla. Una caída más rápida le da peso al salto y acorta la espera hasta aterrizar.
+
+<h3 id="jump-gravity-formula">¿Cómo calculo la gravedad del salto a partir de la altura y el tiempo?</h3>
+
+v₀ = 2h / t y g = 2h / t², con h la altura y t el tiempo hasta lo alto. Con el tiempo de caída sale la gravedad de caída.
+
+<h3 id="terminal-velocity-value">¿Qué velocidad terminal debería usar un plataformas?</h3>
+
+Celeste usa 20 casillas por segundo y este laboratorio 22,5: la caída se siente y todavía se puede dirigir.

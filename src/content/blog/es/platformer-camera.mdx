@@ -1,0 +1,94 @@
+---
+title: "Cámara de plataformas: look-ahead, ancla vertical, suavizado"
+description: "Una cámara de plataformas debe ignorar los saltitos, mirar por delante y suavizar igual a cualquier FPS. Mira las tres reglas con números y juégalas."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 10
+seriesTitle: "Cámara de plataformas"
+videoHero: {"sheets": "camera", "title": "Cámara de plataformas", "videoNote": "Sube los escalones y luego salta en el sitio sobre la meseta. Con la cámara inteligente la vista se queda quieta mientras salta; tras pulsar T, la cámara sigue cada salto.", "steps": ["Sube los escalones con <kbd>→</kbd> y <kbd>Espacio</kbd>. La línea amarilla continua es el ancla, la altura del último suelo que pisaste. Sube un escalón cada vez que aterrizas.", "En la meseta, da saltitos con <kbd>Espacio</kbd>. La línea discontinua de arriba es el techo de la ventana. Un salto completo se queda justo por debajo, así que la vista no se mueve.", "Date la vuelta con <kbd>←</kbd>. La cruz del look-ahead se pasa al otro lado poco a poco, más despacio de lo que la cámara te sigue a ti.", "Pulsa <kbd>T</kbd> y vuelve a saltar. Las guías desaparecen salvo el centro de la cámara, y cada salto arrastra el nivel entero arriba y abajo."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Una buena **cámara de plataformas** se mueve lo menos posible y te enseña lo que tienes delante: ignora los saltitos, mira 110 px por delante y suaviza igual a cualquier tasa de fotogramas.
+
+| | Valor |
+|---|---|
+| Ventana vertical alrededor del último suelo | 170 px hacia arriba, 50 px hacia abajo |
+| Altura de un salto completo | 144 px |
+| Look-ahead | 110 px (2,75 casillas) |
+| Suavizado del seguimiento | media distancia en 0,08 s |
+
+<h2 id="platform-snapping">Platform snapping: no seguir el salto</h2>
+
+Una cámara pegada al jugador desplaza el nivel entero con cada saltito. Con *platform snapping* se queda a la altura del último suelo que pisaste y solo te sigue si subes más de 170 px o bajas más de 50. Un salto completo sube 144 px, así que un saltito nunca mueve la pantalla. Hacia abajo la ventana es pequeña porque ahí es donde vas a aterrizar.
+
+Según la charla [*Scroll Back*](https://www.gamedeveloper.com/design/scroll-back-the-theory-and-practice-of-cameras-in-side-scrollers) de Itay Keren en la GDC, esta técnica la introdujo Super Mario World.
+
+<h2 id="look-ahead">Look-ahead: encuadrar hacia donde va el jugador</h2>
+
+El espacio que importa es el de delante, por eso la cámara apunta 110 px por delante de hacia donde te mueves. Solo cambia de lado por encima de 60 px/s, así que girarte sin moverte no zarandea la vista, y se suaviza más despacio que el seguimiento: media distancia en 0,27 s, frente a 0,08 s.
+
+<h2 id="frame-rate-independent-smoothing">Un suavizado de cámara que no depende de los FPS</h2>
+
+`lerp(position, target, 0.1)` recorre un 10 % de lo que falta en cada fotograma, así que la cámara se vuelve más rígida cuantos más FPS hay. Con `1 − e^(−k·Δt)` como fracción, lo que falta al cabo de t segundos es igual a cualquier tasa de fotogramas. Celeste lo escribe como `1 - 0.01^Δt`.
+
+<h2 id="how-to-implement">Cómo implementar una cámara de plataformas</h2>
+
+1. **Ancla la altura** al último suelo o a la pared por la que te deslizas. En el aire, arrástrala solo cuando el jugador sale de la ventana.
+2. **Mueve el look-ahead más despacio que el seguimiento**, y dale la vuelta solo cuando el jugador corre de verdad.
+3. **Suaviza por tiempo, no por fotograma.**
+4. **Al reaparecer, salta directa al jugador.** Suavizar medio nivel después de morir es un paneo lento que nadie ha pedido.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/camera/platformer_camera.gd">
+```gdscript
+func _physics_process(delta: float) -> void:
+	var pos := target.global_position
+
+	if Lab.on(&"camera_smart"):
+		# Look-ahead: sólo cambia de lado cuando el jugador se mueve de verdad.
+		if absf(target.velocity.x) > 60.0:
+			_look_target = signf(target.velocity.x) * look_ahead
+		_look = BP.damp(_look, _look_target, look_sharpness, delta)
+
+		# Platform snapping: re-anclar al pisar suelo (o al deslizar por una pared).
+		if target.is_on_floor() or target.is_wall_sliding:
+			_anchor_y = pos.y
+		else:
+			_anchor_y = clampf(_anchor_y, pos.y - window_down, pos.y + window_up)
+
+		var desired := Vector2(pos.x + _look, _anchor_y - vertical_offset)
+		_focus.x = BP.damp(_focus.x, desired.x, follow_sharpness_x, delta)
+		_focus.y = BP.damp(_focus.y, desired.y, follow_sharpness_y, delta)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/core/bp.gd">
+```gdscript
+## Suavizado exponencial independiente del framerate.
+## `lerp(a, b, 0.1)` por frame cambia de velocidad con los FPS; esto no.
+static func damp(from: float, to: float, sharpness: float, delta: float) -> float:
+	return lerpf(from, to, 1.0 - exp(-sharpness * delta))
+```
+</CodeBlock>
+
+La `Camera2D` de Godot trae márgenes de arrastre, suavizado y límites, pero ni look-ahead ni nada que vuelva a anclar al aterrizar, así que este script fija su posición en cada tick de física.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-far-ahead">¿Cuánto debería mirar por delante una cámara de plataformas?</h3>
+
+Unos 110 px, 2,75 casillas. El artículo de Keren cuenta que Defender apunta a un punto un 25 % del ancho de pantalla por delante de la nave.
+
+<h3 id="follow-jumps">¿Debe seguir los saltos una cámara de plataformas?</h3>
+
+En vertical, no. Haz la ventana más alta que un salto completo (170 px frente a 144 aquí) y un salto por sí solo nunca moverá la pantalla.

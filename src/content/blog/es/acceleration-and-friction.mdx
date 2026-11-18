@@ -1,0 +1,81 @@
+---
+title: "Aceleración y fricción en plataformas: ajústalas en segundos"
+description: "La aceleración y la fricción deciden lo rápido que el personaje arranca, frena y gira: 0,11, 0,07 y 0,06 s. Por qué se ajustan en tiempo, y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 6
+seriesTitle: "Aceleración y fricción"
+videoHero: {"sheets": "accel", "title": "Aceleración y fricción", "videoNote": "Correr, soltar, girar y soltar, en bucle, con el inspector del laboratorio encendido. Con la técnica, la traza de velocidad sube y baja en rampa; después de T salta al instante entre la velocidad máxima y cero.", "steps": ["Pulsa <kbd>I</kbd> para abrir el inspector. La línea blanca de su osciloscopio es tu velocidad horizontal.", "Corre hacia la derecha con <kbd>→</kbd>, suelta y luego pulsa <kbd>←</kbd>. La línea sube en rampa, se curva en cada cambio y vuelve a cero en pendiente.", "Salta a las plataformas de dos casillas con <kbd>Espacio</kbd> y párate en cada una soltando <kbd>→</kbd> justo al aterrizar.", "Pulsa <kbd>T</kbd> y repítelo. Ahora la velocidad es instantánea: exacta, pero rígida. La línea se convierte en una onda cuadrada."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+La **aceleración** es lo rápido que el personaje llega a su velocidad máxima de carrera; la **fricción**, lo rápido que se para cuando sueltas. Aquí son 0,11 s para arrancar, 0,07 s para frenar y 0,06 s para perder la velocidad al girar: rampa suficiente para que el personaje pese y lo bastante corta para seguir siendo preciso.
+
+| El jugador... | Ritmo | Tiempo |
+|---|---|---|
+| mantiene una dirección | acelerar | 0,11 s de 0 a 340 px/s |
+| suelta | frenar | 0,07 s de 340 px/s a 0 |
+| empuja hacia el otro lado | girar | 0,06 s para perder la velocidad y luego 0,11 s hacia el otro lado |
+| está en el aire | los mismos, rebajados | 80 % para dirigir y girar, 40 % para frenar |
+
+<h2 id="what-is-acceleration-friction">Aceleración y fricción: el personaje no es un cursor</h2>
+
+Una velocidad que pasa de cero al máximo de golpe es exacta y rígida. Una rampa de unas pocas centésimas le da peso al personaje, siempre que frenar sea más rápido que arrancar y girar, más rápido todavía. En el aire el frenado baja al 40 %, y soltar a mitad de salto no se come el impulso con el que saltaste.
+
+<h2 id="how-to-implement">Cómo implementar la aceleración y la fricción</h2>
+
+1. **Ajusta tiempos, no aceleraciones.** El ritmo es la velocidad máxima dividida entre el tiempo: 340 px/s en 0,11 s son 3.091 px/s².
+2. **Elige el ritmo según lo que hace el jugador.** Al soltar, el de frenar; al empujar contra la velocidad que llevas, el de girar; en cualquier otro caso, el de acelerar. En el aire, rebájalos.
+3. **Que el giro se acabe en el cero.** El ritmo de giro solo actúa mientras la velocidad aún apunta al otro lado, así que una media vuelta completa cuesta 0,06 + 0,11 = 0,17 s.
+4. **Acércate al objetivo una cantidad fija por tick.** Un `lerp` cierra una fracción fija: nunca termina de llegar, y su factor cambia de significado si cambia la frecuencia de ticks.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+var p := params
+var target := input_x * p.max_speed * _walk_scale(on_floor)
+# ...
+# ACELERACIÓN Y FRICCIÓN: tres tasas distintas según la intención del jugador.
+var rate: float
+if input_x == 0:
+	rate = p.max_speed / p.decel_time                 # soltar: frenar rápido
+	if not on_floor:
+		rate *= p.air_friction                         # ...pero conservar inercia en el aire
+		# ...
+elif velocity.x != 0.0 and signf(velocity.x) != float(input_x):
+	rate = p.max_speed / p.turn_time                  # invertir: giro aún más rápido
+	if not on_floor:
+		rate *= p.air_control
+else:
+	rate = p.max_speed / p.accel_time                 # acelerar
+	if not on_floor:
+		rate *= p.air_control
+	# ...
+velocity.x = move_toward(velocity.x, target, rate * delta)
+```
+</CodeBlock>
+
+El archivo de parámetros no tiene ni una aceleración, solo tiempos: `accel_time`, `decel_time` y `turn_time`.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-fast-accelerate">¿Cuánto debe tardar en acelerar el personaje de un plataformas?</h3>
+
+Poco: 0,11 s hasta la velocidad máxima aquí y 0,09 s en [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs). A 60 fotogramas por segundo, en los dos casos son menos de siete fotogramas.
+
+<h3 id="stop-faster">¿Frenar debe ser más rápido que acelerar?</h3>
+
+En el suelo, si tus plataformas son estrechas, sí: 0,07 s para frenar frente a 0,11 s para arrancar. Celeste usa el mismo ritmo para las dos cosas y se juega muy bien, así que tómalo como una decisión a propósito.
+
+<h3 id="air-control">¿Qué es el control en el aire en un plataformas?</h3>
+
+La fracción de la aceleración del suelo que conservas en el aire: 0,8 aquí y 0,65 en Celeste. Si el frenado en el aire tiene su propio número (0,4 aquí), dirigir un salto y dejarse llevar en él se ajustan por separado.

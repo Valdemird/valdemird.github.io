@@ -3,7 +3,11 @@ import BaseHead from '../BaseHead.astro';
 import Header from '../Header.astro';
 import Footer from '../Footer.astro';
 import { getLearnStats, courseHomeHref, learnHomeHref, type Lang } from '../../lib/learn';
-import { UI_STRINGS, PERSON } from '../../consts';
+import { UI_STRINGS, PERSON, SERIES } from '../../consts';
+import { getSeriesStats, seriesHref, seriesNodeId } from '../../lib/series';
+import TrackArtAgent from '../learn/TrackArtAgent.astro';
+import TrackArtClip from '../learn/TrackArtClip.astro';
+import FeatureCard from '../FeatureCard.astro';
 
 interface Props {
 	lang: Lang;
@@ -20,8 +24,13 @@ const agenticReadLabel =
 		? `${Math.round(agenticStats.readingMinutes / 60)}h`
 		: `${agenticStats.readingMinutes} min`;
 
+const series = await getSeriesStats('platformer-lab', lang);
+const seriesHours = series.minutes / 60;
+
 const tracks = [
 	{
+		ldType: 'Course',
+		art: 'agent',
 		href: courseHomeHref(lang),
 		eyebrow: es ? 'Curso-wiki · bilingüe' : 'Course-wiki · bilingual',
 		title: es ? 'Ingeniería de sistemas agénticos' : 'Engineering agentic systems',
@@ -37,12 +46,31 @@ const tracks = [
 		],
 		cta: es ? 'Abrir el curso' : 'Open the course',
 	},
+	{
+		// A blog series, not a course: one technique per post, each with its sheet to play.
+		ldType: 'CreativeWorkSeries',
+		art: 'clip',
+		ldId: seriesNodeId('platformer-lab', lang),
+		href: seriesHref('platformer-lab', lang),
+		eyebrow: es ? 'Serie jugable' : 'Playable series',
+		title: SERIES['platformer-lab'][lang].name,
+		description: es
+			? 'Cada mecánica de un plataformas, de un salto que perdona a un jefe que lo exige todo: qué hace, por qué importa y la lámina para jugarla en el navegador.'
+			: 'Every mechanic of a platformer, from a jump that forgives to a boss that demands everything: what it does, why it matters, and the sheet to play in your browser.',
+		metrics: [
+			{ value: String(series.posts), label: 'posts' },
+			{ value: String(series.sheets), label: es ? 'láminas jugables' : 'playable sheets' },
+			{ value: String(series.clips), label: es ? 'videos' : 'clips' },
+			{ value: seriesHours >= 1 ? `~${Math.round(seriesHours * 2) / 2}h` : `${series.minutes} min`, label: es ? 'de lectura' : 'read' },
+		],
+		cta: es ? 'Abrir la serie' : 'Open the series',
+	},
 ];
 
 const title = es ? 'Aprende' : 'Learn';
 const description = es
-	? 'Cursos-wiki en profundidad sobre temas difíciles de ingeniería: cada afirmación citada, graduada por credibilidad y comprobada. Elige una ruta.'
-	: 'In-depth course-wikis on hard engineering topics: every claim sourced, graded for credibility, and fact-checked. Pick a track.';
+	? 'Rutas en profundidad sobre temas difíciles de ingeniería: cursos-wiki con cada afirmación citada y graduada por credibilidad, y series jugables que se aprenden probando. Elige una ruta.'
+	: 'In-depth tracks on hard engineering topics: course-wikis with every claim sourced and graded for credibility, and playable series you learn by trying. Pick a track.';
 
 const alternates = [
 	{ hreflang: 'en', href: `https://valdemird.com${learnHomeHref('en')}` },
@@ -58,7 +86,8 @@ const jsonLd = {
 	author: PERSON,
 	url: `https://valdemird.com${learnHomeHref(lang)}`,
 	hasPart: tracks.map((t) => ({
-		'@type': 'Course',
+		'@type': t.ldType,
+		...('ldId' in t && t.ldId ? { '@id': t.ldId } : {}),
 		name: t.title,
 		url: `https://valdemird.com${t.href}`,
 	})),
@@ -75,33 +104,29 @@ const jsonLd = {
 		<main id="main-content">
 			<div class="wrap">
 				<header class="hero">
-					<p class="eyebrow">{es ? 'Aprende · directorio' : 'Learn · directory'}</p>
-					<h1>{title}</h1>
-					<p class="lead">{description}</p>
+					<p class="eyebrow" data-enter>{es ? 'Aprende · directorio' : 'Learn · directory'}</p>
+					<h1 data-enter>{title}</h1>
+					<p class="lead" data-enter>{description}</p>
 				</header>
 
 				<section class="tracks" aria-label={es ? 'Rutas de aprendizaje' : 'Learning tracks'}>
-					{tracks.map((t) => (
-						<a class="track" href={t.href}>
-							<p class="t-eyebrow">{t.eyebrow}</p>
-							<h2>{t.title}</h2>
-							<p class="t-desc">{t.description}</p>
-							<dl class="t-metrics" aria-label={es ? 'Cuánta información contiene' : 'How much it contains'}>
-								{t.metrics.map((m) => (
-									<div class="tm">
-										<dt>{m.value}</dt>
-										<dd>{m.label}</dd>
-									</div>
-								))}
-							</dl>
-							<span class="t-cta">
-								{t.cta}
-								<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-									<line x1="5" y1="12" x2="19" y2="12"></line>
-									<polyline points="12 5 19 12 12 19"></polyline>
-								</svg>
-							</span>
-						</a>
+					{tracks.map((t, i) => (
+						<FeatureCard
+							href={t.href}
+							eyebrow={t.eyebrow}
+							title={t.title}
+							description={t.description}
+							stats={t.metrics}
+							statsLabel={es ? 'Cuánta información contiene' : 'How much it contains'}
+							cta={t.cta}
+							artSide={i % 2 ? 'right' : 'left'}
+						>
+							{t.art === 'agent' ? (
+								<TrackArtAgent slot="art" lang={lang} />
+							) : (
+								<TrackArtClip slot="art" sheets="juice" badge={es ? 'jugable' : 'playable'} />
+							)}
+						</FeatureCard>
 					))}
 				</section>
 
@@ -111,6 +136,19 @@ const jsonLd = {
 		<Footer />
 	</body>
 </html>
+
+<script>
+	import { initPageEntrance, cleanupAll } from '../../lib/animations';
+
+	function initLearn() {
+		if (!document.querySelector('.tracks')) return;
+		if (!document.documentElement.hasAttribute('data-vt-nav')) initPageEntrance('[data-enter]');
+		// The pictures run themselves (src/lib/track-art.ts).
+		document.addEventListener('astro:before-swap', cleanupAll, { once: true });
+	}
+	initLearn();
+	document.addEventListener('astro:after-swap', initLearn);
+</script>
 
 <style>
 	main { padding-top: var(--space-xl); }
@@ -140,92 +178,11 @@ const jsonLd = {
 		max-width: 60ch;
 	}
 
+	/* Cards space themselves (FeatureCard's own margin). */
 	.tracks {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
-		gap: var(--space-lg);
-		max-width: var(--content-width);
+		max-width: var(--wide-width);
 		margin: 0 auto;
 	}
-
-	.track {
-		display: block;
-		text-decoration: none;
-		color: inherit;
-		border: 1px solid var(--color-border);
-		border-radius: var(--radius-lg);
-		/* Tinted wash marks the card — no left accent bar (design rule). */
-		background: oklch(from var(--color-accent) l c h / 0.045);
-		padding: 2rem 2.25rem;
-		transition: box-shadow var(--duration-normal) var(--ease-smooth),
-			transform var(--duration-normal) var(--ease-spring),
-			border-color var(--duration-normal) var(--ease-smooth);
-	}
-	.track:hover {
-		box-shadow: var(--shadow-lg);
-		transform: translateY(-3px);
-		border-color: var(--color-accent);
-	}
-
-	.t-eyebrow {
-		font-family: var(--font-mono);
-		font-size: 0.68rem;
-		font-weight: 600;
-		text-transform: uppercase;
-		letter-spacing: 0.14em;
-		color: var(--color-accent);
-		margin: 0 0 0.8rem;
-	}
-	.track h2 {
-		font-size: clamp(1.4rem, 3vw, 1.85rem);
-		margin: 0 0 0.5em;
-		line-height: 1.2;
-		letter-spacing: -0.015em;
-	}
-	.t-desc {
-		font-size: 1.02rem;
-		color: var(--color-text-secondary);
-		line-height: 1.65;
-		margin: 0 0 1.5em;
-	}
-
-	.t-metrics {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 1.3rem 2rem;
-		margin: 0 0 1.5em;
-		padding: 1rem 0;
-		border-top: 1px solid var(--color-border);
-		border-bottom: 1px solid var(--color-border);
-	}
-	.tm { display: flex; flex-direction: column; gap: 0.15rem; }
-	.tm dt {
-		font-family: var(--font-mono);
-		font-size: 1.3rem;
-		font-weight: 600;
-		line-height: 1;
-		color: var(--color-text);
-		letter-spacing: -0.01em;
-	}
-	.tm dd {
-		margin: 0;
-		font-family: var(--font-mono);
-		font-size: 0.66rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: var(--color-text-muted);
-	}
-
-	.t-cta {
-		display: inline-flex;
-		align-items: center;
-		gap: 0.4rem;
-		font-size: 0.88rem;
-		font-weight: 500;
-		color: var(--color-accent);
-	}
-	.t-cta svg { transition: transform var(--duration-normal) var(--ease-spring); }
-	.track:hover .t-cta svg { transform: translateX(4px); }
 
 	.more {
 		text-align: center;
@@ -237,7 +194,4 @@ const jsonLd = {
 		margin: var(--space-2xl) 0 0;
 	}
 
-	@media (max-width: 640px) {
-		.track { padding: 1.5rem; }
-	}
 </style>

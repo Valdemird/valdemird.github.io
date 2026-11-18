@@ -49,6 +49,34 @@ export const ORGANIZATION = {
 
 export const ORGANIZATION_REF = { '@id': ORGANIZATION_ID } as const;
 
+// Ordered blog series. A post joins one with `series: "<id>"` and `seriesOrder: n`
+// in its frontmatter. Each series has a hub page at /blog/series/<slug>/ (ES:
+// /es/blog/series/<slug>/, see src/lib/series.ts); BlogPost.astro renders the
+// series nav and the CreativeWorkSeries JSON-LD from this table, and llms.txt
+// lists the series in order. `parts` group the posts by seriesOrder on the hub.
+export const SERIES = {
+	'platformer-lab': {
+		slug: 'platformer-game-feel',
+		parts: [
+			{ id: 'movement', from: 1, to: 10, en: 'Movement', es: 'Movimiento' },
+			{ id: 'combat', from: 11, to: 20, en: 'Combat', es: 'Combate' },
+		],
+		en: {
+			name: 'Game feel in a platformer, playable',
+			description: 'The techniques that make a platformer feel good, one per post: what each one does, why it matters, and a sheet to play it.',
+			title: 'Platformer game feel: 20 mechanics explained and playable',
+			metaDescription: 'Coyote time, wall jumps, dash, hitboxes, i-frames, bosses: 20 platformer mechanics, each explained in a few lines and playable in your browser.',
+		},
+		es: {
+			name: 'Game feel en un plataformas, jugable',
+			description: 'Las técnicas que hacen que un plataformas se sienta bien, una por post: qué hace cada una, por qué importa y una lámina para jugarla.',
+			title: 'Game feel en plataformas: 20 mecánicas explicadas y jugables',
+			metaDescription: 'Coyote time, wall jump, dash, hitboxes, i-frames, jefes: 20 mecánicas de plataformas, cada una explicada en pocas líneas y jugable en el navegador.',
+		},
+	},
+} as const;
+export type SeriesId = keyof typeof SERIES;
+
 // i18n UI strings
 export const UI_STRINGS = {
 	en: {

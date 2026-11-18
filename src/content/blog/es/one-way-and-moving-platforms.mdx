@@ -1,0 +1,99 @@
+---
+title: "Plataformas one-way y móviles: bajar y saltar con inercia"
+description: "Una plataforma one-way es sólida por arriba y te deja bajar a través cuando quieres. Una móvil te da su velocidad al saltar. Mira las dos y juégalas."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 9
+seriesTitle: "Plataformas one-way y móviles"
+videoHero: {"sheets": "movers", "title": "Plataformas móviles", "videoNote": "Sube a la plataforma rápida y salta mientras avanza hacia el hueco de 8 casillas: con inercia, el salto se lleva la velocidad de la plataforma y llega. Tras pulsar T salta solo con su propia velocidad y se queda corto. Cada intento del video empieza en el borde del bloque.", "steps": ["Cruza el foso en la primera plataforma con <kbd>→</kbd> y sube en el ascensor. Quédate quieto encima: la plataforma te lleva y no resbalas.", "Desde el borde del bloque, sube corriendo a la plataforma rápida con <kbd>→</kbd> pulsado y salta con <kbd>Espacio</kbd> desde su borde delantero mientras todavía se mueve. Te llevas su velocidad y cruzas el hueco de 8 casillas.", "¿Te quedaste corto? El ascensor de abajo te vuelve a subir.", "Pulsa <kbd>T</kbd> y repite el salto. Sales solo con tu propia velocidad y caes al suelo bajo el hueco."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Una **plataforma one-way** es sólida por arriba y vacía por abajo: la atraviesas saltando desde debajo y bajas a través de ella cuando tú quieres. Una **plataforma móvil** te lleva encima, y al saltar desde ella conservas su velocidad.
+
+| | Valor |
+|---|---|
+| Ventana para bajar a través | 0,22 s |
+| Plataforma rápida | 267 px/s |
+| Saltar corriendo desde ella | 340 + 267 = 607 px/s |
+| Hueco que cruzas con esa velocidad | 8 casillas (un salto completo corriendo cubre 6,4) |
+
+<h2 id="what-is-a-one-way-platform">Plataformas one-way: subir atravesando, bajar a propósito</h2>
+
+Con plataformas one-way el jugador sube una torre sin rodear cada piso. Para bajar hace falta abajo + salto, nunca abajo a secas: abajo a secas es agacharse, y agacharse sobre una one-way no debería tirarte. En el [código de Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) se llaman *jump-thrus*.
+
+<PlayableLab
+  sheets="oneway"
+  title="Plataformas one-way"
+  steps={[
+    "Sube atravesando las tres plataformas de la izquierda con <kbd>Espacio</kbd>. Pasas por debajo y aterrizas encima.",
+    "Desde la de arriba, salta hacia la derecha al pilar con <kbd>→</kbd> y <kbd>Espacio</kbd>, y déjate caer por el otro lado a la primera plataforma del pozo.",
+    "Mantén <kbd>↓</kbd> y pulsa <kbd>Espacio</kbd> para atravesarla hacia abajo. Repítelo en la siguiente para llegar al suelo y a la salida, abajo a la derecha.",
+    "Ahora quédate quieto sobre una plataforma y pulsa solo <kbd>↓</kbd>. Solo te agachas: para bajar hacen falta las dos teclas.",
+  ]}
+/>
+
+<h2 id="what-is-moving-platform-momentum">Inercia de plataforma: saltar con su velocidad</h2>
+
+Mientras estás encima de una plataforma móvil, te lleva con ella y no resbalas. Al saltar conservas su velocidad sumada a la tuya: corre sobre una plataforma que va a 267 px/s y sales a 607 px/s, lo bastante para cruzar un hueco de 8 casillas que un salto de 6,4 no alcanza. Hereda su movimiento lateral y el que sube, pero no el que baja, para que saltar desde una plataforma que desciende no acorte nunca el salto.
+
+<h2 id="how-to-implement">Cómo implementar plataformas one-way y móviles</h2>
+
+1. **One-way:** que solo choque por arriba, con algo de margen (6 px en una plataforma de 8) para que las caídas rápidas no la atraviesen, y en su propia capa de colisión.
+2. **Bajar a través:** con abajo + salto sobre una one-way, el jugador deja de chocar con esa capa durante 0,22 s y baja 2 px. Vacía también el jump buffer y el coyote time, o la misma pulsación te devuelve arriba de un salto.
+3. **Plataformas móviles:** muévelas en el paso de física, el mismo que el del jugador, y lleva encima a quien las pise.
+4. **Pierde el exceso de velocidad despacio en el aire.** Si el control en el aire te devuelve a la velocidad de carrera al ritmo de siempre, la velocidad heredada desaparece en unos 0,1 s y el salto se queda corto.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="game/entities/one_way_platform.gd">
+```gdscript
+func _ready() -> void:
+	collision_layer = 2
+# ...
+	shape.one_way_collision = true
+	shape.one_way_collision_margin = 6.0
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _drop_through() -> void:
+	_jump_buffer = 0.0
+	_coyote = 0.0
+	_drop_timer = 0.22
+	set_collision_mask_value(LAYER_ONE_WAY, false)
+	global_position.y += 2.0
+	velocity.y = maxf(velocity.y, 80.0)
+# ...
+func _apply_lab() -> void:
+	# INERCIA DE PLATAFORMA: al saltar desde una plataforma móvil se hereda su
+	# velocidad (sólo la componente ascendente en vertical: nunca acorta el salto).
+	platform_on_leave = (PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY if Lab.on(&"platform_momentum")
+			else PLATFORM_ON_LEAVE_DO_NOTHING)
+# ...
+	if absf(velocity.x) > p.max_speed:
+		# Sobrevelocidad (plataforma, dash-jump): perderla despacio, sobre todo en el aire.
+		rate = p.overspeed_decel if on_floor else p.air_overspeed_decel
+```
+</CodeBlock>
+
+La plataforma es un `AnimatableBody2D`, así que `move_and_slide()` lleva a quien vaya encima, y `air_overspeed_decel` vale 140 px/s², tan poco que la velocidad heredada dura todo el salto.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="jump-falls-short">¿Por qué mi salto desde una plataforma móvil se queda corto?</h3>
+
+Revisa primero el control en el aire: la velocidad que pasa de la de carrera debe perderse despacio (aquí 140 px/s², frente a unos 2.473 de la aceleración normal en el aire). Y corre con la plataforma. Si saltas parado sales a 267 px/s, menos que tu propia carrera, y el salto es uno normal.
+
+<h3 id="which-platform-on-leave">¿Qué platform_on_leave debería usar en Godot?</h3>
+
+`PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY`. Conserva la inercia lateral e ignora el movimiento hacia abajo, así que ningún salto sale más corto. La opción de serie, `PLATFORM_ON_LEAVE_ADD_VELOCITY`, también suma la parte que baja.

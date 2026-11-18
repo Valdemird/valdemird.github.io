@@ -1,0 +1,80 @@
+---
+title: "Hitstop y confirmar el golpe: que se note que has dado"
+description: "El hitstop congela el juego 50 ms cuando un ataque conecta. Con retroceso, destello y chispas, le dice al jugador que ha dado. Míralo y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 13
+seriesTitle: "Hitstop y confirmación"
+videoHero: {"sheets": "c_confirm", "plane": "combate", "title": "Confirmar el golpe", "videoNote": "Golpea al maniquí con la confirmación encendida: hitstop, retroceso, destello y chispas. Tras pulsar T, los mismos golpes entran sin nada de eso, y cuesta saber que han entrado.", "steps": ["Camina hacia la derecha con <kbd>→</kbd> y golpea al maniquí con <kbd>C</kbd>. Congelación, destello, chispas, y tú te deslizas un poco hacia atrás.", "Salta el bloque bajo con <kbd>Espacio</kbd> y golpea a los dos enemigos que patrullan. Cada golpe los aparta a ellos y te echa atrás a ti.", "Pulsa <kbd>T</kbd> y repítelo todo. El mismo daño, sin congelación, sin destello, sin empujón.", "Con la técnica todavía apagada, sigue golpeando a un enemigo mientras caminas hacia él, y mira dónde acabas."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+El **hitstop** congela el juego **50 ms** cuando un ataque conecta. Junto con el retroceso, el destello, las chispas y el sonido de impacto forma la **confirmación del golpe**: todo lo que le dice al jugador que ha dado, porque el daño por sí solo es un número invisible.
+
+| Suceso | Hitstop |
+|---|---|
+| Recibir un golpe | 110 ms |
+| El remate del combo conecta | 90 ms |
+| Muere un enemigo | 80 ms |
+| Un golpe normal | 50 ms |
+| Un golpe parado por una guardia | 40 ms |
+
+<h2 id="what-is-hitstop">Hitstop: congelar el juego en el impacto</h2>
+
+El [glosario de juegos de pelea de Infil](https://glossary.infil.net/?t=Hitstop) lo define como una pausa brevísima con efecto dramático: cuando un ataque se siente contundente ("beefy"), suele ser por esto. Recibir daño es lo que más congela, porque tu propio error tiene que pesar más que tu acierto. El [código del jugador de Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) llama a `Celeste.Freeze(.05f)` al empezar cada dash: los mismos 50 ms, sin ningún ataque.
+
+<h2 id="hit-confirmation">Confirmar el golpe: todas las señales de que entró</h2>
+
+El hitstop es el canal del tiempo. Además, el atacante retrocede a 170 px/s durante 70 ms, el objetivo destella y sale empujado, saltan chispas en la dirección del golpe y la cámara y el mando tiemblan un poco. La T lo apaga todo a la vez: el mismo daño, y nada que te lo cuente. Los juegos de pelea llaman [hit confirm](https://glossary.infil.net/?t=Hit+Confirm) a la parte del jugador, ver que el primer golpe entró antes de seguir con el combo.
+
+<h2 id="how-to-implement">Cómo implementar el hitstop y la confirmación del golpe</h2>
+
+1. **Congela con la escala de tiempo y termina con el reloj real.** Con la escala a cero también se paran los temporizadores del juego, incluido el que usarías para descongelar.
+2. **Quédate con la congelación pendiente más larga.** Dos golpes en el mismo tic no se suman: un tajo que atraviesa a dos objetivos congela 50 ms, no 100.
+3. **Anuncia el golpe; no llames a los efectos desde el código del daño.** La presentación, la víctima y el atacante reaccionan cada uno por su cuenta, y así una sola tecla lo apaga todo sin tocar el daño.
+4. **Echa atrás al atacante.** Sin retroceso, un tajo dado a la carrera te mete dentro del enemigo, y su daño por contacto castiga el golpe que acabas de dar.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/autoload/juice.gd">
+```gdscript
+func _enter_tree() -> void:
+	# Debe seguir procesando aunque el juego esté en pausa o congelado.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+# ...
+## HIT STOP: congela el juego unas centésimas para dar peso a un impacto.
+## 30–80 ms bastan; más de 120 ms se siente como un tirón.
+func hitstop(seconds: float) -> void:
+	if not Lab.on(&"juice_hitstop") or seconds <= 0.0:
+		return
+	# Usamos reloj real: con time_scale = 0 los temporizadores del juego no avanzan.
+	_freeze_until_msec = maxi(_freeze_until_msec, Time.get_ticks_msec() + int(seconds * 1000.0))
+	_frozen = true
+	Engine.time_scale = 0.0
+
+func _process(_delta: float) -> void:
+	if _frozen and Time.get_ticks_msec() >= _freeze_until_msec:
+		_frozen = false
+		Engine.time_scale = Lab.game_speed
+```
+</CodeBlock>
+
+`_process` se sigue llamando aunque el delta del juego valga cero, así que puede mirar el reloj y terminar la congelación.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-long-hitstop">¿Cuánto debería durar el hitstop?</h3>
+
+Unos 50 ms por golpe, 3 frames a 60 fps, y 90 ms para un remate. A partir de 120 ms se siente como un tirón.
+
+<h3 id="hit-confirm-vs-hitstop">¿Confirmar el golpe es lo mismo que el hitstop?</h3>
+
+No. El hitstop es uno de sus canales. En los juegos de pelea, el hit confirm es además una habilidad del jugador: darse cuenta de que un golpe entró y solo entonces seguir con el combo.

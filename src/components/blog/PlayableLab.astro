@@ -1,0 +1,848 @@
+---
+/**
+ * PlayableLab — one sheet of the Platformer Blueprint lab, inside the post.
+ *
+ * Two tabs:
+ *   · Watch it — a short clip of the real game (record.mjs): the technique on,
+ *     then T pressed and the same inputs with it off. Plays muted when in view.
+ *   · Play it and try it — the real game (godot/platformer-lab/build.sh), driven
+ *     by the reader from the first frame, with numbered steps of what to try.
+ *     Nothing loads until the reader presses Play.
+ *
+ *   <PlayableLab sheets="coyote" title="Coyote time"
+ *     steps={["Run right with → and jump with Space at the very last moment.", "..."]} />
+ *
+ * The clip, if it exists, also ships as VideoObject structured data. Only one
+ * game runs at a time: starting one closes the others on the page.
+ */
+import { getLocale } from '../../consts';
+import clips from '../../data/platformer-lab-clips.json';
+import { labMedia } from '../../lib/lab-media';
+
+type Plane = 'plataformas' | 'combate';
+interface Props {
+	/** Sheet id(s) from the game's lab, comma-separated: "coyote" or "coyote,buffer". */
+	sheets: string;
+	plane?: Plane;
+	/** Reader-facing name of the sheet, shown above the frame. */
+	title: string;
+	/** Numbered "how to try it" steps, shown under the game. May contain <kbd>. */
+	steps?: string[];
+	/** One line on what the clip shows (also the video's description for search). */
+	videoNote?: string;
+	/** Screenshot shown before loading. Defaults to the posters.mjs output for these sheets. */
+	poster?: string;
+	/** Clip. Defaults to the record.mjs output; the tab only appears if the file exists. */
+	video?: string;
+	caption?: string;
+	/** "hero": the clip that opens a video-first post. Wider, no title row (the post's H1
+	 *  follows), and the poster loads with the page because it is the LCP image. */
+	variant?: 'inline' | 'hero';
+}
+
+const { sheets, plane = 'plataformas', title, steps = [], caption, variant = 'inline' } = Astro.props;
+const hero = variant === 'hero';
+const media = labMedia(plane, sheets, { poster: Astro.props.poster, video: Astro.props.video });
+const { slug, poster, posterSrcset, videoPoster, videoSrc, smallSrc, hasVideo } = media;
+const videoPath = media.video;
+const clip = (clips as Record<string, { uploadDate: string; duration: string }>)[slug];
+// Same width as .pl below: min(900px, 100vw - 2rem).
+const posterSizes = '(min-width: 932px) 900px, calc(100vw - 2rem)';
+const lang = getLocale(Astro.url);
+const es = lang === 'es';
+
+const src = `/play/platformer-lab/index.html?${new URLSearchParams({ plano: plane, lamina: sheets, lang })}`;
+const uid = `pl-${slug.replace(/[^a-z0-9]+/gi, '-')}`;
+
+const COPY = es
+	? {
+			eyebrow: 'Lámina jugable',
+			watch: 'Míralo',
+			play: 'Juégalo y pruébalo',
+			start: 'Jugar',
+			watchStart: 'Ver el video',
+			watchRetry: 'No cargó: reintentar',
+			startHint: 'Tú llevas el mando desde el primer momento. Los pasos están debajo.',
+			videoNote: Astro.props.videoNote ?? 'Primero con la técnica encendida; a mitad del video se pulsa T y las mismas pulsaciones fallan sin ella.',
+			legendOn: 'con la técnica',
+			legendOff: 'T pulsada: sin ella',
+			tryTitle: 'Cómo probarlo',
+			posterAlt: `${title}: captura de la lámina jugable`,
+			fullscreen: 'Pantalla completa',
+			close: 'Cerrar',
+			refocus: 'Haz clic para seguir jugando',
+			weight: 'Es el juego de verdad, corriendo en tu navegador. La primera vez descarga el motor; después queda en caché.',
+			spanish: '',
+			touch: 'En el móvil aparecen botones en la pantalla: ← → para moverte, SALTO, y T para la técnica.',
+			keys: { move: 'moverse', jump: 'saltar', dash: 'dash', toggle: 'técnica on/off', lab: 'ficha y código', retry: 'reintentar', attack: 'atacar', heal: 'curarse' },
+			frameTitle: `${title} (juego jugable)`,
+			videoTitle: `${title}: con y sin la técnica`,
+		}
+	: {
+			eyebrow: 'Playable sheet',
+			watch: 'Watch it',
+			play: 'Play it and try it',
+			start: 'Play',
+			watchStart: 'Play the clip',
+			watchRetry: "Didn't load: retry",
+			startHint: "You're in control from the first frame. The steps are below.",
+			videoNote: Astro.props.videoNote ?? 'First with the technique on; halfway through, T is pressed and the same inputs fail without it.',
+			legendOn: 'technique on',
+			legendOff: 'T pressed: off',
+			tryTitle: 'How to try it',
+			posterAlt: `${title}: screenshot of the playable sheet`,
+			fullscreen: 'Full screen',
+			close: 'Close',
+			refocus: 'Click to keep playing',
+			weight: 'The real game, running in your browser. The first load fetches the engine; after that it is cached.',
+			spanish: 'The in-game labels are in Spanish.',
+			touch: 'On a phone you get on-screen buttons: ← → to move, JUMP, and T for the technique.',
+			keys: { move: 'move', jump: 'jump', dash: 'dash', toggle: 'technique on/off', lab: 'notes & code', retry: 'retry', attack: 'attack', heal: 'heal' },
+			frameTitle: `${title} (playable game)`,
+			videoTitle: `${title}: with and without the technique`,
+		};
+
+const keys: { k: string[]; label: string }[] = [
+	{ k: ['←', '→'], label: COPY.keys.move },
+	{ k: ['Space'], label: COPY.keys.jump },
+	{ k: ['X'], label: COPY.keys.dash },
+	...(plane === 'combate'
+		? [
+				{ k: ['C'], label: COPY.keys.attack },
+				{ k: ['V'], label: COPY.keys.heal },
+			]
+		: []),
+	{ k: ['T'], label: COPY.keys.toggle },
+	{ k: ['Tab'], label: COPY.keys.lab },
+	{ k: ['R'], label: COPY.keys.retry },
+];
+
+const site = Astro.site ?? new URL('https://valdemird.com');
+const videoLd = hasVideo
+	? JSON.stringify({
+			'@context': 'https://schema.org',
+			'@type': 'VideoObject',
+			name: COPY.videoTitle,
+			description: COPY.videoNote,
+			thumbnailUrl: [new URL(poster, site).href],
+			contentUrl: new URL(videoPath, site).href,
+			// From the clip manifest (record.mjs), not the file's mtime: in CI that is the checkout time.
+			uploadDate: clip?.uploadDate ?? '2026-11-18',
+			...(clip?.duration ? { duration: clip.duration } : {}),
+			inLanguage: lang,
+		})
+	: '';
+---
+
+<figure class:list={['pl', { 'pl--hero': hero }]} data-playable-lab data-src={src}>
+	{!hero && (
+		<header class="pl-head">
+			<span class="pl-eyebrow">{COPY.eyebrow}</span>
+			<span class="pl-title">{title}</span>
+		</header>
+	)}
+
+	{hasVideo && (
+		<div class="pl-tabs" role="tablist" aria-label={title}>
+			<button class="pl-tab" type="button" role="tab" id={`${uid}-tab-watch`} aria-controls={`${uid}-watch`} aria-selected="true" data-pl-tab="watch">
+				<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
+				{COPY.watch}
+			</button>
+			<button class="pl-tab" type="button" role="tab" id={`${uid}-tab-play`} aria-controls={`${uid}-play`} aria-selected="false" tabindex="-1" data-pl-tab="play">
+				<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M7 9h10a4 4 0 0 1 0 8 3 3 0 0 1-2.4-1.2l-.6-.8h-4l-.6.8A3 3 0 0 1 7 17a4 4 0 0 1 0-8zm1.5 2v1.5H7V14h1.5v1.5H10V14h1.5v-1.5H10V11zm7.25 1a1 1 0 1 0 0 2 1 1 0 0 0 0-2z" fill="currentColor" /></svg>
+				{COPY.play}
+			</button>
+		</div>
+	)}
+
+	{hasVideo && (
+		<div class="pl-panel" role="tabpanel" id={`${uid}-watch`} aria-labelledby={`${uid}-tab-watch`} data-pl-panel="watch">
+			<div class="pl-frame">
+				{/* The 960 poster: the clip itself is 960×540, so a bigger one buys nothing. A video
+				    poster can't load lazily, so the script sets it when the clip nears the screen;
+				    without JS there is no poster, only the native controls. (An <img> under the
+				    video would be lazy for free, but Chrome's controls paint over it.) */}
+				{/* Phones get the 640×360 copy: a fifth of the bytes, the same clip. Browsers that
+				    ignore `media` take the first source, which is why the small one comes first. */}
+				<video class="pl-video" poster={hero ? videoPoster : undefined} data-poster={hero ? undefined : videoPoster} muted loop playsinline controls preload="none" aria-label={COPY.videoTitle} data-pl-video>
+					{smallSrc && <source src={smallSrc} type="video/mp4" media="(max-width: 640px)" />}
+					<source src={videoSrc} type="video/mp4" />
+				</video>
+				{/* Revealed by the script when the clip won't start on its own: reduced motion, or
+				    autoplay refused. Without JS the native controls are enough. */}
+				<button class="pl-play pl-watch-start" type="button" data-pl-watch-start data-retry={COPY.watchRetry} hidden>
+					<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
+					<span data-label>{COPY.watchStart}</span>
+				</button>
+			</div>
+			<p class="pl-legend">
+				<span class="pl-chip pl-chip--on">1 · {COPY.legendOn}</span>
+				<span class="pl-chip pl-chip--off">2 · {COPY.legendOff}</span>
+				<span class="pl-legend__note">{COPY.videoNote}</span>
+			</p>
+		</div>
+	)}
+
+	<div class="pl-panel" role={hasVideo ? 'tabpanel' : undefined} id={`${uid}-play`} aria-labelledby={hasVideo ? `${uid}-tab-play` : undefined} data-pl-panel="play" hidden={hasVideo}>
+		<div class="pl-frame" data-pl-frame data-frame-title={COPY.frameTitle}>
+			<img class="pl-poster" src={poster} srcset={posterSrcset} sizes={posterSizes} alt={COPY.posterAlt} width="1280" height="720" loading="lazy" decoding="async" />
+			<div class="pl-cover">
+				<button class="pl-play" type="button" data-pl-play>
+					<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" /></svg>
+					<span>{COPY.start}</span>
+				</button>
+				<p class="pl-hint">{COPY.startHint}</p>
+			</div>
+			<button class="pl-refocus" type="button" data-pl-refocus tabindex="-1">{COPY.refocus}</button>
+		</div>
+
+		{steps.length > 0 && (
+			<div class="pl-try">
+				<span class="pl-try__title">{COPY.tryTitle}</span>
+				<ol class="pl-try__steps">
+					{steps.map((step) => <li set:html={step} />)}
+				</ol>
+			</div>
+		)}
+
+		<div class="pl-bar">
+			<ul class="pl-keys" aria-label={es ? 'Controles' : 'Controls'}>
+				{keys.map(({ k, label }) => (
+					<li>
+						{k.map((key) => <kbd>{key}</kbd>)}
+						<span>{label}</span>
+					</li>
+				))}
+			</ul>
+			<div class="pl-actions">
+				<button class="pl-btn" type="button" data-pl-fullscreen>{COPY.fullscreen}</button>
+				<button class="pl-btn" type="button" data-pl-close hidden>{COPY.close}</button>
+			</div>
+		</div>
+		<p class="pl-touch">{COPY.touch}</p>
+		{/* Only the game downloads an engine, so the note lives on its tab. */}
+		<p class="pl-weight">{COPY.weight}</p>
+	</div>
+
+	{(caption || COPY.spanish) && (
+		<figcaption class="pl-caption">
+			{caption && <span class="pl-caption__text">{caption}</span>}
+			{COPY.spanish && <span class="pl-caption__meta">{COPY.spanish}</span>}
+		</figcaption>
+	)}
+
+	{videoLd && <script type="application/ld+json" set:html={videoLd} />}
+</figure>
+
+<script>
+	type Controller = { root: HTMLElement; stop: () => void };
+	const controllers = new Set<Controller>();
+	const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+	/** Which running sheet (if any) owns the keyboard right now. */
+	function syncFocus() {
+		// The parent document's activeElement is the iframe while the game has focus.
+		const active = document.activeElement;
+		for (const { root } of controllers) {
+			const frame = root.querySelector('iframe');
+			root.classList.toggle('is-blurred', !!frame && active !== frame);
+		}
+	}
+
+	/** Muted autoplay. If the browser refuses (power saving, a site setting), the big play button appears. */
+	function autoplay(video: HTMLVideoElement) {
+		// Data saver on: no clip downloads until the reader asks for one.
+		const saveData = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+		if (saveData) {
+			const button = video.parentElement?.querySelector<HTMLButtonElement>('[data-pl-watch-start]');
+			if (button && video.paused) button.hidden = false;
+			return;
+		}
+		video.play().catch((error: DOMException) => {
+			const button = video.parentElement?.querySelector<HTMLButtonElement>('[data-pl-watch-start]');
+			if (button && video.paused) showButton(button, video, error);
+		});
+	}
+
+	/** The big button: "play" when autoplay was refused, "retry" when the clip itself failed. */
+	function showButton(button: HTMLButtonElement, video: HTMLVideoElement, error?: DOMException) {
+		const failed = !!video.error || error?.name === 'NotSupportedError';
+		if (failed) {
+			console.warn('[PlayableLab] clip failed', video.currentSrc, error?.name, error?.message, video.error?.code, video.error?.message);
+			const label = button.querySelector('[data-label]');
+			if (label && button.dataset.retry) label.textContent = button.dataset.retry;
+			button.dataset.failed = '1';
+		}
+		button.hidden = false;
+	}
+
+	// Posters load a screen and a half ahead of the clip, not with the page.
+	const posterObserver = new IntersectionObserver(
+		(entries) => {
+			for (const entry of entries) {
+				if (!entry.isIntersecting) continue;
+				const video = entry.target as HTMLVideoElement;
+				if (video.dataset.poster) video.poster = video.dataset.poster;
+				posterObserver.unobserve(video);
+			}
+		},
+		{ rootMargin: '150% 0px' },
+	);
+
+	// Clips play muted while on screen (and never on their own with reduced motion).
+	const videoObserver = new IntersectionObserver(
+		(entries) => {
+			for (const entry of entries) {
+				const video = entry.target as HTMLVideoElement;
+				if (entry.isIntersecting && !reduceMotion() && !video.closest('[hidden]')) {
+					autoplay(video);
+				} else if (!entry.isIntersecting) {
+					video.pause();
+				}
+			}
+		},
+		{ threshold: 0.5 },
+	);
+
+	function initOne(root: HTMLElement) {
+		if (root.dataset.plReady) return;
+		root.dataset.plReady = '1';
+		const frame = root.querySelector<HTMLElement>('[data-pl-frame]')!;
+		const play = root.querySelector<HTMLButtonElement>('[data-pl-play]')!;
+		const close = root.querySelector<HTMLButtonElement>('[data-pl-close]')!;
+		const fullscreen = root.querySelector<HTMLButtonElement>('[data-pl-fullscreen]')!;
+		const refocus = root.querySelector<HTMLButtonElement>('[data-pl-refocus]')!;
+		const tabs = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-pl-tab]'));
+		const video = root.querySelector<HTMLVideoElement>('[data-pl-video]');
+		const watchStart = root.querySelector<HTMLButtonElement>('[data-pl-watch-start]');
+		let iframe: HTMLIFrameElement | null = null;
+
+		if (video && watchStart) {
+			if (reduceMotion()) watchStart.hidden = false;
+			// Once the clip is playing, its own controls take over from the big button.
+			video.addEventListener('playing', () => (watchStart.hidden = true));
+			watchStart.addEventListener('click', () => {
+				watchStart.hidden = true;
+				// After a failure, start over: reload the source before playing.
+				if (watchStart.dataset.failed || video.error) video.load();
+				video.muted = true;
+				video.play().catch((error: DOMException) => showButton(watchStart, video, error));
+			});
+			video.addEventListener('error', () => {
+				if (!watchStart.hidden || video.paused) showButton(watchStart, video);
+			});
+		}
+
+		function url() {
+			const u = new URL(root.dataset.src!, location.origin);
+			if (matchMedia('(pointer: coarse)').matches) u.searchParams.set('tactil', '1');
+			if (reduceMotion()) u.searchParams.set('reducir', '1');
+			return u.pathname + u.search;
+		}
+
+		function start() {
+			if (iframe) return;
+			for (const other of controllers) if (other.root !== root) other.stop();
+			video?.pause();
+			iframe = document.createElement('iframe');
+			iframe.className = 'pl-iframe';
+			iframe.src = url();
+			iframe.title = frame.dataset.frameTitle || '';
+			iframe.allow = 'autoplay; fullscreen; gamepad';
+			iframe.addEventListener('load', () => {
+				iframe?.focus();
+				syncFocus();
+			});
+			frame.append(iframe);
+			root.classList.add('is-playing');
+			close.hidden = false;
+			iframe.focus();
+		}
+
+		function stop() {
+			iframe?.remove();
+			iframe = null;
+			root.classList.remove('is-playing', 'is-blurred');
+			close.hidden = true;
+		}
+
+		function select(name: string, focus = false) {
+			for (const tab of tabs) {
+				const on = tab.dataset.plTab === name;
+				tab.setAttribute('aria-selected', String(on));
+				tab.tabIndex = on ? 0 : -1;
+				if (on && focus) tab.focus();
+			}
+			for (const panel of root.querySelectorAll<HTMLElement>('[data-pl-panel]')) {
+				panel.hidden = panel.dataset.plPanel !== name;
+			}
+			if (name === 'watch') {
+				stop();
+				if (video && !reduceMotion()) autoplay(video);
+			} else {
+				video?.pause();
+			}
+		}
+
+		tabs.forEach((tab, i) => {
+			tab.addEventListener('click', () => select(tab.dataset.plTab!));
+			tab.addEventListener('keydown', (e) => {
+				if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+				e.preventDefault();
+				const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+				select(next.dataset.plTab!, true);
+			});
+		});
+
+		play.addEventListener('click', start);
+		close.addEventListener('click', stop);
+		refocus.addEventListener('click', () => {
+			iframe?.focus();
+			syncFocus();
+		});
+		fullscreen.addEventListener('click', async () => {
+			start();
+			const el = frame as HTMLElement & { webkitRequestFullscreen?: () => void };
+			if (document.fullscreenEnabled && el.requestFullscreen) {
+				try {
+					await el.requestFullscreen();
+					iframe?.focus();
+					return;
+				} catch {
+					/* fall through */
+				}
+			}
+			if (el.webkitRequestFullscreen) {
+				el.webkitRequestFullscreen();
+				return;
+			}
+			// Phones without the Fullscreen API (iPhone): the game on its own page.
+			location.href = url();
+		});
+
+		if (video) {
+			posterObserver.observe(video);
+			videoObserver.observe(video);
+		}
+		controllers.add({ root, stop });
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-playable-lab]').forEach(initOne);
+	}
+
+	// Focusing the iframe blurs the parent window; clicking the page focuses it back.
+	window.addEventListener('blur', () => setTimeout(syncFocus, 0));
+	window.addEventListener('focus', () => setTimeout(syncFocus, 0));
+	document.addEventListener('astro:before-swap', () => {
+		for (const c of controllers) c.stop();
+		controllers.clear();
+		videoObserver.disconnect();
+		posterObserver.disconnect();
+	});
+	document.addEventListener('astro:after-swap', init);
+	init();
+</script>
+
+<style>
+	.pl {
+		/* The game's own paper colour (BP.PAPER_SHADE), so loading never flashes white. */
+		--pl-paper: oklch(0.36 0.13 262);
+		--pl-w: min(900px, calc(100vw - 2rem));
+		width: var(--pl-w);
+		margin: 2.5rem 0 2.5rem calc(50% - var(--pl-w) / 2);
+		display: grid;
+		gap: 0.75rem;
+	}
+
+	/* The clip that opens a video-first post: as wide as the page allows, right under the nav. */
+	.pl--hero {
+		/* Wide, but short enough on a laptop that the title below peeks over the fold
+		   (and never smaller than 560px on short landscape screens). */
+		--pl-w: min(1100px, calc(100vw - 2rem), max(560px, calc((100svh - 16rem) * 16 / 9)));
+		margin-top: 0.5rem;
+		margin-bottom: 2rem;
+	}
+	.pl--hero .pl-frame {
+		box-shadow: var(--shadow-lg);
+	}
+
+	.pl-head {
+		display: flex;
+		align-items: baseline;
+		gap: 0.75rem;
+	}
+	.pl-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+	.pl-title {
+		font-family: var(--font-serif);
+		font-size: 1.15rem;
+		color: var(--color-text);
+	}
+
+	/* ----- tabs ----- */
+	.pl-tabs {
+		display: flex;
+		gap: 0.5rem;
+		flex-wrap: wrap;
+	}
+	.pl-tab {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.45rem;
+		padding: 0.55rem 1rem;
+		border-radius: 999px;
+		border: 1px solid var(--color-border);
+		background: var(--color-surface);
+		color: var(--color-text-secondary);
+		font-family: var(--font-mono);
+		font-size: 0.78rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		cursor: pointer;
+		transition: all var(--duration-normal) var(--ease-spring);
+	}
+	.pl-tab:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md);
+		border-color: var(--color-accent);
+		color: var(--color-text);
+	}
+	.pl-tab[aria-selected='true'] {
+		background: var(--color-accent-subtle);
+		border-color: var(--color-accent);
+		color: var(--color-accent);
+	}
+	.pl-tab:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 2px;
+	}
+
+	.pl-panel {
+		display: grid;
+		gap: 0.75rem;
+	}
+	.pl-panel[hidden] {
+		display: none;
+	}
+
+	.pl-frame {
+		position: relative;
+		aspect-ratio: 16 / 9;
+		overflow: hidden;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		background: var(--pl-paper);
+		box-shadow: var(--shadow-md);
+	}
+	.pl-frame:fullscreen {
+		aspect-ratio: auto;
+		border-radius: 0;
+		border: none;
+	}
+
+	/* The iframe is created by the script, so it has no scoped attribute: :global. */
+	.pl-poster,
+	.pl-video,
+	.pl-frame :global(.pl-iframe) {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		border: 0;
+		display: block;
+	}
+	.pl-poster,
+	.pl-video {
+		object-fit: cover;
+	}
+	.pl-watch-start {
+		white-space: nowrap;
+		position: absolute;
+		left: 50%;
+		top: 50%;
+		translate: -50% -50%;
+	}
+	.pl-watch-start:hover {
+		transform: translateY(-2px) scale(1.03);
+	}
+	.pl-watch-start[hidden] {
+		display: none;
+	}
+	.pl-poster {
+		transition: filter var(--duration-slow) var(--ease-smooth);
+	}
+	.pl:not(.is-playing) .pl-frame:hover .pl-poster {
+		filter: brightness(1.06) saturate(1.05);
+	}
+
+	/* ----- video legend ----- */
+	.pl-legend {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.45rem 0.6rem;
+		margin: 0;
+		font-size: 0.85rem;
+		color: var(--color-text-secondary);
+	}
+	.pl-chip {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		padding: 0.2em 0.6em;
+		border-radius: 999px;
+	}
+	.pl-chip--on {
+		color: var(--color-success);
+		background: oklch(from var(--color-success) l c h / 0.1);
+	}
+	.pl-chip--off {
+		color: var(--color-warning);
+		background: oklch(from var(--color-warning) l c h / 0.12);
+	}
+	.pl-legend__note {
+		flex-basis: 100%;
+	}
+
+	/* ----- play cover ----- */
+	.pl-cover {
+		position: absolute;
+		inset: 0;
+		display: grid;
+		place-content: center;
+		justify-items: center;
+		gap: 0.9rem;
+		padding: 1.5rem;
+		text-align: center;
+		background: radial-gradient(70% 70% at 50% 50%, oklch(from var(--pl-paper) calc(l - 0.2) c h / 0.62), oklch(from var(--pl-paper) calc(l - 0.2) c h / 0.18));
+	}
+	.is-playing .pl-cover,
+	.is-playing .pl-poster {
+		visibility: hidden;
+	}
+
+	.pl-play {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.55rem;
+		padding: 0.75rem 1.4rem;
+		border-radius: 999px;
+		border: 1px solid oklch(from var(--color-bg) l c h / 0.5);
+		background: oklch(from var(--color-bg) l c h / 0.82);
+		backdrop-filter: blur(12px) saturate(1.4);
+		-webkit-backdrop-filter: blur(12px) saturate(1.4);
+		color: var(--color-text);
+		font-family: var(--font-mono);
+		font-size: 0.85rem;
+		font-weight: 600;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		cursor: pointer;
+		box-shadow: var(--shadow-md);
+		transition: all var(--duration-normal) var(--ease-spring);
+	}
+	.pl-play:hover {
+		transform: translateY(-2px) scale(1.03);
+		box-shadow: var(--shadow-lg);
+		border-color: var(--color-accent);
+	}
+	.pl-play:focus-visible {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 3px;
+	}
+	.pl-play svg {
+		color: var(--color-accent);
+	}
+	.pl-hint {
+		margin: 0;
+		max-width: 42ch;
+		font-size: 0.86rem;
+		line-height: 1.5;
+		color: oklch(0.96 0.01 260);
+		text-shadow: 0 1px 8px oklch(0 0 0 / 0.55);
+	}
+
+	/* Keyboard went back to the page: say so, and give the game its focus back on click. */
+	.pl-refocus {
+		position: absolute;
+		inset: 0;
+		display: none;
+		place-items: end center;
+		padding-bottom: 1rem;
+		border: none;
+		background: oklch(0 0 0 / 0.18);
+		color: oklch(0.97 0.01 260);
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		cursor: pointer;
+	}
+	.is-playing.is-blurred .pl-refocus {
+		display: grid;
+	}
+	@media (pointer: coarse) {
+		.is-playing.is-blurred .pl-refocus {
+			display: none;
+		}
+	}
+
+	/* ----- how to try it ----- */
+	.pl-try {
+		padding: 0.9rem 1.1rem;
+		border-radius: var(--radius-md);
+		background: oklch(from var(--color-accent) l c h / 0.045);
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+	}
+	:global([data-theme='dark']) .pl-try {
+		background: oklch(from var(--color-accent) l c h / 0.085);
+	}
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .pl-try {
+			background: oklch(from var(--color-accent) l c h / 0.085);
+		}
+	}
+	.pl-try__title {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+	.pl-try__steps {
+		margin: 0.5rem 0 0;
+		padding-left: 1.3rem;
+		display: grid;
+		gap: 0.35rem;
+		font-size: 0.92rem;
+		color: var(--color-text);
+	}
+	.pl-try__steps li {
+		margin: 0;
+	}
+	.pl-try__steps :global(kbd) {
+		font-family: var(--font-mono);
+		font-size: 0.75em;
+		padding: 0.05em 0.4em;
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-border-strong);
+		border-bottom-width: 2px;
+		border-radius: var(--radius-sm);
+	}
+
+	.pl-bar {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.6rem 1rem;
+	}
+	.pl-keys {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.35rem 1rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		font-size: 0.78rem;
+		color: var(--color-text-secondary);
+	}
+	.pl-keys li {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		margin: 0;
+	}
+	.pl-keys kbd {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		min-width: 1.5em;
+		padding: 0.08em 0.4em;
+		text-align: center;
+		color: var(--color-text);
+		background: var(--color-bg-secondary);
+		border: 1px solid var(--color-border-strong);
+		border-bottom-width: 2px;
+		border-radius: var(--radius-sm);
+	}
+
+	.pl-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+	.pl-btn {
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		padding: 0.4rem 0.75rem;
+		border-radius: var(--radius-sm);
+		border: 1px solid var(--color-border);
+		background: var(--color-surface);
+		color: var(--color-text-secondary);
+		cursor: pointer;
+		transition: all var(--duration-normal) var(--ease-spring);
+	}
+	.pl-btn:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md);
+		border-color: var(--color-accent);
+		color: var(--color-text);
+	}
+	.pl-btn[hidden] {
+		display: none;
+	}
+
+	.pl-touch {
+		display: none;
+		margin: 0;
+		font-size: 0.82rem;
+		color: var(--color-text-secondary);
+	}
+	@media (pointer: coarse) {
+		.pl-keys {
+			display: none;
+		}
+		.pl-touch {
+			display: block;
+		}
+	}
+
+	.pl-caption {
+		display: grid;
+		gap: 0.3rem;
+		font-size: 0.85rem;
+		color: var(--color-text-secondary);
+	}
+	.pl-weight {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+	.pl-caption__meta {
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-muted);
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.pl-play,
+		.pl-btn,
+		.pl-tab,
+		.pl-poster {
+			transition: none;
+		}
+	}
+</style>

@@ -1,0 +1,95 @@
+---
+/**
+ * TrackArtClip — what a playable series is about, shown with the series itself:
+ * a few seconds of the real game, looping. The phone-size copy of a lab clip
+ * (640×360) is enough at this size.
+ *
+ * Decorative and inside a card link, so no controls and aria-hidden. It only
+ * plays while on screen (.is-live, set by the learn page's script), never with
+ * reduced motion or data saver: then the poster stays.
+ */
+import { labMedia } from '../../lib/lab-media';
+
+interface Props {
+	plane?: string;
+	sheets: string;
+	/** Short tag over the picture, e.g. "jugable". */
+	badge?: string;
+}
+const { plane = 'plataformas', sheets, badge } = Astro.props;
+const media = labMedia(plane, sheets);
+const poster = media.posterSrcset ? media.videoPoster : media.poster;
+---
+
+<div class="art art--clip" aria-hidden="true" data-track-art>
+	{media.hasVideo ? (
+		<video muted loop playsinline preload="none" poster={poster} data-track-clip>
+			<source src={media.smallSrc ?? media.videoSrc} type="video/mp4" />
+		</video>
+	) : (
+		<img src={poster} alt="" loading="lazy" decoding="async" />
+	)}
+	{badge && <span class="badge">{badge}</span>}
+</div>
+
+<script>
+	import { initTrackArtOnPage } from '../../lib/track-art';
+	initTrackArtOnPage();
+</script>
+
+<style>
+	.art {
+		position: relative;
+		aspect-ratio: 16 / 11;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-border);
+		overflow: hidden;
+		/* The lab's paper colour while the poster loads. */
+		background: oklch(0.36 0.13 262);
+	}
+	video,
+	img {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		display: block;
+	}
+	.badge {
+		position: absolute;
+		left: 0.7rem;
+		bottom: 0.7rem;
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.25rem 0.6rem;
+		border-radius: 999px;
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		font-weight: 600;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+		color: oklch(0.97 0.01 260);
+		background: oklch(0.2 0.05 262 / 0.72);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
+	}
+	.badge::before {
+		content: '';
+		width: 0.45rem;
+		height: 0.45rem;
+		border-radius: 50%;
+		background: oklch(0.72 0.17 145);
+	}
+	@media (prefers-reduced-motion: no-preference) {
+		.is-live .badge::before {
+			animation: live 1.6s ease-in-out infinite;
+		}
+	}
+	@keyframes live {
+		50% {
+			opacity: 0.35;
+		}
+	}
+</style>

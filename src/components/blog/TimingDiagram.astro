@@ -1,0 +1,640 @@
+---
+/**
+ * TimingDiagram — a technique's time windows on one axis, with a marker the
+ * reader drags: "if you press here, this happens with the technique, and this
+ * without it". Built for the platformer series (coyote time, jump buffer,
+ * attack phases, i-frames…), where the whole idea is a window of milliseconds.
+ *
+ *   <TimingDiagram
+ *     title="Coyote time and jump buffer"
+ *     duration={600} start={250}
+ *     phases={[{ from: 0, to: 200, label: "floor", tone: "solid", on: { ok: true, text: "You jump." } }, …]}
+ *     events={[{ at: 200, label: "the ledge ends" }]}
+ *     windows={[{ from: 200, to: 300, label: "coyote time", detail: "100 ms", measure: "since",
+ *                 on: { ok: true, text: "You jump, {ms} ms after the ledge." },
+ *                 off: { ok: false, text: "You fall: {ms} ms too late." } }]}
+ *   />
+ *
+ * The model (what a press at t does) lives in src/lib/timing.ts, shared with
+ * the client script. Server-rendered at `start`, so it reads without JS.
+ */
+import { getLocale } from '../../consts';
+import { pct, resolve, type Phase, type TimingEvent, type TimingWindow } from '../../lib/timing';
+
+interface Props {
+	title: string;
+	/** Length of the axis, in ms. */
+	duration: number;
+	phases: Phase[];
+	events?: TimingEvent[];
+	windows?: TimingWindow[];
+	/** Where the marker starts (and where the intro sweep stops), in ms. */
+	start?: number;
+	/** Marker step for the keyboard, in ms. */
+	step?: number;
+	/** What the marker stands for: "you press jump". */
+	probe?: string;
+	onLabel?: string;
+	offLabel?: string;
+	hint?: string;
+	/** Scale tick every n ms (0 hides the scale). */
+	tick?: number;
+}
+
+const lang = getLocale(Astro.url);
+const es = lang === 'es';
+const {
+	title,
+	duration,
+	phases,
+	events = [],
+	windows = [],
+	start = 0,
+	step = 5,
+	probe = es ? 'pulsas' : 'you press',
+	onLabel = es ? 'Con la técnica' : 'With the technique',
+	offLabel = es ? 'Sin ella' : 'Without it',
+	hint = es ? 'Arrastra el marcador o usa las flechas: es el momento en que pulsas.' : 'Drag the marker or use the arrow keys: it is the moment you press.',
+	tick = 100,
+} = Astro.props;
+
+const config = { duration, phases, events, windows };
+const initial = resolve(config, start);
+const ticks = tick > 0 ? Array.from({ length: Math.floor(duration / tick) + 1 }, (_, i) => i * tick) : [];
+const align = (center: number) => (center < 0.2 ? 'start' : center > 0.8 ? 'end' : 'center');
+const winAlign = (w: TimingWindow) => ((w.from + w.to) / 2 / duration > 0.55 ? 'end' : 'start');
+const icon = (ok: boolean | null) => (ok === true ? '✓' : ok === false ? '✗' : '–');
+/** Events closer than a third of the axis would collide on a phone: every other one goes up a row. */
+const eventRows = [...events]
+	.sort((a, b) => a.at - b.at)
+	.reduce<{ at: number; label: string; row: number }[]>((out, e) => {
+		const prev = out[out.length - 1];
+		const row = prev && (e.at - prev.at) / duration < 0.35 && prev.row === 0 ? 1 : 0;
+		return [...out, { ...e, row }];
+	}, []);
+const twoRows = eventRows.some((e) => e.row === 1);
+/** Near an edge the marker's tag hangs inward, so it never pokes out of the figure. */
+const side = (t: number) => (t / duration < 0.25 ? 'start' : t / duration > 0.75 ? 'end' : 'center');
+---
+
+<figure class="td" data-timing data-config={JSON.stringify(config)} data-start={start}>
+	<header class="td-head">
+		<span class="td-eyebrow">{es ? 'Diagrama de tiempo' : 'Timing diagram'}</span>
+		<span class="td-title">{title}</span>
+	</header>
+
+	<div class="td-chart" style={twoRows ? '--events-h: 3.4rem' : undefined}>
+		<div class="td-events" aria-hidden="true">
+			{eventRows.map((e) => (
+				<div class="td-event" data-align={align(e.at / duration)} data-row={e.row} style={`left:${pct(config, e.at)}`}>
+					<span>{e.label}</span>
+				</div>
+			))}
+		</div>
+
+		<div class="td-track" aria-hidden="true">
+			{phases.map((p, i) => (
+				<div
+					class:list={['td-phase', { 'is-active': i === initial.phase && initial.window < 0 }]}
+					data-tone={p.tone ?? 'neutral'}
+					data-phase={i}
+					style={`left:${pct(config, p.from)};width:${((p.to - p.from) / duration) * 100}%`}
+				>
+					<span>{p.label}</span>
+				</div>
+			))}
+			{events.map((e) => <i class="td-mark" style={`left:${pct(config, e.at)}`} />)}
+		</div>
+
+		{windows.length > 0 && (
+			<div class="td-windows" aria-hidden="true">
+				{windows.map((w, i) => (
+					<div
+						class:list={['td-win', { 'is-active': i === initial.window }]}
+						data-tone={w.tone ?? (i % 2 ? 'b' : 'a')}
+						data-align={winAlign(w)}
+						data-window={i}
+						style={`--l:${pct(config, w.from)};--w:${((w.to - w.from) / duration) * 100}%`}
+					>
+						<span class="td-win-bar" />
+						<span class="td-win-label"><b>{w.label}</b>{w.detail && <span> · {w.detail}</span>}</span>
+					</div>
+				))}
+			</div>
+		)}
+
+		{ticks.length > 0 && (
+			<div class="td-scale" aria-hidden="true">
+				{ticks.map((t, i) => (
+					<span style={`left:${pct(config, t)}`} data-edge={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : undefined}>
+						{t}{i === ticks.length - 1 ? ' ms' : ''}
+					</span>
+				))}
+			</div>
+		)}
+
+		<div class="td-probe" style={`left:${pct(config, start)}`} aria-hidden="true" data-probe>
+			<span class="td-probe-tag" data-probe-tag data-label={probe} data-side={side(start)}>{probe}{phases[initial.phase] ? ` · ${phases[initial.phase].label}` : ''}</span>
+		</div>
+		<input
+			class="td-range"
+			type="range"
+			min="0"
+			max={duration}
+			step={step}
+			value={start}
+			aria-label={es ? `Momento en que ${probe}, en milisegundos` : `Moment ${probe}, in milliseconds`}
+			aria-valuetext={`${start} ms: ${onLabel}, ${initial.on.text} ${offLabel}, ${initial.off.text}`}
+			data-range
+		/>
+	</div>
+
+	<div class="td-outcome" aria-live="polite">
+		<div class="td-case" data-ok={String(initial.on.ok)} data-case="on">
+			<span class="td-case-label">{onLabel}</span>
+			<span class="td-case-text"><span class="td-icon" aria-hidden="true">{icon(initial.on.ok)}</span> <span data-text>{initial.on.text}</span></span>
+		</div>
+		<div class="td-case" data-ok={String(initial.off.ok)} data-case="off">
+			<span class="td-case-label">{offLabel}</span>
+			<span class="td-case-text"><span class="td-icon" aria-hidden="true">{icon(initial.off.ok)}</span> <span data-text>{initial.off.text}</span></span>
+		</div>
+	</div>
+
+	{hint && <figcaption class="td-hint">{hint}</figcaption>}
+
+	{windows.length > 0 && (
+		<ul class="sr-only">
+			{windows.map((w) => (
+				<li>{w.label}{w.detail ? ` (${w.detail})` : ''}: {onLabel.toLowerCase()}, {w.on.text.replaceAll('{ms}', 'n')} {offLabel.toLowerCase()}, {w.off.text.replaceAll('{ms}', 'n')}</li>
+			))}
+		</ul>
+	)}
+</figure>
+
+<script>
+	import { pct, resolve, type TimingConfig } from '../../lib/timing';
+
+	const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const icon = (ok: boolean | null) => (ok === true ? '✓' : ok === false ? '✗' : '–');
+
+	function initOne(root: HTMLElement) {
+		if (root.dataset.tdReady) return;
+		root.dataset.tdReady = '1';
+		const config = JSON.parse(root.dataset.config!) as TimingConfig;
+		const range = root.querySelector<HTMLInputElement>('[data-range]')!;
+		const probe = root.querySelector<HTMLElement>('[data-probe]')!;
+		const tag = root.querySelector<HTMLElement>('[data-probe-tag]')!;
+		const phases = Array.from(root.querySelectorAll<HTMLElement>('[data-phase]'));
+		const wins = Array.from(root.querySelectorAll<HTMLElement>('[data-window]'));
+		const cases = {
+			on: root.querySelector<HTMLElement>('[data-case="on"]')!,
+			off: root.querySelector<HTMLElement>('[data-case="off"]')!,
+		};
+		const labels = {
+			on: cases.on.querySelector('.td-case-label')!.textContent ?? '',
+			off: cases.off.querySelector('.td-case-label')!.textContent ?? '',
+		};
+		let touched = false;
+
+		function render(t: number) {
+			probe.style.left = pct(config, t);
+			const r = resolve(config, t);
+			phases.forEach((el, i) => el.classList.toggle('is-active', i === r.phase && r.window < 0));
+			// Narrow phases hide their own label, so the marker says which phase it is in.
+			const phase = config.phases[r.phase];
+			tag.textContent = phase ? `${tag.dataset.label} · ${phase.label}` : tag.dataset.label ?? '';
+			const k = t / config.duration;
+			tag.dataset.side = k < 0.25 ? 'start' : k > 0.75 ? 'end' : 'center';
+			wins.forEach((el, i) => el.classList.toggle('is-active', i === r.window));
+			for (const key of ['on', 'off'] as const) {
+				const out = r[key];
+				cases[key].dataset.ok = String(out.ok);
+				cases[key].querySelector('.td-icon')!.textContent = icon(out.ok);
+				cases[key].querySelector('[data-text]')!.textContent = out.text;
+			}
+			range.setAttribute('aria-valuetext', `${Math.round(t)} ms: ${labels.on}, ${r.on.text} ${labels.off}, ${r.off.text}`);
+		}
+
+		range.addEventListener('input', () => {
+			touched = true;
+			render(Number(range.value));
+		});
+
+		// A first sweep from 0 to the start position shows that the marker moves.
+		const target = Number(root.dataset.start ?? 0);
+		if (!reduceMotion() && target > 0) {
+			const seen = new IntersectionObserver(
+				(entries) => {
+					if (!entries.some((e) => e.isIntersecting)) return;
+					seen.disconnect();
+					const t0 = performance.now();
+					const MS = 1400;
+					const frame = (now: number) => {
+						if (touched) return;
+						const k = Math.min((now - t0) / MS, 1);
+						const t = target * (1 - Math.pow(1 - k, 3));
+						range.value = String(Math.round(t / 5) * 5);
+						render(t);
+						if (k < 1) requestAnimationFrame(frame);
+					};
+					requestAnimationFrame(frame);
+				},
+				{ threshold: 0.6 },
+			);
+			seen.observe(root);
+		}
+	}
+
+	function init() {
+		document.querySelectorAll<HTMLElement>('[data-timing]').forEach(initOne);
+	}
+	init();
+	document.addEventListener('astro:after-swap', init);
+</script>
+
+<style>
+	.td {
+		margin: 2.25rem 0;
+		padding: 1.25rem 1.4rem 1.1rem;
+		border-radius: var(--radius-lg);
+		border: 1px solid var(--color-border);
+		background: var(--color-surface);
+		box-shadow: var(--shadow-sm);
+		display: grid;
+		gap: 1rem;
+		/* Safety net for long labels near the edges on a phone. */
+		overflow: clip;
+	}
+	.td-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 0.3rem 0.75rem;
+	}
+	.td-eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+	.td-title {
+		font-family: var(--font-serif);
+		font-size: 1.1rem;
+		color: var(--color-text);
+	}
+
+	/* ----- chart ----- */
+	.td-chart {
+		/* Height of the event labels above the track (two rows when events are close). */
+		--events-h: 2.1rem;
+		position: relative;
+		margin: 0 0.4rem;
+		padding-bottom: 0.2rem;
+		touch-action: pan-y;
+	}
+	.td-chart:has(.td-range:focus-visible) {
+		outline: 2px solid var(--color-accent);
+		outline-offset: 0.6rem;
+		border-radius: var(--radius-sm);
+	}
+
+	.td-events {
+		position: relative;
+		height: var(--events-h);
+	}
+	.td-event {
+		position: absolute;
+		bottom: 0;
+		translate: -50% 0;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		color: var(--color-text-secondary);
+		white-space: nowrap;
+	}
+	.td-event[data-align='start'] {
+		translate: 0 0;
+		align-items: flex-start;
+	}
+	.td-event[data-align='end'] {
+		translate: -100% 0;
+		align-items: flex-end;
+	}
+	.td-event::after {
+		content: '';
+		width: 1px;
+		height: 0.55rem;
+		margin-top: 0.2rem;
+		background: var(--color-border-strong);
+	}
+	.td-event[data-row='1']::after {
+		height: 1.85rem;
+	}
+
+	.td-track {
+		position: relative;
+		height: 2.4rem;
+		border-radius: var(--radius-sm);
+		overflow: hidden;
+		border: 1px solid var(--color-border-strong);
+		background: var(--color-bg-secondary);
+	}
+	.td-phase {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		display: grid;
+		place-items: center;
+		font-family: var(--font-mono);
+		font-size: 0.72rem;
+		letter-spacing: 0.04em;
+		color: var(--color-text-secondary);
+		transition: color var(--duration-fast) var(--ease-smooth), background-color var(--duration-fast) var(--ease-smooth);
+	}
+	.td-phase {
+		container-type: inline-size;
+	}
+	.td-phase span {
+		white-space: nowrap;
+		padding: 0.1rem 0.4rem;
+		border-radius: 999px;
+		background: oklch(from var(--color-surface) l c h / 0.85);
+	}
+	/* Ground reads as ground: the same diagonal hatch the game draws under solid tiles. */
+	/* A phase too narrow for its label drops it; the marker's tag names the phase instead. */
+	@container (max-width: 6.5rem) {
+		.td-phase span {
+			display: none;
+		}
+	}
+	.td-phase[data-tone='solid'] {
+		background: repeating-linear-gradient(
+			135deg,
+			oklch(from var(--color-text) l c h / 0.13) 0 1.5px,
+			transparent 1.5px 7px
+		);
+	}
+	.td-phase[data-tone='air'] {
+		background: oklch(from var(--color-accent) l c h / 0.05);
+	}
+	.td-phase[data-tone='danger'] {
+		background: oklch(from var(--color-destructive) l c h / 0.1);
+	}
+	.td-phase.is-active {
+		color: var(--color-text);
+	}
+	.td-mark {
+		position: absolute;
+		top: 0;
+		bottom: 0;
+		width: 1px;
+		translate: -0.5px 0;
+		background: var(--color-border-strong);
+	}
+
+	/* ----- windows: one row each, a bracket where the window is open ----- */
+	.td-windows {
+		display: grid;
+		gap: 0.3rem;
+		margin-top: 0.55rem;
+	}
+	.td-win {
+		--tone: var(--color-accent);
+		position: relative;
+		height: 1.55rem;
+	}
+	.td-win[data-tone='b'] {
+		--tone: var(--color-important);
+	}
+	.td-win[data-tone='c'] {
+		--tone: var(--color-success);
+	}
+	.td-win-bar {
+		position: absolute;
+		top: 0;
+		left: var(--l);
+		width: var(--w);
+		height: 0.5rem;
+		border: 1.5px solid var(--tone);
+		border-top: none;
+		border-radius: 0 0 4px 4px;
+		background: oklch(from var(--tone) l c h / 0.14);
+		transition: background-color var(--duration-fast) var(--ease-smooth), height var(--duration-fast) var(--ease-spring);
+	}
+	.td-win-label {
+		position: absolute;
+		/* Above the marker line, so the line passes behind the words. */
+		z-index: 3;
+		top: 0.55rem;
+		left: var(--l);
+		padding: 0 0.25rem;
+		margin-left: -0.25rem;
+		border-radius: var(--radius-sm);
+		background: var(--color-surface);
+		font-family: var(--font-mono);
+		font-size: 0.7rem;
+		white-space: nowrap;
+		color: var(--color-text-secondary);
+	}
+	.td-win-label b {
+		font-weight: 600;
+		color: var(--tone);
+	}
+	.td-win[data-align='end'] .td-win-label {
+		left: auto;
+		right: calc(100% - var(--l) - var(--w));
+		margin: 0 -0.25rem 0 0;
+	}
+	.td-win.is-active .td-win-bar {
+		background: oklch(from var(--tone) l c h / 0.32);
+		height: 0.65rem;
+	}
+	.td-win.is-active .td-win-label {
+		color: var(--color-text);
+	}
+
+	.td-scale {
+		position: relative;
+		height: 1.1rem;
+		margin-top: 0.45rem;
+		border-top: 1px dashed var(--color-border);
+	}
+	.td-scale span {
+		position: absolute;
+		top: 0.2rem;
+		white-space: nowrap;
+		translate: -50% 0;
+		font-family: var(--font-mono);
+		font-size: 0.6rem;
+		color: var(--color-text-muted);
+	}
+	.td-scale span[data-edge='start'] {
+		translate: 0 0;
+	}
+	.td-scale span[data-edge='end'] {
+		translate: -100% 0;
+	}
+
+	/* ----- the marker ----- */
+	.td-probe {
+		position: absolute;
+		top: calc(var(--events-h) - 0.4rem);
+		bottom: 1.2rem;
+		width: 2px;
+		translate: -1px 0;
+		background: var(--color-text);
+		border-radius: 1px;
+		pointer-events: none;
+		z-index: 2;
+	}
+	.td-probe::after {
+		/* The knob sits on the track. */
+		content: '';
+		position: absolute;
+		top: calc(0.4rem + 1.2rem);
+		left: 50%;
+		width: 0.95rem;
+		height: 0.95rem;
+		translate: -50% -50%;
+		border-radius: 50%;
+		background: var(--color-surface);
+		border: 2px solid var(--color-text);
+		box-shadow: var(--shadow-md);
+	}
+	.td-probe-tag {
+		position: absolute;
+		top: -1.55rem;
+		left: 50%;
+		translate: -50% 0;
+		padding: 0.12rem 0.45rem;
+		border-radius: 999px;
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		white-space: nowrap;
+		color: var(--color-bg);
+		background: var(--color-text);
+		opacity: 0;
+		transition: opacity var(--duration-fast) var(--ease-smooth);
+	}
+	.td-probe-tag[data-side='start'] {
+		translate: -0.6rem 0;
+	}
+	.td-probe-tag[data-side='end'] {
+		translate: calc(-100% + 0.6rem) 0;
+	}
+	.td-chart:hover .td-probe-tag,
+	.td-chart:has(.td-range:focus-visible) .td-probe-tag,
+	.td-chart:has(.td-range:active) .td-probe-tag {
+		opacity: 1;
+	}
+	/* The native range covers the chart; its thumb is as wide as the overhang on each side,
+	   so a value lands exactly under the marker. */
+	.td-range {
+		position: absolute;
+		inset: 0 -14px;
+		width: calc(100% + 28px);
+		height: 100%;
+		margin: 0;
+		opacity: 0;
+		cursor: ew-resize;
+		z-index: 4;
+		-webkit-appearance: none;
+		appearance: none;
+		background: transparent;
+	}
+	.td-range::-webkit-slider-runnable-track {
+		height: 100%;
+	}
+	.td-range::-webkit-slider-thumb {
+		-webkit-appearance: none;
+		width: 28px;
+		height: 100%;
+	}
+	.td-range::-moz-range-thumb {
+		width: 28px;
+		height: 100%;
+		border: 0;
+	}
+
+	/* ----- outcome ----- */
+	.td-outcome {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.6rem;
+	}
+	.td-case {
+		--state: var(--color-text-muted);
+		display: grid;
+		gap: 0.25rem;
+		padding: 0.65rem 0.8rem;
+		border-radius: var(--radius-md);
+		background: oklch(from var(--state) l c h / 0.08);
+		border-top: 1px solid oklch(from var(--state) l c h / 0.35);
+		border-bottom: 1px solid oklch(from var(--state) l c h / 0.35);
+		transition: background-color var(--duration-fast) var(--ease-smooth), border-color var(--duration-fast) var(--ease-smooth);
+	}
+	.td-case[data-ok='true'] {
+		--state: var(--color-success);
+	}
+	.td-case[data-ok='false'] {
+		--state: var(--color-destructive);
+	}
+	.td-case-label {
+		font-family: var(--font-mono);
+		font-size: 0.64rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.12em;
+		color: var(--color-text-secondary);
+	}
+	.td-case-text {
+		font-size: 0.92rem;
+		line-height: 1.45;
+		color: var(--color-text);
+	}
+	.td-icon {
+		font-weight: 700;
+		color: var(--state);
+	}
+	.td-case[data-ok='true'] .td-icon {
+		color: var(--color-success-text);
+	}
+	.td-hint {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		color: var(--color-text-muted);
+	}
+
+	@media (max-width: 560px) {
+		.td {
+			padding: 1rem 1rem 0.9rem;
+		}
+		.td-outcome {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.td-event,
+		.td-win-label {
+			font-size: 0.64rem;
+		}
+		/* Every other tick on a phone: 0, 200, 400… */
+		.td-scale span:nth-child(even):not([data-edge]) {
+			display: none;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.td-phase,
+		.td-win-bar,
+		.td-case,
+		.td-probe-tag {
+			transition: none;
+		}
+	}
+</style>

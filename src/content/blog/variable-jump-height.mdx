@@ -1,0 +1,88 @@
+---
+title: "Variable jump height: short hops and full jumps, one button"
+description: "Variable jump height turns how long you hold jump into how high you go: a tap is a 1.1-tile hop, a hold 3.6 tiles. See the timing and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 2
+seriesTitle: "Variable jump height"
+videoHero: {"sheets": "variable", "title": "Variable jump height", "videoNote": "Short hops under the spiked ceiling and a full jump over the wall. Then T switches the technique off: every jump comes out full and the first one hits the spikes.", "steps": ["Run right with <kbd>→</kbd>. Under the spiked ceiling, tap <kbd>Space</kbd> briefly: short hops over the gaps.", "At the end, hold <kbd>Space</kbd> for the full jump over the three-tile wall.", "Press <kbd>T</kbd> to switch variable jump off. Every jump is now full height, and the ceiling is waiting."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+With **variable jump height**, the longer you hold jump, the higher you go: a tap gives a 1.1-tile hop and a full hold gives 3.6 tiles. One button then covers both a low ceiling and a tall wall.
+
+<TimingDiagram
+  title="Variable jump height"
+  duration={600}
+  start={150}
+  probe="you let go"
+  hint="Drag the marker or use the arrow keys: it is the moment you let go of jump."
+  phases={[
+    { from: 0, to: 380, label: "rising", tone: "air", on: { ok: true, text: "You let go while rising: gravity triples and the jump comes out lower." }, off: { ok: false, text: "Letting go changes nothing: the jump comes out full." } },
+    { from: 380, to: 600, label: "falling", tone: "air", on: { ok: null, text: "Past the top: letting go changes nothing." } },
+  ]}
+  events={[
+    { at: 0, label: "takeoff" },
+    { at: 380, label: "the top" },
+  ]}
+  windows={[
+    { from: 0, to: 380, label: "hold window", detail: "380 ms", measure: "since",
+      on: { ok: true, text: "You let go {ms} ms in: gravity triples and the jump comes out shorter." },
+      off: { ok: false, text: "Letting go does nothing: every jump is the full 3.6 tiles." } },
+  ]}
+/>
+
+<h2 id="what-is-variable-jump-height">Variable jump height: a tap hops, a hold jumps</h2>
+
+Obstacles ask for different heights. A spiked ceiling wants a short hop, a wall wants the whole jump. Variable jump height lets the player pick any height between 1.1 and 3.6 tiles with the same button, and the button reads the hold the way players already expect. Without it, every obstacle in the game has to be designed around one arc.
+
+<h2 id="how-to-implement">How to implement variable jump height</h2>
+
+1. **Watch for the release while rising.** If the button comes up while the character still moves upward, mark the jump as cut.
+2. **Raise gravity until the top.** A cut jump rises with gravity ×3, so the arc bends instead of breaking. Halving the upward speed on release also works, but the arc gets a visible kink at that instant.
+3. **Cut once per jump.** Pressing again mid-air must not undo it.
+4. **Protect wall jumps.** Block the cut for the first 220 ms of a [wall jump](/blog/wall-jump/), or someone mashing the button against a wall loses height on every kick.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+# SALTO VARIABLE: soltar el botón mientras se sube multiplica la gravedad.
+# Toque corto = saltito; mantener = salto completo.
+if _jumping and not _jump_cut and velocity.y < 0.0 and not jump_held \
+		and _wall_jump_hold <= 0.0 and Lab.on(&"variable_jump"):
+	_jump_cut = true
+	jump_cut.emit()
+
+var gravity: float
+if velocity.y < 0.0:
+	gravity = p.gravity_up
+	if _jump_cut:
+		gravity *= p.jump_cut_gravity_mult
+```
+</CodeBlock>
+
+`jump_cut_gravity_mult` is 3, and it is the only number to tune.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="short-hop-height">How short should a short hop be?</h3>
+
+About 30% of a full jump: 1.1 tiles against 3.6. Low enough to stay under a three-tile spiked ceiling, long enough (2.5 tiles at a run) to clear a two-tile gap.
+
+<h3 id="cut-velocity-or-gravity">Should I cut the velocity or raise the gravity?</h3>
+
+Raise the gravity if you want the arc to stay smooth; cut the velocity if you want the release to be visible. Both work.
+
+<h3 id="hold-window">How long should the hold window be?</h3>
+
+Here the hold counts all the way to the top, 0.38 s. [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) caps it at 0.2 s: while you hold, the upward speed doesn't drop.

@@ -1,0 +1,106 @@
+---
+title: "Coyote time y jump buffer: qué son y cómo funcionan"
+description: "El coyote time te deja saltar justo después de salir de una cornisa. El jump buffer guarda un salto pulsado justo antes de aterrizar. Míralos y juégalos."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "plataformas", "godot"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 1
+seriesTitle: "Coyote time y jump buffer"
+videoHero: {"sheets": "coyote", "title": "Coyote time", "videoNote": "Con coyote time, el héroe salta un instante después de dejar cada cornisa y llega igual. Luego T lo apaga y los mismos saltos tardíos caen.", "steps": ["Corre hacia la derecha con <kbd>→</kbd> y salta con <kbd>Espacio</kbd> lo más tarde que puedas antes de cada hueco.", "Si ya estabas en el aire cuando pulsaste, aparece la etiqueta verde «COYOTE +ms»: ese salto te lo dio la ventana.", "Pulsa <kbd>T</kbd> y repite la carrera. Los mismos saltos tardíos ahora dicen «× TARDE» y te caes."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+El **coyote time** te deja saltar un instante después de salir de una cornisa. El **jump buffer** guarda un salto que pulsaste justo antes de aterrizar. Los dos hacen que el juego responda a lo que quisiste hacer, no a lo que dice la caja de colisión.
+
+<TimingDiagram
+  title="Coyote time y jump buffer"
+  duration={600}
+  start={250}
+  probe="pulsas saltar"
+  phases={[
+    { from: 0, to: 200, label: "suelo", tone: "solid", on: { ok: true, text: "Estás en el suelo: saltas." } },
+    { from: 200, to: 480, label: "aire", tone: "air", on: { ok: null, text: "Estás en el aire: la pulsación no hace nada." } },
+    { from: 480, to: 600, label: "suelo", tone: "solid", on: { ok: true, text: "Estás en el suelo: saltas." } },
+  ]}
+  events={[
+    { at: 200, label: "se acaba la cornisa" },
+    { at: 480, label: "aterrizas" },
+  ]}
+  windows={[
+    { from: 200, to: 300, label: "coyote time", detail: "100 ms", measure: "since",
+      on: { ok: true, text: "Saltas, {ms} ms después de dejar la cornisa." },
+      off: { ok: false, text: "Caes: llegas {ms} ms tarde." } },
+    { from: 360, to: 480, label: "jump buffer", detail: "120 ms", measure: "until",
+      on: { ok: true, text: "Guardada: saltas al aterrizar, {ms} ms después." },
+      off: { ok: false, text: "Perdida: llegas {ms} ms pronto y aterrizas sin saltar." } },
+  ]}
+/>
+
+<h2 id="coyote-time">Coyote time: saltar cuando ya no hay suelo</h2>
+
+Saltas lo más tarde que puedes, porque más tarde es más lejos. A ojo, el personaje sigue sobre la cornisa unos fotogramas después de dejarla. El coyote time te da esos fotogramas: **100 ms**, lo mismo que usa Celeste. El nombre viene del Coyote de los dibujos, que sólo cae cuando mira abajo.
+
+<h2 id="jump-buffer">Jump buffer: pulsar pronto también cuenta</h2>
+
+Si pulsas un poco antes de tocar el suelo, sin buffer la pulsación se pierde: pulsaste y no pasó nada. Con buffer se guarda **120 ms** y el salto sale al aterrizar. Se nota sobre todo al encadenar saltos.
+
+<PlayableLab
+  sheets="buffer"
+  title="Jump buffer"
+  videoNote="Cada pulsación llega 70 ms antes de aterrizar. Con el buffer el héroe encadena los botes; tras T, las mismas pulsaciones se pierden y cae en los pinchos."
+  steps={[
+    "Corre hacia la derecha con <kbd>→</kbd> y salta al primer pilar.",
+    "Mientras bajas, pulsa <kbd>Espacio</kbd> un poco antes de aterrizar. Rebotas al siguiente pilar y ves «BUFFER −ms».",
+    "Pulsa <kbd>T</kbd> y mantén el mismo ritmo. Las pulsaciones tempranas dicen «× PRONTO», se pierden, y abajo esperan los pinchos.",
+  ]}
+/>
+
+<h2 id="how-to-implement">Cómo implementar coyote time y jump buffer</h2>
+
+1. **Coyote time:** un temporizador que se recarga mientras pisas suelo y baja en el aire. Puedes saltar si estás en el suelo o si le queda tiempo.
+2. **Ponlo a cero al saltar.** Si no, una segunda pulsación al empezar el salto es un doble salto gratis.
+3. **Jump buffer:** otro temporizador que se carga al pulsar y baja cada fotograma. Si tocas suelo y le queda tiempo, saltas.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+# Tras moverse, cada tick. Mientras se pisa suelo, el coyote está "cargado".
+if on_floor:
+	_coyote = params.coyote_time if Lab.on(&"coyote_time") else 0.0
+
+# JUMP BUFFER: no se actúa sobre la pulsación; se RECUERDA durante unos ms.
+if Input.is_action_just_pressed(&"jump"):
+	_jump_buffer = params.jump_buffer_time if Lab.on(&"jump_buffer") else delta * 0.5
+
+# En _tick_timers(), cada tick:
+_coyote = maxf(_coyote - delta, 0.0)
+_jump_buffer = maxf(_jump_buffer - delta, 0.0)
+
+# En _try_jump():
+if _jump_buffer <= 0.0:
+	return
+if on_floor or _coyote > 0.0:
+	_do_jump(&"ground" if on_floor else &"coyote")
+```
+</CodeBlock>
+
+`_begin_rise()` pone `_coyote` a cero al empezar cada salto.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-long-coyote-time">¿Cuánto debe durar el coyote time?</h3>
+
+Unos 100 ms, seis fotogramas a 60 fps. Más y se nota que saltas desde el aire.
+
+<h3 id="how-long-jump-buffer">¿Cuánto debe durar el jump buffer?</h3>
+
+Unos 120 ms. Mucho más y salta cuando ya cambiaste de idea.

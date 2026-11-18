@@ -1,0 +1,131 @@
+---
+title: "Patrones de ataque de enemigos: una pregunta y una apertura"
+description: "El patrón de ataque de un enemigo es un bucle fijo: avisa, ataca y se recupera. La recuperación es tu apertura. Míralo en una línea de tiempo y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 19
+seriesTitle: "Patrones de enemigos"
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+El **patrón de ataque** de un enemigo es el bucle fijo que recorre cada vez que ataca: avisa, ataca y se recupera. Como es fijo, se puede aprender, y la recuperación es tu **apertura**: el saltador de abajo queda expuesto **0,7 s** después de cada salto.
+
+<TimingDiagram
+  title="El patrón del saltador"
+  duration={1670}
+  start={1200}
+  step={10}
+  tick={200}
+  probe="actúas"
+  onLabel="Te apartas"
+  offLabel="Atacas"
+  phases={[
+    { from: 0, to: 450, label: "aviso", tone: "neutral",
+      on: { ok: false, text: "Demasiado pronto: apunta el salto a donde estés cuando despegue." },
+      off: { ok: null, text: "Se está agachando para saltar: la apertura llega cuando aterrice." } },
+    { from: 450, to: 970, label: "salto", tone: "danger",
+      on: { ok: true, text: "Cae en suelo vacío: te moviste cuando ya se había lanzado." },
+      off: { ok: true, text: "Golpéalo hacia arriba mientras está encima de ti." } },
+    { from: 970, to: 1670, label: "aterrizaje", tone: "solid",
+      on: { ok: null, text: "Nada que esquivar: es tu turno." } },
+  ]}
+  events={[
+    { at: 450, label: "despega" },
+    { at: 970, label: "aterriza" },
+  ]}
+  windows={[
+    { from: 970, to: 1670, label: "apertura", detail: "700 ms", measure: "until",
+      on: { ok: null, text: "Nada que esquivar: sigue expuesto {ms} ms más." },
+      off: { ok: true, text: "Golpe gratis: quedan {ms} ms de apertura." } },
+  ]}
+/>
+
+<h2 id="what-is-an-enemy-pattern">Patrones de enemigos: cada enemigo hace una pregunta</h2>
+
+Todo enemigo hace las dos preguntas que describe Mike Stout ([Game Developer, 2015, en inglés](https://www.gamedeveloper.com/design/enemy-attacks-and-telegraphing)): "¿puedes esquivar mi daño?" durante [el aviso](/blog/es/telegraphing-attacks/), y "¿puedes golpearme?" durante la recuperación. La variedad sale de la primera pregunta, no de tener más vida: el rondador pregunta si conoces tu alcance; el embestidor, si estás en su línea; el saltador, si te moverás cuando ya se haya lanzado, y el dron, si sigues moviéndote.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_patterns"
+  title="Patrones"
+  steps={[
+    "Pulsa <kbd>T</kbd> para ver el estado de cada enemigo sobre su cabeza. Verde quiere decir que es tu turno.",
+    "Saltador: espera a que se agache y muévete con <kbd>←</kbd> <kbd>→</kbd> cuando ya haya despegado. Golpéalo con <kbd>C</kbd> mientras aterriza (0,7 s).",
+    "Drones: no te pares. Cada uno fija la puntería a mitad del aviso, así que el disparo va a donde estabas. Golpéalos con <kbd>↑</kbd> + <kbd>C</kbd> desde la plataforma.",
+    "Al final hay un rondador bajo un dron: uno te entretiene en el suelo mientras el otro dispara.",
+  ]}
+/>
+
+<h2 id="openings-guard">Aperturas: el escudero al que no se puede aporrear</h2>
+
+Si golpeas de frente el escudo del escudero, suena a metal, no le haces daño y el retroceso es 1,9 veces el normal. Su pregunta es si sabes esperar, y se abre de cuatro formas: durante los 0,85 s que siguen a su estocada, desde arriba, por la espalda y en los 0,45 s que tarda en girarse cuando lo atraviesas con el dash. Contra un rondador, atacas; contra un escudero, decides *cuándo*.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_guard"
+  title="Defensa y aperturas"
+  steps={[
+    "Acércate al primer escudero y golpea su escudo con <kbd>C</kbd>: suena a metal, no le haces daño y sales empujado casi el doble.",
+    "Ponte a unas dos casillas para provocar su estocada. Retrocede o atraviésalo con el dash, <kbd>X</kbd>, y golpéalo durante los 0,85 s de guardia baja.",
+    "O sáltalo con <kbd>Espacio</kbd> y golpea hacia abajo con <kbd>↓</kbd> + <kbd>C</kbd>: el escudo no le cubre la cabeza. Además tarda 0,45 s en darse la vuelta.",
+    "El segundo escudero tiene un dron encima. Ya no hay tiempo para esperar aperturas: elige a quién quitar primero.",
+  ]}
+/>
+
+<h2 id="how-to-implement">Cómo implementar patrones de ataque de enemigos</h2>
+
+1. Pon el bucle común en una clase base: patrulla, aviso, ataque y recuperación. Cada enemigo sólo decide qué hacer en cada estado.
+2. Termina cada ataque en un estado expuesto de duración fija, como una recuperación, un aturdimiento o un aterrizaje. Un enemigo sin apertura no es justo.
+3. Si un ataque apunta, fija la puntería a mitad del aviso. Un disparo que corrige hasta el último frame no se puede esquivar con habilidad.
+4. Haz del escudo una comprobación sobre cada golpe, no una segunda caja de colisión: sólo detiene los tajos que llegan de frente con la guardia alta.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/combat_kit/enemies/guard.gd">
+```gdscript
+## ¿Para el escudo este golpe? Sólo los tajos que vienen de frente y con la guardia alta.
+func _blocks(hit: Hit) -> bool:
+	if hit.kind != &"slash" or state == &"recover":
+		return false
+	if hit.direction.y > 0.5:
+		return false   # desde arriba: el escudo no cubre la cabeza
+	if not is_instance_valid(hit.source) or not hit.source is Node2D:
+		return false
+	var attacker_side := signf((hit.source as Node2D).global_position.x - global_position.x)
+	return attacker_side == float(facing)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/combat_kit/enemies/drone.gd">
+```gdscript
+		&"windup":
+			# La puntería sigue al jugador sólo la primera mitad del aviso.
+			if not _aim_locked and has_target():
+				_aim = target.global_position
+				_aim_locked = windup_ratio() >= 0.5
+			if windup_done():
+				_shoot()
+				release(&"cooldown")
+```
+</CodeBlock>
+
+Cada `return false` es una apertura: el escudero recuperándose, un golpe desde arriba, un golpe por la espalda.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="what-is-an-opening">¿Qué es una apertura en diseño de combate?</h3>
+
+Una ventana en la que el enemigo no puede defenderse ni responder y tú puedes golpearlo sin riesgo: la recuperación tras un ataque, un aturdimiento, un aterrizaje. La del dron es más sencilla: los 1,5 s entre disparos.
+
+<h3 id="how-many-enemy-types">¿Cuántos tipos de enemigo necesita un juego?</h3>
+
+Menos de los que parece, si cada uno hace una pregunta distinta. Aquí bastan cinco más un jefe, y parejas como un rondador bajo un dron suman situaciones sin código nuevo.

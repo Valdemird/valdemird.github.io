@@ -1,0 +1,64 @@
+---
+title: "Floor snap: por qué tu personaje da botes en las pendientes"
+description: "El floor snap vuelve a pegar al suelo a un personaje que corre tras cada movimiento, para que baje pendientes sin dar botes. Mira los números y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 8
+seriesTitle: "Pendientes y floor snap"
+videoHero: {"sheets": "slopes", "title": "Pendientes y floor snap", "videoNote": "Baja las rampas corriendo y salta el foso justo donde acaba la pendiente. Después de T baja las cuestas a botes y muchas veces no tiene suelo debajo cuando necesita saltar.", "steps": ["Corre hacia la derecha con <kbd>→</kbd> por las dos colinas sin saltar. En la bajada el personaje va pegado a la rampa.", "Al pie de la segunda rampa, salta el foso de cuatro casillas con <kbd>Espacio</kbd> justo donde acaba la pendiente.", "Pulsa <kbd>T</kbd> y repítelo. El personaje baja las rampas a saltitos, y a veces el salto al borde del foso ni siquiera sale."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+El **floor snap** vuelve a pegar al personaje al suelo después de cada movimiento, hasta una distancia fija: aquí, 12 px. Es lo que mantiene a un personaje que corre cuesta abajo pegado a la rampa, en lugar de bajarla a saltitos.
+
+| Corriendo a 340 px/s por una rampa de 45°, a 120 ticks/s | Por tick |
+|---|---|
+| Lo que baja el suelo | 2,8 px |
+| Lo que la gravedad baja al personaje | unos 0,2 px |
+| Lo que puede cerrar el floor snap | 12 px (en Godot, 1 px por defecto) |
+
+<h2 id="why-it-bounces">Por qué un personaje que corre da botes cuesta abajo</h2>
+
+En una rampa de 45° el suelo baja lo mismo que avanzas de lado, y la gravedad, que arranca desde cero en lo alto, solo cubre una fracción de píxel. Tras un solo tick queda un hueco bajo los pies y el juego cree que estás en el aire. El personaje da saltitos, la animación parpadea y pulsar salto solo funciona dentro del [coyote time](/blog/es/coyote-time-jump-buffer/).
+
+<h2 id="what-is-floor-snap">Floor snap: de vuelta a la rampa tras cada movimiento</h2>
+
+Tras cada movimiento, el floor snap mira hacia abajo hasta su longitud y deja al personaje sobre el suelo que encuentre. No se aplica mientras sube, así que los saltos funcionan como siempre, y es mucho más corto que una casilla de 40 px, así que salir andando de una cornisa de verdad sigue siendo caerse.
+
+<h2 id="how-to-implement">Cómo implementar el floor snap en pendientes</h2>
+
+1. **Pega después de moverte, nunca al subir.** Si el personaje estaba en el suelo y no sube, bájalo al suelo que tenga debajo, hasta la longitud del snap.
+2. **Calcúlalo con tu velocidad máxima en el suelo.** En cada tick el suelo baja velocidad × tan(ángulo de la pendiente) ÷ ticks de física por segundo. Supéralo, y quédate por debajo de tu cornisa real más baja.
+3. **Mantén la misma velocidad en las rampas**, para que el personaje no frene al subir ni acelere al bajar.
+4. **Pon el ángulo máximo de suelo un poco por encima de tu rampa más empinada.**
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="game/level/sheets.gd">
+```gdscript
+floor_snap_length = 12.0       # px de «pegado»
+floor_constant_speed = true    # misma velocidad en rampa
+floor_stop_on_slope = true     # no resbalar parado
+floor_max_angle = deg_to_rad(50)
+```
+</CodeBlock>
+
+Los cuatro vienen de serie en `CharacterBody2D`, que por defecto trae 1 px de snap y la velocidad constante apagada.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="floor-snap-value">¿Cuánto debe medir el floor snap?</h3>
+
+Más de lo que baja el suelo en un tick a tu velocidad máxima y menos que tu cornisa real más baja. Aquí, 12 px: cuatro veces los 2,8 px que baja una rampa de 45° por tick a toda carrera, y menos de un tercio de una casilla de 40 px.
+
+<h3 id="max-angle-45">¿Qué floor_max_angle uso para pendientes de 45°?</h3>
+
+Algo por encima de 45°, porque 45° es justo el límite por defecto de Godot. Esta demo usa 0,87 rad, unos 50°.

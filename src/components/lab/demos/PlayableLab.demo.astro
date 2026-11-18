@@ -1,0 +1,64 @@
+---
+import Playable from '../../blog/PlayableLab.astro';
+import DemoSection from '../DemoSection.astro';
+
+export const meta = {
+	title: 'PlayableLab',
+	category: 'playful',
+	status: 'experimental',
+	summary: 'One sheet of my platformer lab inside the page: a clip of the technique on and off, and the real game to try it yourself.',
+	summaryEs: 'Una lámina del laboratorio de mi plataformas dentro de la página: un video de la técnica encendida y apagada, y el juego de verdad para probarla tú.',
+	why: 'I can describe coyote time in a sentence, and you will nod and forget it. The argument that works is the one where you run off a ledge, press jump a beat too late, and land anyway. So these are the actual game, not a recreation: the same jump code, the same numbers, the same callouts that print "COYOTE +ms" when the window saves you. The clip is for reading on a phone or in a hurry: the technique on, then T, then the same inputs failing. The second tab is for everyone who wants to feel it under their own thumbs.',
+	whyEs: 'Puedo explicar el coyote time en una frase, y tú asentirás y lo olvidarás. El argumento que funciona es el que corres tú: te sales de una cornisa, pulsas saltar un instante tarde y aterrizas igual. Por eso esto es el juego de verdad, no una recreación: el mismo código de salto, los mismos números, los mismos avisos que dicen «COYOTE +ms» cuando la ventana te salva. El video es para leer desde el móvil o con prisa: la técnica encendida, luego T, luego las mismas pulsaciones fallando. La segunda pestaña es para quien quiera sentirlo con sus propios dedos.',
+	props: [
+		{ name: 'sheets', type: 'string', description: 'Sheet id(s) from the game lab, comma-separated ("coyote", "coyote,buffer").' },
+		{ name: 'plane', type: '"plataformas" | "combate"', default: '"plataformas"', description: 'Which blueprint the sheets belong to.' },
+		{ name: 'title', type: 'string', description: 'Reader-facing name, shown above the frame.' },
+		{ name: 'steps', type: 'string[]', description: 'Numbered "how to try it" steps under the game. May contain <kbd>.' },
+		{ name: 'videoNote', type: 'string', description: 'What the clip shows. Also the VideoObject description.' },
+		{ name: 'poster', type: 'string', description: 'Screenshot before loading. Defaults to /images/play/platformer-lab/<plane>-<sheets>.webp.' },
+		{ name: 'video', type: 'string', description: 'Clip. Defaults to /videos/play/platformer-lab/<plane>-<sheets>.mp4; the Watch tab only appears if it exists.' },
+		{ name: 'caption', type: 'string', description: 'Caption under the component.' },
+		{ name: 'variant', type: '"inline" | "hero"', default: '"inline"', description: 'hero: the clip that opens a video-first post (frontmatter videoHero). Wider, no title row, poster loaded with the page.' },
+	],
+};
+
+const { lang = 'en' } = Astro.props;
+const es = lang === 'es';
+---
+
+<DemoSection
+	label="coyote time"
+	description={es
+		? 'Con video: la pestaña «Míralo» enseña la técnica encendida y apagada; «Juégalo y pruébalo» abre el juego con los pasos a seguir.'
+		: 'With a clip: "Watch it" shows the technique on and off; "Play it and try it" opens the game with the steps to follow.'}
+	usage={`<PlayableLab sheets="coyote" title="Coyote time" steps={[...]} />`}
+>
+	<Playable
+		sheets="coyote"
+		title="Coyote time"
+		steps={es
+			? ['Corre con <kbd>→</kbd> y salta con <kbd>Espacio</kbd> lo más tarde que puedas antes de cada hueco.', 'Si ya estabas en el aire verás «COYOTE +ms».', 'Pulsa <kbd>T</kbd> y repite: ahora verás «× TARDE» y caerás.']
+			: ['Run with <kbd>→</kbd> and jump with <kbd>Space</kbd> as late as you can before each gap.', 'If you were already in the air you will see «COYOTE +ms».', 'Press <kbd>T</kbd> and repeat: now you get «× TARDE» and fall.']}
+	/>
+</DemoSection>
+
+<DemoSection
+	label={es ? 'apertura de un post de video' : 'video-first post opener'}
+	description={es
+		? 'La misma lámina como primera cosa del post: más ancha, sin fila de título (el título del post va justo debajo) y con la portada cargada desde el principio.'
+		: 'The same sheet as the first thing in a post: wider, no title row (the post title sits right below), poster loaded up front.'}
+	usage={`videoHero: { sheets: "coyote", title: "Coyote time", steps: [...] }  # frontmatter`}
+>
+	<Playable variant="hero" sheets="buffer" title="Jump buffer" />
+</DemoSection>
+
+<DemoSection
+	label={es ? 'combate · sin video' : 'combat · no clip'}
+	description={es
+		? 'Sin video grabado, el componente enseña directamente la pestaña de juego.'
+		: 'With no recorded clip, the component goes straight to the game tab.'}
+	usage={`<PlayableLab plane="combate" sheets="c_pogo" title="Pogo" />`}
+>
+	<Playable plane="combate" sheets="c_pogo" title={es ? 'Arriba, abajo y pogo' : 'Up, down and pogo'} />
+</DemoSection>

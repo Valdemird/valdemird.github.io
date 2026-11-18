@@ -1,0 +1,131 @@
+---
+title: "Enemy attack patterns: one question and one opening each"
+description: "An enemy attack pattern is a fixed loop: warn, attack, recover. The recovery is the opening where you hit back. See it on a timeline and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 19
+seriesTitle: "Enemy attack patterns"
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+An **enemy attack pattern** is the fixed loop an enemy runs every time it attacks: warn, attack, recover. Because it's fixed you can learn it, and the recovery is your **opening**: the hopper below sits open for **0.7 s** after every leap.
+
+<TimingDiagram
+  title="The hopper's pattern"
+  duration={1670}
+  start={1200}
+  step={10}
+  tick={200}
+  probe="you act"
+  onLabel="You step aside"
+  offLabel="You swing"
+  phases={[
+    { from: 0, to: 450, label: "warning", tone: "neutral",
+      on: { ok: false, text: "Too early: it aims its leap at wherever you stand at takeoff." },
+      off: { ok: null, text: "It's crouching to leap: the opening comes after it lands." } },
+    { from: 450, to: 970, label: "leap", tone: "danger",
+      on: { ok: true, text: "It lands on empty floor: you moved after it committed." },
+      off: { ok: true, text: "Hit it upward while it's above you." } },
+    { from: 970, to: 1670, label: "landing", tone: "solid",
+      on: { ok: null, text: "Nothing to dodge: it's your turn." } },
+  ]}
+  events={[
+    { at: 450, label: "it takes off" },
+    { at: 970, label: "it lands" },
+  ]}
+  windows={[
+    { from: 970, to: 1670, label: "opening", detail: "700 ms", measure: "until",
+      on: { ok: null, text: "Nothing to dodge: it stays open {ms} ms more." },
+      off: { ok: true, text: "Free hit: {ms} ms of the opening left." } },
+  ]}
+/>
+
+<h2 id="what-is-an-enemy-pattern">Enemy attack patterns: every enemy asks one question</h2>
+
+Every enemy asks the two questions Mike Stout names ([Game Developer, 2015](https://www.gamedeveloper.com/design/enemy-attacks-and-telegraphing)): "Can you avoid my damage?" during [the warning](/blog/telegraphing-attacks/), and "Can you hit me?" during the recovery. Variety comes from the first question, not from more health: the walker asks if you know your reach, the charger if you're in its line, the hopper if you'll move after it commits, the drone if you're still moving.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_patterns"
+  title="Patterns"
+  steps={[
+    "Press <kbd>T</kbd> to show each enemy's state over its head. Green means it's your turn.",
+    "Hopper: wait for it to crouch, then move with <kbd>←</kbd> <kbd>→</kbd> after it takes off. Hit it with <kbd>C</kbd> while it lands (0.7 s).",
+    "Drones: keep moving. Each one locks its aim halfway through its warning, so the shot goes where you were. Hit them with <kbd>↑</kbd> + <kbd>C</kbd> from the platform.",
+    "At the end there's a walker under a drone: one keeps you busy on the ground while the other shoots.",
+  ]}
+/>
+
+<h2 id="openings-guard">Openings: the guard you can't mash</h2>
+
+Hit the guard's shield from the front and you get a clang, no damage and a recoil 1.9 times stronger than usual. It asks whether you can wait, and it opens four ways: for 0.85 s after its thrust, from above, from behind, and during the 0.45 s it takes to turn after you dash through it. Against a walker you press attack; against a guard you decide *when*.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_guard"
+  title="Guard and openings"
+  steps={[
+    "Walk up to the first guard and hit its shield with <kbd>C</kbd>: a metal clang, no damage, and you get pushed back almost twice as far.",
+    "Get within about two tiles to provoke its thrust. Back off or dash through with <kbd>X</kbd>, then hit it during the 0.85 s its guard is down.",
+    "Or jump over it with <kbd>Space</kbd> and strike down with <kbd>↓</kbd> + <kbd>C</kbd>: the shield doesn't cover its head. It also takes 0.45 s to turn around.",
+    "The second guard has a drone overhead. There's no time to wait for openings now: pick which one goes first.",
+  ]}
+/>
+
+<h2 id="how-to-implement">How to implement enemy attack patterns</h2>
+
+1. Put the shared loop in one base class: patrol, warning, attack, recovery. Each enemy only decides what to do in each state.
+2. End every attack in an open state of fixed length, like a recovery, a daze or a landing. An enemy with no opening isn't fair.
+3. If an attack aims, lock the aim halfway through the warning. A shot that corrects until the last frame can't be dodged by skill.
+4. Make a shield a check on each hit, not a second collision box: it blocks only slashes from the front while the guard is up.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/combat_kit/enemies/guard.gd">
+```gdscript
+## ¿Para el escudo este golpe? Sólo los tajos que vienen de frente y con la guardia alta.
+func _blocks(hit: Hit) -> bool:
+	if hit.kind != &"slash" or state == &"recover":
+		return false
+	if hit.direction.y > 0.5:
+		return false   # desde arriba: el escudo no cubre la cabeza
+	if not is_instance_valid(hit.source) or not hit.source is Node2D:
+		return false
+	var attacker_side := signf((hit.source as Node2D).global_position.x - global_position.x)
+	return attacker_side == float(facing)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/combat_kit/enemies/drone.gd">
+```gdscript
+		&"windup":
+			# La puntería sigue al jugador sólo la primera mitad del aviso.
+			if not _aim_locked and has_target():
+				_aim = target.global_position
+				_aim_locked = windup_ratio() >= 0.5
+			if windup_done():
+				_shoot()
+				release(&"cooldown")
+```
+</CodeBlock>
+
+Each `return false` is an opening: the guard recovering, a hit from above, a hit from behind.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="what-is-an-opening">What is an opening in combat design?</h3>
+
+A window where the enemy can't defend or answer and you can hit it freely: the recovery after an attack, a daze, a landing. The drone's is plainer, the 1.5 s between shots.
+
+<h3 id="how-many-enemy-types">How many enemy types does a game need?</h3>
+
+Fewer than it seems, if each asks a different question. Five plus a boss is enough here, and pairs like a walker under a drone add situations without new code.

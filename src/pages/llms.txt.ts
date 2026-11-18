@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
-import { SITE_TITLE, SITE_DESCRIPTION } from '../consts';
+import { SITE_TITLE, SITE_DESCRIPTION, SERIES, type SeriesId } from '../consts';
+import { seriesUrl } from '../lib/series';
 
 export const GET: APIRoute = async () => {
 	const all = (await getCollection('blog'))
@@ -67,6 +68,27 @@ export const GET: APIRoute = async () => {
 
 	if (esPosts.length > 0) {
 		lines.push('## Blog Posts (Español)', '', ...esPosts.map(postBlock));
+	}
+
+	// Ordered series: the reading order matters, so agents get it explicitly.
+	for (const id of Object.keys(SERIES) as SeriesId[]) {
+		for (const lang of ['en', 'es'] as const) {
+			const parts = all
+				.filter((p) => p.data.series === id && p.data.lang === lang && !p.data.draft)
+				.sort((a, b) => (a.data.seriesOrder ?? 0) - (b.data.seriesOrder ?? 0));
+			if (parts.length === 0) continue;
+			const info = SERIES[id][lang];
+			lines.push(
+				`## Series: ${info.name} (${lang})`,
+				'',
+				info.description,
+				'',
+				`Hub, with every part in order: ${seriesUrl(id, lang)}`,
+				'',
+				...parts.map((p, i) => `${i + 1}. [${p.data.title}](https://valdemird.com/blog/${p.id}/) (markdown: https://valdemird.com/blog/${p.id}.md)`),
+				'',
+			);
+		}
 	}
 
 	lines.push(

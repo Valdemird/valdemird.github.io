@@ -3,6 +3,8 @@ import { getCollection } from 'astro:content';
 import satori from 'satori';
 import sharp from 'sharp';
 import { getOgSatoriFonts } from '../../lib/og-fonts';
+import { SERIES, type SeriesId } from '../../consts';
+import { getSeriesStats } from '../../lib/series';
 
 export const getStaticPaths: GetStaticPaths = async () => {
 	const posts = await getCollection('blog');
@@ -33,7 +35,26 @@ export const getStaticPaths: GetStaticPaths = async () => {
 			},
 		}));
 
-	return [...blogPaths, ...learnPaths];
+	// Series hubs: /og/series-<slug>.png and /og/es/series-<slug>.png.
+	const seriesPaths = [];
+	for (const id of Object.keys(SERIES) as SeriesId[]) {
+		for (const lang of ['en', 'es'] as const) {
+			const info = SERIES[id][lang];
+			const stats = await getSeriesStats(id, lang);
+			seriesPaths.push({
+				params: { slug: `${lang === 'es' ? 'es/' : ''}series-${SERIES[id].slug}` },
+				props: {
+					title: info.title,
+					description: info.metaDescription,
+					pubDate: stats.updated,
+					tags: ['godot', 'game-feel', lang === 'es' ? 'serie' : 'series'],
+					lang,
+				},
+			});
+		}
+	}
+
+	return [...blogPaths, ...learnPaths, ...seriesPaths];
 };
 
 function formatDate(date: Date, lang: string): string {

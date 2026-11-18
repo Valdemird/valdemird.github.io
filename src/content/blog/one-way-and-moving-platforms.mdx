@@ -1,0 +1,99 @@
+---
+title: "One-way and moving platforms: drop through, keep momentum"
+description: "A one-way platform is solid from above and lets you drop through on purpose. A moving platform hands you its speed when you jump. See both and play them."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 9
+seriesTitle: "One-way and moving platforms"
+videoHero: {"sheets": "movers", "title": "Moving platforms", "videoNote": "Rides the fast platform and jumps while it moves toward the 8-tile gap: with momentum the jump carries the platform's speed and makes it. After T it jumps with its own speed only and falls short. Each attempt in the clip starts at the edge of the block.", "steps": ["Ride the first platform over the pit with <kbd>→</kbd> and take the lift up. Stand still on them: the platform carries you and you don't slide.", "From the edge of the block, run onto the fast platform holding <kbd>→</kbd> and jump with <kbd>Space</kbd> from its front edge while it's still moving. You keep its speed and clear the 8-tile gap.", "Fell short? The lift down below takes you back up.", "Press <kbd>T</kbd> and make the same jump. You leave with your own speed only and drop to the floor under the gap."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+A **one-way platform** is solid from above and empty from below: you jump up through it, and drop down through it on purpose. A **moving platform** carries you, and when you jump off it you keep its speed.
+
+| | Value |
+|---|---|
+| Drop-through window | 0.22 s |
+| Fast platform | 267 px/s |
+| Running jump off it | 340 + 267 = 607 px/s |
+| Gap that speed clears | 8 tiles (a full running jump covers 6.4) |
+
+<h2 id="what-is-a-one-way-platform">One-way platforms: up through, down on purpose</h2>
+
+One-way platforms let the player climb a tower without walking around every floor. Dropping through takes down + jump, never down alone: down alone is crouch, and crouching on a one-way platform shouldn't drop you. [Celeste's code](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) calls them jump-thrus.
+
+<PlayableLab
+  sheets="oneway"
+  title="One-way platforms"
+  steps={[
+    "Jump up through the three platforms on the left with <kbd>Space</kbd>. You pass through from below and land on top.",
+    "From the top one, jump right onto the pillar with <kbd>→</kbd> and <kbd>Space</kbd>, then walk off its far side onto the first platform of the shaft.",
+    "Hold <kbd>↓</kbd> and press <kbd>Space</kbd> to drop through it. Do it once more to reach the floor and the way out at the bottom right.",
+    "Now stand still on a platform and press <kbd>↓</kbd> alone. You only crouch: dropping takes both keys.",
+  ]}
+/>
+
+<h2 id="what-is-moving-platform-momentum">Moving platform momentum: jump off with its speed</h2>
+
+While you stand on a moving platform, it carries you and you don't slide. Jump, and you keep its speed on top of your own: run along a platform doing 267 px/s and you leave at 607 px/s, enough for an 8-tile gap that a 6.4-tile running jump can't clear. Keep its sideways and upward motion but drop the downward part, so jumping off a platform on its way down never shortens the jump.
+
+<h2 id="how-to-implement">How to implement one-way and moving platforms</h2>
+
+1. **One-way:** collide only from above, with some margin (6 px on an 8 px platform) so fast falls don't slip through, and put these platforms on their own collision layer.
+2. **Drop-through:** on down + jump over a one-way floor, stop colliding with that layer for 0.22 s and nudge the player 2 px down. Clear the jump buffer and coyote time too, or the same press jumps you straight back up.
+3. **Moving platforms:** move them in the physics step, the same step as the player, and carry whoever stands on them.
+4. **Bleed extra speed slowly in the air.** If air control pulls you back to run speed at the usual rate, the inherited speed is gone in about 0.1 s and the jump falls short.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="game/entities/one_way_platform.gd">
+```gdscript
+func _ready() -> void:
+	collision_layer = 2
+# ...
+	shape.one_way_collision = true
+	shape.one_way_collision_margin = 6.0
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _drop_through() -> void:
+	_jump_buffer = 0.0
+	_coyote = 0.0
+	_drop_timer = 0.22
+	set_collision_mask_value(LAYER_ONE_WAY, false)
+	global_position.y += 2.0
+	velocity.y = maxf(velocity.y, 80.0)
+# ...
+func _apply_lab() -> void:
+	# INERCIA DE PLATAFORMA: al saltar desde una plataforma móvil se hereda su
+	# velocidad (sólo la componente ascendente en vertical: nunca acorta el salto).
+	platform_on_leave = (PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY if Lab.on(&"platform_momentum")
+			else PLATFORM_ON_LEAVE_DO_NOTHING)
+# ...
+	if absf(velocity.x) > p.max_speed:
+		# Sobrevelocidad (plataforma, dash-jump): perderla despacio, sobre todo en el aire.
+		rate = p.overspeed_decel if on_floor else p.air_overspeed_decel
+```
+</CodeBlock>
+
+The platform is an `AnimatableBody2D`, so `move_and_slide()` carries the rider, and `air_overspeed_decel` is 140 px/s², slow enough for the inherited speed to last the whole jump.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="jump-falls-short">Why does my jump off a moving platform fall short?</h3>
+
+Check your air control first: speed above the run speed should bleed off slowly in the air (140 px/s² here, against about 2,473 for normal air acceleration). Then run with the platform. Jump standing still and you leave at 267 px/s, under your own run speed, so it's an ordinary jump.
+
+<h3 id="which-platform-on-leave">Which platform_on_leave should I use in Godot?</h3>
+
+`PLATFORM_ON_LEAVE_ADD_UPWARD_VELOCITY`. It keeps the sideways momentum and ignores downward motion, so a jump never comes out shorter. The default, `PLATFORM_ON_LEAVE_ADD_VELOCITY`, adds the downward part too.

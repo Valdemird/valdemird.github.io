@@ -1,0 +1,94 @@
+---
+title: "Platformer camera: look-ahead, platform snapping, smoothing"
+description: "A platformer camera should ignore hops, look ahead of the player and smooth the same at any frame rate. See the three rules with numbers and play them."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 10
+seriesTitle: "Platformer camera"
+videoHero: {"sheets": "camera", "title": "Platformer camera", "videoNote": "Climbs the steps, then jumps in place on the plateau. With the smart camera the view stays put while it hops; after T the camera follows every jump.", "steps": ["Climb the steps with <kbd>→</kbd> and <kbd>Space</kbd>. The solid yellow line is the anchor, the height of the last floor you stood on. It moves up one step each time you land.", "On the plateau, hop with <kbd>Space</kbd>. The dashed line above you is the top of the window. A full jump tops out just under it, so the view stays put.", "Turn around with <kbd>←</kbd>. The look-ahead cross drifts over to the other side, slower than the camera follows you.", "Press <kbd>T</kbd> and hop again. The guides disappear except the camera's center, and every jump drags the whole level up and down."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+A good **platformer camera** moves as little as it can and shows what's in front of you. This one ignores hops, aims 110 px ahead of where you're running, and smooths the same at any frame rate.
+
+| | Value |
+|---|---|
+| Vertical window around the last floor | 170 px up, 50 px down |
+| Full jump height | 144 px |
+| Look-ahead | 110 px (2.75 tiles) |
+| Follow smoothing | half the distance in 0.08 s |
+
+<h2 id="platform-snapping">Platform snapping: don't follow the jump</h2>
+
+A camera glued to the player scrolls the whole level on every hop. Platform snapping keeps it at the height of the last floor you stood on, and only follows if you go 170 px above it or 50 px below. A full jump rises 144 px, so a hop never moves the screen. Downward the window is small, because below you is where you'll land.
+
+Itay Keren's GDC talk [*Scroll Back*](https://www.gamedeveloper.com/design/scroll-back-the-theory-and-practice-of-cameras-in-side-scrollers) credits Super Mario World with introducing it.
+
+<h2 id="look-ahead">Look-ahead: frame where the player is going</h2>
+
+The space that matters is in front of you, so the camera aims 110 px ahead of where you're moving. It only switches sides above 60 px/s, so turning in place doesn't swing the view, and it eases slower than the follow: half the distance in 0.27 s, against 0.08 s.
+
+<h2 id="frame-rate-independent-smoothing">Camera smoothing that works at any frame rate</h2>
+
+`lerp(position, target, 0.1)` covers 10% of what's left every frame, so the camera gets stiffer the more FPS you have. Use `1 − e^(−k·Δt)` as the fraction instead and the distance left after t seconds is the same at any frame rate. Celeste writes the same idea as `1 - 0.01^Δt`.
+
+<h2 id="how-to-implement">How to implement a platformer camera</h2>
+
+1. **Anchor the height** to the last floor or wall slide. In the air, only drag it when the player leaves the window.
+2. **Ease the look-ahead slower than the follow**, and flip it only on a real run.
+3. **Smooth by time, not by frame.**
+4. **Snap on respawn.** Smoothing across half a level after a death is a slow pan nobody asked for.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/camera/platformer_camera.gd">
+```gdscript
+func _physics_process(delta: float) -> void:
+	var pos := target.global_position
+
+	if Lab.on(&"camera_smart"):
+		# Look-ahead: sólo cambia de lado cuando el jugador se mueve de verdad.
+		if absf(target.velocity.x) > 60.0:
+			_look_target = signf(target.velocity.x) * look_ahead
+		_look = BP.damp(_look, _look_target, look_sharpness, delta)
+
+		# Platform snapping: re-anclar al pisar suelo (o al deslizar por una pared).
+		if target.is_on_floor() or target.is_wall_sliding:
+			_anchor_y = pos.y
+		else:
+			_anchor_y = clampf(_anchor_y, pos.y - window_down, pos.y + window_up)
+
+		var desired := Vector2(pos.x + _look, _anchor_y - vertical_offset)
+		_focus.x = BP.damp(_focus.x, desired.x, follow_sharpness_x, delta)
+		_focus.y = BP.damp(_focus.y, desired.y, follow_sharpness_y, delta)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/core/bp.gd">
+```gdscript
+## Suavizado exponencial independiente del framerate.
+## `lerp(a, b, 0.1)` por frame cambia de velocidad con los FPS; esto no.
+static func damp(from: float, to: float, sharpness: float, delta: float) -> float:
+	return lerpf(from, to, 1.0 - exp(-sharpness * delta))
+```
+</CodeBlock>
+
+Godot's `Camera2D` has drag margins, smoothing and limits but no look-ahead and nothing that re-anchors on landing, so this script sets its position every physics tick.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-far-ahead">How far ahead should a platformer camera look?</h3>
+
+About 110 px, roughly 2.75 tiles. Keren's article describes Defender aiming about 25% of the screen width in front of the ship.
+
+<h3 id="follow-jumps">Should a platformer camera follow jumps?</h3>
+
+Not vertically. Make the window taller than a full jump (170 px against 144 here) and a jump on its own never moves the screen.

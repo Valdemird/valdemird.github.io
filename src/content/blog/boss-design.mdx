@@ -1,0 +1,103 @@
+---
+title: "Boss fight design: three attacks, two phases, a stagger bar"
+description: "Good boss design tests what the player already learned: a few readable attacks, randomness with rules, a stagger bar and a faster phase two. Play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 20
+seriesTitle: "Boss design"
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+A **boss fight** is an exam: it teaches nothing new and combines what the player already learned. This one has three attacks with their own warnings, collapses for **2.2 s** after seven hits, and speeds up at half health.
+
+| Boss attack | Warning | Asked before by |
+|---|---|---|
+| Charge | 0.6 s | [The charger](/blog/telegraphing-attacks/) |
+| Hammer | 0.5 s | [The hopper](/blog/enemy-patterns-and-openings/) |
+| Burst | 0.6 s | The drone |
+
+<h2 id="what-makes-a-good-boss">Boss attacks: questions the player already answered</h2>
+
+Each attack repeats an earlier enemy's question and takes the same answer. After every attack the boss recovers for 0.8 s: your turn to hit it.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_boss"
+  title="Boss"
+  steps={[
+    "Walk right with <kbd>→</kbd> into the room. The gates close behind you and the boss wakes up.",
+    "Read each warning. Charge: jump with <kbd>Space</kbd> or dash through with <kbd>X</kbd>. Hammer: get out from under it, then jump the two shockwaves. Burst: keep moving or dash through the fan.",
+    "Hit it with <kbd>C</kbd> while it recovers after each attack. Seven hits and it collapses for 2.2 s: that's your big opening.",
+    "At half health it roars and everything gets faster. If you lose, you're back at the door with full health.",
+  ]}
+/>
+
+<h2 id="random-with-rules">Random boss attacks, with rules</h2>
+
+A fixed order gets memorized instead of read. So the pick is weighted by distance and never the same attack three times in a row: within 260 px the hammer comes half the time, further away a quarter. You can't predict the next attack, but you can predict the mood.
+
+<h2 id="stagger-bar">Stagger bar: aggression turned into an opening</h2>
+
+The boss never flinches from a single hit, so the stagger bar is where your aggression shows: the seventh hit drops it for 2.2 s with its contact damage off. Sekiro builds its whole combat on the same idea, [posture](https://sekiroshadowsdietwice.wiki.fextralife.com/Posture).
+
+<h2 id="boss-phases">Boss phases: the same attacks, faster</h2>
+
+At half health the boss roars for 0.9 s, so you notice the rules just changed. Then warnings are multiplied by 0.85 and recoveries by 0.72, with no new attacks to learn mid-fight.
+
+<h2 id="how-to-implement">How to implement a boss fight</h2>
+
+1. Build the boss on the regular enemy loop, and add only an attack selector and a hit counter.
+2. Weight each pick by distance, and drop the last attack from the pool once it has come twice in a row.
+3. Ignore hits during the stagger so collapses can't chain, and if the bar fills mid-jump or mid-charge, collapse when the attack ends, not in mid-air.
+4. Put the checkpoint at the door, and close the gates only once the player is inside and clear of both.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/combat_kit/enemies/boss.gd">
+```gdscript
+func _choose_attack() -> void:
+	var far := absf(to_target().x) > 260.0
+	var weights := {
+		&"embestida": 3.0 if far else 2.0,
+		&"martillo": 2.0 if far else 3.0,
+		&"rafaga": 3.0 if far else 1.0,
+	}
+	if _repeats >= 1:
+		weights.erase(_last_attack)   # como mucho dos veces seguidas
+
+
+func _on_damaged(hit: Hit) -> void:
+	super(hit)
+	if state == &"staggered":
+		return   # ya está desplomado: los golpes no alargan la apertura
+	# AGUANTE: cada golpe suma; al llenarse, se desploma.
+	poise_damage += 1
+	if poise_damage >= poise:
+		if state in [&"idle", &"recover", &"windup", &"burst", &"roar"]:
+			_stagger()
+		else:
+			_stagger_pending = true   # en pleno salto o embestida: al terminar
+```
+</CodeBlock>
+
+`embestida` is the charge, `martillo` the hammer and `rafaga` the burst; the weighted draw comes right after, in the same function.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-many-attacks">How many attacks should a boss have?</h3>
+
+Few enough to learn in a handful of attempts. This one has three, and its script says why: better three that read well than ten that confuse.
+
+<h3 id="random-but-fair">How do you make boss attack patterns random but fair?</h3>
+
+Put rules on the randomness: weight the choice by distance, never repeat an attack three times in a row, and keep every warning. The order can't be memorized, but the next move can always be read.
+
+This is the last post in [the series](/blog/series/platformer-game-feel/): one room where every earlier technique has to work at once.

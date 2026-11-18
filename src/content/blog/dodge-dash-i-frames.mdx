@@ -1,0 +1,101 @@
+---
+title: "Dodge i-frames: dash invincibility and the cooldown rule"
+description: "A dodge dash grants invincibility frames: 0.21 s of protection on a 0.16 s dash. The cooldown must be twice that, or mashing wins. See it and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 16
+seriesTitle: "Dodge i-frames"
+videoHero: {"sheets": "c_dodge", "plane": "combate", "title": "Dodge dash", "videoNote": "Dashes through the damage curtains. With dash i-frames it passes untouched; after T the same dashes take the hit.", "steps": ["Run right with <kbd>→</kbd> toward the first curtain. There's wall above it, so you can't jump. Press <kbd>X</kbd> just before it and the dash carries you through untouched.", "The double curtain is two tiles wide. One dash covers 3.6, so it fits.", "In the tunnel there's no room to jump. The pile driver warns and then strikes: dash with <kbd>X</kbd> through the shockwave when it reaches you.", "Press <kbd>T</kbd> and dash through the same curtain. The dash moves you exactly the same, but now it costs a mask."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+A **dodge dash** grants invincibility frames while it lasts, so you go through attacks instead of over them. Here that's the **0.16 s** of the dash plus 0.05 s for the exit, and a **0.45 s** cooldown keeps mashing from making you untouchable.
+
+<TimingDiagram
+  title="One dash, until the next"
+  duration={450}
+  start={120}
+  tick={50}
+  probe="an attack reaches you"
+  phases={[
+    { from: 0, to: 160, label: "dash", tone: "air", on: { ok: true, text: "Untouched: you dash through it." }, off: { ok: false, text: "Hit: without dash i-frames, you lose a mask." } },
+    { from: 160, to: 450, label: "after the dash", tone: "neutral", on: { ok: false, text: "Hit: you're vulnerable and can't dash yet." } },
+  ]}
+  events={[
+    { at: 160, label: "the dash ends" },
+    { at: 450, label: "dash ready" },
+  ]}
+  windows={[
+    { from: 0, to: 210, label: "i-frames", detail: "210 ms", measure: "until",
+      on: { ok: true, text: "Untouched: {ms} ms of protection left." },
+      off: { ok: false, text: "Hit: without dash i-frames, you lose a mask." } },
+    { from: 210, to: 450, label: "vulnerable gap", detail: "240 ms", measure: "until",
+      on: { ok: false, text: "Hit. You can dash again in {ms} ms." },
+      off: { ok: false, text: "Hit. You can dash again in {ms} ms." } },
+  ]}
+/>
+
+<h2 id="what-is-a-dodge-dash">Dash i-frames: through the attack, not over it</h2>
+
+Jumping dodges what comes along the floor, but it leaves you in the air and far from the enemy. A sideways dash dodges and places you: you come out on the other side, behind whoever attacked, with their recovery still ahead of them. The extra 0.05 s covers the instant after the dash when you may still overlap what you went through. Hollow Knight's [Shade Cloak](https://hollowknight.wiki.fextralife.com/Shade+Cloak) works the same way: it lets you "dash through enemies and their attacks without taking damage."
+
+<h2 id="dash-cooldown-rule">The cooldown rule: at least twice the protection</h2>
+
+If the cooldown counts from the start of the dash, someone mashing the button is protected at most protection ÷ cooldown of the time. With 0.21 s of protection, a 0.22 s cooldown would make you untouchable 95% of the time, and the dash would become the fastest way to walk. At 0.45 s it's 47% at most, and between two dashes there's always a vulnerable gap of 0.24 s, longer than the protected one. The Shade Cloak recharges in about 1.5 s.
+
+<h2 id="how-to-implement">How to implement dash i-frames</h2>
+
+1. **Don't add a dodge state.** When the dash starts, grant invulnerability for its length plus a small margin, on the same timer the i-frames after a hit use.
+2. **Cancel any attack in progress when the dash starts.** Otherwise a slash thrown just before travels inside the dash, untouchable and hitting at once.
+3. **Set the cooldown to at least twice the protection,** counted from the start of the dash.
+4. **Don't protect against hazards.** Spikes and pits ignore invulnerability, or a dodge would cross any spike pit 3.6 tiles at a time.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+## Lo que dura de más la protección del dash respecto al dash: cubre la salida.
+const DASH_GUARD_EXTRA := 0.05
+# ...
+	player.dash_started.connect(_on_dash_started)
+# ...
+func _on_dash_started(_direction: Vector2) -> void:
+	_cancel_attack()
+	if Lab.on(&"dash_iframes"):
+		health.grant_invulnerability(player.params.dash_time + DASH_GUARD_EXTRA)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
+```gdscript
+@export_range(0.05, 0.4, 0.005, "suffix:s") var dash_time := 0.16
+## ESPERA entre dos dashes, contada desde que EMPIEZA el primero (en el aire no
+## hace falta: hay uno por vuelo). No es un detalle: con el dash protegido
+## (`dash_iframes`), una espera corta convierte aporrear el botón en ser
+## intocable casi todo el tiempo y en la forma más rápida de andar. La regla:
+## al menos el doble de lo que dura la protección, para que entre dos dashes
+## haya siempre una ventana vulnerable tan larga como la protegida.
+@export_range(0.0, 1.0, 0.01, "suffix:s") var dash_cooldown := 0.45
+```
+</CodeBlock>
+
+`grant_invulnerability()` fills the same timer as the [i-frames after a hit](/blog/health-damage-invincibility-frames/) and keeps the larger value, so a dash never shortens protection you already had.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-long-dash-iframes">How long should dash i-frames last?</h3>
+
+The length of the dash plus a small margin for the exit: 0.16 s plus 0.05 s, so 0.21 s here.
+
+<h3 id="dash-spikes">Does a dodge dash protect you from spikes?</h3>
+
+Not here, and Hollow Knight's Shade Cloak doesn't either. The dodge is for attacks, things that come at you with a warning.

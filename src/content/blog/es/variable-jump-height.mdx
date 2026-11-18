@@ -1,0 +1,88 @@
+---
+title: "Salto variable: saltitos y saltos completos con un botón"
+description: "El salto variable convierte cuánto mantienes el botón en cuánto subes: un toque da 1,1 casillas y mantener, 3,6. Mira cuándo cuenta y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 2
+seriesTitle: "Salto variable"
+videoHero: {"sheets": "variable", "title": "Salto variable", "videoNote": "Saltitos bajo el techo de pinchos y un salto completo sobre el muro. Luego T apaga la técnica: todos los saltos salen enteros y el primero se clava en los pinchos.", "steps": ["Corre hacia la derecha con <kbd>→</kbd>. Bajo el techo de pinchos, toca <kbd>Espacio</kbd> un instante: saltitos sobre los huecos.", "Al final, mantén <kbd>Espacio</kbd> para el salto completo sobre el muro de tres casillas.", "Pulsa <kbd>T</kbd> para apagar el salto variable. Ahora todos los saltos son de altura completa, y el techo te espera."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Con el **salto variable**, cuanto más mantienes el botón, más alto llegas: un toque da un saltito de 1,1 casillas y mantenerlo, el salto completo de 3,6. Así un solo botón sirve para pasar bajo un techo bajo y para subir un muro alto.
+
+<TimingDiagram
+  title="Salto variable"
+  duration={600}
+  start={150}
+  probe="sueltas"
+  hint="Arrastra el marcador o usa las flechas: es el momento en que sueltas el salto."
+  phases={[
+    { from: 0, to: 380, label: "subida", tone: "air", on: { ok: true, text: "Sueltas mientras subes: la gravedad se triplica y el salto sale más bajo." }, off: { ok: false, text: "Soltar no cambia nada: el salto sale entero." } },
+    { from: 380, to: 600, label: "caída", tone: "air", on: { ok: null, text: "Ya pasaste lo más alto: soltar no cambia nada." } },
+  ]}
+  events={[
+    { at: 0, label: "despegue" },
+    { at: 380, label: "lo más alto" },
+  ]}
+  windows={[
+    { from: 0, to: 380, label: "ventana para mantener", detail: "380 ms", measure: "since",
+      on: { ok: true, text: "Sueltas a los {ms} ms: la gravedad se triplica y el salto se queda corto." },
+      off: { ok: false, text: "Soltar no hace nada: todos los saltos son de 3,6 casillas." } },
+  ]}
+/>
+
+<h2 id="what-is-variable-jump-height">Salto variable: un toque es un saltito, mantener es un salto</h2>
+
+Cada obstáculo pide una altura distinta. Un techo de pinchos pide un saltito; un muro, el salto entero. Con el salto variable el jugador elige cualquier altura entre 1,1 y 3,6 casillas con el mismo botón, y el botón responde como el jugador ya espera que responda. Sin él, cada obstáculo del juego tiene que diseñarse para un único arco.
+
+<h2 id="how-to-implement">Cómo implementar el salto variable</h2>
+
+1. **Vigila cuándo se suelta el botón durante la subida.** Si se suelta mientras el personaje todavía va hacia arriba, marca el salto como recortado.
+2. **Sube la gravedad hasta lo más alto.** Un salto recortado sube con la gravedad ×3, así que el arco se dobla en lugar de romperse. Partir por la mitad la velocidad de subida al soltar también funciona, pero el arco hace un quiebre visible justo en ese instante.
+3. **Recorta una sola vez por salto.** Volver a pulsar en el aire no debe deshacerlo.
+4. **Protege el salto de pared.** Impide el recorte durante los primeros 220 ms de un [salto de pared](/blog/es/wall-jump/); si no, quien aporrea el botón contra una pared pierde altura en cada impulso.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+# SALTO VARIABLE: soltar el botón mientras se sube multiplica la gravedad.
+# Toque corto = saltito; mantener = salto completo.
+if _jumping and not _jump_cut and velocity.y < 0.0 and not jump_held \
+		and _wall_jump_hold <= 0.0 and Lab.on(&"variable_jump"):
+	_jump_cut = true
+	jump_cut.emit()
+
+var gravity: float
+if velocity.y < 0.0:
+	gravity = p.gravity_up
+	if _jump_cut:
+		gravity *= p.jump_cut_gravity_mult
+```
+</CodeBlock>
+
+`jump_cut_gravity_mult` vale 3, y es el único número que hay que ajustar.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="short-hop-height">¿Cuánto debe medir un saltito?</h3>
+
+Más o menos el 30 % del salto completo: 1,1 casillas frente a 3,6. Lo bastante bajo para no tocar un techo de pinchos a tres casillas, y lo bastante largo (2,5 casillas a la carrera) para cruzar un hueco de dos.
+
+<h3 id="cut-velocity-or-gravity">¿Recorto la velocidad o subo la gravedad?</h3>
+
+Sube la gravedad si quieres que el arco siga siendo suave; recorta la velocidad si quieres que la suelta se note. Las dos funcionan.
+
+<h3 id="hold-window">¿Cuánto debe durar la ventana para mantener?</h3>
+
+Aquí mantener cuenta hasta lo más alto, 0,38 s. [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) la limita a 0,2 s: mientras mantienes, la velocidad de subida no baja.

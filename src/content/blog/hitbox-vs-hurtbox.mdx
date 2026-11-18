@@ -1,0 +1,86 @@
+---
+title: "Hitbox vs hurtbox: the three boxes every character needs"
+description: "A hitbox is where an attack deals damage and a hurtbox is where a character takes it. See the three boxes, why none should match the sprite, and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 11
+seriesTitle: "Hitbox vs hurtbox"
+videoHero: {"sheets": "c_boxes", "plane": "combate", "title": "Hitbox, hurtbox and body", "videoNote": "Attacks the training dummies from the edge of reach. With the generous hitbox the slash lands; after T the same slashes from the same spot miss.", "steps": ["Walk right with <kbd>→</kbd> and slash the first training dummy with <kbd>C</kbd>. Green is where you can be hit, red is your slash while it's active, white is your body.", "Step back with <kbd>←</kbd> until the slash barely reaches and attack again. The red box goes past the drawn slash, and it still lands.", "At the dummy on the pedestal, attack from the floor without jumping. The generous box is tall enough to reach it.", "Press <kbd>T</kbd> for the exact box and repeat both. From the same spots, the slash misses."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+A **hitbox** is where an attack deals damage. A **hurtbox** is where a character can take it. A hit is one overlapping the other, and a third box, the body, only bumps into floors and walls.
+
+| Box | Size | Against the drawing |
+|---|---|---|
+| Player body | 24×36 px | it's the collision shape |
+| Player hurtbox | 16×28 px | smaller: a graze doesn't count |
+| Player slash hitbox | 88×56 px | bigger: the exact one is 48×28 |
+| Enemy hurtbox | body + 6 px | bigger: easy to hit |
+| Enemy contact hitbox | 60% of the body | smaller: brushing past is free |
+
+<h2 id="what-is-a-hitbox-and-a-hurtbox">Hitbox, hurtbox and body: three boxes, three jobs</h2>
+
+[Infil's Fighting Game Glossary](https://glossary.infil.net/?t=Hitbox) defines a hit the same way, and gives the color convention most training modes use: hitboxes red, hurtboxes green. Fighting games call the third box the pushbox. Here the body is what collides with the world, and it never deals or takes damage.
+
+<h2 id="generous-hitbox">Generous hitboxes: big for the player, small against them</h2>
+
+None of the three should match the drawing. Make every disagreement favor the player: the slash reaches 80 px from the center instead of 60, is 56 px thick instead of 28, and starts 8 px behind the center so a point-blank slash still lands. Enemies are easy to hit, and while they just walk around only their core hurts. When they attack with the body itself, that box grows to the body minus 8 px.
+
+Fighting games keep hurtboxes [close to the model](https://glossary.infil.net/?t=Hurtbox), because every pixel you give one player you take from the other.
+
+<h2 id="how-to-implement">How to implement hitboxes and hurtboxes</h2>
+
+1. **One body, two areas.** The body collides with the world. The hurtbox can be found but looks for nothing, and the hitbox looks but can't be found.
+2. **One layer per team.** Put each team's hurtboxes on their own layer and point every hitbox at the other team's. A hitbox never even sees an ally, so there's no team check anywhere.
+3. **One hit per activation.** Keep a list of what the attack has already hit and clear it when the attack starts. Without it, a slash active for 100 ms hits the same target twelve times at 120 ticks per second.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/combat_kit/core/hitbox.gd">
+```gdscript
+func _init() -> void:
+	monitoring = true
+	monitorable = false
+	collision_layer = 0
+# ...
+func _ready() -> void:
+	collision_mask = CombatLayers.hurtbox_bit(CombatLayers.opponent(team))
+# ...
+## Empiezan los frames activos: la lista de golpeados se vacía.
+func begin() -> void:
+	active = true
+	_already_hit.clear()
+# ...
+	for area in get_overlapping_areas():
+		var hurtbox := area as Hurtbox
+		if hurtbox == null or not hurtbox.enabled:
+			continue
+		if not continuous and hurtbox in _already_hit:
+			continue
+		var hit := _make_hit(hurtbox)
+		var result := hurtbox.receive(hit)
+		if not continuous:
+			_already_hit.append(hurtbox)
+```
+</CodeBlock>
+
+The hurtbox is the mirror image: `monitoring = false`, `monitorable = true`, and its layer is its own team's.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="hurtbox-same-as-hitbox">Is a hurtbox the same as a hitbox?</h3>
+
+No. The hitbox belongs to the attack and the hurtbox to whoever gets hit. People often say "hitbox" for both, which is how complaints about someone's "hitbox" end up being about their hurtbox.
+
+<h3 id="hitbox-match-sprite">Should the hitbox match the sprite?</h3>
+
+Not in a single-player action game. The slash box here has about 3.7 times the area of the drawn slash, and the player's hurtbox is smaller than the body. Match the drawing only when fairness between two humans is the point.

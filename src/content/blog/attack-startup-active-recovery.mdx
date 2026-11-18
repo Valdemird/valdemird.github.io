@@ -1,0 +1,104 @@
+---
+title: "Attack startup, active and recovery frames: how they work"
+description: "Every attack has startup, active and recovery frames: before it can hit, while it hits, and until you can act again. See 35, 100 and 200 ms and play them."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 12
+seriesTitle: "Attack phases"
+videoHero: {"sheets": "c_anatomy", "plane": "combate", "title": "Anatomy of a hit", "videoNote": "Mashes attack a little faster than the swing allows. With the attack buffer every early press comes out as the next hit of the combo; after T the early presses are lost and the combo breaks.", "steps": ["Walk right with <kbd>→</kbd> and attack with <kbd>C</kbd>. Watch the ruler over your head: startup, active and recovery, to scale.", "Slash the two dummies standing together. One swing, two hits: each box takes one hit per activation.", "At the last dummy, press <kbd>C</kbd> a little faster than the swing. Each early press shows a green BUFFER tag with how early it was, and the combo keeps going.", "Press <kbd>T</kbd> and mash again. Early presses now show a red × PRONTO tag (Spanish for \"too early\"), and they're gone."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+Every attack has three phases: **startup** until it can hit, **active** while the hitbox is on, and **recovery** until you can act again. Here the slash lasts **35, 100 and 200 ms**, and only the middle 100 ms can hurt anything.
+
+<TimingDiagram
+  title="One slash in a combo"
+  duration={335}
+  start={260}
+  tick={50}
+  probe="you press attack again"
+  onLabel="With the attack buffer"
+  offLabel="Without it"
+  phases={[
+    { from: 0, to: 35, label: "startup", tone: "neutral", on: { ok: false, text: "Lost: too early even for the buffer." } },
+    { from: 35, to: 135, label: "active", tone: "danger", on: { ok: false, text: "Lost: too early even for the buffer." } },
+    { from: 135, to: 335, label: "recovery", tone: "neutral", on: { ok: null, text: "Recovery: no hitbox, and the next hit has to wait." } },
+  ]}
+  events={[
+    { at: 35, label: "hitbox on" },
+    { at: 135, label: "hitbox off" },
+  ]}
+  windows={[
+    { from: 75, to: 225, label: "attack buffer", detail: "150 ms", measure: "until",
+      on: { ok: true, text: "Kept: the next hit starts at 225 ms, {ms} ms from now." },
+      off: { ok: false, text: "Lost: without the buffer a press only counts on its own tick." } },
+    { from: 225, to: 335, label: "cancel", detail: "from 90 ms into recovery", measure: "until",
+      on: { ok: true, text: "Cancel: the next hit cuts the recovery and starts now." },
+      off: { ok: false, text: "Lost: {ms} ms too early." } },
+  ]}
+/>
+
+<h2 id="what-are-startup-active-recovery">Startup, active and recovery: what each phase decides</h2>
+
+Startup decides how fast the button feels, active how forgiving the timing is, and recovery what a miss costs. [Infil's Fighting Game Glossary](https://glossary.infil.net/?t=Startup) calls them the three stages of an attack, and only the active frames have a hitbox. At 60 fps this slash is about 2, 6 and 12 frames.
+
+<h2 id="attack-buffer">Attack buffer: an early press is still a press</h2>
+
+An attack buffer remembers a press made while the character is busy for **150 ms**, and the attack comes out as soon as it can: the [jump buffer](/blog/coyote-time-jump-buffer/) on another button. In a combo, a stored press also cuts the recovery from 90 ms in, so the next hit starts at 225 ms instead of 335. Fighting games call that a [cancel](https://glossary.infil.net/?t=Cancel). Waiting out the whole recovery is a [link](https://glossary.infil.net/?t=Link), and it's all T leaves you.
+
+<h2 id="how-to-implement">How to implement attack phases and an attack buffer</h2>
+
+1. **One timer per swing.** Each phase compares it with its own length. The hitbox turns on when startup ends and off when active ends.
+2. **The button only fills a buffer.** The swing starts when the character is idle and the buffer still has time left.
+3. **In a combo, let a buffered press cut the recovery,** here from 45% of it.
+4. **Never set recovery to zero, and don't make the buffer much longer than it.** Without recovery nobody thinks before pressing. With a huge buffer, a press the player gave up on still comes out.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+		if Lab.on(&"attack_buffer"):
+			_attack_buffer = params.attack_buffer_time
+	# ...
+	match phase:
+		Phase.STARTUP:
+			if _phase_time >= startup_time():
+				_set_phase(Phase.ACTIVE)
+				slash.begin()
+		Phase.ACTIVE:
+			# ...
+			if _phase_time >= active_time() or grounded:
+				slash.end()
+				_set_phase(Phase.RECOVERY)
+		Phase.RECOVERY:
+			if _phase_time >= recovery_time():
+				_end_attack()
+			elif _attack_buffer > 0.0 and not is_healing and Lab.on(&"attack_buffer") \
+					and _phase_time >= recovery_time() * params.combo_cancel and _chains(_decide(true)):
+				_end_attack()
+	# ...
+	if phase == Phase.IDLE and _attack_buffer > 0.0 and not is_healing and not dashing and not spent:
+		_start_attack()
+```
+</CodeBlock>
+
+`slash.begin()` also empties the list of hurtboxes already hit, so each target takes one hit per activation.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="attack-startup-length">How long should attack startup be?</h3>
+
+For the player, as short as the animation allows: 35 ms here, about two frames at 60 fps. For enemies it's the opposite, because their startup is the warning that lets you react.
+
+<h3 id="how-many-active-frames">How many active frames should an attack have?</h3>
+
+Fighting games usually use 1 to 4, according to Infil's [active entry](https://glossary.infil.net/?t=Active). This slash uses 6 (100 ms), a wide window for a game where you and your targets keep moving mid-swing.

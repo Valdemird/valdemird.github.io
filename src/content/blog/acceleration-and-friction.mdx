@@ -1,0 +1,81 @@
+---
+title: "Platformer acceleration and friction: tune them in seconds"
+description: "Acceleration and friction set how fast a character starts, stops and turns: 0.11 s, 0.07 s and 0.06 s here. Why to tune them as times, and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 6
+seriesTitle: "Acceleration and friction"
+videoHero: {"sheets": "accel", "title": "Acceleration and friction", "videoNote": "Run, release, turn, release, in a loop, with the lab's inspector on. With the technique the velocity trace ramps up and down; after T it jumps instantly between full speed and zero.", "steps": ["Press <kbd>I</kbd> to open the inspector. The white line in its oscilloscope is your horizontal speed.", "Run right with <kbd>→</kbd>, let go, then press <kbd>←</kbd>. The line ramps up, bends at every change and comes back to zero on a slope.", "Jump onto the two-tile platforms with <kbd>Space</kbd> and stop on each one by letting go of <kbd>→</kbd> as you land.", "Press <kbd>T</kbd> and do it again. Speed is instant now: exact, but stiff. The line turns into a square wave."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+**Acceleration** is how quickly a character reaches its top running speed; **friction** is how quickly it stops once you let go. Here that's 0.11 s to start, 0.07 s to stop and 0.06 s to shed the speed on a turn: enough ramp to give the character weight, short enough to stay precise.
+
+| The player... | Rate | Time |
+|---|---|---|
+| holds a direction | accelerate | 0.11 s from 0 to 340 px/s |
+| lets go | brake | 0.07 s from 340 px/s to 0 |
+| pushes the other way | turn | 0.06 s to lose the speed, then 0.11 s the other way |
+| is in the air | same rates, scaled | 80% to steer and turn, 40% to brake |
+
+<h2 id="what-is-acceleration-friction">Acceleration and friction: the character is not a cursor</h2>
+
+Speed that snaps from zero to full is exact and stiff. A ramp of a few hundredths of a second gives the character weight, as long as stopping is faster than starting and turning is faster still. In the air, braking drops to 40%, so letting go mid-jump doesn't kill the momentum you jumped with.
+
+<h2 id="how-to-implement">How to implement acceleration and friction</h2>
+
+1. **Tune times, not accelerations.** The rate is the top speed divided by the time: 340 px/s in 0.11 s is 3,091 px/s².
+2. **Pick the rate by what the player does.** Letting go uses the brake rate, pushing against the current speed the turn rate, anything else the accelerate rate. In the air, scale them.
+3. **Let the turn hand over at zero.** The turn rate applies only while the speed still points the other way, so a full reversal costs 0.06 + 0.11 = 0.17 s.
+4. **Move toward the target by a fixed amount each tick.** A `lerp` closes a fixed fraction instead: it never quite arrives, and its factor changes meaning if the tick rate does.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+var p := params
+var target := input_x * p.max_speed * _walk_scale(on_floor)
+# ...
+# ACELERACIÓN Y FRICCIÓN: tres tasas distintas según la intención del jugador.
+var rate: float
+if input_x == 0:
+	rate = p.max_speed / p.decel_time                 # soltar: frenar rápido
+	if not on_floor:
+		rate *= p.air_friction                         # ...pero conservar inercia en el aire
+		# ...
+elif velocity.x != 0.0 and signf(velocity.x) != float(input_x):
+	rate = p.max_speed / p.turn_time                  # invertir: giro aún más rápido
+	if not on_floor:
+		rate *= p.air_control
+else:
+	rate = p.max_speed / p.accel_time                 # acelerar
+	if not on_floor:
+		rate *= p.air_control
+	# ...
+velocity.x = move_toward(velocity.x, target, rate * delta)
+```
+</CodeBlock>
+
+The parameter file holds no accelerations, only times: `accel_time`, `decel_time` and `turn_time`.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-fast-accelerate">How fast should a platformer character accelerate?</h3>
+
+Fast: 0.11 s to full speed here, 0.09 s in [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs). At 60 frames per second that's under seven frames in both.
+
+<h3 id="stop-faster">Should stopping be faster than accelerating?</h3>
+
+On the ground, if your platforms are narrow, yes: 0.07 s to stop against 0.11 s to start. Celeste uses one rate for both and plays fine, so make it a choice on purpose.
+
+<h3 id="air-control">What is air control in a platformer?</h3>
+
+The fraction of the ground acceleration you keep in the air: 0.8 here, 0.65 in Celeste. Giving air braking its own number (0.4 here) lets you tune steering a jump and coasting through one separately.

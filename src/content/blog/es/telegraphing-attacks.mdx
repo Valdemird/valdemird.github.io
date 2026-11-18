@@ -1,0 +1,105 @@
+---
+title: "Telegrafiar ataques: el aviso que vuelve justo un golpe"
+description: "Telegrafiar un ataque es anunciarlo antes de que haga daño: una pose, un anillo y un sonido de duración fija. Míralo en una línea de tiempo y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 17
+seriesTitle: "Telegrafiar ataques"
+videoHero: {"sheets": "c_telegraph", "plane": "combate", "title": "Telegrafiar", "videoNote": "Espera el aviso del embestidor y salta con un retraso de reacción como el de una persona. Con el aviso, la embestida pasa por debajo; tras pulsar T no hay aviso y la misma reacción llega tarde.", "steps": ["Camina a la derecha con <kbd>→</kbd> hasta que el embestidor te vea. Se echa atrás, se cierra un anillo sobre su cabeza y suena: tienes 0,55 s.", "Sáltalo con <kbd>Espacio</kbd> o atraviésalo con el dash, <kbd>X</kbd> (el dash es invulnerable).", "Haz que se estrelle contra un muro. Se queda aturdido 1,3 s: golpéalo con <kbd>C</kbd>.", "Pulsa <kbd>T</kbd>. El aviso baja a 0,05 s, sin anillo y sin sonido. Prueba el mismo salto."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+**Telegrafiar** un ataque es anunciarlo antes de que pueda hacerte daño, y siempre durante el mismo tiempo. El embestidor de abajo avisa **0,55 s** antes de embestir: lo justo para leer el ataque y responderle.
+
+<TimingDiagram
+  title="El aviso del embestidor"
+  duration={700}
+  start={300}
+  probe="reaccionas"
+  onLabel="Aviso de 0,55 s"
+  offLabel="Con T: 0,05 s"
+  phases={[
+    { from: 0, to: 550, label: "preparación", tone: "neutral", on: { ok: true, text: "A tiempo: el aviso sigue en marcha." }, off: { ok: false, text: "Tarde: con T, la embestida salió a los 50 ms." } },
+    { from: 550, to: 700, label: "embestida", tone: "danger", on: { ok: false, text: "Tarde: la embestida ya ha salido." } },
+  ]}
+  events={[
+    { at: 0, label: "te ve" },
+    { at: 550, label: "embiste" },
+  ]}
+  windows={[
+    { from: 0, to: 550, label: "aviso", detail: "550 ms", measure: "until",
+      on: { ok: true, text: "A tiempo: la embestida sale dentro de {ms} ms." },
+      off: { ok: false, text: "Tarde: con T, la embestida salió a los 50 ms." } },
+    { from: 0, to: 50, label: "con T", detail: "50 ms", measure: "until",
+      on: { ok: true, text: "A tiempo: queda casi todo el aviso por delante." },
+      off: { ok: false, text: "La embestida sale en {ms} ms: demasiado poco para leerla." } },
+  ]}
+/>
+
+<h2 id="what-is-telegraphing">Telegrafiar: una pose, un anillo y un sonido</h2>
+
+El aviso es un estado propio con una duración fija, y el ataque sólo sale cuando termina. El cuerpo se echa atrás y tiembla, un anillo se cierra sobre su cabeza para decirte *cuándo*, y un pitido que sube te avisa aunque no estés mirando a ese enemigo. Como la duración no cambia nunca, a los dos o tres intentos tus manos ya se la saben. Pulsa T y el embestidor es igual de rápido, pero deja de decirte lo que va a hacer.
+
+<h2 id="how-to-implement">Cómo implementar un ataque telegrafiado</h2>
+
+1. Haz del aviso un estado propio, con una duración fija para cada ataque. El ataque sólo sale cuando se acaba ese tiempo.
+2. Saca todas las señales de ese mismo temporizador: el anillo se cierra según la parte del aviso que ya ha pasado y el sonido suena en cuanto empieza el estado.
+3. Decide la dirección del ataque al empezar el aviso y no la corrijas. Un ataque que se tuerce después del aviso castiga al jugador por haberlo leído.
+4. Dale aguante al enemigo durante el aviso. Si un golpe pudiera interrumpirlo, aporrear el botón cancelaría todos los ataques.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
+```gdscript
+## TELEGRAFIAR: entra en el estado de aviso. El ataque sale cuando `windup_done()`.
+func telegraph(attack: StringName, seconds: float) -> void:
+	attack_name = attack
+	set_state(&"windup")
+	windup_total = seconds if Lab.on(&"telegraph") else minf(seconds, 0.05)
+	Combat.enemy_telegraphed.emit(self, attack, windup_total)
+
+func windup_done() -> bool:
+	return state == &"windup" and state_time >= windup_total
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/combat_kit/enemies/charger.gd">
+```gdscript
+func _think(delta: float) -> void:
+	match state:
+		&"patrol":
+			patrol(walk_speed, delta)
+			if is_on_floor() and sees_target():
+				face_target()
+				telegraph(&"embestida", windup_time)
+		&"windup":
+			if windup_done():
+				contact.attack = &"embestida"
+				release(&"charge")
+```
+</CodeBlock>
+
+`face_target()` se ejecuta una sola vez, antes de `telegraph()`, así que la embestida va justo hacia donde apuntaba el aviso.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-long-telegraph">¿Cuánto debería durar el aviso de un ataque?</h3>
+
+Aquí los enemigos normales avisan entre 0,45 s (el saltador) y 0,65 s (el dron). El aviso real más corto es el martillo del jefe en la segunda fase, 0,425 s. Con 0,05 s ya no es un aviso.
+
+<h3 id="telegraph-too-easy">¿Telegrafiar hace el juego demasiado fácil?</h3>
+
+No. El aviso te da la información, y responder a tiempo sigue siendo cosa tuya. Para endurecer una pelea, acorta el aviso o encadena ataques: el jefe acorta todos sus avisos un 15 % en la segunda fase.
+
+<h3 id="telegraph-sound">¿El aviso debería sonar?</h3>
+
+Sí. La pose y el anillo sólo funcionan si estás mirando al enemigo. Un pitido en cuanto empieza el aviso hace que también se pueda leer un ataque desde el borde de la pantalla.

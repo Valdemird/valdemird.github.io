@@ -1,0 +1,106 @@
+---
+title: "Dash en plataformas: distancia fija y una pausa de 45 ms"
+description: "Un dash es un arranque a velocidad fija y sin gravedad: 900 px/s durante 0,16 s, siempre 3,6 casillas. Mira su pausa y su buffer en el tiempo y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 5
+seriesTitle: "Dash"
+videoHero: {"sheets": "dash", "title": "Dash", "videoNote": "Salto y dash en lo más alto sobre 8 casillas de pinchos, salto más dash hacia arriba en el muro de 6 casillas y un dash por el túnel de 1 casilla sobre un foso. Tras pulsar T, los mismos dashes pierden su pausa de 45 ms.", "steps": ["Corre hacia la derecha con <kbd>→</kbd>. Ante los ocho pinchos, salta con <kbd>Espacio</kbd> y, arriba del todo, haz el dash con <kbd>X</kbd>.", "En el muro de seis casillas, salta y haz el dash hacia arriba: mantén <kbd>↑</kbd> y pulsa <kbd>X</kbd> cerca de lo alto del salto.", "En el túnel de una casilla no hay sitio para saltar. Cruza el foso con un dash, <kbd>X</kbd>.", "Pulsa <kbd>T</kbd> y repite los tres. Las distancias no cambian, pero los dashes pierden su pausa de 45 ms, y una <kbd>X</kbd> pulsada justo antes de aterrizar ya no espera a la recarga."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Un **dash** es un arranque corto a velocidad fija durante un tiempo fijo, con la gravedad apagada: 900 px/s durante 0,16 s, siempre 3,6 casillas, en cualquiera de ocho direcciones. Como la distancia nunca cambia, un nivel se puede medir con él.
+
+<TimingDiagram
+  title="Un dash en el aire y el aterrizaje"
+  duration={600}
+  start={450}
+  probe="pulsas dash"
+  phases={[
+    { from: 45, to: 205, label: "dash", tone: "neutral", on: { ok: null, text: "El dash está gastado: la pulsación no hace nada." } },
+    { from: 205, to: 500, label: "aire", tone: "air", on: { ok: null, text: "Estás en el aire y el dash está gastado: la pulsación no hace nada." } },
+    { from: 500, to: 600, label: "suelo", tone: "solid", on: { ok: true, text: "Estás en el suelo y el dash ha vuelto: haces el dash." } },
+  ]}
+  events={[
+    { at: 0, label: "haces el dash" },
+    { at: 205, label: "acaba el dash" },
+    { at: 500, label: "aterrizas" },
+  ]}
+  windows={[
+    { from: 0, to: 45, label: "pausa", detail: "45 ms", measure: "since",
+      on: { ok: null, text: "El juego entero se para al empezar el dash. Está gastado: la pulsación no hace nada." },
+      off: { ok: null, text: "Sin pausa, el dash ya se mueve. Está gastado: la pulsación no hace nada." } },
+    { from: 400, to: 500, label: "buffer del dash", detail: "100 ms", measure: "until",
+      on: { ok: true, text: "Guardada: haces el dash al aterrizar, {ms} ms después." },
+      off: { ok: false, text: "Perdida: llegas {ms} ms pronto y aterrizas sin dash." } },
+  ]}
+/>
+
+<h2 id="what-is-a-dash">Dash: una distancia fija para diseñar niveles</h2>
+
+Velocidad, duración y dirección quedan fijadas al pulsar, así que nada puede doblar el dash una vez empieza. El dash en diagonal se normaliza y recorre las mismas 3,6 casillas a lo largo de la diagonal. Si saltas primero y haces el dash arriba del todo, el alcance pasa de 6,4 casillas a unas 9,5.
+
+<h2 id="freeze-and-buffer">Pausa y buffer del dash: lo que apaga la T</h2>
+
+La T no toca la velocidad, la duración ni la distancia: quita las dos cosas que rodean al dash. La pausa es un hitstop: el juego entero se detiene 45 ms al empezar, y esa parada es lo que le da pegada. El buffer guarda 100 ms una pulsación hecha cuando el dash aún no está disponible, como el [jump buffer](/blog/es/coyote-time-jump-buffer/). Celeste congela su dash 50 ms.
+
+<h2 id="how-to-implement">Cómo implementar un dash</h2>
+
+1. **Haz del dash un estado aparte.** Mientras dura, sáltate el paso normal, donde viven la gravedad, el control en el aire y el salto.
+2. **Fija la dirección al pulsar** y vuelve a imponer la velocidad en cada tick. En el suelo, descarta la parte que apunta hacia abajo.
+3. **Recorta la velocidad al salir**: la horizontal, a la de correr (340 px/s); la de subida, al 40 %. Sin ese recorte, el personaje sale a 900 px/s y se pasa del sitio para el que se midió el nivel.
+4. **Recárgalo al tocar suelo o al rebotar**, uno por vuelo, con un cooldown en el suelo.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _start_dash(on_floor: bool) -> void:
+	var dir := Vector2(input_x, input_y)
+	if on_floor and dir.y > 0.0:
+		dir.y = 0.0
+	if dir == Vector2.ZERO:
+		dir = Vector2(facing, 0.0)
+	dash_dir = dir.normalized()
+	# ...
+	velocity = dash_dir * params.dash_speed
+
+func _step_dash() -> void:
+	# Durante el dash la velocidad es constante y la gravedad no actúa:
+	# la distancia recorrida es siempre la misma (predecible = diseñable).
+	velocity = dash_dir * params.dash_speed
+
+func _end_dash(boosted: bool) -> void:
+	state = State.NORMAL
+	# Al terminar se recorta la velocidad: el dash acaba donde el diseñador espera.
+	var limit := params.max_speed * (params.dash_jump_speed_mult if boosted else 1.0)
+	velocity.x = clampf(velocity.x, -limit, limit)
+	if velocity.y < 0.0:
+		velocity.y *= params.dash_end_up_mult
+```
+</CodeBlock>
+
+`boosted` es el salto desde un dash a ras de suelo, que conserva 1,4 veces la velocidad de correr.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="dash-duration">¿Cuánto debe durar un dash?</h3>
+
+0,16 s aquí y 0,15 s en [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs): lo bastante corto para leerse como un solo arranque y lo bastante largo para cubrir unas casillas.
+
+<h3 id="gravity-during-dash">¿Debe actuar la gravedad durante el dash?</h3>
+
+No. Sin gravedad, la distancia es velocidad por tiempo y nada más, y por eso se puede medir. La parte vertical se resuelve después: este laboratorio conserva el 40 % de la velocidad de subida y Celeste el 75 %.
+
+<h3 id="dash-cooldown">¿Cuánto debe durar el cooldown del dash?</h3>
+
+Si el dash hace invulnerable al jugador, al menos el doble de la protección: 0,45 s aquí para 0,21 s, y así aporrear el botón no se convierte en un escudo. Si no protege, solo limita aporrear en el suelo. Celeste usa 0,2 s.

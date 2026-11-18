@@ -7,7 +7,8 @@ const altLocale = locale === 'en' ? 'es' : 'en';
 
 // Blog posts use /blog/es/<slug>/ pattern (es/ is part of content id, not a URL prefix)
 function getAltPath(pathname: string, currentLocale: string): string {
-	const isBlogPost = /^\/blog\/(?!index)/.test(pathname) && !pathname.endsWith('/blog/');
+	// Series hubs (/blog/series/…, /es/blog/series/…) follow the /es/ prefix rule below.
+	const isBlogPost = /^\/blog\/(?!index|series\/)/.test(pathname) && !pathname.endsWith('/blog/');
 	if (isBlogPost) {
 		if (currentLocale === 'en') {
 			// /blog/my-post/ → /blog/es/my-post/
@@ -63,7 +64,7 @@ const ariaCurrent = (item: { href: string; active: boolean }) =>
 		</div>
 
 		<div class="nav-actions">
-			<a href={altPath} class="lang-switch" aria-label={`${strings.nav.switchLang} ${altLocale === 'en' ? 'English' : 'Español'}`}>
+			<a href={altPath} class="lang-switch" hreflang={altLocale} aria-label={`${altLocale === 'en' ? 'EN' : 'ES'}, ${strings.nav.switchLang} ${altLocale === 'en' ? 'English' : 'Español'}`}>
 				{altLocale === 'en' ? 'EN' : 'ES'}
 			</a>
 

@@ -1,0 +1,64 @@
+---
+title: "Floor snap: why your character bounces down slopes"
+description: "Floor snap pulls a running character back onto the ground after each move, so it runs down slopes instead of hopping off them. See the numbers and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 8
+seriesTitle: "Slopes and floor snap"
+videoHero: {"sheets": "slopes", "title": "Slopes and floor snap", "videoNote": "Runs down the ramps and jumps the pit right where the slope ends. After T it bounces down the slopes and often has no floor under it when it needs to jump.", "steps": ["Run right with <kbd>→</kbd> over both hills without jumping. On the way down the character stays glued to the ramp.", "At the bottom of the second ramp, jump the four-tile pit with <kbd>Space</kbd> right where the slope ends.", "Press <kbd>T</kbd> and run it again. The character hops down the ramps, and sometimes the jump at the edge of the pit doesn't happen at all."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+**Floor snap** pulls a character back down onto the floor after each move, up to a set distance: 12 px here. It's what keeps a running character on a downhill ramp instead of hopping down it.
+
+| Running at 340 px/s down a 45° ramp, 120 ticks/s | Per tick |
+|---|---|
+| The floor drops away | 2.8 px |
+| Gravity pulls the character down | about 0.2 px |
+| Floor snap can close | 12 px (Godot's default: 1 px) |
+
+<h2 id="why-it-bounces">Why a running character bounces down slopes</h2>
+
+On a 45° ramp the floor drops as far as you move sideways, and gravity, starting from zero at the top, covers only a fraction of a pixel of that. After a single tick there's a gap under the feet and the game thinks you're in the air. The character hops, the animation flickers, and a jump press only works inside [coyote time](/blog/coyote-time-jump-buffer/).
+
+<h2 id="what-is-floor-snap">Floor snap: back onto the ramp after every move</h2>
+
+After each move, floor snap looks down by up to its length and puts the character back on the floor it finds. It's skipped while the character moves up, so jumps work as usual, and it's far shorter than a 40 px tile, so walking off a real ledge still means falling.
+
+<h2 id="how-to-implement">How to implement floor snap on slopes</h2>
+
+1. **Snap after moving, never while rising.** If the character was on the floor and isn't moving up, pull it down onto the floor below, up to the snap length.
+2. **Size it from your top ground speed.** Each tick the floor drops speed × tan(slope angle) ÷ physics ticks per second. Beat that, and stay shorter than your smallest real ledge.
+3. **Keep ground speed constant on slopes**, so the character doesn't slow down uphill or speed up downhill.
+4. **Set the max floor angle a little above your steepest ramp.**
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="game/level/sheets.gd">
+```gdscript
+floor_snap_length = 12.0       # px de «pegado»
+floor_constant_speed = true    # misma velocidad en rampa
+floor_stop_on_slope = true     # no resbalar parado
+floor_max_angle = deg_to_rad(50)
+```
+</CodeBlock>
+
+All four are built into `CharacterBody2D`, whose defaults are 1 px of snap and constant speed off.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="floor-snap-value">How long should floor snap be?</h3>
+
+More than the floor drops in one tick at your top ground speed, less than your smallest real ledge. Here that's 12 px: four times the 2.8 px a 45° ramp drops per tick at full run, and under a third of a 40 px tile.
+
+<h3 id="max-angle-45">What floor_max_angle should I use for 45° slopes?</h3>
+
+Something above 45°, because 45° is exactly Godot's default limit. This demo uses 0.87 rad, about 50°.

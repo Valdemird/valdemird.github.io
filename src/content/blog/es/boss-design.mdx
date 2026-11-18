@@ -1,0 +1,103 @@
+---
+title: "Diseño de jefes: tres ataques, dos fases y barra de aguante"
+description: "Un buen jefe examina lo que el jugador ya aprendió: pocos ataques legibles, azar con reglas, una barra de aguante y una segunda fase más rápida. Juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 20
+seriesTitle: "Diseño de jefes"
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Una **pelea contra un jefe** es un examen: no enseña nada nuevo, combina lo que el jugador ya aprendió. Éste tiene tres ataques, cada uno con su aviso, se desploma **2,2 s** tras siete golpes y se acelera a mitad de vida.
+
+| Ataque del jefe | Aviso | Ya lo preguntó |
+|---|---|---|
+| Embestida | 0,6 s | [El embestidor](/blog/es/telegraphing-attacks/) |
+| Martillo | 0,5 s | [El saltador](/blog/es/enemy-patterns-and-openings/) |
+| Ráfaga | 0,6 s | El dron |
+
+<h2 id="what-makes-a-good-boss">Ataques del jefe: preguntas que el jugador ya respondió</h2>
+
+Cada ataque repite la pregunta de un enemigo anterior y se responde igual. Después de cada ataque el jefe se recupera 0,8 s: es tu turno para golpearlo.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_boss"
+  title="Jefe"
+  steps={[
+    "Camina a la derecha con <kbd>→</kbd> y entra en la sala. Las compuertas se cierran detrás de ti y el jefe se despierta.",
+    "Lee cada aviso. Embestida: salta con <kbd>Espacio</kbd> o atraviésala con el dash, <kbd>X</kbd>. Martillo: sal de debajo y luego salta las dos ondas. Ráfaga: no te pares o cruza el abanico con el dash.",
+    "Golpéalo con <kbd>C</kbd> mientras se recupera de cada ataque. Con siete golpes se desploma 2,2 s: ésa es tu gran apertura.",
+    "A mitad de vida ruge y todo se acelera. Si pierdes, vuelves a la puerta con la vida llena.",
+  ]}
+/>
+
+<h2 id="random-with-rules">Ataques aleatorios del jefe, con reglas</h2>
+
+Un orden fijo se memoriza en vez de leerse, así que la elección se pondera por la distancia y nunca repite un ataque tres veces seguidas: a menos de 260 px sale el martillo la mitad de las veces; más lejos, una de cada cuatro. No puedes predecir el siguiente ataque, pero sí el humor.
+
+<h2 id="stagger-bar">Barra de aguante: la agresividad convertida en apertura</h2>
+
+El jefe no se inmuta por un golpe suelto, así que tu agresividad se nota en la barra de aguante: el séptimo golpe lo tumba 2,2 s sin daño por contacto. Sekiro construye todo su combate sobre la misma idea, la [postura](https://sekiroshadowsdietwice.wiki.fextralife.com/Posture) (enlace en inglés).
+
+<h2 id="boss-phases">Fases del jefe: los mismos ataques, más rápidos</h2>
+
+A mitad de vida el jefe ruge 0,9 s para que notes que las reglas han cambiado. Luego los avisos se multiplican por 0,85 y las recuperaciones por 0,72, sin ataques nuevos que aprender.
+
+<h2 id="how-to-implement">Cómo implementar la pelea contra un jefe</h2>
+
+1. Monta el jefe sobre el bucle de cualquier enemigo y añade sólo un selector de ataques y un contador de golpes.
+2. Pondera cada elección por la distancia y saca el último ataque del sorteo cuando ya haya salido dos veces seguidas.
+3. Ignora los golpes durante el desplome para que no se encadenen, y si la barra se llena en pleno salto o embestida, que se desplome al acabar el ataque, no en el aire.
+4. Pon el checkpoint en la puerta y cierra las compuertas sólo cuando el jugador esté dentro y lejos de las dos.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/combat_kit/enemies/boss.gd">
+```gdscript
+func _choose_attack() -> void:
+	var far := absf(to_target().x) > 260.0
+	var weights := {
+		&"embestida": 3.0 if far else 2.0,
+		&"martillo": 2.0 if far else 3.0,
+		&"rafaga": 3.0 if far else 1.0,
+	}
+	if _repeats >= 1:
+		weights.erase(_last_attack)   # como mucho dos veces seguidas
+
+
+func _on_damaged(hit: Hit) -> void:
+	super(hit)
+	if state == &"staggered":
+		return   # ya está desplomado: los golpes no alargan la apertura
+	# AGUANTE: cada golpe suma; al llenarse, se desploma.
+	poise_damage += 1
+	if poise_damage >= poise:
+		if state in [&"idle", &"recover", &"windup", &"burst", &"roar"]:
+			_stagger()
+		else:
+			_stagger_pending = true   # en pleno salto o embestida: al terminar
+```
+</CodeBlock>
+
+`embestida`, `martillo` y `rafaga` son los tres ataques, y el sorteo ponderado viene justo después, en la misma función.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-many-attacks">¿Cuántos ataques debería tener un jefe?</h3>
+
+Los suficientemente pocos como para aprenderlos en un puñado de intentos. Éste tiene tres, y su script dice por qué: mejor tres bien leídos que diez confusos.
+
+<h3 id="random-but-fair">¿Cómo se hace que los patrones de un jefe sean aleatorios pero justos?</h3>
+
+Poniéndole reglas al azar: ponderar la elección por la distancia, no repetir nunca un ataque tres veces seguidas y conservar todos los avisos. No puedes memorizar el orden, pero siempre puedes leer el siguiente movimiento.
+
+Éste es el último post de [la serie](/es/blog/series/platformer-game-feel/): una sala donde todo lo anterior tiene que funcionar a la vez.

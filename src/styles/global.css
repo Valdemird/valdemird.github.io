@@ -308,6 +308,17 @@ pre > code {
 	}
 }
 
+/* github-dark's comment grey (#6A737D) is 3.0:1 on its #24292e background, under
+   the 4.5:1 WCAG AA asks for small text; #959DA5 is 5.3:1 and still reads as a comment. */
+[data-theme='dark'] .astro-code span[style*='--shiki-dark:#6A737D' i] {
+	color: #959da5 !important;
+}
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme='light']) .astro-code span[style*='--shiki-dark:#6A737D' i] {
+		color: #959da5 !important;
+	}
+}
+
 /* --- Media --- */
 img {
 	max-width: 100%;

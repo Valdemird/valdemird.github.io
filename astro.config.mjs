@@ -60,10 +60,27 @@ function frontmatterDate(raw) {
 
 const blogLastmod = new Map();
 const blogIds = new Set();
+const seriesLastmod = new Map(); // "<series id>:<lang>" -> newest part date
 for (const { path, id } of walk(BLOG_DIR)) {
 	blogIds.add(id);
-	const date = frontmatterDate(readFileSync(path, 'utf8'));
+	const raw = readFileSync(path, 'utf8');
+	const date = frontmatterDate(raw);
 	if (date) blogLastmod.set(`${SITE}/blog/${id}/`, new Date(date).toISOString());
+	const series = frontmatter(raw).match(/^series:\s*['"]?([a-z0-9-]+)/m)?.[1];
+	if (series && date) {
+		const key = `${series}:${id.startsWith('es/') ? 'es' : 'en'}`;
+		if (!seriesLastmod.has(key) || seriesLastmod.get(key) < date) seriesLastmod.set(key, date);
+	}
+}
+
+// Series hubs (/blog/series/<slug>/, /es/blog/series/<slug>/): lastmod is the newest
+// part. The id -> slug pairs come from SERIES in src/consts.ts.
+const CONSTS_FILE = fileURLToPath(new URL('./src/consts.ts', import.meta.url));
+for (const [, id, slug] of readFileSync(CONSTS_FILE, 'utf8').matchAll(/'([a-z0-9-]+)':\s*\{\s*slug:\s*'([a-z0-9-]+)'/g)) {
+	for (const [lang, prefix] of [['en', ''], ['es', '/es']]) {
+		const date = seriesLastmod.get(`${id}:${lang}`);
+		if (date) blogLastmod.set(`${SITE}${prefix}/blog/series/${slug}/`, new Date(date).toISOString());
+	}
 }
 
 // ES posts live at /blog/es/<slug>/, but every other ES page is /es/... so
@@ -71,6 +88,7 @@ for (const { path, id } of walk(BLOG_DIR)) {
 // static, so Astro emits a meta-refresh page per entry).
 const esBlogSlugs = [...blogIds].filter((id) => id.startsWith('es/')).map((id) => id.slice(3));
 const esBlogRedirects = Object.fromEntries(esBlogSlugs.map((slug) => [`/es/blog/${slug}`, `/blog/es/${slug}/`]));
+const esBlogRedirectUrls = new Set(esBlogSlugs.map((slug) => `${SITE}/es/blog/${slug}/`));
 
 // Sitemap hreflang for blog pairs. The i18n option below only pairs /es/-prefixed
 // URLs, so /blog/<slug>/ and /blog/es/<slug>/ need their alternates set by hand.
@@ -148,8 +166,9 @@ export default defineConfig({
 				defaultLocale: 'en',
 				locales: SITEMAP_LOCALES,
 			},
-			// Keep the /es/blog/<slug>/ redirect stubs out of the sitemap.
-			filter: (page) => !(page.startsWith(`${SITE}/es/blog/`) && page !== `${SITE}/es/blog/`),
+			// Keep the /es/blog/<slug>/ redirect stubs out of the sitemap (but not the
+			// real pages under /es/blog/, like the ES index and the series hubs).
+			filter: (page) => !esBlogRedirectUrls.has(page),
 			// Accurate lastmod from real content dates (reviewed > updated > publish),
 			// not the build timestamp — Google distrusts sitemaps with bogus lastmod.
 			// No priority/changefreq: Google ignores both.

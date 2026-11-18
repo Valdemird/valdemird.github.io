@@ -30,7 +30,7 @@ export const GET: APIRoute = async () => {
 			const date = post.data.pubDate.toISOString().split('T')[0];
 			const reviewed = post.data.reviewedDate?.toISOString().split('T')[0];
 			const tagList = post.data.tags?.join(', ') || '';
-			const plainText = post.body ? cleanMdxBody(post.body) : '(Content not available in plain text)';
+			const plainText = post.body ? cleanMdxBody(post.body, post.data.lang ?? 'en') : '(Content not available in plain text)';
 
 			lines.push(
 				`## ${post.data.title}`,

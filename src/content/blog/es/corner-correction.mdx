@@ -1,0 +1,85 @@
+---
+title: "Corrección de esquinas en plataformas: qué es y cómo se hace"
+description: "La corrección de esquinas aparta unos píxeles el salto que roza un techo, o lo sube a la cornisa que casi alcanza. Mira cuánto perdona y juégala."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 7
+seriesTitle: "Corrección de esquinas"
+videoHero: {"sheets": "corner", "title": "Corrección de esquinas", "videoNote": "Se para unos píxeles descentrado bajo cada hueco de una casilla y salta en vertical. Con la corrección de esquinas el juego lo empuja hasta que pasa; después de T, el mismo salto se da contra la esquina.", "steps": ["Corre hacia la derecha con <kbd>→</kbd> por el pasillo y párate bajo el primer hueco, un poco descentrado.", "Salta en vertical manteniendo <kbd>Espacio</kbd>. El juego te desliza hasta que pasas, y una etiqueta verde «ESQUINA ↔ px» dice cuántos píxeles hicieron falta.", "Pulsa <kbd>T</kbd> y repite el mismo salto desde el mismo sitio. La cabeza choca con la esquina, y la etiqueta «× ESQUINA px» te dice por cuánto fallaste."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+La **corrección de esquinas** (corner correction) mueve al personaje unos píxeles cuando un salto va a rozar una esquina: hasta 9 px de lado para pasar el borde de un techo, o hasta 7 px hacia arriba para subir a una cornisa que casi alcanza. El jugador ve un salto que funcionó, y el empujón no lo ve nunca.
+
+| Caso | Corrección |
+|---|---|
+| La cabeza roza la esquina de un techo al subir | hasta 9 px de lado |
+| Caes de lado contra el borde de una cornisa | hasta 7 px hacia arriba |
+| Cualquiera de los dos durante un [dash](/blog/es/platformer-dash/) | hasta 12 px |
+
+<h2 id="head-correction">Corrección de esquinas al subir: pasar el borde del techo</h2>
+
+Darse con la cabeza por 4 px corta un salto en seco, y el jugador lo vive como un fallo del juego. Con un cuerpo de 24 px y un hueco de 40, para subir en vertical sin tocar tienes que estar a menos de 8 px del centro. Una corrección de 9 px estira esa ventana de 16 px a 34, y el jugador nunca ve cómo se estira.
+
+[Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) solo prueba 4 px, y solo hacia el lado al que ya te mueves.
+
+<h2 id="ledge-correction">Corrección de esquinas en cornisas: subirte al borde</h2>
+
+La misma idea funciona de lado. Para el jugador, quedarse corto por un píxel ante lo alto de una plataforma parece un aterrizaje. Sin la corrección, el personaje resbalaría por la cara de la plataforma, así que el juego lo sube al borde y para la caída.
+
+<h2 id="how-to-implement">Cómo implementar la corrección de esquinas</h2>
+
+1. **Comprueba antes de mover.** Con la velocidad ya decidida, pregunta si el movimiento de este tick va a chocar.
+2. **Busca el empujón más pequeño.** Prueba 1 px, 2, 3, hasta el límite: a los dos lados para la cabeza, solo hacia arriba para la cornisa. Quédate con el primero que deje el camino libre.
+3. **Comprueba que el propio empujón esté libre.** Esquivar un techo no puede meterte en una pared.
+4. **Mantén el límite pequeño.** El empujón ocurre en un solo tick, así que uno grande se ve como un salto de posición.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _correct_corners(delta: float) -> void:
+	var enabled := Lab.on(&"corner_correction")
+	var dashing := state == State.DASH
+	var p := params
+
+	if velocity.y < 0.0:
+		var up := Vector2(0.0, velocity.y * delta)
+		if test_move(global_transform, up):
+			var limit := p.dash_correction_px if dashing else p.corner_correction_px
+			var px := _find_nudge(up, Vector2.RIGHT, limit, [1.0, -1.0])
+			if px != 0.0:
+				if enabled:
+					global_position.x += px
+
+func _find_nudge(motion: Vector2, axis: Vector2, max_px: int, signs: Array) -> float:
+	for i in range(1, max_px + 1):
+		for s: float in signs:
+			var shift := axis * (i * s)
+			if test_move(global_transform, shift):
+				continue  # tampoco cabemos hacia ese lado
+			if not test_move(global_transform.translated(shift), motion):
+				return i * s
+	return 0.0
+```
+</CodeBlock>
+
+La cornisa usa el mismo `_find_nudge` con `Vector2.UP`, y después deja `velocity.y` como mucho en cero.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-many-pixels">¿Cuántos píxeles debe usar la corrección de esquinas?</h3>
+
+Pocos. Celeste usa 4 px para la cabeza. Esta demo usa 9 px para la cabeza y 7 para las cornisas, con un cuerpo de 24 px y casillas de 40.
+
+<h3 id="only-head">¿La corrección de esquinas es solo para la cabeza?</h3>
+
+No. Si una caída se queda corta ante lo alto de una cornisa por unos píxeles, sube al personaje encima. Es la misma técnica, pero de lado.

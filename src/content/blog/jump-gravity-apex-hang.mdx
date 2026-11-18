@@ -1,0 +1,103 @@
+---
+title: "Jump gravity: fall faster than you rise, hang at the apex"
+description: "Asymmetric gravity makes a jump rise in 0.38 s and fall in 0.30 s; apex hang halves gravity near the top. Why both work, with a sheet to play for each."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 3
+seriesTitle: "Jump gravity"
+videoHero: {"sheets": "gravity", "title": "Asymmetric gravity", "videoNote": "Up the steps and over the pit with asymmetric gravity, then T switches it off: same jumps, but every fall takes longer and the arc floats.", "steps": ["Jump up the three platforms with <kbd>Space</kbd> and look at the trail: the dots stretch apart on the way down.", "From the top, drop off the edge. The fall speeds up until it hits the 900 px/s cap.", "Press <kbd>T</kbd> and jump again. Without the technique the fall is as slow as the rise, and the same jumps feel floaty."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+**Asymmetric gravity** makes a jump fall faster than it rises: 0.38 s up, 0.30 s down. **Apex hang** halves gravity near the top while you hold jump. One gives the jump weight, the other a moment to aim the landing.
+
+| Parameter | Value |
+|---|---|
+| Rise of a 3.6-tile jump | 0.38 s |
+| Fall | 0.30 s |
+| Gravity up / down | 1,994 / 3,200 px/s² |
+| Terminal velocity | 900 px/s |
+| Apex hang, under 90 px/s | gravity ×0.5, air acceleration ×1.5 |
+
+<h2 id="what-is-asymmetric-gravity">Asymmetric gravity: fall faster than you rise</h2>
+
+Real gravity is the same both ways, so the fall takes as long as the climb, and on screen that symmetric arc reads as floaty. A faster fall hands control back sooner and makes the landing spot easier to predict. It needs a cap: without one, a ten-tile drop gets hard to steer and to read.
+
+<h2 id="what-is-apex-hang">Apex hang: a little more air at the top</h2>
+
+The top of the jump is where you decide where to land. Apex hang gives you a few extra hundredths of a second and a bit more grip right there: the same full jump reaches the top in 0.42 s instead of 0.38 s. [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) does it too, halving gravity under 40 px/s while jump is held.
+
+<PlayableLab
+  sheets="apex"
+  title="Apex hang"
+  videoNote="Pillar to pillar with apex hang: watch the readout over each jump, 0.42 s to the top. Then T switches it off and the same jumps peak at 0.38 s, with less time to correct."
+  steps={[
+    "Jump from pillar to pillar with <kbd>Space</kbd> held, steering with <kbd>←</kbd> <kbd>→</kbd> at the top of each jump.",
+    "Watch the readout above the arc: about 0.42 s to reach the top.",
+    "Press <kbd>T</kbd> and do it again. The top comes at 0.38 s and the landing correction gets noticeably harder.",
+  ]}
+/>
+
+<h2 id="how-to-implement">How to implement jump gravity and apex hang</h2>
+
+1. **Pick times, not gravity.** Choose the height and the rise and fall times, and derive both gravities from them.
+2. **Switch gravity by direction**, and clamp the fall at the terminal velocity.
+3. **Add the hang.** With jump held and vertical speed under the threshold, halve gravity and raise air acceleration by 50%.
+4. **Keep the hang small.** Past a point the character stops jumping and starts floating.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
+```gdscript
+## Gravedad de subida: g = 2h / t²
+var gravity_up: float:
+	get:
+		return 2.0 * jump_height * tile_size / (time_to_apex * time_to_apex)
+
+## Gravedad de caída (mayor que la de subida si time_to_fall < time_to_apex).
+var gravity_down: float:
+	get:
+		return 2.0 * jump_height * tile_size / (time_to_fall * time_to_fall)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+else:
+	# GRAVEDAD ASIMÉTRICA: caer más rápido de lo que se sube. Quita la
+	# sensación "flotante" de la parábola simétrica y da peso al aterrizaje.
+	gravity = p.gravity_down if Lab.on(&"asym_gravity") else p.gravity_up
+
+# ÁPICE: gravedad reducida un instante en lo alto del salto (si se mantiene el botón).
+if jump_held and _at_apex(on_floor):
+	gravity *= p.apex_gravity_mult
+
+# Velocidad terminal: siempre acotada (la de la caída rápida es otra, mayor).
+var terminal := maxf(p.max_fall_speed, p.fast_fall_speed) if is_fast_falling else p.max_fall_speed
+velocity.y = minf(velocity.y + gravity * delta, terminal)
+```
+</CodeBlock>
+
+The `else` is the branch for when the character isn't rising.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="why-fall-faster">Why do platformer characters fall faster than they rise?</h3>
+
+A symmetric arc reads as floaty on screen. A faster fall gives the jump weight and shortens the wait to land.
+
+<h3 id="jump-gravity-formula">How do I compute jump gravity from height and time?</h3>
+
+With height h and time to the top t: takeoff speed v₀ = 2h / t, gravity g = 2h / t². The fall time in the same formula gives the fall gravity.
+
+<h3 id="terminal-velocity-value">What terminal velocity should a platformer use?</h3>
+
+Celeste uses 20 tiles per second, this lab 22.5: fast enough to feel the drop, slow enough to steer.

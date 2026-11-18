@@ -1,0 +1,115 @@
+---
+title: "Invincibility frames (i-frames) and spikes that don't kill"
+description: "Invincibility frames are the window after a hit where nothing can hit you again: 1.2 s here. Spikes cost a mask instead of a life. See both and play them."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 15
+seriesTitle: "Invincibility frames"
+videoHero: {"sheets": "c_health", "plane": "combate", "title": "Health and damage", "videoNote": "Walks across the damage pad. With invincibility frames it loses one mask and blinks through; after T each contact costs another mask.", "steps": ["Walk right with <kbd>→</kbd> onto the damage pad. You lose one mask, get knocked back, and blink for 1.2 s.", "Jump into the pen with <kbd>Space</kbd> and stand inside a walker. With i-frames it can only take a mask every 1.2 s.", "Press <kbd>T</kbd> to switch the i-frames off and walk over the pad again: every contact costs another mask.", "Dash through a walker with <kbd>X</kbd>. The dash has i-frames of its own."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+**Invincibility frames** (i-frames) are the window after a hit where nothing can hit you again. Here it lasts **1.2 s**, you blink the whole time, and a mistake costs one mask instead of one per tick.
+
+<TimingDiagram
+  title="The 1.2 s after a hit"
+  duration={1200}
+  start={700}
+  tick={200}
+  probe="the enemy touches you again"
+  phases={[
+    { from: 0, to: 200, label: "knockback", tone: "air", on: { ok: true, text: "Ignored: you're knocked back and blinking." }, off: { ok: false, text: "You lose another mask, mid-knockback." } },
+    { from: 200, to: 1200, label: "blinking", tone: "neutral", on: { ok: true, text: "Ignored: you're still blinking." }, off: { ok: false, text: "You lose another mask." } },
+  ]}
+  events={[
+    { at: 0, label: "hit" },
+    { at: 200, label: "control back" },
+  ]}
+  windows={[
+    { from: 0, to: 1200, label: "i-frames", detail: "1.2 s", measure: "until",
+      on: { ok: true, text: "Ignored: {ms} ms of i-frames left." },
+      off: { ok: false, text: "You lose another mask: contact damage tries again every tick." } },
+  ]}
+/>
+
+<h2 id="what-are-i-frames">I-frames after a hit: one mistake, one mask</h2>
+
+Contact damage is why they exist. An enemy's body or a damage pad is a hitbox that's always on and tries to hit you on every physics tick, 120 times a second. Without the window, standing inside an enemy for an instant would cost a mask per tick. The hit also knocks you back and takes your control for 0.2 s; the rest of the 1.2 s is time to get clear. Health is five masks, the same as [Hollow Knight](https://hollowknight.wiki.fextralife.com/Health+Mask) starts you with.
+
+<h2 id="what-is-hazard-respawn">Hazard respawn: spikes that cost a mask, not a life</h2>
+
+Spikes, pits and the void don't kill. They cost a mask and put you back on the last safe ground you stood on; only the last mask sends you to the checkpoint. Health is the error budget for the area, and a spike shouldn't make you replay what you already knew how to do. I-frames never protect you from spikes, or an enemy hit would buy you 1.2 s to cross a spike pit.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_hazard"
+  title="Environmental damage"
+  videoNote="Walks into the spikes on purpose. With hazard respawn it loses a mask and reappears on the last safe ground; after T the spikes kill and it starts over from the checkpoint."
+  steps={[
+    "Walk right with <kbd>→</kbd> into the first spikes. You lose one mask and reappear on the last safe ground, not at the checkpoint.",
+    "Keep holding <kbd>→</kbd> when you reappear. It doesn't move you until you let go (half a second at most), so the same reflex doesn't put you back on the spikes.",
+    "Jump the spikes with <kbd>Space</kbd> and drop into the pit at the end: the void works the same.",
+    "Press <kbd>T</kbd> and touch the spikes again. Now they kill, and you start over from the checkpoint.",
+  ]}
+/>
+
+<h2 id="how-to-implement">How to implement i-frames and hazard respawn</h2>
+
+1. **One invulnerability timer in the health component.** A hit that lands sets it; while it runs, every hit is refused and contact hitboxes try again next tick.
+2. **Knock the player away on a hit.** If they're still inside the enemy when the timer runs out, the next hit lands on the very next tick.
+3. **Let the movement code ask before it dies.** For a hazard, charge a mask and send the player to the last safe ground instead. Only record ground that's really safe: static, with floor on both sides and no hazard nearby.
+4. **Make hazard hits ignore invulnerability.**
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/combat_kit/core/health.gd">
+```gdscript
+## Aplica un golpe. Devuelve false si no hizo efecto (ya muerto o invulnerable).
+func take(hit: Hit) -> bool:
+	if is_dead():
+		return false
+	if _invulnerable > 0.0 and not hit.ignores_invulnerability:
+		return false
+	current = maxi(current - hit.damage, 0)
+	_invulnerable = invulnerability_time
+	changed.emit(current, maximum)
+	damaged.emit(hit)
+	if current == 0:
+		died.emit(hit)
+	return true
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/combat_kit/player/combat_params.gd">
+```gdscript
+@export_group("Vida y daño")
+@export_range(1, 12) var max_health := 5
+## I-FRAMES: invulnerabilidad tras recibir daño. Tiempo para salir del peligro.
+@export_range(0.0, 3.0, 0.05, "suffix:s") var invulnerability_time := 1.2
+## Empujón al recibir daño: horizontal (alejándose del golpe) y vertical.
+@export var hurt_knockback := Vector2(300.0, 330.0)
+## Tiempo sin control tras el golpe: el empujón se nota, pero no desespera.
+@export_range(0.0, 0.6, 0.01, "suffix:s") var hurt_lock_time := 0.2
+```
+</CodeBlock>
+
+The blink reads the same timer, so it stops exactly when you can be hit again.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-long-i-frames">How long should invincibility frames last?</h3>
+
+Long enough to get out of danger: 1.2 s after a hit here, 0.2 s of it without control. A [dodge](/blog/dodge-dash-i-frames/) is much shorter: 0.21 s.
+
+<h3 id="spikes-kill-or-damage">Should spikes kill or take health?</h3>
+
+If your game has health, take health. Here a spike costs one mask and returns you to the last safe ground. Only the last mask kills.

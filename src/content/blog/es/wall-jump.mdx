@@ -1,0 +1,81 @@
+---
+title: "Salto de pared: las cinco ayudas que lo hacen justo"
+description: "El salto de pared (wall jump) te lanza hacia arriba y lejos de la pared. Cinco ayudas lo hacen justo: 5 px de margen, 100 ms de coyote y más. Juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "plataformas"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 4
+seriesTitle: "Salto de pared"
+videoHero: {"sheets": "wall", "title": "Salto de pared", "videoNote": "El personaje sube el pozo a la manera clásica equivocada: empujando hacia la pared en cada salto y soltando después. Con las ayudas el salto sigue llegando a la otra pared; tras pulsar T, el mismo gesto anula el impulso y no consigue despegarse de la pared.", "steps": ["Camina hacia la derecha con <kbd>→</kbd>, pasa por debajo de la primera pared y entra en el pozo. Salta con <kbd>Espacio</kbd> y mantén <kbd>→</kbd> contra la pared derecha: la caída se frena y deslizas.", "Pulsa <kbd>Espacio</kbd> mientras deslizas y suelta las flechas. El salto te lleva solo a la otra pared. Alterna lados hasta llegar arriba.", "Pulsa <kbd>T</kbd> y sube a la manera equivocada: deja apretada la flecha hacia la pared al saltar. El impulso muere y vuelves contra la misma pared, que ya no te agarra."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Un **salto de pared** (*wall jump*) es un salto que sale de una pared en lugar del suelo: en el aire, pegado a ella, pulsas salto y sales despedido hacia arriba y hacia el otro lado a 400 px/s. Va con el **deslizamiento** (*wall slide*), que limita la caída a 130 px/s mientras empujas hacia la pared, y ahí está la trampa: el gesto que te mantiene en la pared es el mismo que estropea el salto desde ella.
+
+<h2 id="five-ways-it-fails">Ayudas del salto de pared: cinco arreglos que el jugador no ve</h2>
+
+La física cruda rompe el salto de pared en cinco puntos pequeños. Cada ayuda arregla uno, y la T apaga las cinco. [Mega Man X](https://en.wikipedia.org/wiki/Mega_Man_X_%28video_game%29) (1993) ya dejaba deslizarse por casi cualquier pared y saltar desde ella.
+
+| Sin ayuda | La ayuda | En el laboratorio |
+|---|---|---|
+| Hay que tocar la pared al píxel | Detección con margen | 5 px (1,5 px tras la T) |
+| Te separaste de la pared justo antes de pulsar | Coyote time de pared | 100 ms |
+| Apretar hacia la pared anula el impulso | Bloqueo del control | stick ignorado durante 140 ms |
+| Soltar el stick te deja a medio camino | Inercia | rozamiento del aire ×0,1 hasta que tocas el stick |
+| Un toque corto te deja más abajo de donde saliste | Altura mínima | 220 ms antes de poder recortar el salto |
+
+<h2 id="how-to-implement">Cómo implementar un salto de pared</h2>
+
+1. **Detecta la pared con margen.** Desplaza unos píxeles a cada lado la forma de colisión del jugador y mira si toca algo. Cada tick que encuentra pared recarga el coyote de pared.
+2. **Impón la velocidad del salto de golpe**, lejos de la pared y con el 85 % de la altura de un salto normal, y arma el bloqueo, la inercia y la altura mínima.
+3. **Cuenta con que el stick siga apuntando a la pared.** Sin el bloqueo, el control en el aire puede más que el impulso y te devuelve a la misma pared.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+if wall_dir != 0:
+	_wall_coyote = params.wall_coyote_time if Lab.on(&"wall_assist") else 0.0
+# ...
+# WALL SLIDE: pegado a una pared y empujando hacia ella, la caída se frena.
+var sliding := not on_floor and wall_dir != 0 and input_x == wall_dir and velocity.y > 0.0
+if sliding:
+	velocity.y = minf(velocity.y, p.wall_slide_speed)
+# ...
+
+func _do_wall_jump(margin: bool = false) -> void:
+	var from_dir := wall_dir if wall_dir != 0 else _last_wall_dir
+	velocity.x = -from_dir * params.wall_jump_speed_x
+	velocity.y = -params.jump_velocity * sqrt(params.wall_jump_height_ratio)
+	# ...
+	# BLOQUEO DE CONTROL: durante unos ms se ignora el stick. Sin esto, quien
+	# mantiene pulsado "hacia la pared" anula el impulso y vuelve a ella al instante.
+	_wall_jump_lock = params.wall_jump_lock_time if Lab.on(&"wall_assist") else 0.0
+	_wall_jump_hold = params.wall_jump_min_time if Lab.on(&"wall_assist") else 0.0
+	# INERCIA: hasta que se toque el stick, el aire apenas frena este salto.
+	_wall_carry = Lab.on(&"wall_assist")
+```
+</CodeBlock>
+
+Mientras dura `_wall_jump_lock`, el movimiento horizontal sale antes de leer el stick.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="wall-coyote-time">¿Cuánto debe durar el coyote time de pared?</h3>
+
+100 ms, lo mismo que el [coyote time en las cornisas](/blog/es/coyote-time-jump-buffer/). [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) no tiene temporizador de pared y a cambio da más alcance: 3 px con un cuerpo de 8.
+
+<h3 id="wall-slide-speed">¿A qué velocidad debe deslizar el personaje por la pared?</h3>
+
+Lo bastante despacio para apuntar: 130 px/s aquí, más o menos la séptima parte de los 900 px/s de la caída libre.
+
+<h3 id="single-wall-climbing">¿Se debería poder trepar por una sola pared?</h3>
+
+Decídelo a propósito. Aquí cada pared da un salto y después deja de agarrar hasta que pisas suelo, rebotas o saltas desde otra pared. Celeste no limita los saltos de pared y hace que trepar gaste resistencia.

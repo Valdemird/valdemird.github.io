@@ -1,0 +1,80 @@
+---
+title: "Hitstop and hit confirmation: how to make a hit land"
+description: "Hitstop freezes the game for 50 ms when an attack connects. With recoil, a flash and sparks, it tells the player the hit landed. See it and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 13
+seriesTitle: "Hitstop and hit confirm"
+videoHero: {"sheets": "c_confirm", "plane": "combate", "title": "Hit confirmation", "videoNote": "Slashes the dummy with hit confirmation on: hit stop, recoil, flash and sparks. After T the same hits land with none of that, and it's hard to tell they landed.", "steps": ["Walk right with <kbd>→</kbd> and slash the training dummy with <kbd>C</kbd>. Freeze, flash, sparks, and you slide back a little.", "Hop the low block with <kbd>Space</kbd> and hit the two patrolling enemies. Each hit pushes them away and pushes you back.", "Press <kbd>T</kbd> and do it all again. Same damage, no freeze, no flash, no push.", "With the technique still off, keep slashing an enemy while you walk into it, and watch where you end up."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+**Hitstop** freezes the game for **50 ms** when an attack connects. With recoil, a flash, sparks and a hit sound, it adds up to **hit confirmation**: every signal that tells the player the hit landed, because damage on its own is an invisible number.
+
+| Event | Hitstop |
+|---|---|
+| Taking a hit | 110 ms |
+| The combo finisher connects | 90 ms |
+| An enemy dies | 80 ms |
+| A normal hit | 50 ms |
+| A hit blocked by a guard | 40 ms |
+
+<h2 id="what-is-hitstop">Hitstop: a 50 ms freeze on impact</h2>
+
+[Infil's Fighting Game Glossary](https://glossary.infil.net/?t=Hitstop) defines hitstop as an extremely brief pause "for dramatic effect": when an attack feels "beefy", this is usually why. Taking damage freezes longest, because your own mistake has to land harder than your success. Celeste's [player code](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) calls `Celeste.Freeze(.05f)` at the start of every dash: the same 50 ms, with no attack at all.
+
+<h2 id="hit-confirmation">Hit confirmation: every signal that says it connected</h2>
+
+Hitstop is the time channel. The attacker also recoils at 170 px/s for 70 ms, the target flashes and gets pushed, sparks fly along the hit, and the camera and gamepad shake a little. T turns all of it off at once: same damage, nothing to tell you about it. Fighting games use [hit confirm](https://glossary.infil.net/?t=Hit+Confirm) for the player's side, seeing the first hit land before continuing the combo.
+
+<h2 id="how-to-implement">How to implement hitstop and hit confirmation</h2>
+
+1. **Freeze with the time scale, end it with the real clock.** At a time scale of zero the game's own timers stop too, including the one you'd use to unfreeze.
+2. **Keep the longest pending freeze.** Two hits on the same tick don't add up: a slash through two targets freezes for 50 ms, not 100.
+3. **Announce the hit; don't call the effects from the damage code.** Presentation, victim and attacker each react on their own, so one key can turn it all off without touching the damage.
+4. **Push the attacker back.** Without recoil, a slash thrown at a run carries you into the enemy, and its contact damage punishes the hit you just landed.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/autoload/juice.gd">
+```gdscript
+func _enter_tree() -> void:
+	# Debe seguir procesando aunque el juego esté en pausa o congelado.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+# ...
+## HIT STOP: congela el juego unas centésimas para dar peso a un impacto.
+## 30–80 ms bastan; más de 120 ms se siente como un tirón.
+func hitstop(seconds: float) -> void:
+	if not Lab.on(&"juice_hitstop") or seconds <= 0.0:
+		return
+	# Usamos reloj real: con time_scale = 0 los temporizadores del juego no avanzan.
+	_freeze_until_msec = maxi(_freeze_until_msec, Time.get_ticks_msec() + int(seconds * 1000.0))
+	_frozen = true
+	Engine.time_scale = 0.0
+
+func _process(_delta: float) -> void:
+	if _frozen and Time.get_ticks_msec() >= _freeze_until_msec:
+		_frozen = false
+		Engine.time_scale = Lab.game_speed
+```
+</CodeBlock>
+
+`_process` still gets called while the game's delta is zero, so it can check the clock and end the freeze.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-long-hitstop">How long should hitstop be?</h3>
+
+About 50 ms per hit, 3 frames at 60 fps, and 90 ms for a finisher. Past 120 ms it feels like a hitch.
+
+<h3 id="hit-confirm-vs-hitstop">Is hit confirm the same as hitstop?</h3>
+
+No. Hitstop is one channel of it. In fighting games, hit confirm is also a player skill: noticing that a hit landed and only then continuing the combo.

@@ -1,0 +1,101 @@
+---
+title: "Dash de esquiva con i-frames: la regla del cooldown"
+description: "Un dash de esquiva da frames de invencibilidad: 0,21 s de protección en un dash de 0,16 s. El cooldown debe ser el doble o gana aporrear. Míralo y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 16
+seriesTitle: "Dash de esquiva"
+videoHero: {"sheets": "c_dodge", "plane": "combate", "title": "Dash de esquiva", "videoNote": "Atraviesa las cortinas de daño con el dash. Con los i-frames del dash pasa intacto; tras pulsar T los mismos dashes se llevan el golpe.", "steps": ["Corre hacia la derecha con <kbd>→</kbd> hasta la primera cortina. Encima hay pared, así que no se puede saltar. Pulsa <kbd>X</kbd> justo antes y el dash te lleva al otro lado sin un rasguño.", "La cortina doble mide dos casillas de ancho. Un dash recorre 3,6, así que cabe.", "En el túnel no hay sitio para saltar. El martinete avisa y después golpea: haz dash con <kbd>X</kbd> a través de la onda cuando te llegue.", "Pulsa <kbd>T</kbd> y cruza la misma cortina con el dash. Te mueve exactamente igual, pero ahora cuesta una máscara."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Un **dash de esquiva** te da frames de invencibilidad mientras dura, así que atraviesas los ataques en vez de saltarlos. Aquí son los **0,16 s** del dash más 0,05 s para la salida, y un cooldown de **0,45 s** impide que aporrear el botón te vuelva intocable.
+
+<TimingDiagram
+  title="Un dash, hasta el siguiente"
+  duration={450}
+  start={120}
+  tick={50}
+  probe="te alcanza un ataque"
+  phases={[
+    { from: 0, to: 160, label: "dash", tone: "air", on: { ok: true, text: "Intacto: lo atraviesas con el dash." }, off: { ok: false, text: "Te da: sin los i-frames del dash, pierdes una máscara." } },
+    { from: 160, to: 450, label: "después del dash", tone: "neutral", on: { ok: false, text: "Te da: eres vulnerable y aún no puedes hacer dash." } },
+  ]}
+  events={[
+    { at: 160, label: "acaba el dash" },
+    { at: 450, label: "dash listo" },
+  ]}
+  windows={[
+    { from: 0, to: 210, label: "i-frames", detail: "210 ms", measure: "until",
+      on: { ok: true, text: "Intacto: quedan {ms} ms de protección." },
+      off: { ok: false, text: "Te da: sin los i-frames del dash, pierdes una máscara." } },
+    { from: 210, to: 450, label: "hueco vulnerable", detail: "240 ms", measure: "until",
+      on: { ok: false, text: "Te da. Puedes volver a hacer dash dentro de {ms} ms." },
+      off: { ok: false, text: "Te da. Puedes volver a hacer dash dentro de {ms} ms." } },
+  ]}
+/>
+
+<h2 id="what-is-a-dodge-dash">Los i-frames del dash: atravesar el ataque en vez de saltarlo</h2>
+
+Saltar esquiva lo que va por el suelo, pero te deja en el aire y lejos del enemigo. Un dash lateral esquiva y a la vez te coloca: sales por el otro lado, a la espalda de quien atacó y con su recuperación todavía por delante. Los 0,05 s de más cubren el instante tras el dash en el que aún puedes estar solapando lo que atravesaste. La [Shade Cloak](https://hollowknight.wiki.fextralife.com/Shade+Cloak) de Hollow Knight funciona igual: permite "dash through enemies and their attacks without taking damage" (atravesar con el dash a los enemigos y sus ataques sin recibir daño).
+
+<h2 id="dash-cooldown-rule">La regla del cooldown: al menos el doble de la protección</h2>
+
+Si el cooldown se cuenta desde que empieza el dash, quien aporrea el botón está protegido, como mucho, protección ÷ cooldown del tiempo. Con 0,21 s de protección, un cooldown de 0,22 s te haría intocable el 95 % del tiempo, y el dash se convertiría en la forma más rápida de andar. Con 0,45 s es el 47 % como mucho, y entre dos dashes siempre queda un hueco vulnerable de 0,24 s, más largo que el protegido. La Shade Cloak se recarga en unos 1,5 s.
+
+<h2 id="how-to-implement">Cómo implementar los i-frames del dash</h2>
+
+1. **No añadas un estado de esquiva.** Al empezar el dash, concede invulnerabilidad durante lo que dura más un pequeño margen, con el mismo temporizador que los i-frames tras un golpe.
+2. **Corta el ataque en curso al empezar el dash.** Si no, un tajo dado justo antes viaja dentro del dash, intocable y pegando a la vez.
+3. **Pon un cooldown de al menos el doble de la protección,** contado desde que empieza el dash.
+4. **No protejas de los peligros del entorno.** Los pinchos y los fosos ignoran la invulnerabilidad; si no, una esquiva cruzaría cualquier foso de pinchos de 3,6 en 3,6 casillas.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+## Lo que dura de más la protección del dash respecto al dash: cubre la salida.
+const DASH_GUARD_EXTRA := 0.05
+# ...
+	player.dash_started.connect(_on_dash_started)
+# ...
+func _on_dash_started(_direction: Vector2) -> void:
+	_cancel_attack()
+	if Lab.on(&"dash_iframes"):
+		health.grant_invulnerability(player.params.dash_time + DASH_GUARD_EXTRA)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/platformer_kit/player/movement_params.gd">
+```gdscript
+@export_range(0.05, 0.4, 0.005, "suffix:s") var dash_time := 0.16
+## ESPERA entre dos dashes, contada desde que EMPIEZA el primero (en el aire no
+## hace falta: hay uno por vuelo). No es un detalle: con el dash protegido
+## (`dash_iframes`), una espera corta convierte aporrear el botón en ser
+## intocable casi todo el tiempo y en la forma más rápida de andar. La regla:
+## al menos el doble de lo que dura la protección, para que entre dos dashes
+## haya siempre una ventana vulnerable tan larga como la protegida.
+@export_range(0.0, 1.0, 0.01, "suffix:s") var dash_cooldown := 0.45
+```
+</CodeBlock>
+
+`grant_invulnerability()` rellena el mismo temporizador que los [i-frames tras un golpe](/blog/es/health-damage-invincibility-frames/) y se queda con el valor mayor, así que un dash nunca acorta una protección que ya tenías.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-long-dash-iframes">¿Cuánto deben durar los i-frames del dash?</h3>
+
+Lo que dura el dash más un pequeño margen para la salida: aquí 0,16 s más 0,05 s, es decir, 0,21 s.
+
+<h3 id="dash-spikes">¿Un dash de esquiva protege de los pinchos?</h3>
+
+Aquí no, y la Shade Cloak de Hollow Knight tampoco. La esquiva es para los ataques, para lo que viene hacia ti con aviso.

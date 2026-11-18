@@ -1,0 +1,115 @@
+---
+title: "Frames de invencibilidad (i-frames) y pinchos que no matan"
+description: "Los frames de invencibilidad son la ventana tras un golpe en la que nada te vuelve a dar: aquí 1,2 s. Los pinchos quitan una máscara, no una vida. Juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 15
+seriesTitle: "Frames de invencibilidad"
+videoHero: {"sheets": "c_health", "plane": "combate", "title": "Vida y daño", "videoNote": "Cruza la placa de daño. Con frames de invencibilidad pierde una máscara y pasa parpadeando; tras pulsar T cada contacto cuesta otra máscara.", "steps": ["Camina hacia la derecha con <kbd>→</kbd> hasta la placa de daño. Pierdes una máscara, sales empujado y parpadeas 1,2 s.", "Salta al corral con <kbd>Espacio</kbd> y quédate dentro de un rondador. Con i-frames solo puede quitarte una máscara cada 1,2 s.", "Pulsa <kbd>T</kbd> para apagar los i-frames y vuelve a cruzar la placa: cada contacto cuesta otra máscara.", "Atraviesa un rondador con <kbd>X</kbd>. El dash tiene sus propios i-frames."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import TimingDiagram from '../../../components/blog/TimingDiagram.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+Los **frames de invencibilidad** (i-frames) son la ventana tras un golpe en la que nada te puede volver a dar. Aquí duran **1,2 s**, parpadeas todo ese tiempo, y un error te cuesta una máscara en vez de una por tick.
+
+<TimingDiagram
+  title="Los 1,2 s después de un golpe"
+  duration={1200}
+  start={700}
+  tick={200}
+  probe="el enemigo te vuelve a tocar"
+  phases={[
+    { from: 0, to: 200, label: "empujón", tone: "air", on: { ok: true, text: "Ignorado: sales empujado y parpadeando." }, off: { ok: false, text: "Pierdes otra máscara en pleno empujón." } },
+    { from: 200, to: 1200, label: "parpadeo", tone: "neutral", on: { ok: true, text: "Ignorado: sigues parpadeando." }, off: { ok: false, text: "Pierdes otra máscara." } },
+  ]}
+  events={[
+    { at: 0, label: "golpe" },
+    { at: 200, label: "recuperas el control" },
+  ]}
+  windows={[
+    { from: 0, to: 1200, label: "i-frames", detail: "1,2 s", measure: "until",
+      on: { ok: true, text: "Ignorado: quedan {ms} ms de i-frames." },
+      off: { ok: false, text: "Pierdes otra máscara: el daño por contacto lo vuelve a intentar en cada tick." } },
+  ]}
+/>
+
+<h2 id="what-are-i-frames">I-frames tras un golpe: un error, una máscara</h2>
+
+Existen por el daño por contacto. El cuerpo de un enemigo o una placa de daño es un hitbox siempre encendido que intenta golpearte en cada tick de física, 120 veces por segundo. Sin la ventana, quedarte un instante dentro de un enemigo te quitaría una máscara por tick. El golpe además te empuja y te quita el control 0,2 s; el resto de los 1,2 s es tiempo para salir. La vida son cinco máscaras, las mismas con las que empiezas en [Hollow Knight](https://hollowknight.wiki.fextralife.com/Health+Mask).
+
+<h2 id="what-is-hazard-respawn">Volver al suelo firme: pinchos que quitan una máscara, no una vida</h2>
+
+Con la vuelta al suelo firme (en inglés, *hazard respawn*), los pinchos, los fosos y el vacío no matan. Te quitan una máscara y te devuelven al último suelo firme que pisaste; solo la última máscara te manda al checkpoint. La vida es el presupuesto de errores de la zona, y un pincho no debería obligarte a repetir lo que ya sabías hacer. Los i-frames nunca protegen de los pinchos, o el golpe de un enemigo te compraría 1,2 s para cruzar un foso de pinchos.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_hazard"
+  title="Daño de entorno"
+  videoNote="Se mete a propósito en los pinchos. Con la vuelta al suelo firme pierde una máscara y reaparece en el último suelo firme; tras pulsar T los pinchos matan y vuelve a empezar desde el checkpoint."
+  steps={[
+    "Camina hacia la derecha con <kbd>→</kbd> hasta los primeros pinchos. Pierdes una máscara y reapareces en el último suelo firme, no en el checkpoint.",
+    "Sigue apretando <kbd>→</kbd> al reaparecer. No te mueve hasta que lo sueltas (medio segundo como mucho), así el mismo reflejo no te vuelve a meter en los pinchos.",
+    "Salta los pinchos con <kbd>Espacio</kbd> y déjate caer en el foso del final: el vacío funciona igual.",
+    "Pulsa <kbd>T</kbd> y vuelve a tocar los pinchos. Ahora matan, y empiezas otra vez desde el checkpoint.",
+  ]}
+/>
+
+<h2 id="how-to-implement">Cómo implementar los i-frames y la vuelta al suelo firme</h2>
+
+1. **Un solo temporizador de invulnerabilidad en el componente de vida.** Un golpe que entra lo carga; mientras corre, se rechaza cualquier golpe y los hitboxes de contacto lo reintentan en el tick siguiente.
+2. **Aleja al jugador de un empujón al recibir el golpe.** Si sigue dentro del enemigo cuando se acaba el temporizador, el siguiente golpe entra en el tick inmediato.
+3. **Que el código de movimiento pregunte antes de morir.** Ante un peligro, cobra una máscara y devuelve al jugador al último suelo firme. Apunta solo el suelo que sea firme de verdad: quieto, con suelo a ambos lados y sin peligros cerca.
+4. **Haz que los golpes del entorno ignoren la invulnerabilidad.**
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/combat_kit/core/health.gd">
+```gdscript
+## Aplica un golpe. Devuelve false si no hizo efecto (ya muerto o invulnerable).
+func take(hit: Hit) -> bool:
+	if is_dead():
+		return false
+	if _invulnerable > 0.0 and not hit.ignores_invulnerability:
+		return false
+	current = maxi(current - hit.damage, 0)
+	_invulnerable = invulnerability_time
+	changed.emit(current, maximum)
+	damaged.emit(hit)
+	if current == 0:
+		died.emit(hit)
+	return true
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/combat_kit/player/combat_params.gd">
+```gdscript
+@export_group("Vida y daño")
+@export_range(1, 12) var max_health := 5
+## I-FRAMES: invulnerabilidad tras recibir daño. Tiempo para salir del peligro.
+@export_range(0.0, 3.0, 0.05, "suffix:s") var invulnerability_time := 1.2
+## Empujón al recibir daño: horizontal (alejándose del golpe) y vertical.
+@export var hurt_knockback := Vector2(300.0, 330.0)
+## Tiempo sin control tras el golpe: el empujón se nota, pero no desespera.
+@export_range(0.0, 0.6, 0.01, "suffix:s") var hurt_lock_time := 0.2
+```
+</CodeBlock>
+
+El parpadeo lee ese mismo temporizador, así que se acaba justo cuando te pueden volver a dar.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-long-i-frames">¿Cuánto deben durar los frames de invencibilidad?</h3>
+
+Lo suficiente para salir del peligro: aquí 1,2 s tras un golpe, 0,2 s de ellos sin control. Una [esquiva](/blog/es/dodge-dash-i-frames/) es mucho más corta: 0,21 s.
+
+<h3 id="spikes-kill-or-damage">¿Los pinchos deben matar o quitar vida?</h3>
+
+Si tu juego tiene vida, que quiten vida. Aquí un pincho cuesta una máscara y te devuelve al último suelo firme. Solo la última máscara mata.

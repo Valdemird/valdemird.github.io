@@ -1,0 +1,81 @@
+---
+title: "Pogo attack: the down-slash that bounces you off enemies"
+description: "A pogo attack is a down-slash in the air that bounces you off whatever it hits, spikes included, and recharges your dash. See its timing and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 14
+seriesTitle: "Pogo attack"
+videoHero: {"sheets": "c_pogo", "plane": "combate", "title": "Up, down and pogo", "videoNote": "Down-slashes from target to target over the spikes, bouncing on each hit. After T the down-slash no longer bounces and the spikes win.", "steps": ["Under the first target, jump with <kbd>Space</kbd> and press <kbd>↑</kbd> + <kbd>C</kbd>: an up-slash.", "Jump toward the spikes and, coming down onto the first target, hold <kbd>↓</kbd> and press <kbd>C</kbd>. Each hit bounces you to the next one; steer with <kbd>←</kbd> <kbd>→</kbd>.", "Miss a target and slash the spikes instead: they bounce you too.", "Press <kbd>T</kbd> to switch the pogo off. The down-slash still hits, but nothing bounces and the spikes win."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+A **pogo attack** is a down-slash in the air that bounces you up when it connects, spikes included. The bounce is a fixed **600 px/s**, about 2.2 tiles, and it recharges your dash and air jump.
+
+| | Value | What it's for |
+|---|---|---|
+| Bounce | 600 px/s, about 2.2 tiles | the same height every time |
+| Down-slash startup | 0 ms | pressing just before contact still bounces |
+| Armed time | 240 ms | pressing early, at the top of the jump, still bounces |
+| Late grace on spikes | 40 ms | pressing just after touching still bounces, if you hold down |
+
+<h2 id="what-is-a-pogo-attack">Pogo attack: hits that work as a floor</h2>
+
+Enemies and spikes stop being things to avoid and become, for an instant, something to stand on. Hollow Knight is the usual reference: its [wiki's combat page](https://hollowknight.wiki.fextralife.com/Combat) says a down attack in the air lets you "pogo off an enemy, often multiple times in a row." The bounce ignores [variable jump height](/blog/variable-jump-height/), so it's always the same 2.2 tiles and a level can be measured in bounces. Spikes carry a hurtbox with no health that blocks every hit, 34 px tall against 10 px of lethal zone: the slash connects, nothing takes damage, and you bounce.
+
+<h2 id="down-slash-timing">Down-slash timing: why it can't copy the forward slash</h2>
+
+The forward slash has 35 ms of startup and 100 ms of [active time](/blog/attack-startup-active-recovery/), right for hitting something in front of you. When you're falling at 500 to 700 px/s, that leaves a few hundredths of a second to press. So the down-slash comes out with no startup, stays armed for 240 ms, and spikes wait 40 ms for a player who lands already holding down. Someone who lands without holding down wasn't trying to bounce.
+
+<h2 id="how-to-implement">How to implement a pogo attack</h2>
+
+1. **Pick the direction when the swing starts.** Down if the player holds down in the air.
+2. **When a down-slash connects, call the same bounce a spring uses:** a fixed upward speed, with the dash and air jumps refilled in that one place.
+3. **Give the down-slash its own timing:** no startup, a long armed time, a short grace on spikes.
+4. **Make the spikes' bounce zone taller than the lethal one,** or the spikes win ties.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+var meant_down := blocked and target.health == null and player.input_y > 0 and not player.is_on_floor()
+if attack_dir.y > 0.0 or (attack_dir.x != 0.0 and meant_down):
+	# POGO: golpear hacia abajo rebota. Convierte enemigos y pinchos en
+	# plataformas para quien se atreve, y recarga el dash (lo hace `bounce`).
+	if _pogo_on():
+		player.bounce(params.pogo_speed, &"pogo")
+		# ...
+		if attack_dir.y > 0.0 and phase == Phase.ACTIVE:
+			# Ya rebotó: el tajo se desarma (lo que le quedaba de armado era para llegar).
+			slash.end()
+			_set_phase(Phase.RECOVERY)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/combat_kit/player/combat_params.gd">
+```gdscript
+@export_group("Tajo hacia abajo (pogo)")
+@export_range(0.0, 0.3, 0.005, "suffix:s") var pogo_startup := 0.0
+@export_range(0.02, 0.6, 0.01, "suffix:s") var pogo_active := 0.24
+@export_range(0.0, 0.2, 0.005, "suffix:s") var pogo_late_time := 0.04
+```
+</CodeBlock>
+
+`bounce()` is the same function the springs call, and it's where the dash and air jumps come back.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="pogo-refill-dash">Should a pogo refill the dash?</h3>
+
+Yes, if your game has one. Here it refills the dash, air jumps and wall jumps, like landing, so a row of targets can replace a floor.
+
+<h3 id="pogo-height">How high should a pogo bounce be?</h3>
+
+Lower than a full jump, and always the same: 600 px/s, about 2.2 tiles against a 3.6-tile jump. Releasing the button doesn't cut it.

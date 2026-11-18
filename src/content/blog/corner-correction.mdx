@@ -1,0 +1,85 @@
+---
+title: "Platformer corner correction: what it is and how it works"
+description: "Corner correction nudges a jump past a ceiling corner it clips by a few pixels, or up onto a ledge it just missed. See how much it forgives and play it."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 7
+seriesTitle: "Corner correction"
+videoHero: {"sheets": "corner", "title": "Corner correction", "videoNote": "Stops a few pixels off-center under each one-tile hole and jumps straight up. With corner correction the game nudges it through; after T the same jump hits the corner.", "steps": ["Run right with <kbd>→</kbd> along the corridor and stop under the first hole, a little off-center.", "Jump straight up holding <kbd>Space</kbd>. The game slides you through, and a green «ESQUINA ↔ px» tag says how many pixels it took.", "Press <kbd>T</kbd> and try the same jump from the same spot. Your head hits the corner, and the «× ESQUINA px» tag tells you by how much you missed."]}
+---
+
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+
+**Corner correction** moves the character a few pixels when a jump would clip a corner: up to 9 px sideways past the edge of a ceiling, or up to 7 px up onto a ledge it just missed. The player sees a jump that worked and never sees the nudge.
+
+| Case | Correction |
+|---|---|
+| Head clips a ceiling corner while rising | up to 9 px sideways |
+| Falling sideways into the lip of a ledge | up to 7 px up |
+| Either one during a [dash](/blog/platformer-dash/) | up to 12 px |
+
+<h2 id="head-correction">Corner correction going up: past the edge of the ceiling</h2>
+
+Hitting your head by 4 px cuts a jump dead, and the player reads it as the game failing. With a 24 px body under a 40 px hole, jumping straight through means lining up within 8 px of the hole's center. A 9 px correction stretches that window from 16 px to 34, and the player never sees it stretch.
+
+[Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) tries only 4 px, and only toward the side you're already moving.
+
+<h2 id="ledge-correction">Corner correction on ledges: up onto the lip</h2>
+
+The same idea works sideways. To the player, a fall that misses the top of a platform by one pixel looks like a landing. Without the correction the character slides down the face instead, so the game lifts it onto the lip and stops the fall.
+
+<h2 id="how-to-implement">How to implement corner correction</h2>
+
+1. **Check before you move.** Once the velocity is decided, ask whether this tick's motion would collide.
+2. **Search for the smallest nudge.** Try 1 px, 2, 3, up to the limit: both sides for the head, only up for a ledge. Keep the first one that clears the way.
+3. **Check that the nudge itself is free.** Dodging a ceiling must never push the character into a wall.
+4. **Keep the limit small.** The nudge happens in one tick, so a big one shows as a jump in position.
+
+<Collapsible title="The code in Godot 4">
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+func _correct_corners(delta: float) -> void:
+	var enabled := Lab.on(&"corner_correction")
+	var dashing := state == State.DASH
+	var p := params
+
+	if velocity.y < 0.0:
+		var up := Vector2(0.0, velocity.y * delta)
+		if test_move(global_transform, up):
+			var limit := p.dash_correction_px if dashing else p.corner_correction_px
+			var px := _find_nudge(up, Vector2.RIGHT, limit, [1.0, -1.0])
+			if px != 0.0:
+				if enabled:
+					global_position.x += px
+
+func _find_nudge(motion: Vector2, axis: Vector2, max_px: int, signs: Array) -> float:
+	for i in range(1, max_px + 1):
+		for s: float in signs:
+			var shift := axis * (i * s)
+			if test_move(global_transform, shift):
+				continue  # tampoco cabemos hacia ese lado
+			if not test_move(global_transform.translated(shift), motion):
+				return i * s
+	return 0.0
+```
+</CodeBlock>
+
+The ledge case calls the same `_find_nudge` with `Vector2.UP`, then caps `velocity.y` at zero.
+
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-many-pixels">How many pixels should corner correction use?</h3>
+
+A few. Celeste uses 4 px for the head. This demo uses 9 px for the head and 7 for ledges, on a 24 px body and 40 px tiles.
+
+<h3 id="only-head">Is corner correction only for the head?</h3>
+
+No. If a fall misses the top of a ledge by a few pixels, lift the character onto it. It's the same technique pointed sideways.

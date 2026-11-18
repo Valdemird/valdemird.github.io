@@ -1,6 +1,6 @@
 ---
-title: "Game feel on the web: squash, shake, and the art of juice"
-description: "Six game-feel techniques for the web: squash & stretch, hitstop, screen shake, particles, synthesized audio, combos. Each one playable, no libraries."
+title: "Game feel and juice: squash, hitstop and screen shake (playable)"
+description: "Game feel is how a game answers your input: the squash, the hitstop, the shake. Six juice techniques rebuilt for the web with no libraries, each one playable."
 pubDate: 2026-06-03
 updatedDate: 2026-10-27
 tags: ["game-feel", "animation", "web-audio", "frontend", "interaction-design"]
@@ -44,6 +44,8 @@ Game feel isn't graphics. It's the response. The same click handler can feel lik
 The term comes from Steve Swink, who wrote the book on it in 2008. Literally: [*Game Feel: A Game Designer's Guide to Virtual Sensation*](http://www.game-feel.com/). His definition has three parts: real-time control, simulated space, and polish. The web gives you the first two for free. This post is about the third, the polish layer that game developers took to calling "juice"<Sidenote>The word predates the talks below. In a [2005 Gamasutra piece on prototyping a game in under seven days](https://www.gamedeveloper.com/game-platforms/how-to-prototype-a-game-in-under-7-days), the Carnegie Mellon team behind the Experimental Gameplay Project called juice "our wet little term for constant and bountiful user feedback."</Sidenote>, and how little code it actually takes.
 
 Every demo below except hitstop is a port of the functions that shipped in the game. Click them. [They are not videos](/blog/interactive-blog-components/), and four of them also sit together on the [JuiceLab page](/lab/juice-lab/) of the component lab.
+
+<h2 id="where-juice-comes-from">Where juice comes from: Juice it or lose it and The art of screenshake</h2>
 
 <Timeline items={[
   { date: "1981", title: "The Illusion of Life", body: "Disney animators Frank Thomas and Ollie Johnston publish the 12 principles of animation. Squash & stretch is principle number one." },

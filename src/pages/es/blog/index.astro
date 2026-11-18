@@ -6,6 +6,7 @@ import PostPreview from '../../../components/PostPreview.astro';
 import DeepDiveCard from '../../../components/DeepDiveCard.astro';
 import LabCard from '../../../components/LabCard.astro';
 import MapCard from '../../../components/MapCard.astro';
+import SeriesCard from '../../../components/SeriesCard.astro';
 import FormattedDate from '../../../components/FormattedDate.astro';
 import { SITE_TITLE, PERSON_ID, ORGANIZATION_ID, t } from '../../../consts';
 import { getCollection } from 'astro:content';
@@ -15,8 +16,11 @@ const strings = t(Astro.url);
 const posts = (await getCollection('blog'))
 	.filter((p) => p.data.lang === 'es' && !p.data.draft)
 	.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
-const featuredPost = posts[0];
-const otherPosts = posts.filter((p) => p !== featuredPost);
+// A series shows up as one SeriesCard (its hub lists the parts), not as twenty
+// list entries; the Blog JSON-LD below still lists every post.
+const listed = posts.filter((p) => !p.data.series);
+const featuredPost = listed[0];
+const otherPosts = listed.filter((p) => p !== featuredPost);
 
 const blogJsonLd = {
 	'@context': 'https://schema.org',
@@ -64,6 +68,7 @@ const blogJsonLd = {
 				</div>
 			</div>
 			<div class="blog-content">
+				<SeriesCard id="platformer-lab" lang="es" />
 				<DeepDiveCard lang="es" />
 				<LabCard lang="es" />
 				<MapCard lang="es" />

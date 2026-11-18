@@ -1,0 +1,81 @@
+---
+title: "Pogo en plataformas: el ataque hacia abajo que rebota"
+description: "El pogo es un tajo hacia abajo en el aire que te hace rebotar en lo que golpea, pinchos incluidos, y te recarga el dash. Mira sus tiempos y juégalo."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 14
+seriesTitle: "Pogo"
+videoHero: {"sheets": "c_pogo", "plane": "combate", "title": "Arriba, abajo y pogo", "videoNote": "Tajos hacia abajo de diana en diana sobre los pinchos, rebotando en cada golpe. Tras pulsar T el tajo hacia abajo ya no rebota y ganan los pinchos.", "steps": ["Debajo de la primera diana, salta con <kbd>Espacio</kbd> y pulsa <kbd>↑</kbd> + <kbd>C</kbd>: un tajo hacia arriba.", "Salta hacia los pinchos y, al caer sobre la primera diana, mantén <kbd>↓</kbd> y pulsa <kbd>C</kbd>. Cada golpe te lanza hacia la siguiente; corrige con <kbd>←</kbd> <kbd>→</kbd>.", "Falla una diana y golpea los pinchos: también te hacen rebotar.", "Pulsa <kbd>T</kbd> para apagar el pogo. El tajo hacia abajo sigue golpeando, pero ya nada rebota y ganan los pinchos."]}
+---
+
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+
+El **pogo** es un tajo hacia abajo en el aire que, si conecta, te lanza hacia arriba, también sobre unos pinchos. El rebote es fijo, **600 px/s**, unas 2,2 casillas, y te recarga el dash y el salto aéreo.
+
+| | Valor | Para qué sirve |
+|---|---|---|
+| Rebote | 600 px/s, unas 2,2 casillas | la misma altura cada vez |
+| Preparación del tajo hacia abajo | 0 ms | pulsar justo antes de tocar todavía rebota |
+| Tiempo armado | 240 ms | pulsar pronto, en lo alto del salto, todavía rebota |
+| Margen sobre los pinchos | 40 ms | pulsar justo después de tocar todavía rebota, si aprietas abajo |
+
+<h2 id="what-is-a-pogo-attack">Pogo: golpes que hacen de suelo</h2>
+
+Enemigos y pinchos dejan de ser cosas que esquivar y pasan a ser, por un instante, algo sobre lo que apoyarse. La referencia habitual es Hollow Knight: la [página de combate de su wiki](https://hollowknight.wiki.fextralife.com/Combat) dice que un ataque hacia abajo en el aire te deja "pogo off an enemy, often multiple times in a row" (hacer pogo sobre un enemigo, a menudo varias veces seguidas). El rebote ignora el [salto variable](/blog/es/variable-jump-height/), así que siempre mide las mismas 2,2 casillas y el nivel se puede medir en rebotes. Los pinchos llevan una hurtbox sin vida que bloquea todos los golpes, de 34 px de alto frente a 10 px de zona letal: el tajo conecta, nadie recibe daño y rebotas.
+
+<h2 id="down-slash-timing">Los tiempos del tajo hacia abajo: por qué no copia los del de frente</h2>
+
+El tajo de frente tiene 35 ms de preparación y 100 ms [activo](/blog/es/attack-startup-active-recovery/), lo justo para darle a algo que tienes delante. Si caes a 500 o 700 px/s, eso deja unas centésimas para pulsar. Por eso el tajo hacia abajo sale sin preparación, se queda armado 240 ms, y los pinchos esperan 40 ms a quien llega ya apretando abajo. Quien cae sin apretar abajo no estaba intentando rebotar.
+
+<h2 id="how-to-implement">Cómo implementar el pogo</h2>
+
+1. **Fija la dirección al empezar el golpe.** Abajo si el jugador aprieta abajo en el aire.
+2. **Si el tajo hacia abajo conecta, llama al mismo rebote que usa un muelle:** una velocidad fija hacia arriba, con el dash y los saltos aéreos recargados en ese único sitio.
+3. **Dale al tajo hacia abajo sus propios tiempos:** sin preparación, mucho tiempo armado y un margen corto sobre los pinchos.
+4. **Haz la zona de rebote de los pinchos más alta que la letal,** o en los empates ganarán los pinchos.
+
+<Collapsible title="El código en Godot 4">
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+var meant_down := blocked and target.health == null and player.input_y > 0 and not player.is_on_floor()
+if attack_dir.y > 0.0 or (attack_dir.x != 0.0 and meant_down):
+	# POGO: golpear hacia abajo rebota. Convierte enemigos y pinchos en
+	# plataformas para quien se atreve, y recarga el dash (lo hace `bounce`).
+	if _pogo_on():
+		player.bounce(params.pogo_speed, &"pogo")
+		# ...
+		if attack_dir.y > 0.0 and phase == Phase.ACTIVE:
+			# Ya rebotó: el tajo se desarma (lo que le quedaba de armado era para llegar).
+			slash.end()
+			_set_phase(Phase.RECOVERY)
+```
+</CodeBlock>
+
+<CodeBlock filename="addons/combat_kit/player/combat_params.gd">
+```gdscript
+@export_group("Tajo hacia abajo (pogo)")
+@export_range(0.0, 0.3, 0.005, "suffix:s") var pogo_startup := 0.0
+@export_range(0.02, 0.6, 0.01, "suffix:s") var pogo_active := 0.24
+@export_range(0.0, 0.2, 0.005, "suffix:s") var pogo_late_time := 0.04
+```
+</CodeBlock>
+
+`bounce()` es la misma función que llaman los muelles, y es ahí donde vuelven el dash y los saltos aéreos.
+
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="pogo-refill-dash">¿El pogo debe recargar el dash?</h3>
+
+Sí, si tu juego tiene dash. Aquí recarga el dash, los saltos aéreos y los de pared, igual que aterrizar, y así una fila de dianas puede sustituir al suelo.
+
+<h3 id="pogo-height">¿Cuánto debe subir un rebote de pogo?</h3>
+
+Menos que un salto completo, y siempre lo mismo: 600 px/s, unas 2,2 casillas frente a un salto de 3,6. Soltar el botón no lo recorta.

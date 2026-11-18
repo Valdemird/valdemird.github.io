@@ -1,0 +1,43 @@
+---
+/**
+ * SeriesCard — a blog series as one block, linking to its hub. Used on the
+ * home page and the blog index, where the series stands in for its parts.
+ */
+import { SERIES, type SeriesId } from '../consts';
+import { getSeriesStats, seriesHref } from '../lib/series';
+import TrackArtClip from './learn/TrackArtClip.astro';
+import FeatureCard from './FeatureCard.astro';
+
+interface Props {
+	id: SeriesId;
+	lang: 'en' | 'es';
+	/** h3 when the card sits under its own section heading (home page). */
+	heading?: 'h2' | 'h3';
+}
+
+const { id, lang, heading = 'h2' } = Astro.props;
+const es = lang === 'es';
+const info = SERIES[id][lang];
+const stats = await getSeriesStats(id, lang);
+const hours = stats.minutes / 60;
+const metrics = [
+	{ value: String(stats.posts), label: 'posts' },
+	{ value: String(stats.sheets), label: es ? 'láminas jugables' : 'playable sheets' },
+	{ value: String(stats.clips), label: es ? 'videos' : 'clips' },
+	{ value: hours >= 1 ? `~${Math.round(hours * 2) / 2}h` : `${stats.minutes} min`, label: es ? 'de lectura' : 'reading' },
+];
+---
+
+<FeatureCard
+	href={seriesHref(id, lang)}
+	eyebrow={es ? `Serie jugable · ${stats.posts} mecánicas` : `Playable series · ${stats.posts} mechanics`}
+	title={info.name}
+	description={info.description}
+	stats={metrics}
+	statsLabel={es ? 'Lo que trae la serie' : 'What the series contains'}
+	cta={es ? 'Ver la serie completa' : 'See the whole series'}
+	heading={heading}
+	artSide="right"
+>
+	<TrackArtClip slot="art" sheets="juice" badge={es ? 'jugable' : 'playable'} />
+</FeatureCard>
