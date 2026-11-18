@@ -49,6 +49,23 @@ export const ORGANIZATION = {
 
 export const ORGANIZATION_REF = { '@id': ORGANIZATION_ID } as const;
 
+// Ordered blog series. A post joins one with `series: "<id>"` and `seriesOrder: n`
+// in its frontmatter; BlogPost.astro renders the series nav and the JSON-LD
+// CreativeWorkSeries from this table, and llms.txt lists the series in order.
+export const SERIES = {
+	'platformer-lab': {
+		en: {
+			name: 'Game feel in a platformer, playable',
+			description: 'Every technique from my Godot platformer lab, one per post: what it does, when you need it, the real code, and the sheet to play.',
+		},
+		es: {
+			name: 'Game feel en un plataformas, jugable',
+			description: 'Cada técnica del laboratorio de mi plataformas en Godot, una por post: qué hace, cuándo la necesitas, el código real y la lámina para jugarla.',
+		},
+	},
+} as const;
+export type SeriesId = keyof typeof SERIES;
+
 // i18n UI strings
 export const UI_STRINGS = {
 	en: {

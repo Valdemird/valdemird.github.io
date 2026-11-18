@@ -1,0 +1,175 @@
+---
+title: "Variable jump height: how one button makes many jumps (with Godot code)"
+description: "Variable jump height turns how long you hold jump into how high you go: a tap gives a 1.1-tile hop, a full press 3.6 tiles. Three ways to code it (my Godot lab, Celeste, the naive cut) and why 58% of my jumps weren't full jumps."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "platformers"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 3
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "Variable jump height: the longer you hold the jump button, the higher you go. In my lab a tap is a 1.1-tile hop and a full press is a 3.6-tile jump.",
+  "The usual way to code it is to make gravity three times stronger the moment you let go while rising. Celeste does it the other way round: it keeps you rising at full speed for up to 0.2 s while you hold.",
+  "In my own recorded play, 58% of the jumps from the ground were not full jumps. The button was doing height control all along.",
+]} />
+
+After the [coyote time post](/blog/coyote-time-jump-buffer/) I went back to the same recorded sessions for one more number. Every time the jump button comes up, my lab writes down how long it was held. Across 3,906 jumps from the ground, only 41.6% were held long enough to reach the top of a full jump. The rest were cut short, the biggest group of them between 200 and 300 ms.
+
+I would have told you I was "just jumping". The numbers say I was choosing a height every time, with one button, without thinking about it.
+
+<StatGrid columns={2} stats={[
+  { value: "3,906", label: "Jumps from the ground", context: "recorded in my lab, Nov 15–18" },
+  { value: "41.6%", label: "Full jumps", context: "button held 380 ms or more" },
+  { value: "58.4%", label: "Cut short on purpose", context: "1.7% were taps under 100 ms" },
+  { value: "333 ms", label: "Median hold", context: "just under the 380 ms rise" },
+]} />
+
+<Callout type="important" title="The thesis">
+Jump height is the most expressive input in a platformer, and it lives in a single button. Variable jump height turns how long you hold into how high you go. Without it, every obstacle in the game has to be designed around one arc.
+</Callout>
+
+<h2 id="what-is-variable-jump-height">What is variable jump height?</h2>
+
+Variable jump height means the jump you get depends on how long you hold the button: release early and the character stops rising sooner. In my lab a tap gives a hop of 1.1 tiles and holding gives the full 3.6 tiles, with everything in between available. Super Mario Bros. already worked this way in 1985: hold A longer and Mario jumps higher.
+
+The point isn't the two extremes. It's the continuum. The chart below is the same jump code with four different hold times, simulated with the lab's real numbers.
+
+<InteractiveChart
+  type="line"
+  title="Height over time, by how long jump is held"
+  story="Same button, same code: the hold time alone decides the arc."
+  xLabel="seconds since takeoff"
+  yLabel="height (tiles)"
+  xUnit=" s"
+  unit=" tiles"
+  palette="sequential"
+  series={[
+    { name: "tap (0 ms)", data: [{ label: "0.00", value: 0.0 }, { label: "0.04", value: 0.63 }, { label: "0.08", value: 1.01 }, { label: "0.12", value: 1.12 }, { label: "0.16", value: 1.06 }, { label: "0.20", value: 0.85 }, { label: "0.24", value: 0.5 }, { label: "0.28", value: 0.01 }, { label: "0.32", value: 0.0 }, { label: "0.36", value: 0.0 }, { label: "0.40", value: 0.0 }, { label: "0.44", value: 0.0 }, { label: "0.48", value: 0.0 }, { label: "0.52", value: 0.0 }, { label: "0.56", value: 0.0 }, { label: "0.60", value: 0.0 }, { label: "0.64", value: 0.0 }, { label: "0.68", value: 0.0 }, { label: "0.72", value: 0.0 }, { label: "0.76", value: 0.0 }, { label: "0.80", value: 0.0 }] },
+    { name: "held 100 ms", data: [{ label: "0.00", value: 0.0 }, { label: "0.04", value: 0.74 }, { label: "0.08", value: 1.39 }, { label: "0.12", value: 1.83 }, { label: "0.16", value: 2.15 }, { label: "0.20", value: 2.21 }, { label: "0.24", value: 2.09 }, { label: "0.28", value: 1.82 }, { label: "0.32", value: 1.51 }, { label: "0.36", value: 1.0 }, { label: "0.40", value: 0.34 }, { label: "0.44", value: 0.0 }, { label: "0.48", value: 0.0 }, { label: "0.52", value: 0.0 }, { label: "0.56", value: 0.0 }, { label: "0.60", value: 0.0 }, { label: "0.64", value: 0.0 }, { label: "0.68", value: 0.0 }, { label: "0.72", value: 0.0 }, { label: "0.76", value: 0.0 }, { label: "0.80", value: 0.0 }] },
+    { name: "held 200 ms", data: [{ label: "0.00", value: 0.0 }, { label: "0.04", value: 0.74 }, { label: "0.08", value: 1.39 }, { label: "0.12", value: 1.85 }, { label: "0.16", value: 2.34 }, { label: "0.20", value: 2.75 }, { label: "0.24", value: 2.97 }, { label: "0.28", value: 2.94 }, { label: "0.32", value: 2.81 }, { label: "0.36", value: 2.52 }, { label: "0.40", value: 2.09 }, { label: "0.44", value: 1.52 }, { label: "0.48", value: 0.81 }, { label: "0.52", value: 0.14 }, { label: "0.56", value: 0.0 }, { label: "0.60", value: 0.0 }, { label: "0.64", value: 0.0 }, { label: "0.68", value: 0.0 }, { label: "0.72", value: 0.0 }, { label: "0.76", value: 0.0 }, { label: "0.80", value: 0.0 }] },
+    { name: "held to the top", data: [{ label: "0.00", value: 0.0 }, { label: "0.04", value: 0.74 }, { label: "0.08", value: 1.39 }, { label: "0.12", value: 1.85 }, { label: "0.16", value: 2.34 }, { label: "0.20", value: 2.75 }, { label: "0.24", value: 3.07 }, { label: "0.28", value: 3.31 }, { label: "0.32", value: 3.43 }, { label: "0.36", value: 3.52 }, { label: "0.40", value: 3.56 }, { label: "0.44", value: 3.55 }, { label: "0.48", value: 3.47 }, { label: "0.52", value: 3.33 }, { label: "0.56", value: 3.03 }, { label: "0.60", value: 2.59 }, { label: "0.64", value: 2.02 }, { label: "0.68", value: 1.3 }, { label: "0.72", value: 0.63 }, { label: "0.76", value: 0.0 }, { label: "0.80", value: 0.0 }] },
+  ]}
+  source="Simulated at 120 Hz with the lab's parameters: 3.6-tile jump, 0.38 s rise, 0.30 s fall, gravity ×3 after release."
+/>
+
+Sheet 02 of the lab puts it under pressure. The ceiling is lined with spikes, so a full jump kills you and only short hops get through. Then a three-tile wall asks for the opposite.
+
+<PlayableLab
+  sheets="variable"
+  title="Variable jump height"
+  videoNote="Short hops under the spiked ceiling and a full jump over the wall. Then T switches the technique off: every jump comes out full and the first one hits the spikes."
+  steps={[
+    "Run right with <kbd>→</kbd>. Under the spiked ceiling, tap <kbd>Space</kbd> briefly: short hops over the gaps.",
+    "At the end, hold <kbd>Space</kbd> for the full jump over the three-tile wall.",
+    "Press <kbd>T</kbd> to switch variable jump off. Every jump is now full height, and the ceiling is waiting.",
+  ]}
+/>
+
+<h2 id="variable-jump-godot">How to code variable jump height in Godot 4</h2>
+
+My lab does it with gravity. While the character rises with the button held, gravity is normal. The moment you release while still going up, gravity is multiplied by 3 until the jump peaks. The comments are in Spanish because the whole project is.
+
+<CodeBlock filename="addons/platformer_kit/player/player.gd">
+```gdscript
+# SALTO VARIABLE: soltar el botón mientras se sube multiplica la gravedad.
+# Toque corto = saltito; mantener = salto completo.
+if _jumping and not _jump_cut and velocity.y < 0.0 and not jump_held \
+		and _wall_jump_hold <= 0.0 and Lab.on(&"variable_jump"):
+	_jump_cut = true
+	jump_cut.emit()
+
+var gravity: float
+if velocity.y < 0.0:
+	gravity = p.gravity_up
+	if _jump_cut:
+		gravity *= p.jump_cut_gravity_mult
+```
+</CodeBlock>
+
+Two details in there matter more than the multiplier. The cut happens once per jump (`_jump_cut`), so pressing again mid-air doesn't undo it. And `_wall_jump_hold` blocks the cut for the first 220 ms of a wall jump: someone mashing the button against a wall would otherwise lose height on every kick.
+
+<h2 id="three-ways">Three ways to do it, and how each one feels</h2>
+
+There are three common recipes. They all make a tap shorter than a hold, and they feel different at the moment of release.
+
+<Tabs labels={["Gravity cut (my lab)", "Sustained speed (Celeste)", "Velocity cut (naive)"]}>
+<TabPanel>
+
+Release while rising and gravity triples until the peak. The arc bends instead of breaking: the character still decelerates smoothly, it just does it faster. This is what the chart above shows.
+
+</TabPanel>
+<TabPanel>
+
+Celeste turns it around. The jump starts at full speed, and for up to 0.2 s (`VarJumpTime = .2f`) holding the button keeps the upward speed from dropping. Let go, or run out of time, and normal gravity takes over.<Sidenote>From [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub. C#, lightly trimmed.</Sidenote>
+
+<CodeBlock filename="Celeste/Source/Player/Player.cs">
+```csharp
+//Variable Jumping
+if (varJumpTimer > 0)
+{
+    if (AutoJump || Input.Jump.Check)
+        Speed.Y = Math.Min(Speed.Y, varJumpSpeed);
+    else
+        varJumpTimer = 0;
+}
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+The version most tutorials start with: when the button comes up, multiply the upward speed by something like 0.5. It works, and you can see it work: the arc has a visible kink at the instant of release. This is a generic sketch, not code from my project.
+
+<CodeBlock>
+```gdscript
+if Input.is_action_just_released("jump") and velocity.y < 0.0:
+	velocity.y *= 0.5
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+I picked the gravity cut because it keeps the arc continuous and has a single number to tune. Celeste's approach has a property of its own: for the first 0.2 s a held jump rises at a constant speed, so a held jump is easy to read.
+
+<h2 id="when-to-use">When variable jump height helps, and when it doesn't</h2>
+
+| Situation | Variable jump? |
+|---|---|
+| Action platformers with one jump button | Yes. Super Mario Bros. already did it in 1985. |
+| Low ceilings, spikes overhead, tight tunnels | Yes. The short hop is the tool that solves them. |
+| A game built around committed jumps | No. Castlevania (1986) gives Simon one fixed jump arc, and its levels are built around it. |
+| Buffered jumps | Careful. If the button was already released when the buffered jump fires, it's cut on the first frame and comes out as a short hop. |
+
+<Collapsible title="Why a 0 ms tap still gives 1.1 tiles">
+The jump starts at full takeoff speed (758 px/s here) and the release is only checked once the character is already rising, so even the shortest tap gets a moment at that speed before gravity triples. That moment plus the tripled gravity is the 1.1-tile floor. If you want a lower minimum, the knob is `jump_cut_gravity_mult`, not the release timing.
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="short-hop-height">How short should a short hop be?</h3>
+
+In my lab the shortest hop is about 30% of a full jump: 1.1 tiles against 3.6. Low enough to stay under the lab's three-tile spiked ceiling, long enough (2.5 tiles at a run) to clear a two-tile gap.
+
+<h3 id="cut-velocity-or-gravity">Should I cut the velocity or raise the gravity?</h3>
+
+Raise the gravity if you want the arc to stay smooth; cut the velocity if you want the release to be visible. Both work. The gravity version has one parameter, the multiplier (3 in my lab).
+
+<h3 id="hold-window">How long should the hold window be?</h3>
+
+Celeste caps it at 0.2 s. My lab lets the hold matter all the way to the peak, 0.38 s, because the cut can happen at any point while rising.
+
+Go back to sheet 02, switch the technique off, and try to get under the ceiling. You'll start tapping the button harder, as if force could make the jump shorter. That reflex is the whole argument: players already believe the button works this way.

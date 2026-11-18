@@ -12,11 +12,12 @@ import Comments from '../components/blog/Comments.astro';
 import PostPreview from '../components/PostPreview.astro';
 import { cleanMdxBody, countWords, extractTldr } from '../lib/mdx-plaintext';
 import { readingMinutes } from '../lib/learn';
-import { PERSON, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, UI_STRINGS } from '../consts';
+import { PERSON, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, UI_STRINGS, SERIES, type SeriesId } from '../consts';
+import SeriesNav from '../components/blog/SeriesNav.astro';
 
 type Props = CollectionEntry<'blog'>['data'];
 
-const { title, description, pubDate, updatedDate, reviewedDate, status, heroImage, heroImageAlt, tags, tldr, lang = 'en' } = Astro.props;
+const { title, description, pubDate, updatedDate, reviewedDate, status, heroImage, heroImageAlt, tags, tldr, series, seriesOrder, lang = 'en' } = Astro.props;
 
 // Effective last-modified for SEO: reviewedDate beats updatedDate beats publish.
 const effectiveDateModified = reviewedDate ?? updatedDate;
@@ -29,7 +30,27 @@ const slug = currentPath.replace(/^\/blog\//, '').replace(/\/$/, '');
 
 // Lookup current post entry to count words for JSON-LD
 const currentPost = allPosts.find((p) => p.id === slug);
-const wordCount = currentPost?.body ? countWords(cleanMdxBody(currentPost.body)) : undefined;
+const wordCount = currentPost?.body ? countWords(cleanMdxBody(currentPost.body, lang)) : undefined;
+
+// Series (frontmatter `series` + `seriesOrder`): same-language parts, in order.
+const seriesInfo = series && series in SERIES ? SERIES[series as SeriesId][lang] : undefined;
+const seriesPosts = seriesInfo
+	? allPosts
+			.filter((p) => p.data.series === series && (p.data.lang ?? 'en') === lang && !p.data.draft)
+			.sort((a, b) => (a.data.seriesOrder ?? 0) - (b.data.seriesOrder ?? 0))
+			.map((p) => ({ id: p.id, title: p.data.title, order: p.data.seriesOrder ?? 0 }))
+	: [];
+const seriesNode = seriesInfo
+	? {
+			'@type': 'CreativeWorkSeries',
+			'@id': `https://valdemird.com/#series-${series}-${lang}`,
+			name: seriesInfo.name,
+			description: seriesInfo.description,
+			inLanguage: lang,
+			author: { '@id': PERSON_ID },
+			hasPart: seriesPosts.map((p) => ({ '@id': `https://valdemird.com/blog/${p.id}/#article` })),
+		}
+	: undefined;
 // Same helper the post cards use, so the header and every list agree.
 const readingTime = readingMinutes(currentPost?.body);
 const strings = UI_STRINGS[lang];
@@ -118,7 +139,8 @@ const articleNode: Record<string, unknown> = {
 	publisher: { '@id': ORGANIZATION_ID },
 	image: { '@id': imageId },
 	mainEntityOfPage: { '@id': webPageId },
-	isPartOf: { '@id': webPageId },
+	isPartOf: seriesNode ? [{ '@id': webPageId }, { '@id': seriesNode['@id'] }] : { '@id': webPageId },
+	...(seriesNode && seriesOrder && { position: seriesOrder }),
 	inLanguage: lang,
 	...(tags && tags.length > 0 && { keywords: tags.join(', ') }),
 	...(articleSection && { articleSection }),
@@ -137,7 +159,7 @@ const breadcrumbNode = {
 
 const blogPostingJsonLd = {
 	'@context': 'https://schema.org',
-	'@graph': [webSiteNode, PERSON, ORGANIZATION, imageNode, webPageNode, articleNode, breadcrumbNode],
+	'@graph': [webSiteNode, PERSON, ORGANIZATION, imageNode, webPageNode, articleNode, breadcrumbNode, ...(seriesNode ? [seriesNode] : [])],
 };
 
 const alternates: { hreflang: string; href: string }[] = [];
@@ -265,6 +287,9 @@ const relatedPosts = allPosts
 					<div class="article-body">
 						<slot />
 					</div>
+					{seriesInfo && seriesPosts.length > 1 && (
+						<SeriesNav name={seriesInfo.name} description={seriesInfo.description} posts={seriesPosts} currentId={slug} lang={lang} />
+					)}
 					<aside class="author-follow" aria-labelledby="author-follow-title">
 						<p class="author-follow-eyebrow" id="author-follow-title">{strings.blog.followEyebrow}</p>
 						<p class="author-follow-name">{PERSON.name}</p>

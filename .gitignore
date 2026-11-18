@@ -29,3 +29,6 @@ public/images/blog/**/.history.jsonl
 
 # Claude Code local permissions — machine-local, not shared
 .claude/settings.local.json
+
+# Godot web export: working copy of the game (rebuilt by godot/platformer-lab/build.sh)
+godot/platformer-lab/.build/

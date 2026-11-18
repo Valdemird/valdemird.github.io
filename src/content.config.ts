@@ -19,6 +19,10 @@ const blog = defineCollection({
 		/** Work-in-progress: excluded from routes, listings, RSS and the .md feed. */
 		draft: z.boolean().default(false),
 		lang: z.enum(['en', 'es']).default('en'),
+		/** Ordered series this post belongs to (key of SERIES in consts.ts). */
+		series: z.string().optional(),
+		/** 1-based position inside the series. */
+		seriesOrder: z.number().int().optional(),
 	}),
 });
 

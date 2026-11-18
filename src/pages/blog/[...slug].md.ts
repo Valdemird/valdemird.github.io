@@ -18,7 +18,7 @@ export const GET: APIRoute = ({ props }) => {
 	const updated = updatedDate?.toISOString().split('T')[0];
 	const reviewed = reviewedDate?.toISOString().split('T')[0];
 	const canonical = `https://valdemird.com/blog/${post.id}/`;
-	const body = post.body ? cleanMdxBody(post.body) : '';
+	const body = post.body ? cleanMdxBody(post.body, lang ?? 'en') : '';
 
 	const frontmatter = [
 		'---',

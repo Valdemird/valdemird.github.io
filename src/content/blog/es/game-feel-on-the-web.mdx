@@ -1,11 +1,13 @@
 ---
-title: "Game feel en la web: squash, shake y el arte del juice"
-description: "Seis técnicas de game feel para la web: squash & stretch, hitstop, screen shake, partículas, audio sintetizado y combos. Todas jugables y sin librerías."
+title: "Game feel y juice: squash, hitstop y screen shake (jugables)"
+description: "El game feel es cómo responde un juego a lo que haces: el squash, el hitstop, el temblor de pantalla. Seis técnicas de juice rehechas para la web sin librerías, todas jugables, y el mismo juice dentro de un plataformas real en Godot."
 pubDate: 2026-06-03
-updatedDate: 2026-10-27
+updatedDate: 2026-11-18
 tags: ["game-feel", "animación", "web-audio", "frontend", "diseño-de-interacción"]
 featured: true
 lang: es
+series: platformer-lab
+seriesOrder: 1
 ---
 
 import GameFeelHero from '../../../components/blog/GameFeelHero.astro';
@@ -18,6 +20,7 @@ import Timeline from '../../../components/blog/Timeline.astro';
 import Collapsible from '../../../components/blog/Collapsible.astro';
 import Sidenote from '../../../components/blog/Sidenote.astro';
 import EasingExplorer from '../../../components/blog/EasingExplorer.astro';
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
 
 <GameFeelHero
   eyebrow="Interactivo"
@@ -44,6 +47,8 @@ El game feel no son los gráficos. Es la respuesta. El mismo manejador de clic p
 El término viene de Steve Swink, que escribió el libro sobre esto en 2008: [*Game Feel: A Game Designer's Guide to Virtual Sensation*](http://www.game-feel.com/). Su definición tiene tres partes: control en tiempo real, espacio simulado y pulido. La web te regala las dos primeras. Este artículo trata de la tercera, la capa de pulido que los desarrolladores de juegos terminaron llamando "juice"<Sidenote>La palabra es anterior a las charlas de abajo. En un [artículo de Gamasutra de 2005 sobre cómo prototipar un juego en menos de siete días](https://www.gamedeveloper.com/game-platforms/how-to-prototype-a-game-in-under-7-days), el equipo de Carnegie Mellon detrás del Experimental Gameplay Project definía el juice como "our wet little term for constant and bountiful user feedback": su forma informal de nombrar un feedback constante y abundante.</Sidenote>, y de lo poco que cuesta en realidad.
 
 Cada demo de aquí abajo, salvo la de hitstop, es un port de las funciones que corrían en el juego. Tócalas. [No son videos](/blog/es/interactive-blog-components/), y cuatro de ellas están además juntas en la [página de JuiceLab](/es/lab/juice-lab/) del laboratorio de componentes.
+
+<h2 id="where-juice-comes-from">De dónde viene el juice: Juice it or lose it y The art of screenshake</h2>
 
 <Timeline items={[
   { date: "1981", title: "The Illusion of Life", body: "Los animadores de Disney Frank Thomas y Ollie Johnston publican los 12 principios de la animación. Squash & stretch es el principio número uno." },
@@ -277,6 +282,24 @@ Seis líneas más. La misma corrección, más peso, sonido y una razón para seg
 
 </TabPanel>
 </Tabs>
+
+<h2 id="in-a-real-game">El mismo juice, dentro de un juego de verdad</h2>
+
+Seis meses después del juego de fiesta empecé un plataformas en Godot. Lo primero que construí no fue un nivel sino un laboratorio: un plano largo en el que cada lámina aísla una técnica y la tecla T la apaga. La lámina 13 es este post rehecho dentro de un motor. Están cinco de los seis canales de arriba (squash and stretch, hitstop, screen shake, partículas y sonido sintetizado), más estelas, todos colgados del mismo salto. Pulsa T y se van todos a la vez.
+
+<PlayableLab
+  sheets="juice"
+  title="Game feel, todo a la vez"
+  videoNote="Saltando bugs y rebotando en los muelles con todo el juice encendido. Luego T se lo quita: los mismos saltos, las mismas reglas, nada que sentir."
+  caption="Lámina 13 de mi laboratorio de plataformas. T le quita el juice, y las reglas de debajo no cambian."
+  steps={[
+    "Corre hacia la derecha con <kbd>→</kbd>, salta sobre los bugs con <kbd>Espacio</kbd> y cae sobre los muelles.",
+    "Sube a la torre y déjate caer las 10 casillas del otro lado. Fíjate en el aterrizaje.",
+    "Pulsa <kbd>T</kbd> y repítelo. Los mismos saltos, las mismas reglas, sin juice.",
+  ]}
+/>
+
+El resto del laboratorio va de lo que hay debajo del juice: los temporizadores y los empujoncitos que deciden si un salto sale o no. Los estoy escribiendo una mecánica por post, empezando por [el coyote time y el jump buffer](/blog/es/coyote-time-jump-buffer/).
 
 <h2 id="respect">La parte que no es opcional</h2>
 

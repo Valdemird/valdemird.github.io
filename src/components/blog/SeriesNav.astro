@@ -1,0 +1,174 @@
+---
+/**
+ * SeriesNav — the ordered list of a blog series, at the foot of each of its posts.
+ *
+ * Rendered by BlogPost.astro when the post's frontmatter has `series` (a key of
+ * SERIES in consts.ts) and `seriesOrder`. Same-language posts only. It is the
+ * series' internal-linking spine: every part links every other part, in order,
+ * plus explicit previous / next links.
+ */
+interface SeriesPost {
+	id: string;
+	title: string;
+	order: number;
+}
+interface Props {
+	name: string;
+	description: string;
+	posts: SeriesPost[];
+	currentId: string;
+	lang: 'en' | 'es';
+}
+
+const { name, description, posts, currentId, lang } = Astro.props;
+const es = lang === 'es';
+const index = posts.findIndex((p) => p.id === currentId);
+const prev = index > 0 ? posts[index - 1] : undefined;
+const next = index >= 0 && index < posts.length - 1 ? posts[index + 1] : undefined;
+const href = (id: string) => `/blog/${id}/`;
+---
+
+<aside class="series" aria-labelledby="series-title">
+	<p class="series-eyebrow">
+		{es ? 'Serie' : 'Series'} · {index + 1} / {posts.length}
+	</p>
+	<p class="series-name" id="series-title">{name}</p>
+	<p class="series-desc">{description}</p>
+	<ol class="series-list">
+		{posts.map((p) => (
+			<li>
+				{p.id === currentId ? (
+					<span class="series-current" aria-current="page">{p.title}</span>
+				) : (
+					<a href={href(p.id)}>{p.title}</a>
+				)}
+			</li>
+		))}
+	</ol>
+	{(prev || next) && (
+		<nav class="series-step" aria-label={es ? 'Navegación de la serie' : 'Series navigation'}>
+			{prev ? (
+				<a class="series-step__link" href={href(prev.id)} rel="prev">
+					<span class="series-step__dir">&larr; {es ? 'Anterior' : 'Previous'}</span>
+					<span class="series-step__title">{prev.title}</span>
+				</a>
+			) : <span />}
+			{next && (
+				<a class="series-step__link series-step__link--next" href={href(next.id)} rel="next">
+					<span class="series-step__dir">{es ? 'Siguiente' : 'Next'} &rarr;</span>
+					<span class="series-step__title">{next.title}</span>
+				</a>
+			)}
+		</nav>
+	)}
+</aside>
+
+<style>
+	.series {
+		margin: var(--space-2xl) 0 var(--space-xl);
+		padding: var(--space-lg);
+		border-top: 1px solid var(--color-border);
+		border-bottom: 1px solid var(--color-border);
+		background: oklch(from var(--color-accent) l c h / 0.045);
+		border-radius: var(--radius-md);
+	}
+	:global([data-theme='dark']) .series {
+		background: oklch(from var(--color-accent) l c h / 0.085);
+	}
+	@media (prefers-color-scheme: dark) {
+		:global(:root:not([data-theme='light'])) .series {
+			background: oklch(from var(--color-accent) l c h / 0.085);
+		}
+	}
+	.series-eyebrow {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.14em;
+		color: var(--color-accent);
+	}
+	.series-name {
+		margin: 0.4rem 0 0;
+		font-family: var(--font-serif);
+		font-size: 1.3rem;
+		color: var(--color-text);
+	}
+	.series-desc {
+		margin: 0.35rem 0 0;
+		font-size: 0.9rem;
+		color: var(--color-text-secondary);
+	}
+	.series-list {
+		margin: var(--space-md) 0 0;
+		padding-left: 1.4rem;
+		display: grid;
+		gap: 0.35rem;
+		font-size: 0.95rem;
+	}
+	.series-list li {
+		margin: 0;
+	}
+	.series-list a {
+		color: var(--color-text-secondary);
+		text-decoration: none;
+		transition: color var(--duration-fast) var(--ease-smooth);
+	}
+	.series-list a:hover {
+		color: var(--color-accent);
+	}
+	.series-current {
+		color: var(--color-text);
+		font-weight: 600;
+	}
+	.series-step {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-md);
+		margin-top: var(--space-lg);
+	}
+	.series-step__link {
+		display: grid;
+		gap: 0.2rem;
+		padding: 0.75rem 0.9rem;
+		border: 1px solid var(--color-border);
+		border-radius: var(--radius-md);
+		background: var(--color-surface);
+		text-decoration: none;
+		transition: all var(--duration-normal) var(--ease-spring);
+	}
+	.series-step__link:hover {
+		transform: translateY(-2px);
+		box-shadow: var(--shadow-md);
+		border-color: var(--color-accent);
+	}
+	.series-step__link--next {
+		text-align: right;
+		grid-column: 2;
+	}
+	.series-step__dir {
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--color-accent);
+	}
+	.series-step__title {
+		font-size: 0.88rem;
+		color: var(--color-text);
+	}
+	@media (max-width: 640px) {
+		.series-step {
+			grid-template-columns: 1fr;
+		}
+		.series-step__link--next {
+			grid-column: 1;
+		}
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.series-step__link {
+			transition: none;
+		}
+	}
+</style>
