@@ -1,0 +1,238 @@
+---
+title: "Patrones de enemigos: cada enemigo hace una pregunta y cada recuperación es una apertura (código en Godot)"
+description: "Patrones de enemigos que funcionan: cada uno hace una pregunta (saltar, esquivar, esperar, rodear) y deja una apertura fija tras atacar. Cinco enemigos sobre una máquina de estados en Godot y un escudo con cuatro aperturas."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 20
+---
+
+import TLDR from '../../../components/blog/TLDR.astro';
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import StatGrid from '../../../components/blog/StatGrid.astro';
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+import DataTable from '../../../components/blog/DataTable.astro';
+import MermaidDiagram from '../../../components/blog/MermaidDiagram.astro';
+
+<TLDR bullets={[
+  "El patrón de un enemigo es un bucle fijo: te ve, avisa, ataca y se recupera. La recuperación es la apertura, la ventana en la que no puede responder y tú puedes golpearlo.",
+  "La variedad sale de la pregunta que hace cada enemigo y de la respuesta que exige, no de tener más vida. Mi laboratorio tiene cinco enemigos sobre una misma máquina de estados: uno ocupa espacio, otro castiga quedarse en línea, otro amenaza desde arriba, otro presiona a distancia y otro bloquea.",
+  "Un escudero enseña lo que es una apertura: en mi laboratorio se abre de cuatro formas, tras su propia estocada (0,85 s), por la espalda (tarda 0,45 s en girarse), desde arriba o atravesándolo con el dash.",
+]} />
+
+La lámina de patrones de mi laboratorio tiene un saltador en su corral, dos drones flotando sobre una plataforma de un solo sentido y un rondador al final. Pulsa T y cada enemigo lleva encima una etiqueta con el estado en el que está. Mientras avisa, la etiqueta enseña el nombre del ataque y una barra que se llena. Cuando está expuesto, la etiqueta se pone verde. La primera nota de la lámina: verde es tu turno.
+
+En mis partidas grabadas, 12 de los 18 golpes que recibí en esa lámina vinieron de los drones. Seis fueron disparos y seis, contacto. El dron tiene 2 puntos de vida, lo mínimo de todo lo que ataca en el laboratorio. En la lámina siguiente, la del escudero, 8 de mis tajos rebotaron contra un escudo.
+
+<StatGrid columns={2} stats={[
+  { value: "5", label: "Tipos de enemigo", context: "más un jefe, todos sobre una clase base" },
+  { value: "12 de 18", label: "Golpes de los drones", context: "en la lámina de patrones, 2 de vida cada uno" },
+  { value: "8", label: "Tajos contra un escudo", context: "mis partidas grabadas, 15–17 nov" },
+  { value: "0,85 s", label: "La apertura del escudero", context: "guardia baja tras su estocada" },
+]} />
+
+Dos puntos de vida y el que más me golpeó. Aguantar nunca fue el trabajo del dron. Su trabajo es una pregunta que no hace nadie más en el laboratorio: ¿sigues moviéndote?
+
+<Callout type="important" title="La tesis">
+La variedad de enemigos no sale de la vida ni del daño. Sale de la pregunta que hace cada uno y de la respuesta que exige: saltar, esquivar, esperar, rodear. Construye todos los enemigos sobre el mismo esqueleto y gasta tu diseño sólo en dos cosas: qué pregunta y dónde deja la puerta abierta.
+</Callout>
+
+<h2 id="what-is-an-enemy-pattern">¿Qué es el patrón de ataque de un enemigo?</h2>
+
+El patrón de ataque de un enemigo es la secuencia fija que recorre cada vez que ataca: detectar al jugador, avisar, atacar y recuperarse. Como es fija, el jugador puede aprenderla. Como acaba en una recuperación, el jugador tiene dónde devolver el golpe. Todos los enemigos de mi laboratorio, el jefe incluido, siguen el mismo esqueleto:
+
+<MermaidDiagram title="El esqueleto que comparten todos los enemigos del laboratorio" chart={`
+graph LR
+  A[patrulla] -->|te ve| B["AVISO<br/>duración fija"]
+  B --> C[ATAQUE]
+  C --> D["RECUPERACIÓN<br/>tu turno"]
+  D --> A
+`} />
+
+Mike Stout describe a los enemigos de los juegos de acción por las preguntas que hacen en cada momento, y las reduce a dos: "¿puedes esquivar mi daño?" y "¿puedes golpearme?".<Sidenote>De su [artículo de 2015 en Game Developer sobre ataques enemigos y telegrafía](https://www.gamedeveloper.com/design/enemy-attacks-and-telegraphing), en inglés.</Sidenote> El aviso hace la primera, [como contaba el post de telegrafiar](/blog/es/telegraphing-attacks/). La recuperación hace la segunda. Lo que distingue a un enemigo de otro es la forma concreta de la primera pregunta y la forma de la ventana que responde a la segunda.
+
+<DataTable
+  columns={[
+    { key: "enemy", label: "Enemigo", align: "left" },
+    { key: "question", label: "La pregunta que hace", align: "left" },
+    { key: "warning", label: "Aviso", align: "right" },
+    { key: "answer", label: "La respuesta", align: "left" },
+    { key: "opening", label: "La apertura", align: "left" },
+    { key: "hp", label: "Vida", align: "right" },
+  ]}
+  rows={[
+    { enemy: "Rondador", question: "¿Conoces tu alcance?", warning: "no tiene", answer: "Golpear y retroceder", opening: "Siempre; nunca ataca", hp: 2 },
+    { enemy: "Embestidor", question: "¿Estás en mi línea?", warning: "0,55 s", answer: "Saltarlo, atravesarlo con el dash", opening: "0,9 s de recuperación, 1,3 s aturdido contra un muro", hp: 4 },
+    { enemy: "Saltador", question: "¿Te moverás cuando ya me haya lanzado?", warning: "0,45 s", answer: "Moverse tras el despegue o golpearlo hacia arriba", opening: "0,7 s de aterrizaje", hp: 3 },
+    { enemy: "Dron", question: "¿Sigues moviéndote?", warning: "0,65 s", answer: "No pararse, golpear el disparo o al dron", opening: "1,5 s entre disparos", hp: 2 },
+    { enemy: "Escudero", question: "¿Sabes esperar?", warning: "0,5 s", answer: "Provocar la estocada, esquivar, castigar", opening: "0,85 s de guardia baja, 0,45 s para girarse", hp: 4 },
+  ]}
+  caption="Los cinco enemigos del laboratorio, con los números de sus scripts."
+/>
+
+Pulsa T en la lámina de abajo y mira las etiquetas, sobre todo la del saltador justo después de aterrizar.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_patterns"
+  title="Patrones"
+  steps={[
+    "Pulsa <kbd>T</kbd> para ver el estado de cada enemigo sobre su cabeza. Verde quiere decir que es tu turno.",
+    "Saltador: espera a que se agache y muévete con <kbd>←</kbd> <kbd>→</kbd> cuando ya haya despegado. Golpéalo con <kbd>C</kbd> mientras aterriza (0,7 s).",
+    "Drones: no te pares. Cada uno fija la puntería a mitad del aviso, así que el disparo va a donde estabas. Golpéalos con <kbd>↑</kbd> + <kbd>C</kbd> desde la plataforma.",
+    "Al final hay un rondador bajo un dron: uno te entretiene en el suelo mientras el otro dispara.",
+  ]}
+/>
+
+<h2 id="patterns-godot">Cómo construir patrones de enemigos en Godot 4</h2>
+
+La clase base `Enemy` se encarga de todo lo común: la vida, las tres cajas ([hitbox, hurtbox y cuerpo](/blog/es/hitbox-vs-hurtbox/)), la reacción al golpe, el aviso y la variable de estado. Un enemigo nuevo escribe una sola función, `_think()`, con un `match` sobre su estado. Dos de ellos, uno al lado del otro, enseñan lo poco que necesita cada uno para ser distinto.
+
+<Tabs labels={["Saltador: un salto de tiempo fijo", "Dron: puntería que se fija a medias"]}>
+<TabPanel>
+
+El salto del saltador es balística de verdad, con velocidad vertical y gravedad fijas, así que el vuelo tarda siempre lo mismo: 2 × 620 / 2400, unos 0,52 s. Sólo cambia la velocidad horizontal, que se despeja de dónde estabas al despegar. Si te mueves cuando ya está en el aire, cae en suelo vacío.
+
+<CodeBlock filename="addons/combat_kit/enemies/hopper.gd">
+```gdscript
+func _leap() -> void:
+	# Tiro parabólico: con la velocidad vertical y la gravedad fijas, el tiempo de
+	# vuelo es constante; la velocidad horizontal se despeja de la distancia.
+	var flight := 2.0 * jump_speed / GRAVITY
+	var landing := global_position.x + clampf(to_target().x, -max_hop, max_hop)
+	if leash > 0.0:
+		landing = clampf(landing, _spawn_position.x - leash, _spawn_position.x + leash)
+	velocity = Vector2((landing - global_position.x) / flight, -jump_speed)
+	contact.attack = &"salto"
+	release(&"leap")
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+El dron te sigue durante la primera mitad de su aviso de 0,65 s y luego se detiene. Desde ese momento la línea que dibuja es una promesa: el disparo va ahí. Un disparo que corrige hasta el último frame no se puede esquivar con habilidad, y la cabecera del script lo dice.
+
+<CodeBlock filename="addons/combat_kit/enemies/drone.gd">
+```gdscript
+		&"windup":
+			velocity = velocity.move_toward(Vector2.ZERO, 500.0 * delta)
+			face_target()
+			# La puntería sigue al jugador sólo la primera mitad del aviso.
+			if not _aim_locked and has_target():
+				_aim = target.global_position
+				_aim_locked = windup_ratio() >= 0.5
+			if windup_done():
+				_shoot()
+				release(&"cooldown")
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+Seis de los golpes de los drones fueron disparos. Cada uno apuntaba a donde yo estaba cuando se fijó la puntería, y yo seguía en medio cuando llegó. Quedarse quieto para cuadrar un golpe al saltador es justo la respuesta equivocada si hay un dron avisando encima.
+
+Las etiquetas verdes salen de la vista de depuración, y la lista de lo que cuenta como "tu turno" cabe en una línea:
+
+<CodeBlock filename="addons/combat_kit/debug/combat_debug.gd">
+```gdscript
+		if enemy.state == &"windup":
+			color = BP.ACCENT
+			label = "%s · AVISO %s" % [enemy.display_name, String(enemy.attack_name).to_upper()]
+		elif enemy.state in [&"recover", &"dazed", &"staggered", &"land"]:
+			color = BP.OK   # ventana de castigo
+```
+</CodeBlock>
+
+Cuatro nombres de estado para cinco enemigos y un jefe. `recover` tras un ataque, `dazed` cuando el embestidor se estrella, `land` tras el salto del saltador y `staggered` cuando al jefe se le rompe el aguante. Diseñar un enemigo es, sobre todo, decidir cuáles de esos tiene y cuánto duran.
+
+<h2 id="openings-guard">Aperturas: el escudero al que no se puede aporrear</h2>
+
+El escudero avanza detrás de un escudo. Si lo golpeas de frente oyes un golpe metálico, no le haces daño y el retroceso es 1,9 veces el normal. La nota de la lámina dice qué hacer en su lugar: no insistas, provoca su estocada, esquívala y castiga.
+
+El escudo no es una segunda caja de colisión. Es una función en la hurtbox del escudero que mira de dónde viene el golpe y en qué estado está él:
+
+<CodeBlock filename="addons/combat_kit/enemies/guard.gd">
+```gdscript
+## ¿Para el escudo este golpe? Sólo los tajos que vienen de frente y con la guardia alta.
+func _blocks(hit: Hit) -> bool:
+	if hit.kind != &"slash" or state == &"recover":
+		return false
+	if hit.direction.y > 0.5:
+		return false   # desde arriba: el escudo no cubre la cabeza
+	if not is_instance_valid(hit.source) or not hit.source is Node2D:
+		return false
+	var attacker_side := signf((hit.source as Node2D).global_position.x - global_position.x)
+	return attacker_side == float(facing)
+```
+</CodeBlock>
+
+Lee las líneas `return false` como una lista de aperturas y añade la que vive en su código de movimiento:
+
+1. Durante `recover`, los 0,85 s que siguen a su estocada, tiene la guardia baja.
+2. Un golpe hacia abajo (`hit.direction.y > 0.5`) pasa: el escudo no cubre la cabeza, así que [el pogo](/blog/es/pogo-attack/) funciona.
+3. Por la espalda, `attacker_side` no coincide con `facing`.
+4. Darse la vuelta le cuesta 0,45 s, así que atravesarlo con el dash y golpearle la espalda te da una ventana gratis.
+
+Un escudero así cambia lo que significa el botón de atacar. Contra un rondador, atacas. Contra un escudero, decides *cuándo* atacar. El texto de la lámina dice que ese concepto es la base de cualquier jefe, y [el post del jefe](/blog/es/boss-design/) es donde se pone a prueba.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_guard"
+  title="Defensa y aperturas"
+  steps={[
+    "Acércate al primer escudero y golpea su escudo con <kbd>C</kbd>: suena a metal, no le haces daño y sales empujado casi el doble.",
+    "Ponte a unas dos casillas para provocar su estocada. Retrocede o atraviésalo con el dash, <kbd>X</kbd>, y golpéalo durante los 0,85 s de guardia baja.",
+    "O sáltalo con <kbd>Espacio</kbd> y golpea hacia abajo con <kbd>↓</kbd> + <kbd>C</kbd>: el escudo no le cubre la cabeza. Además tarda 0,45 s en darse la vuelta.",
+    "El segundo escudero tiene un dron encima. Ya no hay tiempo para esperar aperturas: elige a quién quitar primero.",
+  ]}
+/>
+
+<h2 id="combat-chess">Dos enemigos juntos: el ajedrez de combate de DOOM</h2>
+
+La última nota de la lámina del escudero, "elige a quién quitar primero", es una versión pequeña de lo que id Software llamó *combat chess* en DOOM (2016). El [análisis de Tommy Thompson sobre la IA de ese juego](https://www.gamedeveloper.com/design/cyber-demons-the-ai-of-doom-2016-) cuenta que al mezclar demonios se crea lo que id llama ajedrez de combate, donde tu trabajo es averiguar a qué demonio aplastar primero. Cada arquetipo tiene un papel; por ejemplo, los imps mantienen la distancia para poder lanzar bolas de fuego, que es exactamente el trabajo del dron en mi laboratorio.
+
+Para un juego pequeño, lo útil es la aritmética. Cinco enemigos por separado son cinco situaciones. Un rondador bajo un dron es una sexta, y nadie escribió código para ella: el rondador te pide pelear en el suelo y el dron te pide no quedarte quieto mientras lo haces. El texto de la lámina lo dice así: un enemigo es interesante solo; dos tipos juntos crean una situación nueva sin programar nada.
+
+<h2 id="when-to-use">Cuándo merece la pena un enemigo nuevo y cuándo no</h2>
+
+| Idea | ¿Merece la pena? |
+|---|---|
+| Un enemigo que hace una pregunta nueva (saltar, esquivar, esperar, rodear) | Sí. Para eso está cada uno de los cinco. |
+| El mismo enemigo con más vida o más daño | No. Sólo alarga la misma pelea. |
+| Dos enemigos que ya tienes, juntos | A menudo mejor que uno nuevo. Un rondador bajo un dron es una pelea distinta a cualquiera de los dos. |
+| Un enemigo sin apertura | No. Hasta el escudero tiene cuatro, y el jefe se recupera después de cada ataque. |
+| Un enemigo que te persigue por todo el nivel | No. El saltador y el dron no se alejan más de 200 px de donde nacieron. |
+| Un ataque con puntería que corrige hasta disparar | No. El dron deja de apuntar a mitad del aviso. |
+
+<Collapsible title="Correas: por qué el saltador y el dron no te persiguen">
+Los dos tienen una correa (`leash`) de 200 px alrededor de su punto de origen. El saltador limita a dónde apunta el salto y el dron, dónde intenta flotar. La cabecera del saltador explica el fallo que evita: sin correa, quien se sube al murete de su corral se lo lleva de paseo por todo el nivel y el encuentro deja de ocurrir donde se diseñó. La del dron dice que un volador que te persigue por todo el nivel es una molestia, no un reto. Cada pelea de una lámina se queda donde se colocó, y sólo por eso se pueden combinar dos enemigos a propósito.
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="good-enemy-pattern">¿Qué hace bueno el patrón de ataque de un enemigo?</h3>
+
+Una pregunta clara, un aviso de duración fija y una ventana de recuperación después del ataque. En mi laboratorio todos los enemigos siguen patrulla, aviso, ataque y recuperación; lo que cambia es lo que te pide el ataque y cuánto dura la apertura.
+
+<h3 id="what-is-an-opening">¿Qué es una apertura en diseño de combate?</h3>
+
+Una ventana en la que el enemigo no puede defenderse ni responder y el jugador puede golpearlo sin riesgo. La vista de depuración de mi laboratorio marca cuatro estados como aperturas: recuperación tras un ataque, aturdido, aterrizaje y desplomado. La apertura del dron es más sencilla: los 1,5 s entre disparos.
+
+<h3 id="how-many-enemy-types">¿Cuántos tipos de enemigo necesita un juego?</h3>
+
+Menos de los que parece, si cada uno hace una pregunta distinta. Mi laboratorio usa cinco más un jefe, y las combinaciones (un rondador bajo un dron, un escudero con un dron encima) suman situaciones sin código nuevo.
+
+<h3 id="shielded-enemy">¿Cómo se hace justo un enemigo con escudo?</h3>
+
+Dándole aperturas que enseñen cada una una habilidad distinta. El escudero del laboratorio se abre tras su estocada, por la espalda, desde arriba y ante un dash que lo atraviesa.
+
+Vuelve a la lámina de patrones con T encendida y mira al saltador: tras cada salto su etiqueta se pone verde 0,7 s, la aproveches o no. Los drones nunca se ponen verdes. Su apertura son los 1,5 s entre disparos, y sólo la tienes si sigues moviéndote cuando llega el disparo. Doce golpes dicen que casi nunca lo estaba.

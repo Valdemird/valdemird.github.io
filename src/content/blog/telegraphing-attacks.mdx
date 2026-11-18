@@ -1,0 +1,262 @@
+---
+title: "Telegraphing attacks: the 0.55-second warning that makes a hit fair (Godot code)"
+description: "Telegraphing an attack means announcing it before it lands: a pose, a closing ring and a sound, always the same length. My Godot lab's charger warns 0.55 s ahead; press T and it's 0.05 s. Code and a playable sheet."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 18
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "Telegraphing: every enemy attack announces itself before it can hurt you, with a pose, a visual cue and a sound, and always for the same length of time. In my lab the charger warns 0.55 s before it charges.",
+  "In Godot it's one more state in the enemy's state machine, the windup, with a duration. Press T on the sheet and that duration drops to 0.05 s, three frames at 60 fps. Same attack, no time to answer it.",
+  "Difficulty lives in the length of the warning and in how attacks chain. The lab's boss shortens its warnings by 15% in its second phase. Nothing in the lab attacks without one.",
+]} />
+
+The telegraph sheet of my lab is a short corridor with a charger penned between two walls. When it sees you it leans back, shakes, a ring closes over its head and it makes a rising chirp. 0.55 seconds later it charges at 520 px/s. If it hits the wall instead of you, it sits there dazed for 1.3 s and it's your turn.
+
+Totting up my recorded sessions for this post, the chargers on that sheet caught me with a charge 14 times. Every one of them with the warning on. And across all my sessions on that sheet, I played with the warning switched off for a grand total of 2.9 seconds. I built the switch, flicked it twice, and went back to getting hit the fair way.
+
+<StatGrid columns={2} stats={[
+  { value: "0.55 s", label: "The charger's warning", context: "identical every time it attacks" },
+  { value: "0.05 s", label: "With T pressed", context: "three frames at 60 fps" },
+  { value: "14", label: "Charges that hit me", context: "all of them with the warning on" },
+  { value: "2.9 s", label: "Played with it off", context: "all my sessions on the sheet, Nov 15–17" },
+]} />
+
+So the warning doesn't keep you from getting hit. What it changes is whose fault the hit is.
+
+<Callout type="important" title="The thesis">
+An attack the player can't see coming isn't hard, it's unfair, and it teaches nothing. A telegraph turns a fight into a conversation: read, answer, punish. You tune difficulty by shortening the warning or chaining attacks. You never tune it by deleting the warning.
+</Callout>
+
+<h2 id="what-is-telegraphing">What is telegraphing in game design?</h2>
+
+Telegraphing is announcing an attack before it becomes dangerous. The enemy shows a wind-up (a pose, a flash, a sound) for a fixed time, and only then does its hitbox switch on. Animators have a name for the same move: anticipation, one of Disney's twelve principles, which Wikipedia sums up as a device "used to prepare the audience for an action, and to make the action appear more realistic."<Sidenote>From [Twelve basic principles of animation](https://en.wikipedia.org/wiki/Twelve_basic_principles_of_animation) on Wikipedia.</Sidenote> A game adds the part animation never needed: the audience has to act on it.
+
+In my lab every enemy attack goes through the same function, and every warning has four properties:
+
+- A pose. The charger drifts backwards while it winds up, so the anticipation points away from the attack.
+- A ring with an exclamation mark that closes over the enemy. When it reaches the center, the attack comes out.
+- A sound, so you can react to an enemy you're not looking at.
+- A fixed duration per attack. The charger's is always 0.55 s, so after two or three tries your hands know it.
+
+Here is every warning in the lab, side by side. They're the numbers in the code, not estimates.
+
+<InteractiveChart
+  type="horizontal"
+  title="Warning length of every attack in the lab"
+  story="Regular enemies warn for 0.45 to 0.65 s. The boss's second phase is the shortest real warning. T takes any of them down to 0.05 s."
+  unit=" s"
+  data={[
+    { label: "Drone · shot", value: 0.65 },
+    { label: "Boss · charge", value: 0.6 },
+    { label: "Boss · burst", value: 0.6 },
+    { label: "Charger · charge", value: 0.55 },
+    { label: "Guard · thrust", value: 0.5 },
+    { label: "Boss · hammer", value: 0.5 },
+    { label: "Hopper · leap", value: 0.45 },
+    { label: "Boss phase 2 · hammer", value: 0.425 },
+    { label: "Any attack, T pressed", value: 0.05 },
+  ]}
+  annotations={[
+    { targetIndex: 3, text: "The one on this sheet", emphasize: true },
+    { targetIndex: 8, text: "Three frames" },
+  ]}
+  source="From the enemy scripts in my lab's combat_kit addon. Phase 2 multiplies every boss warning by 0.85."
+/>
+
+The sheet below is the real game. The charger in the first pen is the one from the numbers above. Get it to charge, answer it, then press T and try the same answer again.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_telegraph"
+  title="Telegraphing"
+  videoNote="Waits for the charger's warning and jumps after a human-like reaction delay. With the telegraph the charge passes underneath; after T there is no warning and the same reaction comes too late."
+  steps={[
+    "Walk right with <kbd>→</kbd> until the charger sees you. It leans back, a ring closes over its head and it chirps: you have 0.55 s.",
+    "Jump over it with <kbd>Space</kbd>, or dash through it with <kbd>X</kbd> (the dash is invulnerable).",
+    "Get it to charge into a wall. It stays dazed for 1.3 s: hit it with <kbd>C</kbd>.",
+    "Press <kbd>T</kbd>. The warning drops to 0.05 s, with no ring and no sound. Try the same jump.",
+  ]}
+/>
+
+<h2 id="telegraph-godot">How to telegraph an enemy attack in Godot 4</h2>
+
+Every enemy in the lab runs the same skeleton: patrol, warning, attack, recovery. The warning is a state of its own, `windup`, and the base class `Enemy` owns it. A subclass only says which attack and for how long. The comments are in Spanish because the whole project is.
+
+<CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
+```gdscript
+## TELEGRAFIAR: entra en el estado de aviso. El ataque sale cuando `windup_done()`.
+## Con la técnica apagada el aviso dura un parpadeo: así se siente un ataque
+## que no se anuncia.
+func telegraph(attack: StringName, seconds: float) -> void:
+	attack_name = attack
+	set_state(&"windup")
+	windup_total = seconds if Lab.on(&"telegraph") else minf(seconds, 0.05)
+	Combat.enemy_telegraphed.emit(self, attack, windup_total)
+
+
+func windup_ratio() -> float:
+	if state != &"windup" or windup_total <= 0.0:
+		return 0.0
+	return clampf(state_time / windup_total, 0.0, 1.0)
+
+
+func windup_done() -> bool:
+	return state == &"windup" and state_time >= windup_total
+```
+</CodeBlock>
+
+Note what T does. It doesn't remove the windup state, it clamps it to 0.05 s. The attack still technically has a warning, it's just shorter than anyone can read. That's how the lab fakes a missing tell: the state machine runs exactly the same, and the only thing taken away is the time to react.
+
+The charger uses it like this:
+
+<CodeBlock filename="addons/combat_kit/enemies/charger.gd">
+```gdscript
+func _think(delta: float) -> void:
+	match state:
+		&"patrol":
+			patrol(walk_speed, delta)
+			if is_on_floor() and sees_target():
+				face_target()
+				telegraph(&"embestida", windup_time)
+		&"windup":
+			# Retrocede un poco mientras carga: la anticipación va en sentido contrario.
+			velocity.x = move_toward(velocity.x, -facing * 26.0, 600.0 * delta)
+			if windup_done():
+				contact.attack = &"embestida"
+				release(&"charge")
+		&"charge":
+			velocity.x = facing * charge_speed
+			if wall_ahead(facing):
+				# ...
+				_end_charge(&"dazed")
+			elif ledge_ahead(facing) or state_time >= charge_time:
+				_end_charge(&"recover")
+```
+</CodeBlock>
+
+`face_target()` runs once, before `telegraph()`, and nothing in the `windup` branch turns the charger around again. The direction is decided when the warning starts. What the warning showed you is exactly what happens, and the charge can't curve towards you after you've committed to a jump. The other half of the fairness is after the attack: 0.9 s of recovery, or 1.3 s dazed if it hit a wall. Startup, active and recovery are the same three phases [the player's own attack has](/blog/attack-startup-active-recovery/), with the proportions flipped: the player's startup is 35 ms, the charger's is 550.
+
+<h2 id="three-channels">Pose, ring and sound: the three channels of one warning</h2>
+
+The same 0.55 s are drawn and played three times. Each channel covers a case the others miss.
+
+<Tabs labels={["The pose", "The ring", "The sound"]}>
+<TabPanel>
+
+The body leans back and shakes harder as the warning fills up. This is the channel that works even if you've never seen the enemy before: a body coiling backwards reads as "about to spring" to anyone.
+
+<CodeBlock filename="addons/combat_kit/enemies/charger.gd">
+```gdscript
+	match state:
+		&"windup":
+			lean = -0.2 * f * windup_ratio()
+			offset = Vector2(randf_range(-1.0, 1.0), 0.0) * windup_ratio() * 1.6
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+A ring over the enemy's head shrinks from 20 to 7 px and changes color as it closes. The pose says something is coming. The ring says *when*. It's drawn by the base class, so every enemy gets the same clock.
+
+<CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
+```gdscript
+## AVISO VISIBLE: un signo de admiración y un anillo que se cierra sobre el
+## enemigo. Cuando el anillo llega al centro, el ataque sale.
+func _draw_telegraph() -> void:
+	var k := windup_ratio()
+	var top := Vector2(0.0, -body_size.y - 22.0)
+	var pulse := 0.65 + 0.35 * sin(state_time * 34.0)
+	var color := BP.ACCENT.lerp(BP.HAZARD, k * k)
+	_gfx.draw_arc(top, lerpf(20.0, 7.0, k), 0.0, TAU, 28, Color(color, 0.5 + 0.5 * k), 1.6, true)
+	_gfx.draw_line(top + Vector2(0.0, -7.0), top + Vector2(0.0, 2.0), Color(color, pulse), 3.0, true)
+	_gfx.draw_circle(top + Vector2(0.0, 6.5), 1.8, Color(color, pulse))
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+A short rising chirp the moment any warning starts. The enemy doesn't play it: it emits a signal on a shared bus and the presentation layer decides to make a sound. The comment says why it exists.
+
+<CodeBlock filename="addons/combat_kit/fx/combat_feedback.gd">
+```gdscript
+func _on_enemy_telegraphed(_enemy: Enemy, _attack: StringName, _seconds: float) -> void:
+	# El aviso también SUENA: se puede reaccionar sin estar mirando al enemigo.
+	if Lab.on(&"telegraph"):
+		Sfx.play(&"telegraph", -5.0, 1.0, 0.03)
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+With T pressed, all three go at once: the ring isn't drawn, the chirp doesn't play, and the backwards lean lasts 0.05 s, too short to see.
+
+<h2 id="telegraph-as-question">A telegraph is a question the enemy asks</h2>
+
+Mike Stout put it plainly in a 2015 [Game Developer piece on enemy attacks and telegraphing](https://www.gamedeveloper.com/design/enemy-attacks-and-telegraphing): "We want to communicate exactly what the enemy is going to do so the player knows exactly what to do to avoid it." He describes the delay before an attack as the enemy saying "Okay, here I come. I'm gonna attack now… Can you avoid my damage?"
+
+That's a good way to read the charger's code. The `windup` state is the question. The three valid answers are on the sheet's notes: jump over, dash through, or don't be standing in its line. The `recover` and `dazed` states are the follow-up question Stout pairs with it, "Can you hit me?". The other enemies in the lab ask their own versions of those two, which is the subject of [a later post](/blog/enemy-patterns-and-openings/).
+
+The answers depend on things earlier posts built. Dashing through only works because [the dash grants i-frames](/blog/dodge-dash-i-frames/). Getting clipped by the charge costs one mask and knocks you clear instead of draining your health, because of [the invincibility frames after damage](/blog/health-damage-invincibility-frames/). The telegraph is what lets you pick between those answers on purpose.
+
+<h2 id="when-to-use">When a telegraph helps, and when it isn't enough</h2>
+
+| Situation | What the lab does |
+|---|---|
+| Any attack the player is expected to dodge | Telegraph it, with the same length every time. |
+| A harder version of the same enemy | Shorten the warning. The boss multiplies all of its warnings by 0.85 in phase two. |
+| An aimed attack | Lock the aim partway. The drone stops tracking you halfway through its 0.65 s warning. |
+| Walking into an enemy that isn't attacking | No warning, but a smaller box: a passive enemy's contact box is 60% of its body. |
+| Hitting the enemy during its warning | It takes the damage and keeps going. Otherwise mashing would cancel every attack. |
+| Chaining several attacks in a row | Each one keeps its own warning. The boss never fires an attack without one. |
+
+<Collapsible title="Why hitting the charger during its warning doesn't stop it">
+The base class stuns an enemy for a moment every time you hit it, unless the enemy says it has poise right now. The charger says yes during the warning and during the charge:
+
+<CodeBlock filename="addons/combat_kit/enemies/charger.gd">
+```gdscript
+func _has_poise() -> bool:
+	return state == &"windup" or state == &"charge"
+```
+</CodeBlock>
+
+Without that line the best answer to every telegraph would be to hit the enemy during it, and the warning would become a free window instead of a question. The hopper makes the opposite choice: it only has poise in mid-air, so you can knock it out of its crouch if you're close enough.
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-long-telegraph">How long should an attack telegraph be?</h3>
+
+In my lab regular enemies warn for 0.45 s (the hopper) to 0.65 s (the drone). The shortest real warning is the boss's hammer in phase two, 0.425 s. At 0.05 s it stops being a warning at all.
+
+<h3 id="telegraph-too-easy">Does telegraphing make a game too easy?</h3>
+
+No. The charge hit me 14 times in my own sessions, all of them with the warning on. A telegraph gives the player the information; they still have to act on it in time.
+
+<h3 id="telegraph-sound">Should a telegraph have a sound?</h3>
+
+Yes. The pose and the ring only work if you're looking at the enemy. In the lab the chirp plays the instant any warning starts, so an attack from the edge of the screen is still readable.
+
+<h3 id="telegraph-direction">Can a telegraphed attack change direction mid-warning?</h3>
+
+Not in the lab. The charger picks its direction when the warning starts and never corrects it. An attack that steers after the tell punishes the player for reading it.
+
+Go to the telegraph sheet and press T. The charger is exactly as fast as before, it has the same 4 hit points and the same wall to crash into. You'll lose a mask to it anyway, and this time it'll feel like the game cheated. It didn't get any harder. It just stopped telling you what it was about to do.

@@ -1,0 +1,238 @@
+---
+title: "Enemy attack patterns: every enemy asks a question, every recovery is an opening (Godot code)"
+description: "Enemy attack patterns that work: each enemy asks one question (jump, dodge, wait, go around) and leaves a fixed opening after attacking. Five enemies on one Godot state machine, and a shield with four openings."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 20
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import DataTable from '../../components/blog/DataTable.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+
+<TLDR bullets={[
+  "An enemy pattern is a fixed loop: notice you, warn, attack, recover. The recovery is the opening, the window where it can't answer and you can hit it.",
+  "Variety comes from the question each enemy asks and the answer it demands, not from more health. My lab has five enemies on one state machine: one occupies space, one punishes standing in line, one threatens from above, one presses from range, one blocks.",
+  "A guard with a shield teaches openings: in my lab it opens four ways, after its own thrust (0.85 s), from behind (it takes 0.45 s to turn), from above, or by dashing through it.",
+]} />
+
+The patterns sheet of my lab has a hopper in a pen, two drones hanging over a one-way platform and a walker at the end. Press T and every enemy gets a label over its head with the state it's in. While it warns, the label shows the attack's name and a bar filling up. When it's open, the label turns green. The sheet's first note: green means it's your turn.
+
+In my recorded sessions, 12 of the 18 hits I took on that sheet came from the drones. Six were shots and six were body contact. The drone has 2 hit points, the fewest of anything in the lab that attacks. On the next sheet, the guard's, 8 of my swings bounced off a shield.
+
+<StatGrid columns={2} stats={[
+  { value: "5", label: "Enemy types", context: "plus a boss, all on one base class" },
+  { value: "12 of 18", label: "Hits from the drones", context: "on the patterns sheet, 2 HP each" },
+  { value: "8", label: "Swings into a shield", context: "my recorded sessions, Nov 15–17" },
+  { value: "0.85 s", label: "The guard's opening", context: "guard down after its thrust" },
+]} />
+
+Two hit points, and the most hits on me. Toughness was never the drone's job. Its job is one question nobody else in the lab asks: are you still moving?
+
+<Callout type="important" title="The thesis">
+Enemy variety doesn't come from health or damage. It comes from the question each enemy asks and the answer it demands: jump, dodge, wait, go around. Build every enemy on the same skeleton and spend your design on two things only: what it asks, and where it leaves the door open.
+</Callout>
+
+<h2 id="what-is-an-enemy-pattern">What is an enemy attack pattern?</h2>
+
+An enemy attack pattern is the fixed sequence an enemy runs through every time it attacks: notice the player, warn, attack, recover. Because it's fixed, the player can learn it. Because it ends in a recovery, the player has somewhere to hit back. Every enemy in my lab, including the boss, runs the same skeleton:
+
+<MermaidDiagram title="The skeleton every enemy in the lab shares" chart={`
+graph LR
+  A[patrol] -->|sees you| B["WARNING<br/>fixed length"]
+  B --> C[ATTACK]
+  C --> D["RECOVERY<br/>your turn"]
+  D --> A
+`} />
+
+Mike Stout describes enemies in action games by the questions they ask in the moment, and boils them down to two: "Can you avoid my damage?" and "Can you hit me?"<Sidenote>From his 2015 [Game Developer piece on enemy attacks and telegraphing](https://www.gamedeveloper.com/design/enemy-attacks-and-telegraphing).</Sidenote> The warning asks the first one, [as the telegraph post covered](/blog/telegraphing-attacks/). The recovery asks the second. What makes one enemy different from another is the specific form of the first question, and the shape of the window that answers the second.
+
+<DataTable
+  columns={[
+    { key: "enemy", label: "Enemy", align: "left" },
+    { key: "question", label: "The question it asks", align: "left" },
+    { key: "warning", label: "Warning", align: "right" },
+    { key: "answer", label: "The answer", align: "left" },
+    { key: "opening", label: "The opening", align: "left" },
+    { key: "hp", label: "HP", align: "right" },
+  ]}
+  rows={[
+    { enemy: "Walker", question: "Do you know your reach?", warning: "none", answer: "Hit and step back", opening: "Always; it never attacks", hp: 2 },
+    { enemy: "Charger", question: "Are you standing in my line?", warning: "0.55 s", answer: "Jump over, dash through", opening: "0.9 s recovery, 1.3 s dazed on a wall", hp: 4 },
+    { enemy: "Hopper", question: "Will you move after I commit?", warning: "0.45 s", answer: "Move after takeoff, or hit it upward", opening: "0.7 s landing", hp: 3 },
+    { enemy: "Drone", question: "Are you still moving?", warning: "0.65 s", answer: "Keep moving, hit the shot or the drone", opening: "1.5 s between shots", hp: 2 },
+    { enemy: "Guard", question: "Can you wait?", warning: "0.5 s", answer: "Provoke the thrust, dodge, punish", opening: "0.85 s guard down, 0.45 s to turn", hp: 4 },
+  ]}
+  caption="The five enemies of the lab, with the numbers from their scripts."
+/>
+
+Press T on the sheet below and watch the labels, especially the hopper's right after it lands.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_patterns"
+  title="Patterns"
+  steps={[
+    "Press <kbd>T</kbd> to show each enemy's state over its head. Green means it's your turn.",
+    "Hopper: wait for it to crouch, then move with <kbd>←</kbd> <kbd>→</kbd> after it takes off. Hit it with <kbd>C</kbd> while it lands (0.7 s).",
+    "Drones: keep moving. Each one locks its aim halfway through its warning, so the shot goes where you were. Hit them with <kbd>↑</kbd> + <kbd>C</kbd> from the platform.",
+    "At the end there's a walker under a drone: one keeps you busy on the ground while the other shoots.",
+  ]}
+/>
+
+<h2 id="patterns-godot">How to build enemy patterns in Godot 4</h2>
+
+The base class `Enemy` owns everything shared: health, the three boxes ([hitbox, hurtbox and body](/blog/hitbox-vs-hurtbox/)), the hit reaction, the warning and the state variable. A new enemy writes one function, `_think()`, with a `match` on its state. Two of them, side by side, show how little each one needs to be different. The comments are in Spanish because the whole project is.
+
+<Tabs labels={["Hopper: a fixed-time leap", "Drone: aim that locks halfway"]}>
+<TabPanel>
+
+The hopper's leap is real ballistics with a fixed vertical speed and a fixed gravity, so the flight always takes the same time: 2 × 620 / 2400, about 0.52 s. Only the horizontal speed changes, solved from where you were standing at takeoff. Move after it leaves the ground and it lands on empty floor.
+
+<CodeBlock filename="addons/combat_kit/enemies/hopper.gd">
+```gdscript
+func _leap() -> void:
+	# Tiro parabólico: con la velocidad vertical y la gravedad fijas, el tiempo de
+	# vuelo es constante; la velocidad horizontal se despeja de la distancia.
+	var flight := 2.0 * jump_speed / GRAVITY
+	var landing := global_position.x + clampf(to_target().x, -max_hop, max_hop)
+	if leash > 0.0:
+		landing = clampf(landing, _spawn_position.x - leash, _spawn_position.x + leash)
+	velocity = Vector2((landing - global_position.x) / flight, -jump_speed)
+	contact.attack = &"salto"
+	release(&"leap")
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+The drone tracks you for the first half of its 0.65 s warning, then stops. From that moment the line it draws is a promise: the shot goes there. A shot that corrects until the last frame can't be dodged by skill, and the script's header says so.
+
+<CodeBlock filename="addons/combat_kit/enemies/drone.gd">
+```gdscript
+		&"windup":
+			velocity = velocity.move_toward(Vector2.ZERO, 500.0 * delta)
+			face_target()
+			# La puntería sigue al jugador sólo la primera mitad del aviso.
+			if not _aim_locked and has_target():
+				_aim = target.global_position
+				_aim_locked = windup_ratio() >= 0.5
+			if windup_done():
+				_shoot()
+				release(&"cooldown")
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+Six of the drones' hits on me were shots. Each one was aimed at where I stood when its aim locked, and I was still in the way when it arrived. Standing still to line up a hit on the hopper is exactly the wrong answer while a drone is mid-warning above you.
+
+The green labels come from the debug view, and the list of what counts as "your turn" is one line:
+
+<CodeBlock filename="addons/combat_kit/debug/combat_debug.gd">
+```gdscript
+		if enemy.state == &"windup":
+			color = BP.ACCENT
+			label = "%s · AVISO %s" % [enemy.display_name, String(enemy.attack_name).to_upper()]
+		elif enemy.state in [&"recover", &"dazed", &"staggered", &"land"]:
+			color = BP.OK   # ventana de castigo
+```
+</CodeBlock>
+
+Four state names, across five enemies and a boss. `recover` after an attack, `dazed` when the charger hits a wall, `land` after the hopper's leap, `staggered` when the boss's poise breaks. Designing an enemy is mostly deciding which of those it gets and for how long.
+
+<h2 id="openings-guard">Openings: the guard that can't be mashed</h2>
+
+The guard walks behind a shield. Hit it from the front and you get a metal clang, no damage and a recoil 1.9 times stronger than usual. The sheet's note says what to do instead: don't insist, provoke its thrust, dodge it, punish.
+
+The shield isn't a second collision box. It's a function on the guard's hurtbox that looks at where the hit came from and what state the guard is in:
+
+<CodeBlock filename="addons/combat_kit/enemies/guard.gd">
+```gdscript
+## ¿Para el escudo este golpe? Sólo los tajos que vienen de frente y con la guardia alta.
+func _blocks(hit: Hit) -> bool:
+	if hit.kind != &"slash" or state == &"recover":
+		return false
+	if hit.direction.y > 0.5:
+		return false   # desde arriba: el escudo no cubre la cabeza
+	if not is_instance_valid(hit.source) or not hit.source is Node2D:
+		return false
+	var attacker_side := signf((hit.source as Node2D).global_position.x - global_position.x)
+	return attacker_side == float(facing)
+```
+</CodeBlock>
+
+Read the `return false` lines as a list of openings, and add the one that lives in its movement code:
+
+1. During `recover`, the 0.85 s after its thrust, the guard is down.
+2. A downward strike (`hit.direction.y > 0.5`) gets past it: the shield doesn't cover the head, so [a pogo](/blog/pogo-attack/) works.
+3. From behind, `attacker_side` doesn't match `facing`.
+4. Turning around costs it 0.45 s, so dashing through it and hitting its back gives you a free window.
+
+A guard like this changes what the attack button means. Against a walker you press attack. Against a guard you decide *when* to press it. The lab's sheet text calls that concept the basis of any boss, and [the boss post](/blog/boss-design/) is where it gets tested.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_guard"
+  title="Guard and openings"
+  steps={[
+    "Walk up to the first guard and hit its shield with <kbd>C</kbd>: a metal clang, no damage, and you get pushed back almost twice as far.",
+    "Get within about two tiles to provoke its thrust. Back off or dash through with <kbd>X</kbd>, then hit it during the 0.85 s its guard is down.",
+    "Or jump over it with <kbd>Space</kbd> and strike down with <kbd>↓</kbd> + <kbd>C</kbd>: the shield doesn't cover its head. It also takes 0.45 s to turn around.",
+    "The second guard has a drone overhead. There's no time to wait for openings now: pick which one goes first.",
+  ]}
+/>
+
+<h2 id="combat-chess">Two enemies together: DOOM's combat chess</h2>
+
+The last note on the guard sheet, "pick which one goes first", is a small version of what id Software called combat chess in DOOM (2016). Tommy Thompson's [write-up of that game's AI](https://www.gamedeveloper.com/design/cyber-demons-the-ai-of-doom-2016-) describes how mixing demons "creates what id refers to as combat chess: where your job is to figure out which demon to smash first". Each archetype has a role, for example "imps maintain their distance to enable them to throw fireballs", which is the drone's whole job in my lab.
+
+The useful part for a small game is the arithmetic. Five enemies alone are five situations. A walker under a drone is a sixth, and nobody wrote code for it: the walker asks you to fight on the ground, the drone asks you not to stand still while you do. That's how the lab's sheet text puts it: one enemy is interesting alone, two types together create a new situation without programming anything.
+
+<h2 id="when-to-use">When a new enemy type helps, and when it doesn't</h2>
+
+| Idea | Worth it? |
+|---|---|
+| An enemy that asks a new question (jump, dodge, wait, go around) | Yes. That's what each of the five is for. |
+| The same enemy with more health or damage | No. It only makes the same fight longer. |
+| Two enemies you already have, together | Often better than a new one. A walker under a drone is a different fight from either. |
+| An enemy with no opening | No. Even the guard has four, and the boss has a recovery after every attack. |
+| An enemy that follows you across the level | No. The hopper and the drone stay within 200 px of where they spawned. |
+| An aimed attack that tracks until it fires | No. The drone stops aiming halfway through its warning. |
+
+<Collapsible title="Leashes: why the hopper and the drone don't chase you">
+Both have a `leash` of 200 px around their spawn point. The hopper clamps where it aims its leap, the drone clamps where it tries to hover. The hopper's header explains the bug it prevents: without the leash, a player standing on the wall of its pen could drag it across the whole level, and the encounter would stop happening where it was designed. The drone's says a flyer that follows you across the level is a nuisance, not a challenge. Each fight on a sheet stays where it was placed, which is the only reason two enemies can be combined on purpose.
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="good-enemy-pattern">What makes a good enemy attack pattern?</h3>
+
+A clear question, a warning of fixed length, and a recovery window after the attack. In my lab every enemy follows patrol, warning, attack, recovery; what changes is what the attack asks of you and how long the opening lasts.
+
+<h3 id="what-is-an-opening">What is an opening in combat design?</h3>
+
+A window where the enemy can't defend or answer and the player can hit it freely. My lab's debug view marks four states as openings: recovery after an attack, dazed, landing, and staggered. The drone's opening is plainer, the 1.5 s between shots.
+
+<h3 id="how-many-enemy-types">How many enemy types does a game need?</h3>
+
+Fewer than it seems, if each asks a different question. My lab uses five plus a boss, and the combinations (a walker under a drone, a guard with a drone overhead) add situations without new code.
+
+<h3 id="shielded-enemy">How do you make a shielded enemy fair?</h3>
+
+Give it openings that each teach a different skill. The lab's guard opens after its thrust, from behind, from above, and to a dash through it.
+
+Go back to the patterns sheet with T on and watch the hopper: after every leap its label goes green for 0.7 s, whether you use it or not. The drones never turn green. Their opening is the 1.5 s between shots, and you only get it if you're still moving when the shot arrives. Twelve hits says I mostly wasn't.

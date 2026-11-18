@@ -1,0 +1,199 @@
+---
+title: "Healing mechanic with risk and reward: hit to charge it, stand still to use it (Godot code)"
+description: "A risk-reward healing mechanic: every hit you land charges 11 energy, 33 buys one mask, and healing means holding a button 0.9 s standing still, where any hit cancels it. Godot code and Hollow Knight's numbers."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 19
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import MermaidDiagram from '../../components/blog/MermaidDiagram.astro';
+
+<TLDR bullets={[
+  "Risk-reward healing: the resource that heals you comes from attacking, and spending it leaves you exposed. In my lab every hit that lands gives 11 energy, and 33 energy buys back one mask of health.",
+  "Healing means holding V for 0.9 s, on the ground, unable to move. A hit cancels it. The energy is only spent when the heal finishes, so an interrupted heal costs time, not resources.",
+  "The numbers are almost exactly Hollow Knight's Focus: 11 per hit, 33 per heal, a meter of 99. In my recorded sessions 7 of my 11 heals happened in the boss room. On the healing sheet itself, zero.",
+]} />
+
+The healing sheet of my lab has three things in a row. A training dummy, to charge energy on. A damage plate, so you can lose a mask on purpose when you're at full health. And a hopper in a pen, which crouches, warns and leaps at wherever you're standing. The sheet's last note says it straight: now heal with the hopper nearby, that's the decision.
+
+The lab records every session. Going through mine for this post, I healed 11 times in total. Not one of them was on the healing sheet, where I spent 44 seconds across all sessions. Seven were in the boss room. In my first long session I fought the boss 24 times and didn't heal once. Both of my wins came later, in the two sessions where I did. I won't claim the heals were the difference: by then I'd also died to that boss 21 times.
+
+<StatGrid columns={2} stats={[
+  { value: "+11", label: "Energy per hit", context: "only hits that connect" },
+  { value: "33", label: "Energy per mask", context: "three hits, then 0.9 s standing still" },
+  { value: "11", label: "Heals in my sessions", context: "7 of them in the boss room" },
+  { value: "6", label: "Heals started and not finished", context: "let go early or got hit" },
+]} />
+
+<Callout type="important" title="The thesis">
+A heal that is instant and free is a panic button, and a panic button needs no thought. Make the heal cost something you only get by attacking, plus a second of standing still, and it turns into a question you ask yourself mid-fight: do I have a second right now? That question is the whole mechanic.
+</Callout>
+
+<h2 id="what-is-risk-reward-healing">What is a risk-reward healing mechanic?</h2>
+
+A risk-reward heal ties recovering health to two costs: you have to earn the resource by fighting, and using it leaves you vulnerable for a moment. Aggression fills the meter, then you need to read the enemies well enough to find a gap. The lab's sheet text has a line I like about the side effect: the loop regulates difficulty on its own, because whoever plays well gets more heals.
+
+Here's the loop as the code runs it:
+
+<MermaidDiagram title="One heal, from hit to mask" chart={`
+graph LR
+  A["Hit lands<br/>+11 energy"] --> B{"33 or more<br/>and a mask missing?"}
+  B -->|no| A
+  B -->|yes| C["Hold V<br/>on the ground, still"]
+  C -->|"0.9 s"| D["+1 mask<br/>−33 energy"]
+  C -->|"hit or let go"| E["Cancelled<br/>energy kept"]
+  D -->|"still holding, 33 left"| C
+  E --> A
+`} />
+
+The sheet below has the dummy, the plate and the hopper in that order. There's no T on this one. The sheet has no technique to switch off, only a trade to learn.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_heal"
+  title="Healing"
+  steps={[
+    "Hit the training dummy with <kbd>C</kbd>. Every hit that connects adds 11 energy; three hits are enough for one heal.",
+    "At full health the heal won't start. Step on the damage plate to lose a mask.",
+    "Stand still on the ground and hold <kbd>V</kbd> for 0.9 s. You can't move while it charges.",
+    "Now go to the hopper's pen and try it there. If it lands on you, the heal is cut and the energy stays.",
+  ]}
+/>
+
+<h2 id="heal-godot">How to code a risky heal in Godot 4</h2>
+
+All the numbers live in a `Resource`, in the same file as the rest of the player's combat tuning. The comments are in Spanish because the whole project is.
+
+<CodeBlock filename="addons/combat_kit/player/combat_params.gd">
+```gdscript
+@export_group("Energía y curación")
+@export_range(1, 300) var energy_max := 99
+## Cada golpe que conecta carga energía: atacar es la forma de poder curarse.
+@export_range(0, 99) var energy_per_hit := 11
+@export_range(1, 99) var heal_cost := 33
+## Tiempo quieto y mantenido para curar una máscara: el RIESGO de la curación.
+@export_range(0.1, 3.0, 0.05, "suffix:s") var heal_time := 0.9
+@export_range(1, 5) var heal_amount := 1
+```
+</CodeBlock>
+
+The energy comes in where a hit is resolved: when a slash lands on something that isn't a shield, `add_energy(params.energy_per_hit)`. A whiff gives nothing, and so does a hit blocked by a guard. That's the same moment the game [confirms the hit with hitstop and sparks](/blog/hit-confirm-hitstop/), so the energy bar fills exactly when the hit feels like it landed.
+
+The heal itself is a timer that only runs while the button is held and the player is on the floor:
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+## CURACIÓN CON RIESGO: mantener el botón, en el suelo y sin moverse. Curarse
+## es una decisión táctica ("¿tengo un segundo libre?"), no un botón del pánico:
+## un golpe recibido la interrumpe y la energía sólo se gasta al completarla.
+func _tick_heal(delta: float) -> void:
+	# ...
+			player.control_enabled = false   # quieto: ése es el riesgo
+			heal_started.emit()
+		return
+
+	if not holding or not player.is_on_floor():
+		_stop_heal(true)
+		return
+	_heal_time += delta
+	# ...
+	if _heal_time >= params.heal_time:
+		add_energy(-params.heal_cost)
+		var amount := health.heal(params.heal_amount)
+		healed.emit(amount)
+		_heal_time = 0.0
+		if not can_heal():
+			_stop_heal(false)
+		else:
+			heal_started.emit()   # encadena otra máscara sin soltar
+```
+</CodeBlock>
+
+Three lines carry the design. `player.control_enabled = false` is the risk: for 0.9 s you can't walk out of anything. `add_energy(-params.heal_cost)` sits *after* the timer completes, so the cost is only paid for a heal you actually got. And the `else` branch means holding the button with 66 energy heals two masks back to back without letting go.
+
+The cancel on damage is in the handler every hit goes through:
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+func _on_damaged(hit: Hit) -> void:
+	# ...
+	_cancel_attack()
+	_stop_heal(true)
+	# Tras un golpe hay que soltar y volver a pulsar para curarse: que no se
+	# reanude sola con el enemigo encima.
+	_heal_blocked = true
+```
+</CodeBlock>
+
+<h2 id="hollow-knight-bloodborne">Hollow Knight, Bloodborne and the lab: three ways to heal by attacking</h2>
+
+<Tabs labels={["My lab", "Hollow Knight", "Bloodborne"]}>
+<TabPanel>
+
+A meter of 99. Every hit that connects gives 11. One heal costs 33 and takes 0.9 s, standing still on the ground. A hit cancels it and the energy stays, because it's only spent when the heal completes.
+
+</TabPanel>
+<TabPanel>
+
+Focus, the Knight's heal, runs on SOUL. The main meter holds 99, "attacking an enemy can gain you 11 SOUL per hit", and Focus costs 33 for one mask.<Sidenote>Numbers from the community wiki's pages on [SOUL](https://hollowknight.wiki.fextralife.com/Soul) and [Focus](https://hollowknight.wiki.fextralife.com/Focus).</Sidenote> The first mask takes about 1.14 s, each one after about 0.89 s. Getting hit interrupts it, and the wiki is blunt about the cost: "any SOUL consumed is wasted, therefore it is imperative that you wait until you have an opening before attempting to heal."
+
+</TabPanel>
+<TabPanel>
+
+Bloodborne's Rally is the same idea without a button. When you take damage, the lost chunk of your health bar turns orange, and "to regain your health, you must successfully execute one or several attacks on an enemy within 5 seconds after being hit."<Sidenote>From the community wiki's page on [Regain](https://bloodborne.wiki.fextralife.com/Regain).</Sidenote> The risk is the same as standing still to heal, turned inside out: to get your health back you have to walk into the thing that just hurt you.
+
+</TabPanel>
+</Tabs>
+
+Put the first two tabs side by side and the lab's numbers are Hollow Knight's almost one for one: 99, 11, 33, about 0.9 s per mask. The one rule that differs is what an interrupted heal costs. Hollow Knight burns SOUL while you channel and keeps it burned if you get hit. The lab charges at the end, so getting hit mid-heal costs you the mask you were about to get and the 0.9 s you spent, nothing more. It's the softer of the two, and it changes how often you're willing to try.
+
+<h2 id="when-to-use">When risky healing helps, and when it doesn't</h2>
+
+| Situation | Risky heal? |
+|---|---|
+| Boss fights and long encounters | Yes. 7 of my 11 heals happened in the boss room, where a mask matters most. |
+| Melee combat built on aggression | Yes. The energy only comes from hits that land, so healing pushes you to attack. |
+| Players who are struggling | Its weak spot. Fewer hits means fewer heals, so the player who most needs one gets them least. |
+| Rooms with constant ranged pressure | Careful. If there is never a free 0.9 s, the heal stops being a decision and becomes useless. |
+| Healing in the air or on the move | Not here. The lab requires the floor and stillness; take either away and the risk is gone. |
+| Full health | Blocked. Pressing V at full health is refused and tells you why. |
+
+<Collapsible title="Three small rules that keep the heal from feeling clumsy">
+Holding V a moment too early still counts. If you press it while still in the air or mid-swing, the heal starts the instant it becomes possible. The comment in the code calls requiring the press on the exact tick "another buffer that's missing", the same reasoning as [the jump buffer](/blog/coyote-time-jump-buffer/).
+
+After a hit, you have to let go and press again. Otherwise a held button would restart the heal on its own the moment the knockback ended, with the enemy still on top of you.
+
+Holding through a completed heal chains the next one if there's energy for it. Two masks in 1.8 s, if you dare stand still that long.
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="make-healing-risky">How do you make healing risky in a game?</h3>
+
+Make it take time, take away movement while it runs and let any hit cancel it. In my lab that's 0.9 s on the ground with no control, and the hit is handled in the same place as all damage.
+
+<h3 id="heal-duration">How long should a heal take?</h3>
+
+My lab uses 0.9 s per mask. Hollow Knight's Focus takes about 1.14 s for the first mask and about 0.89 s for each one after. Much shorter and there is no risk; much longer and nobody tries it outside of an empty room.
+
+<h3 id="cancelled-heal-cost">Should an interrupted heal still cost resources?</h3>
+
+Pick one on purpose. Hollow Knight wastes the SOUL consumed; my lab spends energy only when the heal completes. Charging at the end makes players try more often, and the cost of failing is the time and the mask they didn't get.
+
+<h3 id="why-heal-from-attacks">Why tie healing to attacking?</h3>
+
+So that playing safe and healing pull in opposite directions. To heal you need energy, to get energy you need hits, and hits mean getting close.
+
+Go back to the healing sheet with a mask missing and three hits of energy, and walk up to the hopper's pen. Hold V. Somewhere around half a second in you'll want to let go, because the hopper is crouching, and you'll have to decide whether 0.4 s is enough. That's the whole post, happening in your thumb.
