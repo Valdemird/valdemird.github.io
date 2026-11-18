@@ -111,5 +111,14 @@ grep -iE "error|warning" "$WORK/export.log" | grep -v "^WARNING: Blend file impo
 rm -rf "$OUT"
 mkdir -p "$OUT"
 cp "$WORK/out/"* "$OUT/"
+# The game page is only a canvas, framed by the posts: keep it out of search results.
+# (GitHub Pages can't send an X-Robots-Tag header, so it goes in the HTML.)
+python3 -I - "$OUT/index.html" <<'PY'
+import sys, pathlib
+p = pathlib.Path(sys.argv[1]); s = p.read_text()
+if 'name="robots"' not in s:
+    s = s.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n\t\t<meta name="robots" content="noindex">', 1)
+p.write_text(s)
+PY
 du -sh "$OUT"/* | sort -h
 echo "✓ $OUT"
