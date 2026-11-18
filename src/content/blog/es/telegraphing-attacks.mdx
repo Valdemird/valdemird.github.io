@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 17
 seriesTitle: "Telegrafiar ataques"
+videoHero: {"sheets": "c_telegraph", "plane": "combate", "title": "Telegrafiar", "videoNote": "Espera el aviso del embestidor y salta con un retraso de reacción como el de una persona. Con el aviso, la embestida pasa por debajo; tras pulsar T no hay aviso y la misma reacción llega tarde.", "steps": ["Camina a la derecha con <kbd>→</kbd> hasta que el embestidor te vea. Se echa atrás, se cierra un anillo sobre su cabeza y suena: tienes 0,55 s.", "Sáltalo con <kbd>Espacio</kbd> o atraviésalo con el dash, <kbd>X</kbd> (el dash es invulnerable).", "Haz que se estrelle contra un muro. Se queda aturdido 1,3 s: golpéalo con <kbd>C</kbd>.", "Pulsa <kbd>T</kbd>. El aviso baja a 0,05 s, sin anillo y sin sonido. Prueba el mismo salto."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -46,19 +47,6 @@ import CodeBlock from '../../../components/blog/CodeBlock.astro';
 
 El aviso es un estado propio con una duración fija, y el ataque sólo sale cuando termina. El cuerpo se echa atrás y tiembla, un anillo se cierra sobre su cabeza para decirte *cuándo*, y un pitido que sube te avisa aunque no estés mirando a ese enemigo. Como la duración no cambia nunca, a los dos o tres intentos tus manos ya se la saben. Pulsa T y el embestidor es igual de rápido, pero deja de decirte lo que va a hacer.
 
-<PlayableLab
-  plane="combate"
-  sheets="c_telegraph"
-  title="Telegrafiar"
-  videoNote="Espera el aviso del embestidor y salta con un retraso de reacción como el de una persona. Con el aviso, la embestida pasa por debajo; tras pulsar T no hay aviso y la misma reacción llega tarde."
-  steps={[
-    "Camina a la derecha con <kbd>→</kbd> hasta que el embestidor te vea. Se echa atrás, se cierra un anillo sobre su cabeza y suena: tienes 0,55 s.",
-    "Sáltalo con <kbd>Espacio</kbd> o atraviésalo con el dash, <kbd>X</kbd> (el dash es invulnerable).",
-    "Haz que se estrelle contra un muro. Se queda aturdido 1,3 s: golpéalo con <kbd>C</kbd>.",
-    "Pulsa <kbd>T</kbd>. El aviso baja a 0,05 s, sin anillo y sin sonido. Prueba el mismo salto.",
-  ]}
-/>
-
 <h2 id="how-to-implement">Cómo implementar un ataque telegrafiado</h2>
 
 1. Haz del aviso un estado propio, con una duración fija para cada ataque. El ataque sólo sale cuando se acaba ese tiempo.
@@ -76,7 +64,6 @@ func telegraph(attack: StringName, seconds: float) -> void:
 	set_state(&"windup")
 	windup_total = seconds if Lab.on(&"telegraph") else minf(seconds, 0.05)
 	Combat.enemy_telegraphed.emit(self, attack, windup_total)
-
 
 func windup_done() -> bool:
 	return state == &"windup" and state_time >= windup_total

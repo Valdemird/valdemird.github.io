@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 17
 seriesTitle: "Telegraphing attacks"
+videoHero: {"sheets": "c_telegraph", "plane": "combate", "title": "Telegraphing", "videoNote": "Waits for the charger's warning and jumps after a human-like reaction delay. With the telegraph the charge passes underneath; after T there is no warning and the same reaction comes too late.", "steps": ["Walk right with <kbd>→</kbd> until the charger sees you. It leans back, a ring closes over its head and it chirps: you have 0.55 s.", "Jump over it with <kbd>Space</kbd>, or dash through it with <kbd>X</kbd> (the dash is invulnerable).", "Get it to charge into a wall. It stays dazed for 1.3 s: hit it with <kbd>C</kbd>.", "Press <kbd>T</kbd>. The warning drops to 0.05 s, with no ring and no sound. Try the same jump."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -46,19 +47,6 @@ import CodeBlock from '../../components/blog/CodeBlock.astro';
 
 The warning is a state of its own with a fixed length, and the attack only comes out when it ends. The body leans back and shakes, a ring closes over its head to tell you *when*, and a rising chirp covers the enemy you aren't looking at. Because the length never changes, after two or three tries your hands know it. Press T and the charger is exactly as fast, but it stops telling you what it's about to do.
 
-<PlayableLab
-  plane="combate"
-  sheets="c_telegraph"
-  title="Telegraphing"
-  videoNote="Waits for the charger's warning and jumps after a human-like reaction delay. With the telegraph the charge passes underneath; after T there is no warning and the same reaction comes too late."
-  steps={[
-    "Walk right with <kbd>→</kbd> until the charger sees you. It leans back, a ring closes over its head and it chirps: you have 0.55 s.",
-    "Jump over it with <kbd>Space</kbd>, or dash through it with <kbd>X</kbd> (the dash is invulnerable).",
-    "Get it to charge into a wall. It stays dazed for 1.3 s: hit it with <kbd>C</kbd>.",
-    "Press <kbd>T</kbd>. The warning drops to 0.05 s, with no ring and no sound. Try the same jump.",
-  ]}
-/>
-
 <h2 id="how-to-implement">How to implement a telegraphed attack</h2>
 
 1. Make the warning its own state, with a fixed length per attack. The attack only comes out when that timer runs out.
@@ -76,7 +64,6 @@ func telegraph(attack: StringName, seconds: float) -> void:
 	set_state(&"windup")
 	windup_total = seconds if Lab.on(&"telegraph") else minf(seconds, 0.05)
 	Combat.enemy_telegraphed.emit(self, attack, windup_total)
-
 
 func windup_done() -> bool:
 	return state == &"windup" and state_time >= windup_total

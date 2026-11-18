@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 15
 seriesTitle: "Frames de invencibilidad"
+videoHero: {"sheets": "c_health", "plane": "combate", "title": "Vida y daño", "videoNote": "Cruza la placa de daño. Con frames de invencibilidad pierde una máscara y pasa parpadeando; tras pulsar T cada contacto cuesta otra máscara.", "steps": ["Camina hacia la derecha con <kbd>→</kbd> hasta la placa de daño. Pierdes una máscara, sales empujado y parpadeas 1,2 s.", "Salta al corral con <kbd>Espacio</kbd> y quédate dentro de un rondador. Con i-frames solo puede quitarte una máscara cada 1,2 s.", "Pulsa <kbd>T</kbd> para apagar los i-frames y vuelve a cruzar la placa: cada contacto cuesta otra máscara.", "Atraviesa un rondador con <kbd>X</kbd>. El dash tiene sus propios i-frames."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -41,19 +42,6 @@ Los **frames de invencibilidad** (i-frames) son la ventana tras un golpe en la q
 <h2 id="what-are-i-frames">I-frames tras un golpe: un error, una máscara</h2>
 
 Existen por el daño por contacto. El cuerpo de un enemigo o una placa de daño es un hitbox siempre encendido que intenta golpearte en cada tick de física, 120 veces por segundo. Sin la ventana, quedarte un instante dentro de un enemigo te quitaría una máscara por tick. El golpe además te empuja y te quita el control 0,2 s; el resto de los 1,2 s es tiempo para salir. La vida son cinco máscaras, las mismas con las que empiezas en [Hollow Knight](https://hollowknight.wiki.fextralife.com/Health+Mask).
-
-<PlayableLab
-  plane="combate"
-  sheets="c_health"
-  title="Vida y daño"
-  videoNote="Cruza la placa de daño. Con frames de invencibilidad pierde una máscara y pasa parpadeando; tras pulsar T cada contacto cuesta otra máscara."
-  steps={[
-    "Camina hacia la derecha con <kbd>→</kbd> hasta la placa de daño. Pierdes una máscara, sales empujado y parpadeas 1,2 s.",
-    "Salta al corral con <kbd>Espacio</kbd> y quédate dentro de un rondador. Con i-frames solo puede quitarte una máscara cada 1,2 s.",
-    "Pulsa <kbd>T</kbd> para apagar los i-frames y vuelve a cruzar la placa: cada contacto cuesta otra máscara.",
-    "Atraviesa un rondador con <kbd>X</kbd>. El dash tiene sus propios i-frames.",
-  ]}
-/>
 
 <h2 id="what-is-hazard-respawn">Volver al suelo firme: pinchos que quitan una máscara, no una vida</h2>
 

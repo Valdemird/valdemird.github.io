@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 14
 seriesTitle: "Pogo attack"
+videoHero: {"sheets": "c_pogo", "plane": "combate", "title": "Up, down and pogo", "videoNote": "Down-slashes from target to target over the spikes, bouncing on each hit. After T the down-slash no longer bounces and the spikes win.", "steps": ["Under the first target, jump with <kbd>Space</kbd> and press <kbd>↑</kbd> + <kbd>C</kbd>: an up-slash.", "Jump toward the spikes and, coming down onto the first target, hold <kbd>↓</kbd> and press <kbd>C</kbd>. Each hit bounces you to the next one; steer with <kbd>←</kbd> <kbd>→</kbd>.", "Miss a target and slash the spikes instead: they bounce you too.", "Press <kbd>T</kbd> to switch the pogo off. The down-slash still hits, but nothing bounces and the spikes win."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -26,19 +27,6 @@ A **pogo attack** is a down-slash in the air that bounces you up when it connect
 <h2 id="what-is-a-pogo-attack">Pogo attack: hits that work as a floor</h2>
 
 Enemies and spikes stop being things to avoid and become, for an instant, something to stand on. Hollow Knight is the usual reference: its [wiki's combat page](https://hollowknight.wiki.fextralife.com/Combat) says a down attack in the air lets you "pogo off an enemy, often multiple times in a row." The bounce ignores [variable jump height](/blog/variable-jump-height/), so it's always the same 2.2 tiles and a level can be measured in bounces. Spikes carry a hurtbox with no health that blocks every hit, 34 px tall against 10 px of lethal zone: the slash connects, nothing takes damage, and you bounce.
-
-<PlayableLab
-  plane="combate"
-  sheets="c_pogo"
-  title="Up, down and pogo"
-  videoNote="Down-slashes from target to target over the spikes, bouncing on each hit. After T the down-slash no longer bounces and the spikes win."
-  steps={[
-    "Under the first target, jump with <kbd>Space</kbd> and press <kbd>↑</kbd> + <kbd>C</kbd>: an up-slash.",
-    "Jump toward the spikes and, coming down onto the first target, hold <kbd>↓</kbd> and press <kbd>C</kbd>. Each hit bounces you to the next one; steer with <kbd>←</kbd> <kbd>→</kbd>.",
-    "Miss a target and slash the spikes instead: they bounce you too.",
-    "Press <kbd>T</kbd> to switch the pogo off. The down-slash still hits, but nothing bounces and the spikes win.",
-  ]}
-/>
 
 <h2 id="down-slash-timing">Down-slash timing: why it can't copy the forward slash</h2>
 

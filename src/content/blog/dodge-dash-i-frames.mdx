@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 16
 seriesTitle: "Dodge i-frames"
+videoHero: {"sheets": "c_dodge", "plane": "combate", "title": "Dodge dash", "videoNote": "Dashes through the damage curtains. With dash i-frames it passes untouched; after T the same dashes take the hit.", "steps": ["Run right with <kbd>→</kbd> toward the first curtain. There's wall above it, so you can't jump. Press <kbd>X</kbd> just before it and the dash carries you through untouched.", "The double curtain is two tiles wide. One dash covers 3.6, so it fits.", "In the tunnel there's no room to jump. The pile driver warns and then strikes: dash with <kbd>X</kbd> through the shockwave when it reaches you.", "Press <kbd>T</kbd> and dash through the same curtain. The dash moves you exactly the same, but now it costs a mask."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -44,19 +45,6 @@ A **dodge dash** grants invincibility frames while it lasts, so you go through a
 <h2 id="what-is-a-dodge-dash">Dash i-frames: through the attack, not over it</h2>
 
 Jumping dodges what comes along the floor, but it leaves you in the air and far from the enemy. A sideways dash dodges and places you: you come out on the other side, behind whoever attacked, with their recovery still ahead of them. The extra 0.05 s covers the instant after the dash when you may still overlap what you went through. Hollow Knight's [Shade Cloak](https://hollowknight.wiki.fextralife.com/Shade+Cloak) works the same way: it lets you "dash through enemies and their attacks without taking damage."
-
-<PlayableLab
-  plane="combate"
-  sheets="c_dodge"
-  title="Dodge dash"
-  videoNote="Dashes through the damage curtains. With dash i-frames it passes untouched; after T the same dashes take the hit."
-  steps={[
-    "Run right with <kbd>→</kbd> toward the first curtain. There's wall above it, so you can't jump. Press <kbd>X</kbd> just before it and the dash carries you through untouched.",
-    "The double curtain is two tiles wide. One dash covers 3.6, so it fits.",
-    "In the tunnel there's no room to jump. The pile driver warns and then strikes: dash with <kbd>X</kbd> through the shockwave when it reaches you.",
-    "Press <kbd>T</kbd> and dash through the same curtain. The dash moves you exactly the same, but now it costs a mask.",
-  ]}
-/>
 
 <h2 id="dash-cooldown-rule">The cooldown rule: at least twice the protection</h2>
 

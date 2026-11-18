@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 12
 seriesTitle: "Fases de un ataque"
+videoHero: {"sheets": "c_anatomy", "plane": "combate", "title": "Anatomía de un golpe", "videoNote": "Aporrea el ataque un poco más rápido de lo que permite el golpe. Con el buffer de ataque, cada pulsación adelantada sale como el siguiente golpe del combo; tras pulsar T, las pulsaciones adelantadas se pierden y el combo se rompe.", "steps": ["Camina hacia la derecha con <kbd>→</kbd> y ataca con <kbd>C</kbd>. Mira la regla sobre tu cabeza: anticipación, activo y recuperación, a escala.", "Golpea a los dos maniquíes que están juntos. Un tajo, dos golpes: cada caja recibe uno por activación.", "En el último maniquí, pulsa <kbd>C</kbd> un poco más rápido de lo que dura el golpe. Cada pulsación adelantada enseña una etiqueta verde de BUFFER con cuánto se adelantó, y el combo sigue.", "Pulsa <kbd>T</kbd> y vuelve a aporrear. Ahora las pulsaciones adelantadas enseñan una etiqueta roja de × PRONTO, y se pierden."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -51,19 +52,6 @@ La anticipación decide lo rápido que se siente el botón, el activo lo indulge
 <h2 id="attack-buffer">Buffer de ataque: pulsar antes de tiempo también es pulsar</h2>
 
 Un buffer de ataque recuerda **150 ms** una pulsación hecha mientras el personaje está ocupado, y el ataque sale en cuanto puede: es el [jump buffer](/blog/es/coyote-time-jump-buffer/) en otro botón. En un combo, la pulsación guardada además corta la recuperación desde los 90 ms, y el siguiente golpe empieza a los 225 ms en vez de a los 335. En los juegos de pelea eso es un [cancel](https://glossary.infil.net/?t=Cancel). Esperar la recuperación entera es un [link](https://glossary.infil.net/?t=Link), y es lo único que te deja la T.
-
-<PlayableLab
-  plane="combate"
-  sheets="c_anatomy"
-  title="Anatomía de un golpe"
-  videoNote="Aporrea el ataque un poco más rápido de lo que permite el golpe. Con el buffer de ataque, cada pulsación adelantada sale como el siguiente golpe del combo; tras pulsar T, las pulsaciones adelantadas se pierden y el combo se rompe."
-  steps={[
-    "Camina hacia la derecha con <kbd>→</kbd> y ataca con <kbd>C</kbd>. Mira la regla sobre tu cabeza: anticipación, activo y recuperación, a escala.",
-    "Golpea a los dos maniquíes que están juntos. Un tajo, dos golpes: cada caja recibe uno por activación.",
-    "En el último maniquí, pulsa <kbd>C</kbd> un poco más rápido de lo que dura el golpe. Cada pulsación adelantada enseña una etiqueta verde de BUFFER con cuánto se adelantó, y el combo sigue.",
-    "Pulsa <kbd>T</kbd> y vuelve a aporrear. Ahora las pulsaciones adelantadas enseñan una etiqueta roja de × PRONTO, y se pierden.",
-  ]}
-/>
 
 <h2 id="how-to-implement">Cómo implementar las fases de un ataque y el buffer de ataque</h2>
 

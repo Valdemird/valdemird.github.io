@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 10
 seriesTitle: "Platformer camera"
+videoHero: {"sheets": "camera", "title": "Platformer camera", "videoNote": "Climbs the steps, then jumps in place on the plateau. With the smart camera the view stays put while it hops; after T the camera follows every jump.", "steps": ["Climb the steps with <kbd>→</kbd> and <kbd>Space</kbd>. The solid yellow line is the anchor, the height of the last floor you stood on. It moves up one step each time you land.", "On the plateau, hop with <kbd>Space</kbd>. The dashed line above you is the top of the window. A full jump tops out just under it, so the view stays put.", "Turn around with <kbd>←</kbd>. The look-ahead cross drifts over to the other side, slower than the camera follows you.", "Press <kbd>T</kbd> and hop again. The guides disappear except the camera's center, and every jump drags the whole level up and down."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -26,18 +27,6 @@ A good **platformer camera** moves as little as it can and shows what's in front
 <h2 id="platform-snapping">Platform snapping: don't follow the jump</h2>
 
 A camera glued to the player scrolls the whole level on every hop. Platform snapping keeps it at the height of the last floor you stood on, and only follows if you go 170 px above it or 50 px below. A full jump rises 144 px, so a hop never moves the screen. Downward the window is small, because below you is where you'll land.
-
-<PlayableLab
-  sheets="camera"
-  title="Platformer camera"
-  videoNote="Climbs the steps, then jumps in place on the plateau. With the smart camera the view stays put while it hops; after T the camera follows every jump."
-  steps={[
-    "Climb the steps with <kbd>→</kbd> and <kbd>Space</kbd>. The solid yellow line is the anchor, the height of the last floor you stood on. It moves up one step each time you land.",
-    "On the plateau, hop with <kbd>Space</kbd>. The dashed line above you is the top of the window. A full jump tops out just under it, so the view stays put.",
-    "Turn around with <kbd>←</kbd>. The look-ahead cross drifts over to the other side, slower than the camera follows you.",
-    "Press <kbd>T</kbd> and hop again. The guides disappear except the camera's center, and every jump drags the whole level up and down.",
-  ]}
-/>
 
 Itay Keren's GDC talk [*Scroll Back*](https://www.gamedeveloper.com/design/scroll-back-the-theory-and-practice-of-cameras-in-side-scrollers) credits Super Mario World with introducing it.
 

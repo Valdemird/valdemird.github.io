@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 1
 seriesTitle: "Coyote time and jump buffer"
+videoHero: {"sheets": "coyote", "title": "Coyote time", "videoNote": "With coyote time, the hero jumps a beat after leaving each ledge and still makes it. Then T switches it off and the same late jumps fall.", "steps": ["Run right with <kbd>→</kbd> and jump with <kbd>Space</kbd> as late as you can before each gap.", "If you were already in the air when you pressed, a green «COYOTE +ms» tag appears: the window gave you that jump.", "Press <kbd>T</kbd> and repeat the run. The same late jumps now show «× TARDE» (too late) and you fall."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -44,17 +45,6 @@ import CodeBlock from '../../components/blog/CodeBlock.astro';
 <h2 id="coyote-time">Coyote time: jumping after the ground is gone</h2>
 
 You jump as late as you can, because later means farther. By eye, the character is still on the ledge for a few frames after leaving it. Coyote time gives you those frames: **100 ms**, the same as Celeste. The name comes from Wile E. Coyote, who only falls once he looks down.
-
-<PlayableLab
-  sheets="coyote"
-  title="Coyote time"
-  videoNote="With coyote time, the hero jumps a beat after leaving each ledge and still makes it. Then T switches it off and the same late jumps fall."
-  steps={[
-    "Run right with <kbd>→</kbd> and jump with <kbd>Space</kbd> as late as you can before each gap.",
-    "If you were already in the air when you pressed, a green «COYOTE +ms» tag appears: the window gave you that jump.",
-    "Press <kbd>T</kbd> and repeat the run. The same late jumps now show «× TARDE» (too late) and you fall.",
-  ]}
-/>
 
 <h2 id="jump-buffer">Jump buffer: pressing early counts too</h2>
 

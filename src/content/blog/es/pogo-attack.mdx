@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 14
 seriesTitle: "Pogo"
+videoHero: {"sheets": "c_pogo", "plane": "combate", "title": "Arriba, abajo y pogo", "videoNote": "Tajos hacia abajo de diana en diana sobre los pinchos, rebotando en cada golpe. Tras pulsar T el tajo hacia abajo ya no rebota y ganan los pinchos.", "steps": ["Debajo de la primera diana, salta con <kbd>Espacio</kbd> y pulsa <kbd>↑</kbd> + <kbd>C</kbd>: un tajo hacia arriba.", "Salta hacia los pinchos y, al caer sobre la primera diana, mantén <kbd>↓</kbd> y pulsa <kbd>C</kbd>. Cada golpe te lanza hacia la siguiente; corrige con <kbd>←</kbd> <kbd>→</kbd>.", "Falla una diana y golpea los pinchos: también te hacen rebotar.", "Pulsa <kbd>T</kbd> para apagar el pogo. El tajo hacia abajo sigue golpeando, pero ya nada rebota y ganan los pinchos."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -26,19 +27,6 @@ El **pogo** es un tajo hacia abajo en el aire que, si conecta, te lanza hacia ar
 <h2 id="what-is-a-pogo-attack">Pogo: golpes que hacen de suelo</h2>
 
 Enemigos y pinchos dejan de ser cosas que esquivar y pasan a ser, por un instante, algo sobre lo que apoyarse. La referencia habitual es Hollow Knight: la [página de combate de su wiki](https://hollowknight.wiki.fextralife.com/Combat) dice que un ataque hacia abajo en el aire te deja "pogo off an enemy, often multiple times in a row" (hacer pogo sobre un enemigo, a menudo varias veces seguidas). El rebote ignora el [salto variable](/blog/es/variable-jump-height/), así que siempre mide las mismas 2,2 casillas y el nivel se puede medir en rebotes. Los pinchos llevan una hurtbox sin vida que bloquea todos los golpes, de 34 px de alto frente a 10 px de zona letal: el tajo conecta, nadie recibe daño y rebotas.
-
-<PlayableLab
-  plane="combate"
-  sheets="c_pogo"
-  title="Arriba, abajo y pogo"
-  videoNote="Tajos hacia abajo de diana en diana sobre los pinchos, rebotando en cada golpe. Tras pulsar T el tajo hacia abajo ya no rebota y ganan los pinchos."
-  steps={[
-    "Debajo de la primera diana, salta con <kbd>Espacio</kbd> y pulsa <kbd>↑</kbd> + <kbd>C</kbd>: un tajo hacia arriba.",
-    "Salta hacia los pinchos y, al caer sobre la primera diana, mantén <kbd>↓</kbd> y pulsa <kbd>C</kbd>. Cada golpe te lanza hacia la siguiente; corrige con <kbd>←</kbd> <kbd>→</kbd>.",
-    "Falla una diana y golpea los pinchos: también te hacen rebotar.",
-    "Pulsa <kbd>T</kbd> para apagar el pogo. El tajo hacia abajo sigue golpeando, pero ya nada rebota y ganan los pinchos.",
-  ]}
-/>
 
 <h2 id="down-slash-timing">Los tiempos del tajo hacia abajo: por qué no copia los del de frente</h2>
 

@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 11
 seriesTitle: "Hitbox y hurtbox"
+videoHero: {"sheets": "c_boxes", "plane": "combate", "title": "Hitbox, hurtbox y cuerpo", "videoNote": "Ataca a los maniquíes desde el límite del alcance. Con la hitbox generosa el tajo entra; tras pulsar T, los mismos tajos desde el mismo sitio fallan.", "steps": ["Camina hacia la derecha con <kbd>→</kbd> y golpea al primer maniquí con <kbd>C</kbd>. El verde es donde te pueden dar, el rojo es tu tajo mientras está activo y el blanco es tu cuerpo.", "Retrocede con <kbd>←</kbd> hasta que el tajo apenas llegue y vuelve a atacar. La caja roja va más allá del trazo dibujado, y el golpe sigue entrando.", "En el maniquí del pedestal, ataca desde el suelo sin saltar. La caja generosa es lo bastante alta para alcanzarlo.", "Pulsa <kbd>T</kbd> para pasar a la caja exacta y repite las dos cosas. Desde los mismos sitios, el tajo falla."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -31,19 +32,6 @@ El [glosario de juegos de pelea de Infil](https://glossary.infil.net/?t=Hitbox) 
 <h2 id="generous-hitbox">Hitboxes generosas: grandes a favor del jugador, pequeñas en su contra</h2>
 
 Ninguna de las tres debería coincidir con el dibujo. Haz que cada desacuerdo favorezca al jugador: el tajo llega a 80 px del centro en vez de 60, mide 56 px de grosor en vez de 28 y empieza 8 px por detrás del centro, para que un tajo a quemarropa también entre. A los enemigos es fácil acertarles, y mientras solo pasean nada más hace daño su núcleo. Cuando atacan con el propio cuerpo, esa caja crece hasta el cuerpo menos 8 px.
-
-<PlayableLab
-  plane="combate"
-  sheets="c_boxes"
-  title="Hitbox, hurtbox y cuerpo"
-  videoNote="Ataca a los maniquíes desde el límite del alcance. Con la hitbox generosa el tajo entra; tras pulsar T, los mismos tajos desde el mismo sitio fallan."
-  steps={[
-    "Camina hacia la derecha con <kbd>→</kbd> y golpea al primer maniquí con <kbd>C</kbd>. El verde es donde te pueden dar, el rojo es tu tajo mientras está activo y el blanco es tu cuerpo.",
-    "Retrocede con <kbd>←</kbd> hasta que el tajo apenas llegue y vuelve a atacar. La caja roja va más allá del trazo dibujado, y el golpe sigue entrando.",
-    "En el maniquí del pedestal, ataca desde el suelo sin saltar. La caja generosa es lo bastante alta para alcanzarlo.",
-    "Pulsa <kbd>T</kbd> para pasar a la caja exacta y repite las dos cosas. Desde los mismos sitios, el tajo falla.",
-  ]}
-/>
 
 Los juegos de pelea ajustan la hurtbox [al modelo del personaje](https://glossary.infil.net/?t=Hurtbox), porque cada píxel que le das a un jugador se lo quitas al otro.
 

@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 8
 seriesTitle: "Slopes and floor snap"
+videoHero: {"sheets": "slopes", "title": "Slopes and floor snap", "videoNote": "Runs down the ramps and jumps the pit right where the slope ends. After T it bounces down the slopes and often has no floor under it when it needs to jump.", "steps": ["Run right with <kbd>→</kbd> over both hills without jumping. On the way down the character stays glued to the ramp.", "At the bottom of the second ramp, jump the four-tile pit with <kbd>Space</kbd> right where the slope ends.", "Press <kbd>T</kbd> and run it again. The character hops down the ramps, and sometimes the jump at the edge of the pit doesn't happen at all."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -29,17 +30,6 @@ On a 45° ramp the floor drops as far as you move sideways, and gravity, startin
 <h2 id="what-is-floor-snap">Floor snap: back onto the ramp after every move</h2>
 
 After each move, floor snap looks down by up to its length and puts the character back on the floor it finds. It's skipped while the character moves up, so jumps work as usual, and it's far shorter than a 40 px tile, so walking off a real ledge still means falling.
-
-<PlayableLab
-  sheets="slopes"
-  title="Slopes and floor snap"
-  videoNote="Runs down the ramps and jumps the pit right where the slope ends. After T it bounces down the slopes and often has no floor under it when it needs to jump."
-  steps={[
-    "Run right with <kbd>→</kbd> over both hills without jumping. On the way down the character stays glued to the ramp.",
-    "At the bottom of the second ramp, jump the four-tile pit with <kbd>Space</kbd> right where the slope ends.",
-    "Press <kbd>T</kbd> and run it again. The character hops down the ramps, and sometimes the jump at the edge of the pit doesn't happen at all.",
-  ]}
-/>
 
 <h2 id="how-to-implement">How to implement floor snap on slopes</h2>
 

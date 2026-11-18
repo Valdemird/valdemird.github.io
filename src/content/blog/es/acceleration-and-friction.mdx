@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 6
 seriesTitle: "Aceleración y fricción"
+videoHero: {"sheets": "accel", "title": "Aceleración y fricción", "videoNote": "Correr, soltar, girar y soltar, en bucle, con el inspector del laboratorio encendido. Con la técnica, la traza de velocidad sube y baja en rampa; después de T salta al instante entre la velocidad máxima y cero.", "steps": ["Pulsa <kbd>I</kbd> para abrir el inspector. La línea blanca de su osciloscopio es tu velocidad horizontal.", "Corre hacia la derecha con <kbd>→</kbd>, suelta y luego pulsa <kbd>←</kbd>. La línea sube en rampa, se curva en cada cambio y vuelve a cero en pendiente.", "Salta a las plataformas de dos casillas con <kbd>Espacio</kbd> y párate en cada una soltando <kbd>→</kbd> justo al aterrizar.", "Pulsa <kbd>T</kbd> y repítelo. Ahora la velocidad es instantánea: exacta, pero rígida. La línea se convierte en una onda cuadrada."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -26,18 +27,6 @@ La **aceleración** es lo rápido que el personaje llega a su velocidad máxima 
 <h2 id="what-is-acceleration-friction">Aceleración y fricción: el personaje no es un cursor</h2>
 
 Una velocidad que pasa de cero al máximo de golpe es exacta y rígida. Una rampa de unas pocas centésimas le da peso al personaje, siempre que frenar sea más rápido que arrancar y girar, más rápido todavía. En el aire el frenado baja al 40 %, y soltar a mitad de salto no se come el impulso con el que saltaste.
-
-<PlayableLab
-  sheets="accel"
-  title="Aceleración y fricción"
-  videoNote="Correr, soltar, girar y soltar, en bucle, con el inspector del laboratorio encendido. Con la técnica, la traza de velocidad sube y baja en rampa; después de T salta al instante entre la velocidad máxima y cero."
-  steps={[
-    "Pulsa <kbd>I</kbd> para abrir el inspector. La línea blanca de su osciloscopio es tu velocidad horizontal.",
-    "Corre hacia la derecha con <kbd>→</kbd>, suelta y luego pulsa <kbd>←</kbd>. La línea sube en rampa, se curva en cada cambio y vuelve a cero en pendiente.",
-    "Salta a las plataformas de dos casillas con <kbd>Espacio</kbd> y párate en cada una soltando <kbd>→</kbd> justo al aterrizar.",
-    "Pulsa <kbd>T</kbd> y repítelo. Ahora la velocidad es instantánea: exacta, pero rígida. La línea se convierte en una onda cuadrada.",
-  ]}
-/>
 
 <h2 id="how-to-implement">Cómo implementar la aceleración y la fricción</h2>
 

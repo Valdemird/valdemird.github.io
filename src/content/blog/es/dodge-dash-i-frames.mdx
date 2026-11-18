@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 16
 seriesTitle: "Dash de esquiva"
+videoHero: {"sheets": "c_dodge", "plane": "combate", "title": "Dash de esquiva", "videoNote": "Atraviesa las cortinas de daño con el dash. Con los i-frames del dash pasa intacto; tras pulsar T los mismos dashes se llevan el golpe.", "steps": ["Corre hacia la derecha con <kbd>→</kbd> hasta la primera cortina. Encima hay pared, así que no se puede saltar. Pulsa <kbd>X</kbd> justo antes y el dash te lleva al otro lado sin un rasguño.", "La cortina doble mide dos casillas de ancho. Un dash recorre 3,6, así que cabe.", "En el túnel no hay sitio para saltar. El martinete avisa y después golpea: haz dash con <kbd>X</kbd> a través de la onda cuando te llegue.", "Pulsa <kbd>T</kbd> y cruza la misma cortina con el dash. Te mueve exactamente igual, pero ahora cuesta una máscara."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -44,19 +45,6 @@ Un **dash de esquiva** te da frames de invencibilidad mientras dura, así que at
 <h2 id="what-is-a-dodge-dash">Los i-frames del dash: atravesar el ataque en vez de saltarlo</h2>
 
 Saltar esquiva lo que va por el suelo, pero te deja en el aire y lejos del enemigo. Un dash lateral esquiva y a la vez te coloca: sales por el otro lado, a la espalda de quien atacó y con su recuperación todavía por delante. Los 0,05 s de más cubren el instante tras el dash en el que aún puedes estar solapando lo que atravesaste. La [Shade Cloak](https://hollowknight.wiki.fextralife.com/Shade+Cloak) de Hollow Knight funciona igual: permite "dash through enemies and their attacks without taking damage" (atravesar con el dash a los enemigos y sus ataques sin recibir daño).
-
-<PlayableLab
-  plane="combate"
-  sheets="c_dodge"
-  title="Dash de esquiva"
-  videoNote="Atraviesa las cortinas de daño con el dash. Con los i-frames del dash pasa intacto; tras pulsar T los mismos dashes se llevan el golpe."
-  steps={[
-    "Corre hacia la derecha con <kbd>→</kbd> hasta la primera cortina. Encima hay pared, así que no se puede saltar. Pulsa <kbd>X</kbd> justo antes y el dash te lleva al otro lado sin un rasguño.",
-    "La cortina doble mide dos casillas de ancho. Un dash recorre 3,6, así que cabe.",
-    "En el túnel no hay sitio para saltar. El martinete avisa y después golpea: haz dash con <kbd>X</kbd> a través de la onda cuando te llegue.",
-    "Pulsa <kbd>T</kbd> y cruza la misma cortina con el dash. Te mueve exactamente igual, pero ahora cuesta una máscara.",
-  ]}
-/>
 
 <h2 id="dash-cooldown-rule">La regla del cooldown: al menos el doble de la protección</h2>
 

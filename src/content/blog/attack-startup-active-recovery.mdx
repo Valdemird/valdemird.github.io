@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 12
 seriesTitle: "Attack phases"
+videoHero: {"sheets": "c_anatomy", "plane": "combate", "title": "Anatomy of a hit", "videoNote": "Mashes attack a little faster than the swing allows. With the attack buffer every early press comes out as the next hit of the combo; after T the early presses are lost and the combo breaks.", "steps": ["Walk right with <kbd>→</kbd> and attack with <kbd>C</kbd>. Watch the ruler over your head: startup, active and recovery, to scale.", "Slash the two dummies standing together. One swing, two hits: each box takes one hit per activation.", "At the last dummy, press <kbd>C</kbd> a little faster than the swing. Each early press shows a green BUFFER tag with how early it was, and the combo keeps going.", "Press <kbd>T</kbd> and mash again. Early presses now show a red × PRONTO tag (Spanish for \"too early\"), and they're gone."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -51,19 +52,6 @@ Startup decides how fast the button feels, active how forgiving the timing is, a
 <h2 id="attack-buffer">Attack buffer: an early press is still a press</h2>
 
 An attack buffer remembers a press made while the character is busy for **150 ms**, and the attack comes out as soon as it can: the [jump buffer](/blog/coyote-time-jump-buffer/) on another button. In a combo, a stored press also cuts the recovery from 90 ms in, so the next hit starts at 225 ms instead of 335. Fighting games call that a [cancel](https://glossary.infil.net/?t=Cancel). Waiting out the whole recovery is a [link](https://glossary.infil.net/?t=Link), and it's all T leaves you.
-
-<PlayableLab
-  plane="combate"
-  sheets="c_anatomy"
-  title="Anatomy of a hit"
-  videoNote="Mashes attack a little faster than the swing allows. With the attack buffer every early press comes out as the next hit of the combo; after T the early presses are lost and the combo breaks."
-  steps={[
-    "Walk right with <kbd>→</kbd> and attack with <kbd>C</kbd>. Watch the ruler over your head: startup, active and recovery, to scale.",
-    "Slash the two dummies standing together. One swing, two hits: each box takes one hit per activation.",
-    "At the last dummy, press <kbd>C</kbd> a little faster than the swing. Each early press shows a green BUFFER tag with how early it was, and the combo keeps going.",
-    "Press <kbd>T</kbd> and mash again. Early presses now show a red × PRONTO tag (Spanish for \"too early\"), and they're gone.",
-  ]}
-/>
 
 <h2 id="how-to-implement">How to implement attack phases and an attack buffer</h2>
 

@@ -25,6 +25,21 @@ const blog = defineCollection({
 		seriesOrder: z.number().int().optional(),
 		/** Short name of the part (1–4 words) for the series nav and the hub's cards. */
 		seriesTitle: z.string().optional(),
+		/**
+		 * Video-first post: this lab sheet's clip opens the page, above the title, and
+		 * the article reads as the explanation of what you just watched. Same props as
+		 * <PlayableLab>; the sheet must have a recorded clip.
+		 */
+		videoHero: z
+			.object({
+				sheets: z.string(),
+				plane: z.enum(['plataformas', 'combate']).optional(),
+				title: z.string(),
+				videoNote: z.string().optional(),
+				caption: z.string().optional(),
+				steps: z.array(z.string()).optional(),
+			})
+			.optional(),
 	}),
 });
 

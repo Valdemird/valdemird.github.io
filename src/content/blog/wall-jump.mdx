@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 4
 seriesTitle: "Wall jump"
+videoHero: {"sheets": "wall", "title": "Wall jump", "videoNote": "The hero climbs the shaft the classic wrong way: pressing toward the wall at each jump, then letting go. With the assists the jump still carries to the other wall; after T the same input cancels the push and it can't leave the wall.", "steps": ["Walk right with <kbd>→</kbd> under the first wall and into the shaft. Jump with <kbd>Space</kbd> and keep <kbd>→</kbd> pressed against the right wall: the fall slows to a slide.", "Press <kbd>Space</kbd> while sliding and let go of the arrows. The jump carries you to the other wall on its own. Alternate sides to reach the top.", "Press <kbd>T</kbd> and climb the wrong way: keep the arrow toward the wall pressed as you jump. The push dies and you drop back against the same wall, which no longer grips."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -27,17 +28,6 @@ Raw physics breaks the wall jump in five small places. Each assist fixes one, an
 | Holding toward the wall cancels the push | Control lock | stick ignored for 140 ms |
 | Letting go of the stick stalls you halfway | Carried momentum | air drag ×0.1 until you touch the stick |
 | A short tap leaves you lower than you started | Minimum height | 220 ms before the jump can be cut |
-
-<PlayableLab
-  sheets="wall"
-  title="Wall jump"
-  videoNote="The hero climbs the shaft the classic wrong way: pressing toward the wall at each jump, then letting go. With the assists the jump still carries to the other wall; after T the same input cancels the push and it can't leave the wall."
-  steps={[
-    "Walk right with <kbd>→</kbd> under the first wall and into the shaft. Jump with <kbd>Space</kbd> and keep <kbd>→</kbd> pressed against the right wall: the fall slows to a slide.",
-    "Press <kbd>Space</kbd> while sliding and let go of the arrows. The jump carries you to the other wall on its own. Alternate sides to reach the top.",
-    "Press <kbd>T</kbd> and climb the wrong way: keep the arrow toward the wall pressed as you jump. The push dies and you drop back against the same wall, which no longer grips.",
-  ]}
-/>
 
 <h2 id="how-to-implement">How to implement a wall jump</h2>
 

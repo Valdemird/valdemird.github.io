@@ -34,12 +34,16 @@ interface Props {
 	markdownAlternate?: string;
 	/** Keep this page out of search indexes (e.g. /lab). */
 	noindex?: boolean;
+	/** The page's LCP image, fetched with high priority (a video-first post's poster). */
+	preloadImage?: string;
+	/** The page's main video, for og:video (video-first posts). */
+	video?: { url: string; width: number; height: number };
 }
 
 const AUTHOR_NAME = 'Valdemir D.';
 
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-const { title, description, image: imageProp, imageAlt, lang, type = 'website', alternates = [], jsonLd, extraJsonLd = [], publishedTime, modifiedTime, tags, markdownAlternate, noindex = false } = Astro.props;
+const { title, description, image: imageProp, imageAlt, lang, type = 'website', alternates = [], jsonLd, extraJsonLd = [], publishedTime, modifiedTime, tags, markdownAlternate, noindex = false, preloadImage, video } = Astro.props;
 const image = imageProp || '/og/default.png';
 
 // Title pattern: "<Page> — valdemird". Shells may still pass their own brand
@@ -122,6 +126,7 @@ const structuredData = jsonLd || defaultJsonLd;
 <link rel="preload" href={frauncesLatin} as="font" type="font/woff2" crossorigin />
 <link rel="preload" href={geistLatin} as="font" type="font/woff2" crossorigin />
 <link rel="preload" href={geistMonoLatin} as="font" type="font/woff2" crossorigin />
+{preloadImage && <link rel="preload" href={preloadImage} as="image" fetchpriority="high" />}
 
 <!-- View Transitions -->
 <ClientRouter />
@@ -258,6 +263,11 @@ const structuredData = jsonLd || defaultJsonLd;
 {isGeneratedOg && <meta property="og:image:width" content="1200" />}
 {isGeneratedOg && <meta property="og:image:height" content="630" />}
 <meta property="og:image:alt" content={ogImageAlt} />
+{video && <meta property="og:video" content={new URL(video.url, Astro.url)} />}
+{video && <meta property="og:video:secure_url" content={new URL(video.url, Astro.url)} />}
+{video && <meta property="og:video:type" content="video/mp4" />}
+{video && <meta property="og:video:width" content={String(video.width)} />}
+{video && <meta property="og:video:height" content={String(video.height)} />}
 <meta property="og:locale" content={lang === 'es' ? 'es_ES' : 'en_US'} />
 {lang === 'es' && <meta property="og:locale:alternate" content="en_US" />}
 {lang !== 'es' && <meta property="og:locale:alternate" content="es_ES" />}

@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 9
 seriesTitle: "One-way and moving platforms"
+videoHero: {"sheets": "movers", "title": "Moving platforms", "videoNote": "Rides the fast platform and jumps while it moves toward the 8-tile gap: with momentum the jump carries the platform's speed and makes it. After T it jumps with its own speed only and falls short. Each attempt in the clip starts at the edge of the block.", "steps": ["Ride the first platform over the pit with <kbd>→</kbd> and take the lift up. Stand still on them: the platform carries you and you don't slide.", "From the edge of the block, run onto the fast platform holding <kbd>→</kbd> and jump with <kbd>Space</kbd> from its front edge while it's still moving. You keep its speed and clear the 8-tile gap.", "Fell short? The lift down below takes you back up.", "Press <kbd>T</kbd> and make the same jump. You leave with your own speed only and drop to the floor under the gap."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -41,18 +42,6 @@ One-way platforms let the player climb a tower without walking around every floo
 <h2 id="what-is-moving-platform-momentum">Moving platform momentum: jump off with its speed</h2>
 
 While you stand on a moving platform, it carries you and you don't slide. Jump, and you keep its speed on top of your own: run along a platform doing 267 px/s and you leave at 607 px/s, enough for an 8-tile gap that a 6.4-tile running jump can't clear. Keep its sideways and upward motion but drop the downward part, so jumping off a platform on its way down never shortens the jump.
-
-<PlayableLab
-  sheets="movers"
-  title="Moving platforms"
-  videoNote="Rides the fast platform and jumps while it moves toward the 8-tile gap: with momentum the jump carries the platform's speed and makes it. After T it jumps with its own speed only and falls short. Each attempt in the clip starts at the edge of the block."
-  steps={[
-    "Ride the first platform over the pit with <kbd>→</kbd> and take the lift up. Stand still on them: the platform carries you and you don't slide.",
-    "From the edge of the block, run onto the fast platform holding <kbd>→</kbd> and jump with <kbd>Space</kbd> from its front edge while it's still moving. You keep its speed and clear the 8-tile gap.",
-    "Fell short? The lift down below takes you back up.",
-    "Press <kbd>T</kbd> and make the same jump. You leave with your own speed only and drop to the floor under the gap.",
-  ]}
-/>
 
 <h2 id="how-to-implement">How to implement one-way and moving platforms</h2>
 

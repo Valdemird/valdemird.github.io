@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 5
 seriesTitle: "Dash"
+videoHero: {"sheets": "dash", "title": "Dash", "videoNote": "Jump and dash at the top over 8 tiles of spikes, jump plus dash upward on the 6-tile wall, and a dash through the 1-tile tunnel over a pit. After T the same dashes lose their 45 ms freeze.", "steps": ["Run right with <kbd>→</kbd>. At the eight spikes, jump with <kbd>Space</kbd> and, at the top of the jump, dash with <kbd>X</kbd>.", "At the six-tile wall, jump and dash upward: hold <kbd>↑</kbd> and press <kbd>X</kbd> near the top of the jump.", "In the one-tile tunnel there's no room to jump. Dash across the pit with <kbd>X</kbd>.", "Press <kbd>T</kbd> and do all three again. The distances don't change, but the dashes lose their 45 ms freeze, and an <kbd>X</kbd> pressed just before landing no longer waits for the recharge."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -45,18 +46,6 @@ A **dash** is a short burst at a fixed speed for a fixed time, with gravity swit
 <h2 id="what-is-a-dash">Dash: a fixed distance you can design around</h2>
 
 Speed, duration and direction are fixed the instant you press, so nothing can bend the dash once it starts. A diagonal dash is normalized and covers the same 3.6 tiles along the diagonal. Jump first and dash at the top, and the reach goes from 6.4 tiles to about 9.5.
-
-<PlayableLab
-  sheets="dash"
-  title="Dash"
-  videoNote="Jump and dash at the top over 8 tiles of spikes, jump plus dash upward on the 6-tile wall, and a dash through the 1-tile tunnel over a pit. After T the same dashes lose their 45 ms freeze."
-  steps={[
-    "Run right with <kbd>→</kbd>. At the eight spikes, jump with <kbd>Space</kbd> and, at the top of the jump, dash with <kbd>X</kbd>.",
-    "At the six-tile wall, jump and dash upward: hold <kbd>↑</kbd> and press <kbd>X</kbd> near the top of the jump.",
-    "In the one-tile tunnel there's no room to jump. Dash across the pit with <kbd>X</kbd>.",
-    "Press <kbd>T</kbd> and do all three again. The distances don't change, but the dashes lose their 45 ms freeze, and an <kbd>X</kbd> pressed just before landing no longer waits for the recharge.",
-  ]}
-/>
 
 <h2 id="freeze-and-buffer">Dash freeze and buffer: what T switches off</h2>
 

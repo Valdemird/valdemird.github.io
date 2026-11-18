@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 3
 seriesTitle: "Jump gravity"
+videoHero: {"sheets": "gravity", "title": "Asymmetric gravity", "videoNote": "Up the steps and over the pit with asymmetric gravity, then T switches it off: same jumps, but every fall takes longer and the arc floats.", "steps": ["Jump up the three platforms with <kbd>Space</kbd> and look at the trail: the dots stretch apart on the way down.", "From the top, drop off the edge. The fall speeds up until it hits the 900 px/s cap.", "Press <kbd>T</kbd> and jump again. Without the technique the fall is as slow as the rise, and the same jumps feel floaty."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -27,17 +28,6 @@ import CodeBlock from '../../components/blog/CodeBlock.astro';
 <h2 id="what-is-asymmetric-gravity">Asymmetric gravity: fall faster than you rise</h2>
 
 Real gravity is the same both ways, so the fall takes as long as the climb, and on screen that symmetric arc reads as floaty. A faster fall hands control back sooner and makes the landing spot easier to predict. It needs a cap: without one, a ten-tile drop gets hard to steer and to read.
-
-<PlayableLab
-  sheets="gravity"
-  title="Asymmetric gravity"
-  videoNote="Up the steps and over the pit with asymmetric gravity, then T switches it off: same jumps, but every fall takes longer and the arc floats."
-  steps={[
-    "Jump up the three platforms with <kbd>Space</kbd> and look at the trail: the dots stretch apart on the way down.",
-    "From the top, drop off the edge. The fall speeds up until it hits the 900 px/s cap.",
-    "Press <kbd>T</kbd> and jump again. Without the technique the fall is as slow as the rise, and the same jumps feel floaty.",
-  ]}
-/>
 
 <h2 id="what-is-apex-hang">Apex hang: a little more air at the top</h2>
 

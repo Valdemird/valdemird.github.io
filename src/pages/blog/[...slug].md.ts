@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getCollection } from 'astro:content';
-import { cleanMdxBody } from '../../lib/mdx-plaintext';
+import { cleanMdxBody, videoHeroToMarkdown } from '../../lib/mdx-plaintext';
 
 export async function getStaticPaths() {
 	const posts = (await getCollection('blog')).filter((post) => !post.data.draft);
@@ -12,7 +12,7 @@ export async function getStaticPaths() {
 
 export const GET: APIRoute = ({ props }) => {
 	const { post } = props as { post: Awaited<ReturnType<typeof getCollection<'blog'>>>[number] };
-	const { title, description, pubDate, updatedDate, reviewedDate, status, tags, lang } = post.data;
+	const { title, description, pubDate, updatedDate, reviewedDate, status, tags, lang, videoHero } = post.data;
 
 	const date = pubDate.toISOString().split('T')[0];
 	const updated = updatedDate?.toISOString().split('T')[0];
@@ -34,7 +34,9 @@ export const GET: APIRoute = ({ props }) => {
 		'---',
 	].join('\n');
 
-	const md = `${frontmatter}\n\n# ${title}\n\n> ${description}\n\n${body}\n`;
+	// Video-first posts open with their clip, before the title, as on the page.
+	const hero = videoHero ? `${videoHeroToMarkdown(videoHero, lang ?? 'en')}\n\n` : '';
+	const md = `${frontmatter}\n\n${hero}# ${title}\n\n> ${description}\n\n${body}\n`;
 
 	return new Response(md, {
 		headers: { 'Content-Type': 'text/markdown; charset=utf-8' },

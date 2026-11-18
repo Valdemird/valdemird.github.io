@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 1
 seriesTitle: "Coyote time y jump buffer"
+videoHero: {"sheets": "coyote", "title": "Coyote time", "videoNote": "Con coyote time, el héroe salta un instante después de dejar cada cornisa y llega igual. Luego T lo apaga y los mismos saltos tardíos caen.", "steps": ["Corre hacia la derecha con <kbd>→</kbd> y salta con <kbd>Espacio</kbd> lo más tarde que puedas antes de cada hueco.", "Si ya estabas en el aire cuando pulsaste, aparece la etiqueta verde «COYOTE +ms»: ese salto te lo dio la ventana.", "Pulsa <kbd>T</kbd> y repite la carrera. Los mismos saltos tardíos ahora dicen «× TARDE» y te caes."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -44,17 +45,6 @@ El **coyote time** te deja saltar un instante después de salir de una cornisa. 
 <h2 id="coyote-time">Coyote time: saltar cuando ya no hay suelo</h2>
 
 Saltas lo más tarde que puedes, porque más tarde es más lejos. A ojo, el personaje sigue sobre la cornisa unos fotogramas después de dejarla. El coyote time te da esos fotogramas: **100 ms**, lo mismo que usa Celeste. El nombre viene del Coyote de los dibujos, que sólo cae cuando mira abajo.
-
-<PlayableLab
-  sheets="coyote"
-  title="Coyote time"
-  videoNote="Con coyote time, el héroe salta un instante después de dejar cada cornisa y llega igual. Luego T lo apaga y los mismos saltos tardíos caen."
-  steps={[
-    "Corre hacia la derecha con <kbd>→</kbd> y salta con <kbd>Espacio</kbd> lo más tarde que puedas antes de cada hueco.",
-    "Si ya estabas en el aire cuando pulsaste, aparece la etiqueta verde «COYOTE +ms»: ese salto te lo dio la ventana.",
-    "Pulsa <kbd>T</kbd> y repite la carrera. Los mismos saltos tardíos ahora dicen «× TARDE» y te caes.",
-  ]}
-/>
 
 <h2 id="jump-buffer">Jump buffer: pulsar pronto también cuenta</h2>
 

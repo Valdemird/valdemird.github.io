@@ -110,6 +110,21 @@ function componentsToMarkdown(raw: string, lang: string): string {
 	}
 }
 
+/** A video-first post's opening clip (frontmatter `videoHero`), in the same shape as an inline PlayableLab. */
+export function videoHeroToMarkdown(
+	hero: { sheets: string; plane?: string; title: string; videoNote?: string; steps?: string[] },
+	lang = 'en',
+): string {
+	const block = [
+		`sheets=${JSON.stringify(hero.sheets)}`,
+		hero.plane ? `plane=${JSON.stringify(hero.plane)}` : '',
+		`title=${JSON.stringify(hero.title)}`,
+		hero.videoNote ? `videoNote=${JSON.stringify(hero.videoNote)}` : '',
+		hero.steps?.length ? `steps={${JSON.stringify(hero.steps)}}` : '',
+	].join(' ');
+	return playableToMarkdown(` ${block} `, lang).trim();
+}
+
 export function cleanMdxBody(raw: string, lang = 'en'): string {
 	return componentsToMarkdown(raw, lang)
 		.replace(/^import\s+.*from\s+['"].*['"];?\s*$/gm, '')

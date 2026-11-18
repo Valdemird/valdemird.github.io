@@ -41,7 +41,7 @@ There are no tests or linting configured.
 ## Architecture
 
 - **Astro 6 static site** with file-based routing (`src/pages/`), MDX support, View Transitions (`ClientRouter`), and auto-generated sitemap
-- **Content Layer API** (`src/content.config.ts`) with `glob()` loader — blog posts use frontmatter: `title`, `description`, `pubDate` (required), `updatedDate`, `heroImage`, `heroImageAlt`, `tags`, `featured`, `lang`, `tldr` (optional). If `heroImage` is set, always set `heroImageAlt` in the post's language.
+- **Content Layer API** (`src/content.config.ts`) with `glob()` loader — blog posts use frontmatter: `title`, `description`, `pubDate` (required), `updatedDate`, `heroImage`, `heroImageAlt`, `tags`, `featured`, `lang`, `tldr` (optional). If `heroImage` is set, always set `heroImageAlt` in the post's language. Series posts add `series`, `seriesOrder`, `seriesTitle`; a **video-first post** sets `videoHero` (the props of a `<PlayableLab>` whose sheet has a clip): the clip opens the page above the title and the article explains what you just watched.
 - **i18n**: Built-in Astro routing with `en` (default, no prefix) and `es` (`/es/` prefix). UI strings in `src/consts.ts`
 - **Dynamic routes** for blog posts via `src/pages/blog/[...slug].astro` using `getStaticPaths()` with `post.id` (not slug)
 - **Layouts**: `BlogPost.astro` layout with reading progress bar, editorial typography, and SEO metadata

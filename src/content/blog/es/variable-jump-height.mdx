@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 2
 seriesTitle: "Salto variable"
+videoHero: {"sheets": "variable", "title": "Salto variable", "videoNote": "Saltitos bajo el techo de pinchos y un salto completo sobre el muro. Luego T apaga la técnica: todos los saltos salen enteros y el primero se clava en los pinchos.", "steps": ["Corre hacia la derecha con <kbd>→</kbd>. Bajo el techo de pinchos, toca <kbd>Espacio</kbd> un instante: saltitos sobre los huecos.", "Al final, mantén <kbd>Espacio</kbd> para el salto completo sobre el muro de tres casillas.", "Pulsa <kbd>T</kbd> para apagar el salto variable. Ahora todos los saltos son de altura completa, y el techo te espera."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -41,17 +42,6 @@ Con el **salto variable**, cuanto más mantienes el botón, más alto llegas: un
 <h2 id="what-is-variable-jump-height">Salto variable: un toque es un saltito, mantener es un salto</h2>
 
 Cada obstáculo pide una altura distinta. Un techo de pinchos pide un saltito; un muro, el salto entero. Con el salto variable el jugador elige cualquier altura entre 1,1 y 3,6 casillas con el mismo botón, y el botón responde como el jugador ya espera que responda. Sin él, cada obstáculo del juego tiene que diseñarse para un único arco.
-
-<PlayableLab
-  sheets="variable"
-  title="Salto variable"
-  videoNote="Saltitos bajo el techo de pinchos y un salto completo sobre el muro. Luego T apaga la técnica: todos los saltos salen enteros y el primero se clava en los pinchos."
-  steps={[
-    "Corre hacia la derecha con <kbd>→</kbd>. Bajo el techo de pinchos, toca <kbd>Espacio</kbd> un instante: saltitos sobre los huecos.",
-    "Al final, mantén <kbd>Espacio</kbd> para el salto completo sobre el muro de tres casillas.",
-    "Pulsa <kbd>T</kbd> para apagar el salto variable. Ahora todos los saltos son de altura completa, y el techo te espera.",
-  ]}
-/>
 
 <h2 id="how-to-implement">Cómo implementar el salto variable</h2>
 

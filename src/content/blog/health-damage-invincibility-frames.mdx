@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 15
 seriesTitle: "Invincibility frames"
+videoHero: {"sheets": "c_health", "plane": "combate", "title": "Health and damage", "videoNote": "Walks across the damage pad. With invincibility frames it loses one mask and blinks through; after T each contact costs another mask.", "steps": ["Walk right with <kbd>→</kbd> onto the damage pad. You lose one mask, get knocked back, and blink for 1.2 s.", "Jump into the pen with <kbd>Space</kbd> and stand inside a walker. With i-frames it can only take a mask every 1.2 s.", "Press <kbd>T</kbd> to switch the i-frames off and walk over the pad again: every contact costs another mask.", "Dash through a walker with <kbd>X</kbd>. The dash has i-frames of its own."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -41,19 +42,6 @@ import CodeBlock from '../../components/blog/CodeBlock.astro';
 <h2 id="what-are-i-frames">I-frames after a hit: one mistake, one mask</h2>
 
 Contact damage is why they exist. An enemy's body or a damage pad is a hitbox that's always on and tries to hit you on every physics tick, 120 times a second. Without the window, standing inside an enemy for an instant would cost a mask per tick. The hit also knocks you back and takes your control for 0.2 s; the rest of the 1.2 s is time to get clear. Health is five masks, the same as [Hollow Knight](https://hollowknight.wiki.fextralife.com/Health+Mask) starts you with.
-
-<PlayableLab
-  plane="combate"
-  sheets="c_health"
-  title="Health and damage"
-  videoNote="Walks across the damage pad. With invincibility frames it loses one mask and blinks through; after T each contact costs another mask."
-  steps={[
-    "Walk right with <kbd>→</kbd> onto the damage pad. You lose one mask, get knocked back, and blink for 1.2 s.",
-    "Jump into the pen with <kbd>Space</kbd> and stand inside a walker. With i-frames it can only take a mask every 1.2 s.",
-    "Press <kbd>T</kbd> to switch the i-frames off and walk over the pad again: every contact costs another mask.",
-    "Dash through a walker with <kbd>X</kbd>. The dash has i-frames of its own.",
-  ]}
-/>
 
 <h2 id="what-is-hazard-respawn">Hazard respawn: spikes that cost a mask, not a life</h2>
 

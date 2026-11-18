@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 13
 seriesTitle: "Hitstop y confirmación"
+videoHero: {"sheets": "c_confirm", "plane": "combate", "title": "Confirmar el golpe", "videoNote": "Golpea al maniquí con la confirmación encendida: hitstop, retroceso, destello y chispas. Tras pulsar T, los mismos golpes entran sin nada de eso, y cuesta saber que han entrado.", "steps": ["Camina hacia la derecha con <kbd>→</kbd> y golpea al maniquí con <kbd>C</kbd>. Congelación, destello, chispas, y tú te deslizas un poco hacia atrás.", "Salta el bloque bajo con <kbd>Espacio</kbd> y golpea a los dos enemigos que patrullan. Cada golpe los aparta a ellos y te echa atrás a ti.", "Pulsa <kbd>T</kbd> y repítelo todo. El mismo daño, sin congelación, sin destello, sin empujón.", "Con la técnica todavía apagada, sigue golpeando a un enemigo mientras caminas hacia él, y mira dónde acabas."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -31,19 +32,6 @@ El [glosario de juegos de pelea de Infil](https://glossary.infil.net/?t=Hitstop)
 <h2 id="hit-confirmation">Confirmar el golpe: todas las señales de que entró</h2>
 
 El hitstop es el canal del tiempo. Además, el atacante retrocede a 170 px/s durante 70 ms, el objetivo destella y sale empujado, saltan chispas en la dirección del golpe y la cámara y el mando tiemblan un poco. La T lo apaga todo a la vez: el mismo daño, y nada que te lo cuente. Los juegos de pelea llaman [hit confirm](https://glossary.infil.net/?t=Hit+Confirm) a la parte del jugador, ver que el primer golpe entró antes de seguir con el combo.
-
-<PlayableLab
-  plane="combate"
-  sheets="c_confirm"
-  title="Confirmar el golpe"
-  videoNote="Golpea al maniquí con la confirmación encendida: hitstop, retroceso, destello y chispas. Tras pulsar T, los mismos golpes entran sin nada de eso, y cuesta saber que han entrado."
-  steps={[
-    "Camina hacia la derecha con <kbd>→</kbd> y golpea al maniquí con <kbd>C</kbd>. Congelación, destello, chispas, y tú te deslizas un poco hacia atrás.",
-    "Salta el bloque bajo con <kbd>Espacio</kbd> y golpea a los dos enemigos que patrullan. Cada golpe los aparta a ellos y te echa atrás a ti.",
-    "Pulsa <kbd>T</kbd> y repítelo todo. El mismo daño, sin congelación, sin destello, sin empujón.",
-    "Con la técnica todavía apagada, sigue golpeando a un enemigo mientras caminas hacia él, y mira dónde acabas.",
-  ]}
-/>
 
 <h2 id="how-to-implement">Cómo implementar el hitstop y la confirmación del golpe</h2>
 
@@ -69,7 +57,6 @@ func hitstop(seconds: float) -> void:
 	_freeze_until_msec = maxi(_freeze_until_msec, Time.get_ticks_msec() + int(seconds * 1000.0))
 	_frozen = true
 	Engine.time_scale = 0.0
-
 
 func _process(_delta: float) -> void:
 	if _frozen and Time.get_ticks_msec() >= _freeze_until_msec:

@@ -58,11 +58,14 @@ export interface SeriesCard {
 export async function getSeriesCards(id: SeriesId, lang: Lang): Promise<SeriesCard[]> {
 	const posts = await getSeriesPosts(id, lang);
 	return posts.map((post, i) => {
-		const tags = [...(post.body ?? '').matchAll(/<PlayableLab\b([\s\S]*?)\/>/g)].map((m) => {
+		const inline = [...(post.body ?? '').matchAll(/<PlayableLab\b([\s\S]*?)\/>/g)].map((m) => {
 			const sheets = m[1].match(/\bsheets="([^"]+)"/)?.[1] ?? '';
 			const plane = m[1].match(/\bplane="([^"]+)"/)?.[1] ?? 'plataformas';
 			return `${plane}-${sheets.replaceAll(',', '+')}`;
 		});
+		// A video-first post's opening clip comes first (it lives in frontmatter, not the body).
+		const hero = post.data.videoHero;
+		const tags = hero ? [`${hero.plane ?? 'plataformas'}-${hero.sheets.replaceAll(',', '+')}`, ...inline] : inline;
 		const first = tags[0];
 		const thumb = first && inPublic(`${POSTERS}/${first}-640.webp`) ? `${POSTERS}/${first}-640.webp` : undefined;
 		const small = thumb?.replace(/-640\.webp$/, '-320.webp');

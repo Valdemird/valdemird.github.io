@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 3
 seriesTitle: "Gravedad del salto"
+videoHero: {"sheets": "gravity", "title": "Gravedad asimétrica", "videoNote": "Subiendo los escalones y saltando el foso con gravedad asimétrica; luego T la apaga: los mismos saltos, pero cada caída tarda más y el arco flota.", "steps": ["Sube las tres plataformas saltando con <kbd>Espacio</kbd> y mira el rastro: los puntos se separan al bajar.", "Desde la de arriba, déjate caer. La caída acelera hasta llegar al tope de 900 px/s.", "Pulsa <kbd>T</kbd> y vuelve a saltar. Sin la técnica la caída es tan lenta como la subida, y los mismos saltos se sienten flotantes."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -27,17 +28,6 @@ Con **gravedad asimétrica**, un salto cae más rápido de lo que sube: 0,38 s d
 <h2 id="what-is-asymmetric-gravity">Gravedad asimétrica: caer más rápido de lo que se sube</h2>
 
 Con la gravedad real, la bajada tarda lo mismo que la subida, y en pantalla esa parábola simétrica se ve flotante. Una caída más rápida te devuelve antes el control y hace más predecible dónde aterrizas. Eso sí, necesita un tope: sin él, una caída de diez casillas cuesta de dirigir y de leer.
-
-<PlayableLab
-  sheets="gravity"
-  title="Gravedad asimétrica"
-  videoNote="Subiendo los escalones y saltando el foso con gravedad asimétrica; luego T la apaga: los mismos saltos, pero cada caída tarda más y el arco flota."
-  steps={[
-    "Sube las tres plataformas saltando con <kbd>Espacio</kbd> y mira el rastro: los puntos se separan al bajar.",
-    "Desde la de arriba, déjate caer. La caída acelera hasta llegar al tope de 900 px/s.",
-    "Pulsa <kbd>T</kbd> y vuelve a saltar. Sin la técnica la caída es tan lenta como la subida, y los mismos saltos se sienten flotantes.",
-  ]}
-/>
 
 <h2 id="what-is-apex-hang">Pausa en el ápice: un poco más de aire arriba</h2>
 

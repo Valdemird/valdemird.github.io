@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 9
 seriesTitle: "Plataformas one-way y móviles"
+videoHero: {"sheets": "movers", "title": "Plataformas móviles", "videoNote": "Sube a la plataforma rápida y salta mientras avanza hacia el hueco de 8 casillas: con inercia, el salto se lleva la velocidad de la plataforma y llega. Tras pulsar T salta solo con su propia velocidad y se queda corto. Cada intento del video empieza en el borde del bloque.", "steps": ["Cruza el foso en la primera plataforma con <kbd>→</kbd> y sube en el ascensor. Quédate quieto encima: la plataforma te lleva y no resbalas.", "Desde el borde del bloque, sube corriendo a la plataforma rápida con <kbd>→</kbd> pulsado y salta con <kbd>Espacio</kbd> desde su borde delantero mientras todavía se mueve. Te llevas su velocidad y cruzas el hueco de 8 casillas.", "¿Te quedaste corto? El ascensor de abajo te vuelve a subir.", "Pulsa <kbd>T</kbd> y repite el salto. Sales solo con tu propia velocidad y caes al suelo bajo el hueco."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -41,18 +42,6 @@ Con plataformas one-way el jugador sube una torre sin rodear cada piso. Para baj
 <h2 id="what-is-moving-platform-momentum">Inercia de plataforma: saltar con su velocidad</h2>
 
 Mientras estás encima de una plataforma móvil, te lleva con ella y no resbalas. Al saltar conservas su velocidad sumada a la tuya: corre sobre una plataforma que va a 267 px/s y sales a 607 px/s, lo bastante para cruzar un hueco de 8 casillas que un salto de 6,4 no alcanza. Hereda su movimiento lateral y el que sube, pero no el que baja, para que saltar desde una plataforma que desciende no acorte nunca el salto.
-
-<PlayableLab
-  sheets="movers"
-  title="Plataformas móviles"
-  videoNote="Sube a la plataforma rápida y salta mientras avanza hacia el hueco de 8 casillas: con inercia, el salto se lleva la velocidad de la plataforma y llega. Tras pulsar T salta solo con su propia velocidad y se queda corto. Cada intento del video empieza en el borde del bloque."
-  steps={[
-    "Cruza el foso en la primera plataforma con <kbd>→</kbd> y sube en el ascensor. Quédate quieto encima: la plataforma te lleva y no resbalas.",
-    "Desde el borde del bloque, sube corriendo a la plataforma rápida con <kbd>→</kbd> pulsado y salta con <kbd>Espacio</kbd> desde su borde delantero mientras todavía se mueve. Te llevas su velocidad y cruzas el hueco de 8 casillas.",
-    "¿Te quedaste corto? El ascensor de abajo te vuelve a subir.",
-    "Pulsa <kbd>T</kbd> y repite el salto. Sales solo con tu propia velocidad y caes al suelo bajo el hueco.",
-  ]}
-/>
 
 <h2 id="how-to-implement">Cómo implementar plataformas one-way y móviles</h2>
 

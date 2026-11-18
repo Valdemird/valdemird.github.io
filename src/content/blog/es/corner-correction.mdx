@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 7
 seriesTitle: "Corrección de esquinas"
+videoHero: {"sheets": "corner", "title": "Corrección de esquinas", "videoNote": "Se para unos píxeles descentrado bajo cada hueco de una casilla y salta en vertical. Con la corrección de esquinas el juego lo empuja hasta que pasa; después de T, el mismo salto se da contra la esquina.", "steps": ["Corre hacia la derecha con <kbd>→</kbd> por el pasillo y párate bajo el primer hueco, un poco descentrado.", "Salta en vertical manteniendo <kbd>Espacio</kbd>. El juego te desliza hasta que pasas, y una etiqueta verde «ESQUINA ↔ px» dice cuántos píxeles hicieron falta.", "Pulsa <kbd>T</kbd> y repite el mismo salto desde el mismo sitio. La cabeza choca con la esquina, y la etiqueta «× ESQUINA px» te dice por cuánto fallaste."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -25,17 +26,6 @@ La **corrección de esquinas** (corner correction) mueve al personaje unos píxe
 <h2 id="head-correction">Corrección de esquinas al subir: pasar el borde del techo</h2>
 
 Darse con la cabeza por 4 px corta un salto en seco, y el jugador lo vive como un fallo del juego. Con un cuerpo de 24 px y un hueco de 40, para subir en vertical sin tocar tienes que estar a menos de 8 px del centro. Una corrección de 9 px estira esa ventana de 16 px a 34, y el jugador nunca ve cómo se estira.
-
-<PlayableLab
-  sheets="corner"
-  title="Corrección de esquinas"
-  videoNote="Se para unos píxeles descentrado bajo cada hueco de una casilla y salta en vertical. Con la corrección de esquinas el juego lo empuja hasta que pasa; después de T, el mismo salto se da contra la esquina."
-  steps={[
-    "Corre hacia la derecha con <kbd>→</kbd> por el pasillo y párate bajo el primer hueco, un poco descentrado.",
-    "Salta en vertical manteniendo <kbd>Espacio</kbd>. El juego te desliza hasta que pasas, y una etiqueta verde «ESQUINA ↔ px» dice cuántos píxeles hicieron falta.",
-    "Pulsa <kbd>T</kbd> y repite el mismo salto desde el mismo sitio. La cabeza choca con la esquina, y la etiqueta «× ESQUINA px» te dice por cuánto fallaste.",
-  ]}
-/>
 
 [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) solo prueba 4 px, y solo hacia el lado al que ya te mueves.
 
@@ -67,7 +57,6 @@ func _correct_corners(delta: float) -> void:
 			if px != 0.0:
 				if enabled:
 					global_position.x += px
-
 
 func _find_nudge(motion: Vector2, axis: Vector2, max_px: int, signs: Array) -> float:
 	for i in range(1, max_px + 1):

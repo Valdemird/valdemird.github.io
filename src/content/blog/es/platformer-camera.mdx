@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 10
 seriesTitle: "Cámara de plataformas"
+videoHero: {"sheets": "camera", "title": "Cámara de plataformas", "videoNote": "Sube los escalones y luego salta en el sitio sobre la meseta. Con la cámara inteligente la vista se queda quieta mientras salta; tras pulsar T, la cámara sigue cada salto.", "steps": ["Sube los escalones con <kbd>→</kbd> y <kbd>Espacio</kbd>. La línea amarilla continua es el ancla, la altura del último suelo que pisaste. Sube un escalón cada vez que aterrizas.", "En la meseta, da saltitos con <kbd>Espacio</kbd>. La línea discontinua de arriba es el techo de la ventana. Un salto completo se queda justo por debajo, así que la vista no se mueve.", "Date la vuelta con <kbd>←</kbd>. La cruz del look-ahead se pasa al otro lado poco a poco, más despacio de lo que la cámara te sigue a ti.", "Pulsa <kbd>T</kbd> y vuelve a saltar. Las guías desaparecen salvo el centro de la cámara, y cada salto arrastra el nivel entero arriba y abajo."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -26,18 +27,6 @@ Una buena **cámara de plataformas** se mueve lo menos posible y te enseña lo q
 <h2 id="platform-snapping">Platform snapping: no seguir el salto</h2>
 
 Una cámara pegada al jugador desplaza el nivel entero con cada saltito. Con *platform snapping* se queda a la altura del último suelo que pisaste y solo te sigue si subes más de 170 px o bajas más de 50. Un salto completo sube 144 px, así que un saltito nunca mueve la pantalla. Hacia abajo la ventana es pequeña porque ahí es donde vas a aterrizar.
-
-<PlayableLab
-  sheets="camera"
-  title="Cámara de plataformas"
-  videoNote="Sube los escalones y luego salta en el sitio sobre la meseta. Con la cámara inteligente la vista se queda quieta mientras salta; tras pulsar T, la cámara sigue cada salto."
-  steps={[
-    "Sube los escalones con <kbd>→</kbd> y <kbd>Espacio</kbd>. La línea amarilla continua es el ancla, la altura del último suelo que pisaste. Sube un escalón cada vez que aterrizas.",
-    "En la meseta, da saltitos con <kbd>Espacio</kbd>. La línea discontinua de arriba es el techo de la ventana. Un salto completo se queda justo por debajo, así que la vista no se mueve.",
-    "Date la vuelta con <kbd>←</kbd>. La cruz del look-ahead se pasa al otro lado poco a poco, más despacio de lo que la cámara te sigue a ti.",
-    "Pulsa <kbd>T</kbd> y vuelve a saltar. Las guías desaparecen salvo el centro de la cámara, y cada salto arrastra el nivel entero arriba y abajo.",
-  ]}
-/>
 
 Según la charla [*Scroll Back*](https://www.gamedeveloper.com/design/scroll-back-the-theory-and-practice-of-cameras-in-side-scrollers) de Itay Keren en la GDC, esta técnica la introdujo Super Mario World.
 

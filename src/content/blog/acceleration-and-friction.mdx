@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 6
 seriesTitle: "Acceleration and friction"
+videoHero: {"sheets": "accel", "title": "Acceleration and friction", "videoNote": "Run, release, turn, release, in a loop, with the lab's inspector on. With the technique the velocity trace ramps up and down; after T it jumps instantly between full speed and zero.", "steps": ["Press <kbd>I</kbd> to open the inspector. The white line in its oscilloscope is your horizontal speed.", "Run right with <kbd>→</kbd>, let go, then press <kbd>←</kbd>. The line ramps up, bends at every change and comes back to zero on a slope.", "Jump onto the two-tile platforms with <kbd>Space</kbd> and stop on each one by letting go of <kbd>→</kbd> as you land.", "Press <kbd>T</kbd> and do it again. Speed is instant now: exact, but stiff. The line turns into a square wave."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -26,18 +27,6 @@ import CodeBlock from '../../components/blog/CodeBlock.astro';
 <h2 id="what-is-acceleration-friction">Acceleration and friction: the character is not a cursor</h2>
 
 Speed that snaps from zero to full is exact and stiff. A ramp of a few hundredths of a second gives the character weight, as long as stopping is faster than starting and turning is faster still. In the air, braking drops to 40%, so letting go mid-jump doesn't kill the momentum you jumped with.
-
-<PlayableLab
-  sheets="accel"
-  title="Acceleration and friction"
-  videoNote="Run, release, turn, release, in a loop, with the lab's inspector on. With the technique the velocity trace ramps up and down; after T it jumps instantly between full speed and zero."
-  steps={[
-    "Press <kbd>I</kbd> to open the inspector. The white line in its oscilloscope is your horizontal speed.",
-    "Run right with <kbd>→</kbd>, let go, then press <kbd>←</kbd>. The line ramps up, bends at every change and comes back to zero on a slope.",
-    "Jump onto the two-tile platforms with <kbd>Space</kbd> and stop on each one by letting go of <kbd>→</kbd> as you land.",
-    "Press <kbd>T</kbd> and do it again. Speed is instant now: exact, but stiff. The line turns into a square wave.",
-  ]}
-/>
 
 <h2 id="how-to-implement">How to implement acceleration and friction</h2>
 

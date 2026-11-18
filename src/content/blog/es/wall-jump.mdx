@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 4
 seriesTitle: "Salto de pared"
+videoHero: {"sheets": "wall", "title": "Salto de pared", "videoNote": "El personaje sube el pozo a la manera clásica equivocada: empujando hacia la pared en cada salto y soltando después. Con las ayudas el salto sigue llegando a la otra pared; tras pulsar T, el mismo gesto anula el impulso y no consigue despegarse de la pared.", "steps": ["Camina hacia la derecha con <kbd>→</kbd>, pasa por debajo de la primera pared y entra en el pozo. Salta con <kbd>Espacio</kbd> y mantén <kbd>→</kbd> contra la pared derecha: la caída se frena y deslizas.", "Pulsa <kbd>Espacio</kbd> mientras deslizas y suelta las flechas. El salto te lleva solo a la otra pared. Alterna lados hasta llegar arriba.", "Pulsa <kbd>T</kbd> y sube a la manera equivocada: deja apretada la flecha hacia la pared al saltar. El impulso muere y vuelves contra la misma pared, que ya no te agarra."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -27,17 +28,6 @@ La física cruda rompe el salto de pared en cinco puntos pequeños. Cada ayuda a
 | Apretar hacia la pared anula el impulso | Bloqueo del control | stick ignorado durante 140 ms |
 | Soltar el stick te deja a medio camino | Inercia | rozamiento del aire ×0,1 hasta que tocas el stick |
 | Un toque corto te deja más abajo de donde saliste | Altura mínima | 220 ms antes de poder recortar el salto |
-
-<PlayableLab
-  sheets="wall"
-  title="Salto de pared"
-  videoNote="El personaje sube el pozo a la manera clásica equivocada: empujando hacia la pared en cada salto y soltando después. Con las ayudas el salto sigue llegando a la otra pared; tras pulsar T, el mismo gesto anula el impulso y no consigue despegarse de la pared."
-  steps={[
-    "Camina hacia la derecha con <kbd>→</kbd>, pasa por debajo de la primera pared y entra en el pozo. Salta con <kbd>Espacio</kbd> y mantén <kbd>→</kbd> contra la pared derecha: la caída se frena y deslizas.",
-    "Pulsa <kbd>Espacio</kbd> mientras deslizas y suelta las flechas. El salto te lleva solo a la otra pared. Alterna lados hasta llegar arriba.",
-    "Pulsa <kbd>T</kbd> y sube a la manera equivocada: deja apretada la flecha hacia la pared al saltar. El impulso muere y vuelves contra la misma pared, que ya no te agarra.",
-  ]}
-/>
 
 <h2 id="how-to-implement">Cómo implementar un salto de pared</h2>
 

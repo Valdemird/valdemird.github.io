@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 7
 seriesTitle: "Corner correction"
+videoHero: {"sheets": "corner", "title": "Corner correction", "videoNote": "Stops a few pixels off-center under each one-tile hole and jumps straight up. With corner correction the game nudges it through; after T the same jump hits the corner.", "steps": ["Run right with <kbd>→</kbd> along the corridor and stop under the first hole, a little off-center.", "Jump straight up holding <kbd>Space</kbd>. The game slides you through, and a green «ESQUINA ↔ px» tag says how many pixels it took.", "Press <kbd>T</kbd> and try the same jump from the same spot. Your head hits the corner, and the «× ESQUINA px» tag tells you by how much you missed."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -25,17 +26,6 @@ import CodeBlock from '../../components/blog/CodeBlock.astro';
 <h2 id="head-correction">Corner correction going up: past the edge of the ceiling</h2>
 
 Hitting your head by 4 px cuts a jump dead, and the player reads it as the game failing. With a 24 px body under a 40 px hole, jumping straight through means lining up within 8 px of the hole's center. A 9 px correction stretches that window from 16 px to 34, and the player never sees it stretch.
-
-<PlayableLab
-  sheets="corner"
-  title="Corner correction"
-  videoNote="Stops a few pixels off-center under each one-tile hole and jumps straight up. With corner correction the game nudges it through; after T the same jump hits the corner."
-  steps={[
-    "Run right with <kbd>→</kbd> along the corridor and stop under the first hole, a little off-center.",
-    "Jump straight up holding <kbd>Space</kbd>. The game slides you through, and a green «ESQUINA ↔ px» tag says how many pixels it took.",
-    "Press <kbd>T</kbd> and try the same jump from the same spot. Your head hits the corner, and the «× ESQUINA px» tag tells you by how much you missed.",
-  ]}
-/>
 
 [Celeste](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs) tries only 4 px, and only toward the side you're already moving.
 
@@ -67,7 +57,6 @@ func _correct_corners(delta: float) -> void:
 			if px != 0.0:
 				if enabled:
 					global_position.x += px
-
 
 func _find_nudge(motion: Vector2, axis: Vector2, max_px: int, signs: Array) -> float:
 	for i in range(1, max_px + 1):

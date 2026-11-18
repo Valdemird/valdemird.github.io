@@ -8,6 +8,7 @@ lang: en
 series: platformer-lab
 seriesOrder: 11
 seriesTitle: "Hitbox vs hurtbox"
+videoHero: {"sheets": "c_boxes", "plane": "combate", "title": "Hitbox, hurtbox and body", "videoNote": "Attacks the training dummies from the edge of reach. With the generous hitbox the slash lands; after T the same slashes from the same spot miss.", "steps": ["Walk right with <kbd>→</kbd> and slash the first training dummy with <kbd>C</kbd>. Green is where you can be hit, red is your slash while it's active, white is your body.", "Step back with <kbd>←</kbd> until the slash barely reaches and attack again. The red box goes past the drawn slash, and it still lands.", "At the dummy on the pedestal, attack from the floor without jumping. The generous box is tall enough to reach it.", "Press <kbd>T</kbd> for the exact box and repeat both. From the same spots, the slash misses."]}
 ---
 
 import PlayableLab from '../../components/blog/PlayableLab.astro';
@@ -31,19 +32,6 @@ A **hitbox** is where an attack deals damage. A **hurtbox** is where a character
 <h2 id="generous-hitbox">Generous hitboxes: big for the player, small against them</h2>
 
 None of the three should match the drawing. Make every disagreement favor the player: the slash reaches 80 px from the center instead of 60, is 56 px thick instead of 28, and starts 8 px behind the center so a point-blank slash still lands. Enemies are easy to hit, and while they just walk around only their core hurts. When they attack with the body itself, that box grows to the body minus 8 px.
-
-<PlayableLab
-  plane="combate"
-  sheets="c_boxes"
-  title="Hitbox, hurtbox and body"
-  videoNote="Attacks the training dummies from the edge of reach. With the generous hitbox the slash lands; after T the same slashes from the same spot miss."
-  steps={[
-    "Walk right with <kbd>→</kbd> and slash the first training dummy with <kbd>C</kbd>. Green is where you can be hit, red is your slash while it's active, white is your body.",
-    "Step back with <kbd>←</kbd> until the slash barely reaches and attack again. The red box goes past the drawn slash, and it still lands.",
-    "At the dummy on the pedestal, attack from the floor without jumping. The generous box is tall enough to reach it.",
-    "Press <kbd>T</kbd> for the exact box and repeat both. From the same spots, the slash misses.",
-  ]}
-/>
 
 Fighting games keep hurtboxes [close to the model](https://glossary.infil.net/?t=Hurtbox), because every pixel you give one player you take from the other.
 

@@ -15,10 +15,12 @@ import { readingMinutes } from '../lib/learn';
 import { PERSON, PERSON_ID, ORGANIZATION, ORGANIZATION_ID, SITE_TITLE, SITE_DESCRIPTION, SITE_DESCRIPTION_ES, UI_STRINGS, SERIES, type SeriesId } from '../consts';
 import SeriesNav from '../components/blog/SeriesNav.astro';
 import { seriesHref, seriesUrl, seriesNodeId } from '../lib/series';
+import PlayableLab from '../components/blog/PlayableLab.astro';
+import { labMedia } from '../lib/lab-media';
 
 type Props = CollectionEntry<'blog'>['data'];
 
-const { title, description, pubDate, updatedDate, reviewedDate, status, heroImage, heroImageAlt, tags, tldr, series, seriesOrder, lang = 'en' } = Astro.props;
+const { title, description, pubDate, updatedDate, reviewedDate, status, heroImage, heroImageAlt, tags, tldr, series, seriesOrder, videoHero, lang = 'en' } = Astro.props;
 
 // Effective last-modified for SEO: reviewedDate beats updatedDate beats publish.
 const effectiveDateModified = reviewedDate ?? updatedDate;
@@ -55,6 +57,9 @@ const seriesNode = seriesInfo
 		}
 	: undefined;
 const seriesPartIndex = seriesPosts.findIndex((p) => p.id === slug);
+// Video-first post: the clip opens the page; its poster is the LCP image.
+const heroMedia = videoHero ? labMedia(videoHero.plane ?? 'plataformas', videoHero.sheets) : undefined;
+const heroVideo = heroMedia?.hasVideo ? heroMedia : undefined;
 // Same helper the post cards use, so the header and every list agree.
 const readingTime = readingMinutes(currentPost?.body);
 const strings = UI_STRINGS[lang];
@@ -211,7 +216,7 @@ const relatedPosts = allPosts
 
 <html lang={lang}>
 	<head>
-		<BaseHead title={title} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} publishedTime={pubDate} modifiedTime={effectiveDateModified} tags={tags} markdownAlternate={markdownAlternate} />
+		<BaseHead title={title} description={description} image={ogImage} lang={lang} type="article" alternates={alternates} jsonLd={blogPostingJsonLd} publishedTime={pubDate} modifiedTime={effectiveDateModified} tags={tags} markdownAlternate={markdownAlternate} preloadImage={heroVideo?.videoPoster} video={heroVideo ? { url: heroVideo.video, width: 1280, height: 720 } : undefined} />
 	</head>
 
 	<body>
@@ -277,9 +282,23 @@ const relatedPosts = allPosts
 					<div class="article-utility">
 						<CopyPageButton markdownUrl={`/blog/${slug}.md`} lang={lang} />
 					</div>
-					<header class="article-header">
+					{/* Video-first: the series line for context, then the clip, then the article that explains it. */}
+					{videoHero && heroVideo && (
+						<div class="video-hero">
+							{seriesInfo && seriesPartIndex >= 0 && (
+								<p class="video-hero__context">
+									<a class="series-chip" href={seriesHref(series as SeriesId, lang)}>
+										<span class="series-chip__n">{lang === 'es' ? 'Serie' : 'Series'} · {seriesPartIndex + 1}/{seriesPosts.length}</span>
+										<span class="series-chip__name">{seriesInfo.name}</span>
+									</a>
+								</p>
+							)}
+							<PlayableLab variant="hero" {...videoHero} />
+						</div>
+					)}
+					<header class:list={['article-header', { 'article-header--after-video': !!heroVideo }]}>
 						<FreshnessLine pubDate={pubDate} reviewedDate={reviewedDate ?? updatedDate} status={status} lang={lang} />
-						{seriesInfo && seriesPartIndex >= 0 && (
+						{!heroVideo && seriesInfo && seriesPartIndex >= 0 && (
 							<a class="series-chip" href={seriesHref(series as SeriesId, lang)}>
 								<span class="series-chip__n">{lang === 'es' ? 'Serie' : 'Series'} · {seriesPartIndex + 1}/{seriesPosts.length}</span>
 								<span class="series-chip__name">{seriesInfo.name}</span>
@@ -538,6 +557,23 @@ const relatedPosts = allPosts
 		background: var(--color-accent-subtle);
 		border-radius: var(--radius-sm);
 		color: var(--color-accent-hover);
+	}
+
+	/* Video-first posts: the clip sits right under the nav, the series line above it. */
+	/* Block, not grid: PlayableLab centres itself with its own breakout margin. */
+	.video-hero {
+		margin-top: 0.25rem;
+	}
+	.video-hero__context {
+		display: flex;
+		justify-content: center;
+		margin: 0 0 0.4rem;
+	}
+	.video-hero .series-chip {
+		margin: 0;
+	}
+	.article-header--after-video {
+		padding-top: 0;
 	}
 
 	/* Series posts: a small link to the hub above the title. */

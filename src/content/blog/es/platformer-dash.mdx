@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 5
 seriesTitle: "Dash"
+videoHero: {"sheets": "dash", "title": "Dash", "videoNote": "Salto y dash en lo más alto sobre 8 casillas de pinchos, salto más dash hacia arriba en el muro de 6 casillas y un dash por el túnel de 1 casilla sobre un foso. Tras pulsar T, los mismos dashes pierden su pausa de 45 ms.", "steps": ["Corre hacia la derecha con <kbd>→</kbd>. Ante los ocho pinchos, salta con <kbd>Espacio</kbd> y, arriba del todo, haz el dash con <kbd>X</kbd>.", "En el muro de seis casillas, salta y haz el dash hacia arriba: mantén <kbd>↑</kbd> y pulsa <kbd>X</kbd> cerca de lo alto del salto.", "En el túnel de una casilla no hay sitio para saltar. Cruza el foso con un dash, <kbd>X</kbd>.", "Pulsa <kbd>T</kbd> y repite los tres. Las distancias no cambian, pero los dashes pierden su pausa de 45 ms, y una <kbd>X</kbd> pulsada justo antes de aterrizar ya no espera a la recarga."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -45,18 +46,6 @@ Un **dash** es un arranque corto a velocidad fija durante un tiempo fijo, con la
 <h2 id="what-is-a-dash">Dash: una distancia fija para diseñar niveles</h2>
 
 Velocidad, duración y dirección quedan fijadas al pulsar, así que nada puede doblar el dash una vez empieza. El dash en diagonal se normaliza y recorre las mismas 3,6 casillas a lo largo de la diagonal. Si saltas primero y haces el dash arriba del todo, el alcance pasa de 6,4 casillas a unas 9,5.
-
-<PlayableLab
-  sheets="dash"
-  title="Dash"
-  videoNote="Salto y dash en lo más alto sobre 8 casillas de pinchos, salto más dash hacia arriba en el muro de 6 casillas y un dash por el túnel de 1 casilla sobre un foso. Tras pulsar T, los mismos dashes pierden su pausa de 45 ms."
-  steps={[
-    "Corre hacia la derecha con <kbd>→</kbd>. Ante los ocho pinchos, salta con <kbd>Espacio</kbd> y, arriba del todo, haz el dash con <kbd>X</kbd>.",
-    "En el muro de seis casillas, salta y haz el dash hacia arriba: mantén <kbd>↑</kbd> y pulsa <kbd>X</kbd> cerca de lo alto del salto.",
-    "En el túnel de una casilla no hay sitio para saltar. Cruza el foso con un dash, <kbd>X</kbd>.",
-    "Pulsa <kbd>T</kbd> y repite los tres. Las distancias no cambian, pero los dashes pierden su pausa de 45 ms, y una <kbd>X</kbd> pulsada justo antes de aterrizar ya no espera a la recarga.",
-  ]}
-/>
 
 <h2 id="freeze-and-buffer">Pausa y buffer del dash: lo que apaga la T</h2>
 

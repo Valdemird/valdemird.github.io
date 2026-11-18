@@ -8,6 +8,7 @@ lang: es
 series: platformer-lab
 seriesOrder: 8
 seriesTitle: "Pendientes y floor snap"
+videoHero: {"sheets": "slopes", "title": "Pendientes y floor snap", "videoNote": "Baja las rampas corriendo y salta el foso justo donde acaba la pendiente. Después de T baja las cuestas a botes y muchas veces no tiene suelo debajo cuando necesita saltar.", "steps": ["Corre hacia la derecha con <kbd>→</kbd> por las dos colinas sin saltar. En la bajada el personaje va pegado a la rampa.", "Al pie de la segunda rampa, salta el foso de cuatro casillas con <kbd>Espacio</kbd> justo donde acaba la pendiente.", "Pulsa <kbd>T</kbd> y repítelo. El personaje baja las rampas a saltitos, y a veces el salto al borde del foso ni siquiera sale."]}
 ---
 
 import PlayableLab from '../../../components/blog/PlayableLab.astro';
@@ -29,17 +30,6 @@ En una rampa de 45° el suelo baja lo mismo que avanzas de lado, y la gravedad, 
 <h2 id="what-is-floor-snap">Floor snap: de vuelta a la rampa tras cada movimiento</h2>
 
 Tras cada movimiento, el floor snap mira hacia abajo hasta su longitud y deja al personaje sobre el suelo que encuentre. No se aplica mientras sube, así que los saltos funcionan como siempre, y es mucho más corto que una casilla de 40 px, así que salir andando de una cornisa de verdad sigue siendo caerse.
-
-<PlayableLab
-  sheets="slopes"
-  title="Pendientes y floor snap"
-  videoNote="Baja las rampas corriendo y salta el foso justo donde acaba la pendiente. Después de T baja las cuestas a botes y muchas veces no tiene suelo debajo cuando necesita saltar."
-  steps={[
-    "Corre hacia la derecha con <kbd>→</kbd> por las dos colinas sin saltar. En la bajada el personaje va pegado a la rampa.",
-    "Al pie de la segunda rampa, salta el foso de cuatro casillas con <kbd>Espacio</kbd> justo donde acaba la pendiente.",
-    "Pulsa <kbd>T</kbd> y repítelo. El personaje baja las rampas a saltitos, y a veces el salto al borde del foso ni siquiera sale.",
-  ]}
-/>
 
 <h2 id="how-to-implement">Cómo implementar el floor snap en pendientes</h2>
 
