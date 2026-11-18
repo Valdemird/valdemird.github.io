@@ -1,0 +1,247 @@
+---
+title: "Hitstop and hit confirmation: making a hit feel like it landed (with Godot code)"
+description: "Hitstop freezes the game for 50 ms when an attack connects; with recoil, a flash and sparks, the player knows they hit. How my Godot lab confirms a hit, the code for each layer, and what's left when T turns it all off."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 14
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+import InteractiveChart from '../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "Hit confirmation is everything the game does to tell you an attack connected. In my lab: 50 ms of hitstop, a recoil that pushes you back, a flash and a push on the target, sparks, a hit sound, a small camera shake and gamepad rumble.",
+  "Hitstop is the cheapest part of it. Across my recorded sessions, the freezes from connected swings added up to about 67 seconds in two and a half hours of active play: under 1%.",
+  "In Godot 4 a hitstop is Engine.time_scale = 0 plus a wall clock to end it, because with the time scale at zero the game's own timers stop too.",
+  "On sheet 03, T switches off three flags at once. The damage doesn't change. Everything that tells you about it does.",
+]} />
+
+Sheet 03 of my lab's combat blueprint is the only one where T switches off three flags at once: hitstop, recoil, and a third one that covers the flash, the push and the sparks. The damage doesn't change. Each slash still deals the same 1 point, and the sheet's note says what's left once you press T: the same damage, zero feeling.
+
+The recorded sessions say how often this matters. Of my 4,672 swings, 1,610 connected with something, and every one of them froze the game. In the 88 sessions that log active time (1,304 of those hits), the freezes add up to about 67 seconds in two and a half hours of play.
+
+<StatGrid columns={2} stats={[
+  { value: "50 ms", label: "Hitstop per hit", context: "3 frames at 60 fps; the combo finisher gets 90" },
+  { value: "170 px/s", label: "Recoil", context: "pushes the attacker back for 70 ms" },
+  { value: "1,610", label: "Swings that connected", context: "of 4,672 recorded, Nov 15–18" },
+  { value: "0.7%", label: "Active play spent frozen", context: "about 67 s in 2.5 h, as the lab measures active time" },
+]} />
+
+<Callout type="important" title="The thesis">
+Damage is an invisible number. Players believe what they see, hear and feel in their hands, and a hit that doesn't announce itself reads as a miss. Hit confirmation is the part of combat that tells the player the truth about the simulation.
+</Callout>
+
+<h2 id="what-is-hitstop">What is hitstop, and what is hit confirmation?</h2>
+
+**Hitstop** is a very short freeze at the moment an attack connects. [Infil's Fighting Game Glossary](https://glossary.infil.net/?t=Hitstop) defines it as an extremely brief pause "for dramatic effect", and says that when an attack feels "beefy", this is usually why. It also notes that hitstop sits outside a move's startup, active and recovery: the game puts everyone on hold while the hit lands. I covered the effect on its own, with a web demo, in the [game feel post](/blog/game-feel-on-the-web/#hitstop). In the combat lab it's real: 50 ms of frozen engine.
+
+**Hit confirmation** is the whole package: every signal that says "that one connected". Fighting games use [hit confirm](https://glossary.infil.net/?t=Hit+Confirm) for the player's side of it: seeing that your first attack hit and only then continuing the combo. Infil mentions players watching the health bar or listening for audio cues to react in time. That skill only exists if the game gives them something to react to, which is what this sheet is about.
+
+These are the channels my lab uses on a normal hit, and the flag behind each one:
+
+| Channel | On a normal hit | Flag |
+|---|---|---|
+| Time | 50 ms of hitstop (90 ms on the finisher) | `combat_hitstop` |
+| Attacker | recoil, 170 px/s for 70 ms | `attack_recoil` |
+| Target | flash, a 240 px/s push and a short stun; the dummy swings on a spring instead | `hit_flash` |
+| Particles | 6 sparks from the impact point, along the direction of the hit | `hit_flash` |
+| Sound | a dry hit, different from the whoosh of a slash at the air | `hit_flash` |
+| Camera and pad | a small shake, and rumble if you play with a gamepad | `hit_flash` |
+
+On sheet 03 there's a training dummy first and two patrolling enemies after a low block. Hit all three, then press T and hit them again.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_confirm"
+  title="Hit confirmation"
+  videoNote="Slashes the dummy with hit confirmation on: hit stop, recoil, flash and sparks. After T the same hits land with none of that, and it's hard to tell they landed."
+  steps={[
+    "Walk right with <kbd>→</kbd> and slash the training dummy with <kbd>C</kbd>. Freeze, flash, sparks, and you slide back a little.",
+    "Hop the low block with <kbd>Space</kbd> and hit the two patrolling enemies. Each hit pushes them away and pushes you back.",
+    "Press <kbd>T</kbd> and do it all again. Same damage, no freeze, no flash, no push.",
+    "With the technique still off, keep slashing an enemy while you walk into it, and watch where you end up.",
+  ]}
+/>
+
+<h2 id="hitstop-godot">How to code hitstop in Godot 4</h2>
+
+The simplest freeze in Godot is `Engine.time_scale = 0.0`. The catch is ending it. With the time scale at zero, every timer and every `delta` in the game stops, including whatever you'd use to unfreeze. My lab's `Juice` autoload ends the freeze by checking the wall clock in `_process`, which still gets called while the game's delta is zero. Its node is also set to `PROCESS_MODE_ALWAYS`, so it keeps processing even when the game is paused. The comments are in Spanish because the whole project is.
+
+<CodeBlock filename="addons/platformer_kit/autoload/juice.gd">
+```gdscript
+func _enter_tree() -> void:
+	# Debe seguir procesando aunque el juego esté en pausa o congelado.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+# ...
+## HIT STOP: congela el juego unas centésimas para dar peso a un impacto.
+## 30–80 ms bastan; más de 120 ms se siente como un tirón.
+func hitstop(seconds: float) -> void:
+	if not Lab.on(&"juice_hitstop") or seconds <= 0.0:
+		return
+	# Usamos reloj real: con time_scale = 0 los temporizadores del juego no avanzan.
+	_freeze_until_msec = maxi(_freeze_until_msec, Time.get_ticks_msec() + int(seconds * 1000.0))
+	_frozen = true
+	Engine.time_scale = 0.0
+
+
+func _process(_delta: float) -> void:
+	if _frozen and Time.get_ticks_msec() >= _freeze_until_msec:
+		_frozen = false
+		Engine.time_scale = Lab.game_speed
+```
+</CodeBlock>
+
+The `maxi` matters. Two hits on the same tick don't add up their freezes; the longer one wins. A slash through two dummies freezes for 50 ms, not 100.
+
+<h3 id="who-does-what">Who reacts to a hit</h3>
+
+The simulation never calls any of this directly. The hitbox announces that a hit was resolved, with its point, direction and result, and three different places react: a presentation node for the juice, the victim for its own push and stun, and the attacker for its recoil. That split is what lets one key switch it all off without touching the damage.
+
+<Tabs labels={["Presentation", "Victim", "Attacker", "The T key"]}>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/fx/combat_feedback.gd">
+```gdscript
+	# EL REMATE SE NOTA MÁS: más pausa, más sacudida, más chispas (el golpe que
+	# cierra el combo es un compromiso, y acertarlo tiene que saber a premio).
+	var heavy := hit.attack == &"remate"
+	if Lab.on(&"combat_hitstop"):
+		Juice.hitstop(combat.params.finisher_hit_stop if heavy else combat.params.hit_stop)
+	if not Lab.on(&"hit_flash"):
+		return
+	Sfx.play(&"hit", 2.0 if heavy else 0.0, 0.85 if heavy else 1.0)
+	Juice.shake(0.24 if heavy else 0.13)
+	Juice.rumble(0.25, 0.6 if heavy else 0.35, 0.12 if heavy else 0.08)
+	fx.sparks(at, hit.direction, 11 if heavy else 6, BP.ACCENT, 420.0 if heavy else 330.0, 0.9 if heavy else 0.7)
+	fx.ring(at, 20.0, BP.ACCENT, 0.18)
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+The push and the stun sit behind `hit_flash` too. With T, the enemy doesn't react at all: it keeps walking into you.
+
+<CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
+```gdscript
+func _on_damaged(hit: Hit) -> void:
+	_pips = PIPS_TIME
+	if not Lab.on(&"hit_flash"):
+		return
+	# DESTELLO + EMPUJÓN + ATURDIMIENTO: la respuesta del enemigo al golpe.
+	flash = 1.0
+	var push := hit.knockback * (1.0 - knockback_resistance)
+	if push > 0.0:
+		if flying:
+			velocity = hit.direction * push
+		elif hit.direction.x != 0.0:
+			velocity.x = hit.direction.x * push
+	if hit_stun > 0.0 and not _has_poise():
+		_stun = hit_stun
+		_interrupted()
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+	# ...
+	elif attack_dir.x != 0.0:
+		# RETROCESO: separa al atacante. Sin él, golpear corriendo te mete dentro
+		# del enemigo y el daño por contacto castiga un golpe bien dado.
+		if Lab.on(&"attack_recoil"):
+			var speed := params.recoil_speed * (params.blocked_recoil_mult if blocked else 1.0)
+			player.nudge(-attack_dir.x * speed, params.recoil_lock_time)
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/autoload/combat.gd">
+```gdscript
+## Las tres capas de "que se note que has dado", alternables de golpe.
+const HIT_CONFIRM_FLAGS: Array[StringName] = [&"combat_hitstop", &"attack_recoil", &"hit_flash"]
+	# ...
+	Lab.register_group(&"hit_confirm", "Confirmación de golpe", HIT_CONFIRM_FLAGS)
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+The recoil deserves its own line. Bodies in my lab don't collide with each other (the [hitbox vs hurtbox post](/blog/hitbox-vs-hurtbox/) explains why), so a slash thrown at a run would carry you straight into the enemy's contact box. The comment in the code puts it bluntly: without the recoil, the enemy's contact damage punishes a hit you landed.
+
+<h2 id="hitstop-hierarchy">Getting hit should weigh more than hitting</h2>
+
+The freezes aren't all the same length. `CombatFeedback` opens with a rule: taking damage weighs more than killing, killing more than hitting, hitting more than being blocked. The player's own mistake has to land harder than their success, or they don't register it.
+
+<InteractiveChart
+  type="horizontal"
+  title="Hitstop by event, in ms"
+  story="Your own mistake freezes the game the longest. A hit that bounces off a guard, the shortest."
+  unit=" ms"
+  data={[
+    { label: "Taking a hit", value: 110 },
+    { label: "Finisher connects", value: 90 },
+    { label: "Enemy dies", value: 80 },
+    { label: "Normal hit", value: 50 },
+    { label: "Hit blocked by a guard", value: 40 },
+  ]}
+  annotations={[{ targetIndex: 0, text: "more than twice a normal hit", emphasize: true }]}
+  source="Values from CombatParams and CombatFeedback in my lab. The finisher is the third hit of the combo; the blocked hit is 0.8 × the normal one."
+/>
+
+The blocked hit has a name of its own in fighting games: [blockstop](https://glossary.infil.net/?t=Blockstop), the same pause for a move that gets blocked. My lab confirms the contact but changes the material. It sounds like metal instead of flesh, the sparks fly back toward you, and the recoil is 1.9 times stronger, so the failure is felt in your hands.
+
+Freeze frames aren't only for combat, either. Celeste has no attack button, and its player code still calls `Celeste.Freeze(.05f)` at the start of every dash, the same 50 ms as my hitstop, and `Celeste.Freeze(.1f)` with a strong rumble when something launches the player away.<Sidenote>Both calls are in [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), the player code the Celeste team put on GitHub: `DashBegin()` and `ExplodeLaunch()`.</Sidenote>
+
+<h2 id="when-to-use">When hit confirmation helps, and when it doesn't</h2>
+
+| Situation | What to do |
+|---|---|
+| Melee hits on enemies | Every channel. This is what it was built for. |
+| A finisher or a heavy hit | More of everything: 90 ms instead of 50, a bigger shake, 11 sparks instead of 6. |
+| A blocked hit | Confirm the contact, change the material: a metal sound, a shorter freeze, a bigger recoil. |
+| Several hits on the same tick | Keep the longest pending freeze instead of adding them. One slash through two targets is one impact. |
+| A freeze over about 120 ms | Careful. The comment in `Juice` says that past 120 ms it feels like a hitch instead of a hit. |
+| The player getting hit | The biggest of all: 110 ms, the strongest shake and rumble. The mistake has to be unmistakable. |
+
+<Collapsible title="What exactly T turns off on sheet 03">
+T toggles the three flags in `HIT_CONFIRM_FLAGS` together: `combat_hitstop`, `attack_recoil` and `hit_flash`. With all three off, a hit still deals its damage and still fills the energy bar. What disappears is every way of noticing it: no freeze, no recoil, no flash, no push or stun on the enemy, no sparks, no hit sound, no shake, no rumble.
+
+Two things stay. The whoosh of the slash plays whether it connects or not, because it belongs to the swing, not to the hit. And kills keep their own 80 ms freeze, sound and burst, because the death is outside the bundle. With the technique off, the last hit on an enemy is the only one you can be sure of.
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="how-long-hitstop">How long should hitstop be?</h3>
+
+My lab uses 50 ms per hit (3 frames at 60 fps) and 90 for the finisher. Its own comments give 2 to 4 frames for a hit and 30 to 80 ms as the general range, with anything over 120 ms starting to feel like a hitch.
+
+<h3 id="hitstop-whole-game">Does hitstop freeze the whole game?</h3>
+
+In my lab, yes. `Engine.time_scale = 0` stops everything that runs on the game's clock (physics, movement, timers), and the wall clock decides when it ends. Infil describes it in fighting games as the game putting the characters on hold.
+
+<h3 id="why-recoil">Why push the attacker back when a hit lands?</h3>
+
+To separate them from the target. Without the recoil, a slash thrown while running carries you into the enemy and its contact damage punishes the hit you just landed. My lab pushes back at 170 px/s for 70 ms, and 1.9 times harder against a guard.
+
+<h3 id="hit-confirm-vs-hitstop">Is hit confirm the same as hitstop?</h3>
+
+No. Hitstop is one channel of it, the time one. In fighting games, hit confirm is also a player skill: noticing that a hit landed and continuing the combo. The game's confirmation is what that skill reacts to.
+
+Play sheet 03 with the technique off for a minute and watch your thumb. It starts pressing again after hits that already landed, just to make sure. That second press is what the confirmation was saving you.

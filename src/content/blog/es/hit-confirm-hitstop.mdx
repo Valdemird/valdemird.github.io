@@ -1,0 +1,247 @@
+---
+title: "Hitstop y confirmar el golpe: que se note que has dado (con código en Godot)"
+description: "El hitstop congela el juego 50 ms cuando un ataque conecta; con retroceso, destello y chispas, el jugador sabe que ha dado. Cómo confirma el golpe mi laboratorio en Godot, el código de cada capa y qué queda cuando T lo apaga."
+pubDate: 2026-11-18
+tags: ["game-feel", "diseño-de-juegos", "godot", "combate"]
+featured: false
+lang: es
+series: platformer-lab
+seriesOrder: 14
+---
+
+import TLDR from '../../../components/blog/TLDR.astro';
+import PlayableLab from '../../../components/blog/PlayableLab.astro';
+import StatGrid from '../../../components/blog/StatGrid.astro';
+import Callout from '../../../components/blog/Callout.astro';
+import CodeBlock from '../../../components/blog/CodeBlock.astro';
+import Collapsible from '../../../components/blog/Collapsible.astro';
+import Sidenote from '../../../components/blog/Sidenote.astro';
+import Tabs from '../../../components/blog/Tabs.astro';
+import TabPanel from '../../../components/blog/TabPanel.astro';
+import InteractiveChart from '../../../components/blog/InteractiveChart.astro';
+
+<TLDR bullets={[
+  "Confirmar el golpe es todo lo que hace el juego para decirte que un ataque conectó. En mi laboratorio: 50 ms de hitstop, un retroceso que te echa hacia atrás, un destello y un empujón en el objetivo, chispas, un sonido de impacto, una sacudida de cámara pequeña y vibración en el mando.",
+  "El hitstop es la parte más barata. En mis partidas grabadas, las congelaciones de los golpes que conectaron suman unos 67 segundos en dos horas y media de juego activo: menos del 1 %.",
+  "En Godot 4 un hitstop es Engine.time_scale = 0 más un reloj real para terminarlo, porque con la escala de tiempo a cero los temporizadores del juego también se paran.",
+  "En la lámina 03, la T apaga tres banderas a la vez. El daño no cambia. Cambia todo lo que te lo cuenta.",
+]} />
+
+La lámina 03 del plano de combate de mi laboratorio es la única en la que la T apaga tres banderas a la vez: el hitstop, el retroceso y una tercera que agrupa el destello, el empujón y las chispas. El daño no cambia. Cada tajo sigue quitando el mismo punto, y la nota de la lámina dice qué queda cuando pulsas T: el mismo daño, cero sensación.
+
+Las partidas grabadas dicen cuántas veces importa esto. De mis 4.672 golpes, 1.610 conectaron con algo, y cada uno congeló el juego. En las 88 partidas que apuntan el tiempo activo (1.304 de esos golpes), las congelaciones suman unos 67 segundos en dos horas y media de juego.
+
+<StatGrid columns={2} stats={[
+  { value: "50 ms", label: "Hitstop por golpe", context: "3 frames a 60 fps; el remate del combo, 90" },
+  { value: "170 px/s", label: "Retroceso", context: "empuja al atacante hacia atrás durante 70 ms" },
+  { value: "1.610", label: "Golpes que conectaron", context: "de 4.672 grabados, 15–18 nov" },
+  { value: "0,7 %", label: "Juego activo congelado", context: "unos 67 s en 2,5 h, según mide el laboratorio el tiempo activo" },
+]} />
+
+<Callout type="important" title="La tesis">
+El daño es un número invisible. El jugador cree lo que ve, lo que oye y lo que siente en las manos, y un golpe que no se anuncia se lee como un fallo. Confirmar el golpe es la parte del combate que le cuenta al jugador la verdad de la simulación.
+</Callout>
+
+<h2 id="what-is-hitstop">¿Qué es el hitstop y qué es confirmar el golpe?</h2>
+
+El **hitstop** es una congelación muy corta en el instante en que un ataque conecta. El [glosario de juegos de pelea de Infil](https://glossary.infil.net/?t=Hitstop) lo define como una pausa brevísima con efecto dramático, y dice que cuando un ataque se siente contundente ("beefy"), suele ser por esto. También explica que el hitstop queda fuera de la anticipación, el activo y la recuperación del movimiento: el juego deja a todos en espera mientras el golpe entra. Ya conté el efecto por separado, con una demo para la web, en el [post de game feel](/blog/es/game-feel-on-the-web/#hitstop). En el laboratorio de combate es de verdad: 50 ms de motor congelado.
+
+**Confirmar el golpe** es el paquete entero: cada señal que dice "ese entró". Los juegos de pelea llaman [hit confirm](https://glossary.infil.net/?t=Hit+Confirm) a la parte del jugador: ver que tu primer ataque conectó y solo entonces seguir con el combo. Infil cuenta que hay jugadores que miran la barra de vida o escuchan pistas de sonido para reaccionar a tiempo. Esa habilidad solo existe si el juego le da al jugador algo a lo que reaccionar, y de eso va esta lámina.
+
+Estos son los canales que usa mi laboratorio en un golpe normal, con la bandera que hay detrás de cada uno:
+
+| Canal | En un golpe normal | Bandera |
+|---|---|---|
+| Tiempo | 50 ms de hitstop (90 ms en el remate) | `combat_hitstop` |
+| Atacante | retroceso, 170 px/s durante 70 ms | `attack_recoil` |
+| Objetivo | destello, un empujón de 240 px/s y un aturdimiento corto; el maniquí, en cambio, oscila sobre un muelle | `hit_flash` |
+| Partículas | 6 chispas desde el punto de impacto, en la dirección del golpe | `hit_flash` |
+| Sonido | un impacto seco, distinto del silbido de un tajo al aire | `hit_flash` |
+| Cámara y mando | una sacudida pequeña, y vibración si juegas con mando | `hit_flash` |
+
+En la lámina 03 hay primero un maniquí y, pasado un bloque bajo, dos enemigos que patrullan. Golpea a los tres, luego pulsa T y vuelve a golpearlos.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_confirm"
+  title="Confirmar el golpe"
+  videoNote="Golpea al maniquí con la confirmación encendida: hitstop, retroceso, destello y chispas. Tras pulsar T, los mismos golpes entran sin nada de eso, y cuesta saber que han entrado."
+  steps={[
+    "Camina hacia la derecha con <kbd>→</kbd> y golpea al maniquí con <kbd>C</kbd>. Congelación, destello, chispas, y tú te deslizas un poco hacia atrás.",
+    "Salta el bloque bajo con <kbd>Espacio</kbd> y golpea a los dos enemigos que patrullan. Cada golpe los aparta a ellos y te echa atrás a ti.",
+    "Pulsa <kbd>T</kbd> y repítelo todo. El mismo daño, sin congelación, sin destello, sin empujón.",
+    "Con la técnica todavía apagada, sigue golpeando a un enemigo mientras caminas hacia él, y mira dónde acabas.",
+  ]}
+/>
+
+<h2 id="hitstop-godot">Cómo programar el hitstop en Godot 4</h2>
+
+La congelación más sencilla en Godot es `Engine.time_scale = 0.0`. La pega está en terminarla. Con la escala de tiempo a cero se paran todos los temporizadores y todos los `delta` del juego, incluido el que usarías para descongelar. El autoload `Juice` de mi laboratorio termina la congelación mirando el reloj real en `_process`, que se sigue llamando aunque el delta del juego valga cero. Su nodo además está en `PROCESS_MODE_ALWAYS`, así que sigue procesando incluso con el juego en pausa.
+
+<CodeBlock filename="addons/platformer_kit/autoload/juice.gd">
+```gdscript
+func _enter_tree() -> void:
+	# Debe seguir procesando aunque el juego esté en pausa o congelado.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+# ...
+## HIT STOP: congela el juego unas centésimas para dar peso a un impacto.
+## 30–80 ms bastan; más de 120 ms se siente como un tirón.
+func hitstop(seconds: float) -> void:
+	if not Lab.on(&"juice_hitstop") or seconds <= 0.0:
+		return
+	# Usamos reloj real: con time_scale = 0 los temporizadores del juego no avanzan.
+	_freeze_until_msec = maxi(_freeze_until_msec, Time.get_ticks_msec() + int(seconds * 1000.0))
+	_frozen = true
+	Engine.time_scale = 0.0
+
+
+func _process(_delta: float) -> void:
+	if _frozen and Time.get_ticks_msec() >= _freeze_until_msec:
+		_frozen = false
+		Engine.time_scale = Lab.game_speed
+```
+</CodeBlock>
+
+El `maxi` importa. Dos golpes en el mismo tic no suman sus congelaciones; gana la más larga. Un tajo que atraviesa dos maniquíes congela 50 ms, no 100.
+
+<h3 id="who-does-what">Quién reacciona a un golpe</h3>
+
+La simulación nunca llama a nada de esto directamente. La hitbox anuncia que un golpe se resolvió, con su punto, su dirección y su resultado, y reaccionan tres sitios distintos: un nodo de presentación para el jugo, la víctima para su propio empujón y su aturdimiento, y el atacante para su retroceso. Ese reparto es lo que permite que una sola tecla lo apague todo sin tocar el daño.
+
+<Tabs labels={["Presentación", "Víctima", "Atacante", "La tecla T"]}>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/fx/combat_feedback.gd">
+```gdscript
+	# EL REMATE SE NOTA MÁS: más pausa, más sacudida, más chispas (el golpe que
+	# cierra el combo es un compromiso, y acertarlo tiene que saber a premio).
+	var heavy := hit.attack == &"remate"
+	if Lab.on(&"combat_hitstop"):
+		Juice.hitstop(combat.params.finisher_hit_stop if heavy else combat.params.hit_stop)
+	if not Lab.on(&"hit_flash"):
+		return
+	Sfx.play(&"hit", 2.0 if heavy else 0.0, 0.85 if heavy else 1.0)
+	Juice.shake(0.24 if heavy else 0.13)
+	Juice.rumble(0.25, 0.6 if heavy else 0.35, 0.12 if heavy else 0.08)
+	fx.sparks(at, hit.direction, 11 if heavy else 6, BP.ACCENT, 420.0 if heavy else 330.0, 0.9 if heavy else 0.7)
+	fx.ring(at, 20.0, BP.ACCENT, 0.18)
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+El empujón y el aturdimiento también dependen de `hit_flash`. Con la T, el enemigo no reacciona en absoluto: sigue caminando hacia ti.
+
+<CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
+```gdscript
+func _on_damaged(hit: Hit) -> void:
+	_pips = PIPS_TIME
+	if not Lab.on(&"hit_flash"):
+		return
+	# DESTELLO + EMPUJÓN + ATURDIMIENTO: la respuesta del enemigo al golpe.
+	flash = 1.0
+	var push := hit.knockback * (1.0 - knockback_resistance)
+	if push > 0.0:
+		if flying:
+			velocity = hit.direction * push
+		elif hit.direction.x != 0.0:
+			velocity.x = hit.direction.x * push
+	if hit_stun > 0.0 and not _has_poise():
+		_stun = hit_stun
+		_interrupted()
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+	# ...
+	elif attack_dir.x != 0.0:
+		# RETROCESO: separa al atacante. Sin él, golpear corriendo te mete dentro
+		# del enemigo y el daño por contacto castiga un golpe bien dado.
+		if Lab.on(&"attack_recoil"):
+			var speed := params.recoil_speed * (params.blocked_recoil_mult if blocked else 1.0)
+			player.nudge(-attack_dir.x * speed, params.recoil_lock_time)
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/autoload/combat.gd">
+```gdscript
+## Las tres capas de "que se note que has dado", alternables de golpe.
+const HIT_CONFIRM_FLAGS: Array[StringName] = [&"combat_hitstop", &"attack_recoil", &"hit_flash"]
+	# ...
+	Lab.register_group(&"hit_confirm", "Confirmación de golpe", HIT_CONFIRM_FLAGS)
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+El retroceso merece una línea aparte. En mi laboratorio los cuerpos no chocan entre sí (el [post de hitbox y hurtbox](/blog/es/hitbox-vs-hurtbox/) explica por qué), así que un tajo dado a la carrera te mete de lleno en la caja de contacto del enemigo. El comentario del código lo dice sin rodeos: sin el retroceso, el daño por contacto castiga un golpe bien dado.
+
+<h2 id="hitstop-hierarchy">Recibir un golpe tiene que pesar más que darlo</h2>
+
+No todas las congelaciones duran lo mismo. `CombatFeedback` empieza con una regla: recibir daño pesa más que matar, matar más que golpear, y golpear más que ser bloqueado. El error del jugador tiene que pesar más que su acierto, o no lo registra.
+
+<InteractiveChart
+  type="horizontal"
+  title="Hitstop según el suceso, en ms"
+  story="Tu propio error es lo que más congela el juego. Un golpe que rebota en una guardia, lo que menos."
+  unit=" ms"
+  data={[
+    { label: "Recibir un golpe", value: 110 },
+    { label: "El remate conecta", value: 90 },
+    { label: "Muere un enemigo", value: 80 },
+    { label: "Golpe normal", value: 50 },
+    { label: "Golpe parado por una guardia", value: 40 },
+  ]}
+  annotations={[{ targetIndex: 0, text: "más del doble que un golpe normal", emphasize: true }]}
+  source="Valores de CombatParams y CombatFeedback de mi laboratorio. El remate es el tercer golpe del combo; el golpe bloqueado es 0,8 × el normal."
+/>
+
+El golpe bloqueado tiene nombre propio en los juegos de pelea: [blockstop](https://glossary.infil.net/?t=Blockstop), la misma pausa para un movimiento que se bloquea. Mi laboratorio confirma el contacto pero cambia el material. Suena a metal y no a carne, las chispas salen hacia ti, y el retroceso es 1,9 veces más fuerte, para que el fallo se note en las manos.
+
+Las congelaciones tampoco son exclusivas del combate. Celeste no tiene botón de ataque, y aun así su código del jugador llama a `Celeste.Freeze(.05f)` al empezar cada dash, los mismos 50 ms de mi hitstop, y a `Celeste.Freeze(.1f)` con una vibración fuerte cuando algo sale disparando al jugador.<Sidenote>Las dos llamadas están en [Player.cs](https://github.com/NoelFB/Celeste/blob/master/Source/Player/Player.cs), el código del jugador que el equipo de Celeste subió a GitHub: `DashBegin()` y `ExplodeLaunch()`.</Sidenote>
+
+<h2 id="when-to-use">Cuándo ayuda confirmar el golpe y cuándo no</h2>
+
+| Situación | Qué hacer |
+|---|---|
+| Golpes cuerpo a cuerpo contra enemigos | Todos los canales. Para esto se construyó. |
+| Un remate o un golpe pesado | Más de todo: 90 ms en vez de 50, más sacudida, 11 chispas en vez de 6. |
+| Un golpe bloqueado | Confirma el contacto y cambia el material: sonido de metal, congelación más corta, más retroceso. |
+| Varios golpes en el mismo tic | Quédate con la congelación pendiente más larga en vez de sumarlas. Un tajo que atraviesa a dos es un solo impacto. |
+| Una congelación de más de unos 120 ms | Cuidado. El comentario de `Juice` dice que a partir de 120 ms se siente como un tirón y no como un golpe. |
+| El jugador recibe un golpe | Lo más grande de todo: 110 ms, la sacudida y la vibración más fuertes. El error tiene que ser inconfundible. |
+
+<Collapsible title="Qué apaga exactamente la T en la lámina 03">
+La T alterna juntas las tres banderas de `HIT_CONFIRM_FLAGS`: `combat_hitstop`, `attack_recoil` y `hit_flash`. Con las tres apagadas, un golpe sigue haciendo su daño y sigue llenando la barra de energía. Lo que desaparece es cualquier forma de notarlo: ni congelación, ni retroceso, ni destello, ni empujón o aturdimiento en el enemigo, ni chispas, ni sonido de impacto, ni sacudida, ni vibración.
+
+Quedan dos cosas. El silbido del tajo suena conecte o no, porque es del golpe al aire y no del impacto. Y las muertes conservan su propia congelación de 80 ms, su sonido y su estallido, porque la muerte queda fuera del paquete. Con la técnica apagada, el último golpe a un enemigo es el único del que puedes estar seguro.
+</Collapsible>
+
+<h2 id="quick-answers">Respuestas rápidas</h2>
+
+<h3 id="how-long-hitstop">¿Cuánto debería durar el hitstop?</h3>
+
+Mi laboratorio usa 50 ms por golpe (3 frames a 60 fps) y 90 para el remate. Sus propios comentarios dan entre 2 y 4 frames para un golpe y entre 30 y 80 ms como rango general, y a partir de 120 ms empieza a sentirse como un tirón.
+
+<h3 id="hitstop-whole-game">¿El hitstop congela el juego entero?</h3>
+
+En mi laboratorio, sí. `Engine.time_scale = 0` para todo lo que corre con el reloj del juego (física, movimiento, temporizadores), y el reloj real decide cuándo termina. Infil lo describe en los juegos de pelea como el juego dejando a los personajes en espera.
+
+<h3 id="why-recoil">¿Por qué empujar hacia atrás al atacante cuando conecta?</h3>
+
+Para separarlo del objetivo. Sin el retroceso, un tajo dado corriendo te mete dentro del enemigo y su daño por contacto castiga el golpe que acabas de dar. Mi laboratorio te empuja a 170 px/s durante 70 ms, y 1,9 veces más fuerte contra una guardia.
+
+<h3 id="hit-confirm-vs-hitstop">¿Confirmar el golpe es lo mismo que el hitstop?</h3>
+
+No. El hitstop es uno de sus canales, el del tiempo. En los juegos de pelea, el hit confirm es además una habilidad del jugador: darse cuenta de que un golpe entró y seguir con el combo. La confirmación del juego es aquello a lo que esa habilidad reacciona.
+
+Juega un minuto a la lámina 03 con la técnica apagada y fíjate en tu pulgar. Empieza a pulsar otra vez después de golpes que ya habían entrado, por si acaso. Esa segunda pulsación es lo que la confirmación te estaba ahorrando.

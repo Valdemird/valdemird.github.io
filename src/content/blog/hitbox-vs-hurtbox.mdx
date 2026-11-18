@@ -1,0 +1,276 @@
+---
+title: "Hitbox vs hurtbox: the three boxes every character needs (with Godot code)"
+description: "A hitbox is where an attack deals damage, a hurtbox is where a character takes it, and the body only hits walls. Why my Godot lab makes the slash box bigger than the drawing and the player's hurtbox smaller."
+pubDate: 2026-11-18
+tags: ["game-feel", "game-design", "godot", "combat"]
+featured: false
+lang: en
+series: platformer-lab
+seriesOrder: 12
+---
+
+import TLDR from '../../components/blog/TLDR.astro';
+import PlayableLab from '../../components/blog/PlayableLab.astro';
+import StatGrid from '../../components/blog/StatGrid.astro';
+import Callout from '../../components/blog/Callout.astro';
+import CodeBlock from '../../components/blog/CodeBlock.astro';
+import Collapsible from '../../components/blog/Collapsible.astro';
+import Sidenote from '../../components/blog/Sidenote.astro';
+import Tabs from '../../components/blog/Tabs.astro';
+import TabPanel from '../../components/blog/TabPanel.astro';
+
+<TLDR bullets={[
+  "A hitbox is where an attack deals damage. A hurtbox is where a character can take it. A hit is one overlapping the other, and nothing else counts.",
+  "The body is a third box: it collides with floors and walls and never deals or takes damage.",
+  "None of the three should match the drawing. In my lab the slash box is 88×56 px (the exact one would be 48×28), and the player's hurtbox is 16×28 px inside a 24×36 body.",
+  "In Godot 4 they're two Area2D nodes on their own physics layers. The hitbox only detects, the hurtbox only gets detected, and there isn't a single team check in the code.",
+]} />
+
+Sheet 01 of my lab's combat blueprint is called TRES CAJAS, three boxes, and it draws them on every character: green where you can be hurt, red where you're hurting something, white where you bump into the world. None of them lines up with the drawing, and the sheet's own text says so in Spanish: "Ninguna coincide con el dibujo."
+
+Then I counted what hurt me. Across my recorded sessions I took 293 hits, and 147 of them, almost exactly half, came from touching an enemy that wasn't attacking. Every one of those was decided by a box that is 60% of the enemy's body.
+
+<StatGrid columns={2} stats={[
+  { value: "24×36", label: "Player body (px)", context: "collides with the world, deals and takes nothing" },
+  { value: "16×28", label: "Player hurtbox (px)", context: "smaller than the body: a graze doesn't count" },
+  { value: "88×56", label: "Slash hitbox (px)", context: "the exact box would be 48×28" },
+  { value: "147 of 293", label: "Hits from plain contact", context: "recorded Nov 15–18; the contact box is 60% of the body" },
+]} />
+
+<Callout type="important" title="The thesis">
+Boxes are rules, not a tracing of the art. Make every disagreement between box and drawing favor the player: their attack reaches further than the slash looks, their hurtbox is smaller than their body, and an enemy that's just walking around only hurts from its core.
+</Callout>
+
+<h2 id="what-is-a-hitbox-and-a-hurtbox">What is a hitbox and what is a hurtbox?</h2>
+
+A **hitbox** is the area where an attack can deal damage. A **hurtbox** is the area where a character can receive it. A hit happens when an attack's hitbox overlaps an opponent's hurtbox. That's the definition in [Infil's Fighting Game Glossary](https://glossary.infil.net/?t=Hitbox), which also gives the color convention most training modes use: hitboxes red, hurtboxes green. My lab draws them the same way.
+
+The third box is the **body**. Fighting games call it the [pushbox](https://glossary.infil.net/?t=Pushbox) or collision box, the space that keeps two characters from overlapping. In my lab the body is a `CharacterBody2D` that collides with floors and walls. It never deals damage and never takes it.
+
+Here is every box in the lab, next to what it covers on screen:
+
+| Box | Whose | Size | Against the drawing |
+|---|---|---|---|
+| Body | player | 24×36 px | it's the collision shape |
+| Hurtbox | player | 16×28 px (16×14 crouched) | smaller: a graze doesn't count |
+| Hitbox (slash) | player | 88×56 px, starts 8 px behind the center | bigger than the slash; the exact one is 48×28 |
+| Hurtbox | enemy | body + 6 px | bigger: easy to hit |
+| Hitbox (contact) | enemy | 60% of the body; almost all of it during a body attack | smaller: brushing past is free |
+| Hurtbox | training dummy | 34×56 px, no body at all | you can hit it from inside |
+
+On sheet 01 the boxes stay visible the whole time. The training dummies are the test. One stands on the floor, so you can walk back until your slash barely reaches it. Another stands on a one-tile pedestal, a little too high for an honest slash.
+
+<PlayableLab
+  plane="combate"
+  sheets="c_boxes"
+  title="Hitbox, hurtbox and body"
+  videoNote="Attacks the training dummies from the edge of reach. With the generous hitbox the slash lands; after T the same slashes from the same spot miss."
+  steps={[
+    "Walk right with <kbd>→</kbd> and slash the first training dummy with <kbd>C</kbd>. Green is where you can be hit, red is your slash while it's active, white is your body.",
+    "Step back with <kbd>←</kbd> until the slash barely reaches and attack again. The red box goes past the drawn slash, and it still lands.",
+    "At the dummy on the pedestal, attack from the floor without jumping. The generous box is tall enough to reach it.",
+    "Press <kbd>T</kbd> for the exact box and repeat both. From the same spots, the slash misses.",
+  ]}
+/>
+
+<h2 id="hitbox-hurtbox-godot">How to code hitboxes and hurtboxes in Godot 4</h2>
+
+Three nodes per character: a `CharacterBody2D` for the body and two `Area2D`, one for the hurtbox and one for the hitbox. What keeps the code short is how they use physics layers. The hurtbox is monitorable but doesn't monitor: it can only be found. The hitbox monitors, isn't monitorable, and has no layer at all, only a mask pointing at the other team's hurtbox layer. The comments are in Spanish because the whole project is.
+
+<Tabs labels={["Hitbox", "Hurtbox", "Layers"]}>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/core/hitbox.gd">
+```gdscript
+func _init() -> void:
+	monitoring = true
+	monitorable = false
+	collision_layer = 0
+	_shape.shape = RectangleShape2D.new()
+	add_child(_shape)
+
+
+func _ready() -> void:
+	collision_mask = CombatLayers.hurtbox_bit(CombatLayers.opponent(team))
+	if source == null:
+		source = get_parent()
+	add_to_group(&"hitboxes")
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/core/hurtbox.gd">
+```gdscript
+func _init() -> void:
+	monitoring = false
+	monitorable = true
+	collision_mask = 0
+	_shape.shape = RectangleShape2D.new()
+	add_child(_shape)
+
+
+func _ready() -> void:
+	collision_layer = CombatLayers.hurtbox_bit(team)
+	add_to_group(&"hurtboxes")
+```
+</CodeBlock>
+
+</TabPanel>
+<TabPanel>
+
+<CodeBlock filename="addons/combat_kit/core/combat_layers.gd">
+```gdscript
+## Máscara de bits de una capa (las capas se numeran desde 1).
+static func bit(layer: int) -> int:
+	return 1 << (layer - 1)
+
+
+## Capa en la que vive la hurtbox de un equipo.
+static func hurtbox_bit(team: Team) -> int:
+	return bit(PLAYER_HURTBOX if team == Team.PLAYER else ENEMY_HURTBOX)
+
+
+static func opponent(team: Team) -> Team:
+	return Team.ENEMY if team == Team.PLAYER else Team.PLAYER
+```
+</CodeBlock>
+
+</TabPanel>
+</Tabs>
+
+Layer 5 holds the player's hurtbox and layer 6 the enemies'. The player's slash masks layer 6, an enemy's attack masks layer 5, and so a hitbox can't even see its own team. There's no "is this an ally?" check anywhere, because the physics server never reports an ally in the first place.
+
+<h3 id="one-hit-per-activation">One hit per activation</h3>
+
+The other rule lives in the hitbox's physics loop. While the slash is active it asks Godot for every overlapping area, and each hurtbox goes on a list the moment it's hit. Without that list, a slash active for 100 ms would damage the same target on every physics tick: twelve times at the lab's 120 Hz.
+
+<CodeBlock filename="addons/combat_kit/core/hitbox.gd">
+```gdscript
+## Empiezan los frames activos: la lista de golpeados se vacía.
+func begin() -> void:
+	active = true
+	_already_hit.clear()
+
+
+func end() -> void:
+	active = false
+
+
+func _physics_process(_delta: float) -> void:
+	if not active or (Combat.hold and team != CombatLayers.Team.PLAYER):
+		return
+	for area in get_overlapping_areas():
+		var hurtbox := area as Hurtbox
+		if hurtbox == null or not hurtbox.enabled:
+			continue
+		if not continuous and hurtbox in _already_hit:
+			continue
+		var hit := _make_hit(hurtbox)
+		var result := hurtbox.receive(hit)
+		if result == Hurtbox.Result.IGNORED:
+			continue  # invulnerable: si la ventana sigue abierta, se reintenta
+		if not continuous:
+			_already_hit.append(hurtbox)
+		landed.emit(hurtbox, hit, result)
+		if not active:
+			return  # el dueño cerró la caja al reaccionar
+```
+</CodeBlock>
+
+`continuous` is the exception. An enemy's contact damage is always active and retries every tick, and what limits it is the player's invulnerability after taking a hit. The hitbox also doesn't decide what happens next. It emits `landed` and whoever owns it reacts: recoil, pogo, energy, sound.
+
+<h2 id="generous-hitbox">Generous with the player, stingy against them</h2>
+
+The generous slash comes from three numbers in `CombatParams`: 80 px of reach from the player's center instead of 60, 56 px thick instead of 28, and it starts 8 px behind the center so a point-blank slash still connects. The exact box, the one T switches to, starts at the front edge of the body, 12 px ahead of the center.
+
+<CodeBlock filename="addons/combat_kit/player/player_combat.gd">
+```gdscript
+## HITBOX GENEROSA: la caja del golpe es más larga y más gruesa que el trazo que
+## se dibuja, y empieza un poco por detrás del jugador. Nadie protesta porque un
+## golpe "casi" acierte; todos protestan cuando falla el que parecía dar.
+func _configure_slash(dir: Vector2) -> void:
+	var generous := Lab.on(&"generous_hitbox")
+	var reach := params.slash_reach if generous else params.slash_exact_reach
+	var thick := params.slash_thickness if generous else params.slash_exact_thickness
+	var back := params.slash_backreach if generous else -PlatformerPlayer.HALF_SIZE.x
+	# ...
+	var length := reach + back
+	var along := (reach - back) * 0.5
+	if dir.x != 0.0:
+		slash.set_rect(Vector2(length, thick), Vector2(dir.x * along, drop))
+	else:
+		slash.set_rect(Vector2(thick, length), Vector2(0.0, dir.y * along))
+```
+</CodeBlock>
+
+The pedestal on sheet 01 is that arithmetic in physical form. Standing on the floor, the player's center is 18 px up. The generous box, 56 px tall, reaches 46 px above the floor. The dummy on the pedestal starts at 40, so six of its pixels are inside the slash. The exact box is 28 px tall, stops at 32 px, and misses by eight.<Sidenote>Both boxes reach the pedestal sideways. The difference is purely vertical, which is why the sheet asks you to attack from the floor.</Sidenote>
+
+Enemies get the mirror image. Their hurtbox is 6 px bigger than their body, so hitting them is easy, and their contact box is 60% of the body while they're just walking. When they attack with the body itself, a charge or a jump, the box grows to the body minus 8 px. An attack has to be dodged for real. Brushing past one that's minding its own business doesn't cost you.
+
+<CodeBlock filename="addons/combat_kit/enemies/enemy.gd">
+```gdscript
+	# HURTBOX: algo mayor que el cuerpo — acertarle es fácil.
+	hurtbox = Hurtbox.new()
+	hurtbox.name = "Hurtbox"
+	hurtbox.team = CombatLayers.Team.ENEMY
+	hurtbox.health = health
+	hurtbox.set_rect(body_size + Vector2(6.0, 6.0), _body_shape.position)
+	add_child(hurtbox)
+# ...
+## DOS TAMAÑOS PARA LA CAJA DE CONTACTO. Tocar a un enemigo que anda a lo suyo
+## es un descuido pequeño: la caja es el núcleo del cuerpo (`contact_scale`) y
+## un roce —al pasarle por encima, al golpearlo de cerca— no cuenta. Un ataque
+## hecho con el cuerpo es otra cosa: mientras `contact.attack` lleva el nombre
+## de un ataque, la caja es casi el cuerpo entero.
+func _fit_contact(force: bool = false) -> void:
+	var attacking := contact.attack != &"contacto"
+	if attacking == _contact_attacking and not force:
+		return
+	_contact_attacking = attacking
+	var box := body_size - Vector2(8.0, 8.0) if attacking else body_size * contact_scale
+	contact.set_rect(box, _body_shape.position)
+```
+</CodeBlock>
+
+That 60% box is the busiest one in my data: 147 of the 293 hits I took were plain contact, and every one of them got through a box smaller than the enemy's drawing. The other 146 were real attacks and hazards.
+
+Fighting games aim the other way. Infil's [hurtbox entry](https://glossary.infil.net/?t=Hurtbox) says hurtboxes usually try to match the character model "pretty closely so things don't feel funky." That makes sense when both sides are people: every pixel you give one player, you take from the other. Against enemies run by the game there's nobody to be fair to, so my lab picks a side.
+
+<h2 id="when-to-use">When a generous box helps, and when it doesn't</h2>
+
+| Situation | Bigger or smaller than the drawing? |
+|---|---|
+| The player's attack | Bigger. As the code comment puts it, nobody complains when a slash that almost missed lands; everybody complains when one that looked like a hit misses. |
+| The player's hurtbox | Smaller. A graze that doesn't hurt feels like a close call; a graze that hurts feels like a bug. |
+| An enemy's hurtbox | A little bigger, so aiming is easy. |
+| An enemy's contact damage while it just walks | Much smaller. Touching it is a small mistake, and the box should treat it as one. |
+| An enemy's deliberate attack | Close to the full body. If the attack was announced, dodging it is the player's job. |
+| Two human players | Close to the model on both sides. Generosity to one is unfairness to the other. |
+
+<Collapsible title="Why the bodies don't push each other">
+In a fighting game the pushbox is what stops two characters from walking through each other. In my lab the bodies don't collide at all: the player's body only checks the world and one-way platforms, and enemy bodies only check the world. A player and an enemy can overlap freely.
+
+That's on purpose, and it moves the job somewhere else. Contact damage decides what happens when you overlap an enemy, and the recoil after a landed slash pushes you back out so you don't end up inside it. Without that push, a slash thrown at a run would carry you into the enemy's contact box and punish a hit you landed.
+</Collapsible>
+
+<h2 id="quick-answers">Quick answers</h2>
+
+<h3 id="hurtbox-same-as-hitbox">Is a hurtbox the same as a hitbox?</h3>
+
+No. The hitbox belongs to the attack and the hurtbox to whoever gets hit. Infil's glossary notes that people often say "hitbox" for both, which is how you end up with complaints about someone's "hitbox" that are really about their hurtbox.
+
+<h3 id="hitbox-match-sprite">Should the hitbox match the sprite?</h3>
+
+Not in a single-player action game. My slash box has about 3.7 times the area of the drawn slash (88×56 against 48×28 px), and my player's hurtbox is smaller than the body. Match the art only when fairness between two humans is the point.
+
+<h3 id="hit-multiple-times">How do I stop one attack from hitting the same target every frame?</h3>
+
+Keep a list of the hurtboxes the attack has already hit and clear it when the attack starts. In my lab that list lives in the hitbox: `begin()` empties it and every hit adds to it.
+
+<h3 id="hitbox-colors">What colors are hitboxes and hurtboxes?</h3>
+
+By convention, red hitboxes and green hurtboxes, which is what most fighting game training modes show according to Infil's glossary. My lab adds white for the body.
+
+Go back to sheet 01, press T and slash the dummy on the pedestal from the floor. The red box passes eight pixels under its feet. That's the exact box being faithful to the art, and from the controller it feels like a hit the game refused to count.
