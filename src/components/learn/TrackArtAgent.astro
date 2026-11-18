@@ -1,0 +1,213 @@
+---
+/**
+ * TrackArtAgent — what the agentic-systems course is about, in one picture:
+ * an agent is a loop. A token walks observe → think → act and back, and each
+ * phase lights up as it passes; the model sits in the middle.
+ *
+ * Decorative (the card around it carries the words), so aria-hidden. The walk
+ * is a CSS rotation of the token around the loop, only while the art is on screen (.is-live, set by the
+ * learn page's script) and not at all with reduced motion.
+ */
+interface Props {
+	lang: 'en' | 'es';
+}
+const { lang } = Astro.props;
+const es = lang === 'es';
+const L = es
+	? { observe: 'observa', think: 'piensa', act: 'actúa', model: 'modelo', tools: 'herramientas', context: 'contexto' }
+	: { observe: 'observe', think: 'think', act: 'act', model: 'model', tools: 'tools', context: 'context' };
+// One circle, centre (160,112), r 72. The phases sit at 0°, 120° and 240° clockwise
+// from the top; the token is a dot at the top of a group that spins around the centre.
+const C = { x: 160, y: 112, r: 72 };
+const at = (deg: number) => {
+	const a = (deg * Math.PI) / 180;
+	return { x: C.x + C.r * Math.sin(a), y: C.y - C.r * Math.cos(a) };
+};
+// Arrowheads halfway between phases, pointing along the clockwise tangent.
+const arrows = [60, 180, 300].map((deg) => {
+	const a = (deg * Math.PI) / 180;
+	const p = at(deg);
+	const t = { x: Math.cos(a), y: Math.sin(a) };
+	const n = { x: -Math.sin(a), y: Math.cos(a) };
+	const w = (k: number) => `${(p.x - 7 * t.x + k * 4.5 * n.x).toFixed(1)} ${(p.y - 7 * t.y + k * 4.5 * n.y).toFixed(1)}`;
+	return `M ${w(1)} L ${p.x.toFixed(1)} ${p.y.toFixed(1)} L ${w(-1)}`;
+});
+const nodes = [
+	{ key: 'observe', label: L.observe, ...at(0) },
+	{ key: 'think', label: L.think, ...at(120) },
+	{ key: 'act', label: L.act, ...at(240) },
+];
+---
+
+<div class="art art--agent" aria-hidden="true" data-track-art>
+	<svg viewBox="0 0 320 220" role="presentation">
+		<circle class="ring" cx="160" cy="112" r="72" />
+		{arrows.map((d) => <path class="arrow" d={d} />)}
+
+		<!-- Under the phases: the token slips into each one, which lights up, and comes out the other side. -->
+		<g class="orbit">
+			<circle class="token-halo" cx={C.x} cy={C.y - C.r} r="11" />
+			<circle class="token" cx={C.x} cy={C.y - C.r} r="5.5" />
+		</g>
+
+		{nodes.map((n) => (
+			<g class={`node node--${n.key}`}>
+				<rect x={n.x - 42} y={n.y - 14} width="84" height="28" rx="14" />
+				<text x={n.x} y={n.y + 4}>{n.label}</text>
+			</g>
+		))}
+
+		<g class="model">
+			<rect x="124" y="96" width="72" height="32" rx="8" />
+			<text x="160" y="116">{L.model}</text>
+		</g>
+		<!-- the context window filling as the loop turns -->
+		<g class="context">
+			<text x="20" y="206">{L.context}</text>
+			<rect class="context-track" x="78" y="199" width="222" height="7" rx="3.5" />
+			<rect class="context-fill" x="78" y="199" width="222" height="7" rx="3.5" />
+		</g>
+	</svg>
+</div>
+
+<style>
+	.art {
+		position: relative;
+		aspect-ratio: 16 / 11;
+		border-radius: var(--radius-md);
+		border: 1px solid var(--color-border);
+		background:
+			radial-gradient(60% 70% at 50% 45%, oklch(from var(--color-accent) l c h / 0.12), transparent 70%),
+			var(--color-surface);
+		overflow: hidden;
+		--loop: 4.8s;
+	}
+	svg {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+	}
+	.ring {
+		fill: none;
+		stroke: var(--color-border-strong);
+		stroke-width: 1.5;
+		stroke-dasharray: 3 5;
+	}
+	.arrow {
+		fill: none;
+		stroke: var(--color-text-muted);
+		stroke-width: 1.5;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+	.node rect {
+		fill: var(--color-surface);
+		stroke: var(--color-border-strong);
+		stroke-width: 1.5;
+	}
+	.node text,
+	.model text,
+	.context text {
+		font-family: var(--font-mono);
+		font-size: 12px;
+		text-anchor: middle;
+		fill: var(--color-text-secondary);
+	}
+	.context text {
+		font-size: 10px;
+		text-anchor: start;
+		fill: var(--color-text-muted);
+	}
+	.model rect {
+		fill: oklch(from var(--color-accent) l c h / 0.14);
+		stroke: var(--color-accent);
+		stroke-width: 1.5;
+	}
+	.model text {
+		fill: var(--color-accent);
+		font-weight: 600;
+	}
+	.context-track {
+		fill: var(--color-bg-secondary);
+	}
+	.context-fill {
+		fill: oklch(from var(--color-accent) l c h / 0.55);
+		transform-box: fill-box;
+		transform-origin: left center;
+		transform: scaleX(0.35);
+	}
+
+	.orbit {
+		transform-box: view-box;
+		transform-origin: 160px 112px;
+	}
+	.token {
+		fill: var(--color-accent);
+	}
+	.token-halo {
+		fill: oklch(from var(--color-accent) l c h / 0.22);
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.is-live .orbit {
+			animation: spin var(--loop) linear infinite;
+		}
+		.is-live .node rect {
+			animation: glow var(--loop) linear infinite;
+		}
+		.is-live .node--think rect {
+			animation-delay: calc(var(--loop) / -3 * 2);
+		}
+		.is-live .node--act rect {
+			animation-delay: calc(var(--loop) / -3);
+		}
+		.is-live .context-fill {
+			animation: fill calc(var(--loop) * 3) ease-in-out infinite;
+		}
+	}
+	/* Static picture for reduced motion: the token parked on "think". */
+	@media (prefers-reduced-motion: reduce) {
+		.orbit {
+			transform: rotate(120deg);
+		}
+		.node--think rect {
+			stroke: var(--color-accent);
+		}
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+	/* Lit while the token is within a sixth of the loop of the node (which sits at 0%). */
+	@keyframes glow {
+		0%,
+		12% {
+			stroke: var(--color-accent);
+			fill: oklch(from var(--color-accent) l c h / 0.16);
+		}
+		20%,
+		88% {
+			stroke: var(--color-border-strong);
+			fill: var(--color-surface);
+		}
+		96%,
+		100% {
+			stroke: var(--color-accent);
+			fill: oklch(from var(--color-accent) l c h / 0.16);
+		}
+	}
+	@keyframes fill {
+		0% {
+			transform: scaleX(0.12);
+		}
+		85% {
+			transform: scaleX(0.96);
+		}
+		100% {
+			transform: scaleX(0.12);
+		}
+	}
+</style>
